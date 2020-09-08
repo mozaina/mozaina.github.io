@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>tffasterrcnn源码解析shellscripts | 开发者问答集锦</title>
+    <meta property="og:title" content="tffasterrcnn源码解析shellscripts - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="tffasterrcnn源码解析shellscripts">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/tffasterrcnn%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90shellscripts/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">tffasterrcnn源码解析shellscripts</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="tf-faster-rcnn-源码解析shell-scripts">tf-faster-rcnn 源码解析shell scripts</h1>
+
+<p>之前是用的faster rcnn原作者caffe版本的源码，因为一直换服务器，每次都编译一遍caffe着实麻烦，转战tensorflow版本的faster
+rcnn</p>
+
+<p>因为要用自己的数据，还要改部分模型，所以得搞清楚各种文件结构。首先搞懂模型命令行参数的输入以及数据、各种输出的路径。</p>
+
+<p>这里先看下shell脚本，在experiments/scrips中<br />
+train_faster_rcnn.sh（当然也可以不用shell脚本来运行，但就得输入大量参数）</p>
+
+<pre><code>#!/bin/bash
+
+set -x
+set -e
+
+export PYTHONUNBUFFERED=&quot;True&quot;
+#必须要输入的三个参数
+GPU_ID=$1
+DATASET=$2
+NET=$3
+
+#多余参数，用于自定义输出文件名称
+array=( $@ )
+len=${#array[@]}
+EXTRA_ARGS=${array[@]:3:$len}
+EXTRA_ARGS_SLUG=${EXTRA_ARGS// /_}
+#DATASET选项（只有pascal_voc,pascal_voc_0712.coco三个）
+case ${DATASET} in
+  pascal_voc)
+    #和factory.py中的__sets字典的key匹配才行
+    TRAIN_IMDB=&quot;voc_2007_trainval&quot;
+    TEST_IMDB=&quot;voc_2007_test&quot;
+    STEPSIZE=&quot;[50000]&quot;
+    #迭代的次数
+    ITERS=70000
+    #Anchor的比例和尺度
+    ANCHORS=&quot;[8,16,32]&quot;
+    RATIOS=&quot;[0.5,1,2]&quot;
+    ;;
+  pascal_voc_0712)
+    #同上面的 pacal_voc
+    TRAIN_IMDB=&quot;voc_2007_trainval+voc_2012_trainval&quot;
+    TEST_IMDB=&quot;voc_2007_test&quot;
+    STEPSIZE=&quot;[80000]&quot;
+    ITERS=110000
+    ANCHORS=&quot;[8,16,32]&quot;
+    RATIOS=&quot;[0.5,1,2]&quot;
+    ;;
+  coco)
+    TRAIN_IMDB=&quot;coco_2014_train+coco_2014_valminusminival&quot;
+    TEST_IMDB=&quot;coco_2014_minival&quot;
+    STEPSIZE=&quot;[350000]&quot;
+    ITERS=490000
+    ANCHORS=&quot;[4,8,16,32]&quot;
+    RATIOS=&quot;[0.5,1,2]&quot;
+    ;;
+  *)
+    echo &quot;No dataset given&quot;
+    exit
+    ;;
+esac
+
+#训练输出日志路径
+LOG=&quot;experiments/logs/${NET}_${TRAIN_IMDB}_${EXTRA_ARGS_SLUG}_${NET}.txt.`date +'%Y-%m-%d_%H-%M-%S'`&quot;
+exec &amp;&gt; &gt;(tee -a &quot;$LOG&quot;)
+echo Logging output to &quot;$LOG&quot;
+
+#可以理解为训练完模型输出路径吧。（...没有传进trainval_bet.py,真正的输出路径是在lib/model/config.py中定义）
+set +x
+if [[ ! -z  ${EXTRA_ARGS_SLUG}  ]]; then
+  NET_FINAL=output/${NET}/${TRAIN_IMDB}/${EXTRA_ARGS_SLUG}/${NET}_faster_rcnn_iter_${ITERS}.ckpt
+else
+  NET_FINAL=output/${NET}/${TRAIN_IMDB}/default/${NET}_faster_rcnn_iter_${ITERS}.ckpt
+fi
+set -x
+
+if [ ! -f ${NET_FINAL}.index ]; then
+  if [[ ! -z  ${EXTRA_ARGS_SLUG}  ]]; then
+    CUDA_VISIBLE_DEVICES=${GPU_ID} time python ./tools/trainval_net.py \
+      #pretrain权重
+      --weight data/imagenet_weights/${NET}.ckpt \
+      --imdb ${TRAIN_IMDB} \
+      --imdbval ${TEST_IMDB} \
+      --iters ${ITERS} \
+      --cfg experiments/cfgs/${NET}.yml \
+      --tag ${EXTRA_ARGS_SLUG} \
+      --net ${NET} \
+      --set ANCHOR_SCALES ${ANCHORS} ANCHOR_RATIOS ${RATIOS} \
+      TRAIN.STEPSIZE ${STEPSIZE} ${EXTRA_ARGS}
+  else
+    CUDA_VISIBLE_DEVICES=${GPU_ID} time python ./tools/trainval_net.py \
+      --weight data/imagenet_weights/${NET}.ckpt \
+      --imdb ${TRAIN_IMDB} \
+      --imdbval ${TEST_IMDB} \
+      --iters ${ITERS} \
+      --cfg experiments/cfgs/${NET}.yml \
+      --net ${NET} \
+      --set ANCHOR_SCALES ${ANCHORS} ANCHOR_RATIOS ${RATIOS} \
+      TRAIN.STEPSIZE ${STEPSIZE} ${EXTRA_ARGS}
+  fi
+fi
+
+#训练完了就直接测试（不测试就删除这句）
+./experiments/scripts/test_faster_rcnn.sh $@
+</code></pre>
+
+<p>在shell脚本中直接定义好各种参数，直接运行shell命令，就不必再运行trainval_net.py时，输入大量的参数（而且还容易忘记输的是啥）。<br />
+所以，要自定义模型训练的一些参数和数据集的时候，还要修改这里的shell scripts<br />
+下面分析下这个脚本。</p>
+
+<p><strong>参数</strong> （按顺序）<br />
+GPU_ID，这个没什么好说的。<br />
+DATASET，在源码中，case选项里面只有pascal_voc, pascal_voc_0712,
+coco三个选项，所以只能输入这三个中的一个。（注意，如果使用coco数据集，需要安装cocoAPI）<br />
+如果想要使用自己的数据集，除了修改这里的shell命令，还需要在factory.py的字典__sets{}中添加内容，还需根据自己的数据格式建立dataname.py来重载imdb类。（这个之后的博客会继续总结）<br />
+Net<br />
+1、Net参数再源码中从trainval_net.py来看，有vgg16, res101，mobilenet。因为在lib/nets中只有这几个模型。<br />
+2、预训练的模型需要放在data/imagenet_weights下，模型名是Net.ckpt（当然，不怕出错可以改路径）<br />
+3、cfg 在experiments/cfgs下，以Net.yml命名，如果<br />
+需要其他的预训练的模型，需添加。</p>
+
+<p>所以，综上，如果要训练网络，需要：<br />
+1、下载好预训练的模型，并放在data/imagenet_weights下，并以net.ckpt命名。以下是例子（来自github)<br />
+For vgg16</p>
+
+<pre><code>mkdir -p data/imagenet_weights
+cd data/imagenet_weights
+wget -v http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz
+tar -xzvf vgg_16_2016_08_28.tar.gz
+mv vgg_16.ckpt vgg16.ckpt
+cd ../..
+</code></pre>
+
+<p>For res101</p>
+
+<pre><code>mkdir -p data/imagenet_weights
+cd data/imagenet_weights
+wget -v http://download.tensorflow.org/models/resnet_v1_101_2016_08_28.tar.gz
+tar -xzvf resnet_v1_101_2016_08_28.tar.gz
+mv resnet_v1_101.ckpt res101.ckpt
+cd ../..
+</code></pre>
+
+<p>2、运行shell脚本</p>
+
+<pre><code>./experiments/scripts/train_faster_rcnn.sh [GPU_ID] [DATASET] [NET]
+# GPU_ID is the GPU you want to test on
+# NET in {vgg16, res50, res101, res152} is the network arch to use
+# DATASET {pascal_voc, pascal_voc_0712, coco} is defined in train_faster_rcnn.sh
+# Examples:
+./experiments/scripts/train_faster_rcnn.sh 0 pascal_voc vgg16
+./experiments/scripts/train_faster_rcnn.sh 1 coco res101
+</code></pre>
+
+<p>同样，综上，如果想要增加一个新的分类网络作为基础网络，需要做的是：<br />
+1、在lib/nets中添加新的网络.py，并在trainval_net.py和test_net.py中添加相应的选项。<br />
+2、在data/imagenet_weiights文件下添加相应的预训练的模型，名称是Net.ckpt<br />
+3、在experiments/cfgs下添加相应的配置文件，名称是Net.yml<br />
+4、按上面命令训练</p>
+
+<p>下面是测试的shell脚本，在experiments/scripts/test_faster_rcnn.py</p>
+
+<pre><code>#!/bin/bash
+
+set -x
+set -e
+
+export PYTHONUNBUFFERED=&quot;True&quot;
+
+#执行shell脚本时，必须要输入的三个参数
+GPU_ID=$1
+DATASET=$2
+NET=$3
+
+array=( $@ )
+len=${#array[@]}
+#多余的参数（可以不输入）用来命名输出文件
+EXTRA_ARGS=${array[@]:3:$len}
+EXTRA_ARGS_SLUG=${EXTRA_ARGS// /_}
+
+#输入的第二个参数DATASET必须在以下选项中，如果需要用自己的数据，则需要添加选项（除非不用这个脚本来运行）
+case ${DATASET} in
+  pascal_voc)
+    TRAIN_IMDB=&quot;voc_2007_trainval&quot;
+    TEST_IMDB=&quot;voc_2007_test&quot;
+    #注意，这里的iters不能随便给，必须是有训练好的模型。
+    ITERS=70000
+    ANCHORS=&quot;[8,16,32]&quot;
+    RATIOS=&quot;[0.5,1,2]&quot;
+    ;;
+  pascal_voc_0712)
+    TRAIN_IMDB=&quot;voc_2007_trainval+voc_2012_trainval&quot;
+    TEST_IMDB=&quot;voc_2007_test&quot;
+    ITERS=110000
+    ANCHORS=&quot;[8,16,32]&quot;
+    RATIOS=&quot;[0.5,1,2]&quot;
+    ;;
+  coco)
+    TRAIN_IMDB=&quot;coco_2014_train+coco_2014_valminusminival&quot;
+    TEST_IMDB=&quot;coco_2014_minival&quot;
+    ITERS=490000
+    ANCHORS=&quot;[4,8,16,32]&quot;
+    RATIOS=&quot;[0.5,1,2]&quot;
+    ;;
+  *)
+    echo &quot;No dataset given&quot;
+    exit
+    ;;
+esac
+
+#测试日志路径
+LOG=&quot;experiments/logs/test_${NET}_${TRAIN_IMDB}_${EXTRA_ARGS_SLUG}.txt.`date +'%Y-%m-%d_%H-%M-%S'`&quot;
+exec &amp;&gt; &gt;(tee -a &quot;$LOG&quot;)
+echo Logging output to &quot;$LOG&quot;
+
+set +x
+#用于测试的model的路径名。
+#有输入EXTRA_ARGS
+if [[ ! -z  ${EXTRA_ARGS_SLUG}  ]]; then
+  NET_FINAL=output/${NET}/${TRAIN_IMDB}/${EXTRA_ARGS_SLUG}/${NET}_faster_rcnn_iter_${ITERS}.ckpt
+#没有输入EXTRA_ARGS
+else
+  NET_FINAL=output/${NET}/${TRAIN_IMDB}/default/${NET}_faster_rcnn_iter_${ITERS}.ckpt
+fi
+set -x
+
+#这里运行test_net.py，并设置好参数。
+#有输入EXTRA_ARGS
+if [[ ! -z  ${EXTRA_ARGS_SLUG}  ]]; then
+  CUDA_VISIBLE_DEVICES=${GPU_ID} time python ./tools/test_net.py \
+    --imdb ${TEST_IMDB} \
+    #使用训练好的模型
+    --model ${NET_FINAL} \
+    --cfg experiments/cfgs/${NET}.yml \
+    --tag ${EXTRA_ARGS_SLUG} \
+    --net ${NET} \
+    --set ANCHOR_SCALES ${ANCHORS} ANCHOR_RATIOS ${RATIOS} \
+          ${EXTRA_ARGS}
+#没有输入EXTRA_ARGS
+else
+  CUDA_VISIBLE_DEVICES=${GPU_ID} time python ./tools/test_net.py \
+    --imdb ${TEST_IMDB} \
+    --model ${NET_FINAL} \
+    --cfg experiments/cfgs/${NET}.yml \
+    --net ${NET} \
+    --set ANCHOR_SCALES ${ANCHORS} ANCHOR_RATIOS ${RATIOS} \
+          ${EXTRA_ARGS}
+fi
+</code></pre>
+
+<p>从上面看，test使用的model文件名的名称和train生成的文件名的名称格式是一样的,这样就很方便测试了。<br />
+如果要测试某个训练好的模型，需要的参数和训练时一样，但是需要把训练好的模型放在相应的位置（或者建立软连接）</p>
+
+<p>所以，如果要测试一个训练好的模型，需要做：<br />
+1、建立软连接，将训练好的model连接到output/NET/TRAIN_IMDB/default下，<br />
+命名为：{NET} _faster_rcnn<em>iter</em> ${ITERS}.ckpt</p>
+
+<pre><code>NET=res101
+TRAIN_IMDB=voc_2007_trainval+voc_2012_trainval
+mkdir -p output/${NET}/${TRAIN_IMDB}
+cd output/${NET}/${TRAIN_IMDB}
+ln -s ../../../data/voc_2007_trainval+voc_2012_trainval ./default
+cd ../../..
+</code></pre>
+
+<p>2、运行shell脚本</p>
+
+<pre><code>GPU_ID=0
+./experiments/scripts/test_faster_rcnn.sh $GPU_ID pascal_voc_0712 res101
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

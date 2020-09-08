@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本Debug方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本Debug方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本Debug方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%ACdebug%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本Debug方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>可能有的程序员在对程序调试的时候用printf或者echo将信息挨条打印出来，但是这比较麻烦，因为在交付的时候还要将这些语句一条条删除，下面对shell
+debug的方法稍微做一个总结：</p>
+
+<p>1、使用trap命令</p>
+
+<p>trap命令用于捕获指定的信号并执行预定义的命令。</p>
+
+<p>其基本的语法是:</p>
+
+<p>trap &lsquo;command&rsquo; signal</p>
+
+<p>其中signal是要捕获的信号，command是捕获到指定的信号之后，所要执行的命令。可以用kill
+–l命令看到系统中全部可用的信号名，捕获信号后所执行的命令可以是任何一条或多条合法的shell语句，也可以是一个函数名。</p>
+
+<p>shell脚本在执行时，会产生三个所谓的“伪信号”，(之所以称之为“伪信号”是因为这三个信号是由shell产生的，而其它的信号是由操作系统产生的)，通过使用trap命令捕获这三个“伪信号”并输出相关信息对调试非常有帮助。</p>
+
+<p>表 1. shell伪信号</p>
+
+<p>信号名 何时产生</p>
+
+<p>EXIT 从一个函数中退出或整个脚本执行完毕</p>
+
+<p>ERR 当一条命令返回非零状态时(代表命令执行不成功)</p>
+
+<p>DEBUG 脚本中每一条命令执行之前</p>
+
+<p>通过捕获EXIT信号,我们可以在shell脚本中止执行或从函数中退出时，输出某些想要跟踪的变量的值，并由此来判断脚本的执行状态以及出错原因,其使用方法是：</p>
+
+<p>trap &lsquo;command&rsquo; EXIT 或 trap &lsquo;command&rsquo; 0</p>
+
+<p>通过捕获ERR信号,我们可以方便的追踪执行不成功的命令或函数，并输出相关的调试信息，以下是一个捕获ERR信号的示例程序，其中的$LINENO是一个shell的内置变量，代表shell脚本的当前行号。</p>
+
+<p>$ cat -n exp1.sh</p>
+
+<p>1 ERRTRAP()</p>
+
+<p>2 {</p>
+
+<p>3 echo &ldquo;[LINE:$1] Error: Command or function exited with status $?&rdquo;</p>
+
+<p>4 }</p>
+
+<p>5 foo()</p>
+
+<p>6 {</p>
+
+<p>7 return 1;</p>
+
+<p>8 }</p>
+
+<p>9 trap &lsquo;ERRTRAP $LINENO&rsquo; ERR</p>
+
+<p>10 abc</p>
+
+<p>11 foo</p>
+
+<p>其输出结果如下：</p>
+
+<p>$ sh exp1.sh</p>
+
+<p>exp1.sh: line 10: abc: command not found</p>
+
+<p>[LINE:10] Error: Command or function exited with status 127</p>
+
+<p>[LINE:11] Error: Command or function exited with status 1</p>
+
+<p>在调试过程中，为了跟踪某些变量的值，我们常常需要在shell脚本的许多地方插入相同的echo语句来打印相关变量的值，这种做法显得烦琐而笨拙。而通过捕获DEBUG信号，我们只需要一条trap语句就可以完成对相关变量的全程跟踪。</p>
+
+<p>以下是一个通过捕获DEBUG信号来跟踪变量的示例程序:</p>
+
+<p>$ cat –n exp2.sh</p>
+
+<p>1 #!/bin/bash</p>
+
+<p>2 trap &lsquo;echo “before execute line:$LINENO, a=$a,b=$b,c=$c”&rsquo; DEBUG</p>
+
+<p>3 a=1</p>
+
+<p>4 if [ &ldquo;$a&rdquo; -eq 1 ]</p>
+
+<p>5 then</p>
+
+<p>6 b=2</p>
+
+<p>7 else</p>
+
+<p>8 b=1</p>
+
+<p>9 fi</p>
+
+<p>10 c=3</p>
+
+<p>11 echo &ldquo;end&rdquo;</p>
+
+<p>其输出结果如下：</p>
+
+<p>$ sh exp2.sh</p>
+
+<p>before execute line:3, a=,b=,c=</p>
+
+<p>before execute line:4, a=1,b=,c=</p>
+
+<p>before execute line:6, a=1,b=,c=</p>
+
+<p>before execute line:10, a=1,b=2,c=</p>
+
+<p>before execute line:11, a=1,b=2,c=3</p>
+
+<p>end</p>
+
+<p>从运行结果中可以清晰的看到每执行一条命令之后，相关变量的值的变化。同时，从运行结果中打印出来的行号来分析，可以看到整个脚本的执行轨迹，能够判断出哪些条件分支执行了，哪些条件分支没有执行。</p>
+
+<p>2、使用调试钩子</p>
+
+<p>if [ “$DEBUG” = “true” ]; then</p>
+
+<p>echo “debugging” #此处可以输出调试信息</p>
+
+<p>fi</p>
+
+<p>这样的代码块通常称之为“调试钩子”或“调试块”。在调试钩子内部可以输出任何您想输出的调试信息，使用调试钩子的好处是它是可以通过DEBUG变量来控制的，在脚本的开发调试阶段，可以先执行export
+DEBUG=true命令打开调试钩子，使其输出调试信息，而在把脚本交付使用时，也无需再费事把脚本中的调试语句一一删除。</p>
+
+<p>如果在每一处需要输出调试信息的地方均使用if语句来判断DEBUG变量的值，还是显得比较繁琐，通过定义一个DEBUG函数可以使植入调试钩子的过程更简洁方便。
+使用调试钩子.调试钩子实质上是自己定义的一个变量,如果这个变量为真,就会把调试信息作为参数传给某个定义的函数，然后在这个函数中执行此调试信息
+。也可将该语句写成一个函数，在想要调试的地方调用。</p>
+
+<p>1 DEBUG()</p>
+
+<p>2 {</p>
+
+<p>3 if [ &ldquo;$DEBUG&rdquo; == &ldquo;true&rdquo; ]; then</p>
+
+<p>4 $@ #此处执行传递给DEBUG的参数，在该程序中就是echo &ldquo;a=$a&rdquo;等</p>
+
+<p>5 fi</p>
+
+<p>6 }</p>
+
+<p>7 a=1</p>
+
+<p>8 DEBUG echo &ldquo;a=$a&rdquo;</p>
+
+<p>9 if [ &ldquo;$a&rdquo; -eq 1 ]</p>
+
+<p>10 then</p>
+
+<p>11 b=2</p>
+
+<p>12 else</p>
+
+<p>13 b=1</p>
+
+<p>14 fi</p>
+
+<p>15 DEBUG echo &ldquo;b=$b&rdquo;</p>
+
+<p>16 c=3</p>
+
+<p>17 DEBUG echo &ldquo;c=$c&rdquo;</p>
+
+<p>DEBUG中的语句还可简写为：[  &ldquo;$DEBUG&rdquo; == &ldquo;true&rdquo;  ] &amp;&amp; $@ || : # :代表什么也不做。</p>
+
+<p>除此之外还可以用 set -x 和set +x 来打开和关上调试信息，以及用tree或者如下方法</p>
+
+<p>sh-n 只读取shell脚本，但不实际执行</p>
+
+<p>sh-x 进入跟踪方式，显示所执行的每一条命令</p>
+
+<p>sh-c &ldquo;string&rdquo; 从strings中读取命令</p>
+
+<p>还有一种方法就是：把#!/bin/bash改为#!/bin/bash -xv，这样不用任何其他选项就可以启动调试功能了。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

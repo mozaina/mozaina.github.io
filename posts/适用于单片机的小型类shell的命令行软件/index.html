@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>适用于单片机的小型类shell的命令行软件 | 开发者问答集锦</title>
+    <meta property="og:title" content="适用于单片机的小型类shell的命令行软件 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="适用于单片机的小型类shell的命令行软件">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E9%80%82%E7%94%A8%E4%BA%8E%E5%8D%95%E7%89%87%E6%9C%BA%E7%9A%84%E5%B0%8F%E5%9E%8B%E7%B1%BBshell%E7%9A%84%E5%91%BD%E4%BB%A4%E8%A1%8C%E8%BD%AF%E4%BB%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">适用于单片机的小型类shell的命令行软件</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="在单片机中实现类似shell的命令行工具">在单片机中实现类似shell的命令行工具</h3>
+
+<p>如果在单片机编程过程中有一个类似linux的shell命令工具可以通过串口调试助手输入命令然后运行一些调试函数，将会为编程提供极大的帮助。</p>
+
+<p>本文旨在提供一个十分便于移植和十分简单有效的shell解决方法。<br />
+在移植时只需提供<code>shellGetChar</code>函数和<code>shellSendChar</code>函数，函数编写尽量简单、高效甚至可以简单的移植到类似51单片机这样的8位处理器上。</p>
+
+<p>首先编写shell最基础的东西，从串口获取到一行字符串，其特点如下。</p>
+
+<ol>
+<li>由’\r\n’ 或者’\n’结尾。</li>
+<li>在超级终端上输入字符需要再返回给终端</li>
+
+<li><p>需要对退格和删除键进行特殊处理</p>
+
+<p>#include &ldquo;shell.h&rdquo;</p>
+
+<p>char    shellLine[100]                  = {SHELL_LINE_MAX_LEN}; /<em>用于存储从串口接收到的字符串</em>/
+char    *shellParam[SHELL_LINE_MAX_LEN] = {0};                  /<em>用于存储接收到的参数（包括命令名字）</em>/
+extern  T_ShellCmd* sysCmd[];</p>
+
+<p>uint8_t shellGetChar(char *recCh)
+{
+    /*需要自己提供获取一个字符的函数，获取到字符返回1，反之返回0 */
+    return 0;
+}</p>
+
+<p>void shellSendChar(char ch)
+{
+    /<em>需要提供发送一个字符的函数</em>/
+}</p>
+
+<p>/*
+ *用于从串口获取一条以回车换行结尾的命令
+ */
+uint8_t shellGetOneLine(char *line, uint8_t maxLen)
+{
+    char getChar;
+    static uint8_t count=0; /<em>用于记录除特殊字符外的其他有效字符的数量</em>/
+    if(shellGetChar(&amp;getChar))
+    {
+        if(count&gt;=maxLen) /<em>长度超限</em>/
+        {
+            count = 0; /<em>清零计数器以便后续使用</em>/
+            return 1;  /<em>返回有效标志</em>/
+        }
+        line[count] = getChar; /<em>记录数据</em>/
+        switch(getChar)
+        {<br />
+            case 0x08:
+            case 0x7F: /<em>退格键或者删除键</em>/
+            {
+                if(count&gt;0)
+                {
+                    count&ndash;; /<em>删除上一个接收到的字符</em>/
+                }
+            }break;</p>
+
+<pre><code>        case '\r':
+        case '\n': /*接收到回车换行，证明已经收到一个完整的命令*/
+        {
+            line[count] = '\0'; /*添加字符串结束符，刚好可以去掉'\r'或者'\n'*/
+            count = 0; /*清零计数器以便后续使用*/
+            return 1; /*返回有效标志*/
+        }break;
+
+        default:
+            count++;
+    }
+    shellSendChar(getChar); /*把收到的字符输出到串口*/
+}
+return 0;
+</code></pre>
+
+<p>}</p></li>
+</ol>
+
+<p>处理好接收一行命令的函数后，再编写函数将输入的一行字符串转换成命令名和参数，需要使用sting.h
+中的strtok函数，使用此函数我们可以简便的提取到相关的参数字符。</p>
+
+<pre><code>/*从命令字符串中解析到命令和其参数
+ * 获取到的paramArry[0]为要允许的命令名
+ * 其他的为命令参数
+ * 返回值为获取到的参数的个数（包括一个命令名）
+ */
+uint8_t shellGetParam(char* line, char *paramArry[], uint8_t arryLen)
+{
+    uint8_t i,ret;
+    char *ptr = NULL;
+    ptr = strtok(line, &quot; &quot;);
+    for(i=0; ptr!=NULL &amp;&amp;i&lt;arryLen; i++)
+    {
+        paramArry[i] = ptr;
+        ptr = strtok(NULL, &quot;,&quot;);        
+    }
+    ret = i;
+    return ret;
+}
+</code></pre>
+
+<p>现在我们可以从串口获取到一节命令字符串，并且可以解析得到命令的名字和参数，接下来就是要去通过命令名字去查找我们预先设置好的命令数组，找到相应的命令函数，然后运行即可。</p>
+
+<p>在我们学习C语言的时候，我们有时候会发现main函数会是这个样子，是带参数的。百科上面的解释argc argv百科</p>
+
+<pre><code>int main(int argc, char* argv[])
+{
+
+}
+</code></pre>
+
+<p>因此我定义的命令函数的原型为</p>
+
+<pre><code>typedef int (*T_ShellFun)(int argc, char*argv[]);
+</code></pre>
+
+<p>还需要去设计一个结构体去将命令名和命令函数连接起来</p>
+
+<pre><code>typedef struct
+{
+    char* name; /*命令的名字*/
+    char* help; /*帮助描述*/
+    T_ShellFun fun; /*命令函数*/
+}T_ShellCmd;
+</code></pre>
+
+<p>这里并没有去定义命了的参数个数，在解析完用户输入，运行命令函数时也就不会去检查用户输入的参数的个数。以便实现以下类似功能</p>
+
+<pre><code>ls 
+不输入参数显示当前文件夹下的所有文件和文件夹
+ls \user\
+输入了参数，显示user目录下的文件和文件夹
+</code></pre>
+
+<p>定义好了命令描述结构体，和命令函数模板，就可以定义命令了</p>
+
+<pre><code>extern T_ShellCmd *sysCmd[];
+
+int helpCmdFun(int argc, char*argv[]) /*命令函数*/
+{
+    uint8_t i;
+    for(i=0; sysCmd[i]; i++)
+    {
+        printf(&quot;%-15s %s\r\n&quot;,sysCmd[i]-&gt;name, sysCmd[i]-&gt;help);
+    }
+}
+T_ShellCmd helpCmd= /*命令描述*/
+{
+    .name = &quot;help&quot;,
+    .help = &quot;show all cmd list&quot;,
+    .fun = helpCmdFun
+};
+
+/*例程，此例程序可以接收两个参数，int a，float b*/
+int paramTestCmdFun(int argc, char *argv[]) /*命令函数*/
+{
+    uint8_t reti,retf;
+    int vali;
+    float valf;
+    printf(&quot;get param num %d\r\n&quot;, argc); /*如果用户输入的参数不够cmd函数使用，将传入一个默认的地址，其内容为 '\0' */
+    vali = shellStr2Int(argv[0], &amp;reti); /*提供的字符串转int函数*/
+    valf = shellStr2Float(argv[1], &amp;retf); /**/
+    printf(&quot;int[%d]:%d\r\n&quot;, reti,vali );
+    printf(&quot;float[%d]:%f\r\n&quot;,retf,valf );
+    return argc;
+}
+T_ShellCmd paramTestCmd = /*命令描述结构体*/
+{
+    .name= &quot;test&quot;,
+    .help = &quot;(int a=0, float b=0) show tow param val&quot;, /*参数提示,使用函数参数书写方式，有等于号表明默认参数，无参数不提示参数项*/ 
+    .fun = paramTestCmdFun
+};
+</code></pre>
+
+<p>定义好了一个命令之后我们可以定义一个数组，专门用来存放所有的命令描述结构体</p>
+
+<pre><code>T_ShellCmd *sysCmd[] = 
+{
+    &amp;helpCmd, /*只存放命令结构体的指针减少对存储的占用*/
+    &amp;paramTestCmd, /*按照help的方式建立的其他命令*/
+    NULL /*用于标记命令数组的结尾*/
+};
+</code></pre>
+
+<p>最后编写shellMain以及上面用到的shellStr2Int和shellStr2Float函数，</p>
+
+<pre><code>uint8_t shellMain(void)
+{
+    uint8_t paramNum = 0;
+    if(shellGetOneLine(shellLine, SHELL_LINE_MAX_LEN))
+    {
+        paramNum = shellGetParam(shellLine, shellParam, SHELL_PARAM_MAX_NUM);
+        if(paramNum)
+        {
+            uint8_t i=0;
+            for(i=0; sysCmd[i]; i++) /*查找命令名字*/
+            {
+                if(strcmp(sysCmd[i]-&gt;name, shellParam[0]) == 0)
+                {
+                    int value = sysCmd[i]-&gt;fun(paramNum-1, &amp;shellParam[1]); /*运行命令函数*/
+                    printf(&quot;value %d = 0x%x\r\n&quot;, value, value); /*打印运行结果*/
+                    return 1;
+                }
+            }
+            if(sysCmd[i] == NULL) /*没有找到命令*/
+            {
+                printf(&quot;C interp: unknown symbol name \'%s\' \r\n&quot;,shellLine); /*打印错误信息*/
+            }
+        }
+        printf(&quot;-&gt;&quot;);
+    }
+    return 0;
+}
+
+/*
+ * 提供int字符串转int
+ */
+int shellStr2Int(const char *str, uint8_t* ok)
+{
+    int ret;
+    if(str == NULL)
+    {
+        ok = false;
+        return 0;
+    }
+    *ok=(uint8_t)sscanf(str,&quot;%d&quot;, &amp;ret);
+    if(*ok != 1)
+    {
+        *ok = false;
+        return 0;
+    }
+    return ret;
+}
+
+/*
+ * 提供flaot字符串转浮点数功能
+ */
+float shellStr2Float(const char *str, uint8_t* ok)
+{
+    float ret;
+    if(str == NULL)
+    {
+        ok = false;
+        return 0;
+    }
+    *ok=(uint8_t)sscanf(str,&quot;%f&quot;, &amp;ret);
+    if(*ok != 1)
+    {
+        *ok = false;
+        return 0.0;
+    }
+    return ret;
+}
+
+/*
+ * 提供16进制字符串转数字的功能
+ */
+int shellStr2Hex(const char *str, uint8_t* ok)
+{
+    int ret;
+    if(str == NULL)
+    {
+        ok = false;
+        return 0;
+    }
+    *ok=(uint8_t)sscanf(str,&quot;%X&quot;, &amp;ret);
+    if(*ok != 1)
+    {
+        *ok = false;
+        return 0;
+    }
+    return ret;
+}
+</code></pre>
+
+<p>最后附一下源码shell源码<br />
+文章中的代码已经将代码讲完了，提供的源码里面增加了一个shell_cmd.c用于存放左右的用户自定义命令。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>超详细教程移植RTThreadnano并基于nano添加FinSHshell | 开发者问答集锦</title>
+    <meta property="og:title" content="超详细教程移植RTThreadnano并基于nano添加FinSHshell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="超详细教程移植RTThreadnano并基于nano添加FinSHshell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E8%B6%85%E8%AF%A6%E7%BB%86%E6%95%99%E7%A8%8B%E7%A7%BB%E6%A4%8Drtthreadnano%E5%B9%B6%E5%9F%BA%E4%BA%8Enano%E6%B7%BB%E5%8A%A0finshshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">超详细教程移植RTThreadnano并基于nano添加FinSHshell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><strong>目录</strong></p>
+
+<p>背景：移植RT-Thread nano，并基于 nano 添加 FinSH/shell</p>
+
+<p>前提及准备工作</p>
+
+<p>step1：添加rt-thread nano到裸机工程</p>
+
+<p>1.1、Nano Pack 安装</p>
+
+<p>方法一：Pack Installer 安装</p>
+
+<p>方法二：手动安装</p>
+
+<p>1.2、基础工程准备</p>
+
+<p>1.3、开始移植rtt nano到裸机工程</p>
+
+<p>1.4、适配 RT-Thread nano</p>
+
+<p>1.5、RT-Thread Nano 配置（选配）</p>
+
+<p>1.6 常见问题</p>
+
+<p>step2：添加finsh到工程</p>
+
+<p>2.1、添加finsh源码</p>
+
+<p>2.2、实现uart驱动</p>
+
+<p>2.3、修改console名称</p>
+
+<p>2.4、下载验证</p>
+
+<p>2.5 附录一份uart驱动供参考</p>
+
+<p>2.6 常见问题</p>
+
+<hr />
+
+<h1 id="背景-移植rt-thread-nano-并基于-nano-添加-finsh-shell">背景：移植RT-Thread nano，并基于 nano 添加 FinSH/shell</h1>
+
+<p>在nano上添加finsh可以有两种方法：</p>
+
+<p>1、移植finsh基于device框架【这个官方文档中心有相关的文章了，链接：<a href="https://www.rt-">https://www.rt-</a>
+thread.org/document/site/tutorial/nano/nano_finsh/an0033-nano-finsh/】</p>
+
+<p>2、移植finsh不基于device框架【本文讲解这个不基于device框架的，从头讲解，如果移植rtt nano，然后基于这个nano 再移植finsh】
+<strong>【本文基于 rtt nano 3.1.2 /3.1.1】</strong></p>
+
+<h1 id="前提及准备工作">前提及准备工作</h1>
+
+<ol>
+<li>安装了mdk</li>
+<li>一个stm32 mdk裸机工程：要一份能运行的基本工程，如一个f103的可以跑led的裸机工程即可。（这里基于hal库做的mdk工程）</li>
+<li>一个nano源码：我们直接从keil中下载nano的pack包</li>
+<li>注意， <strong>本文基于 rtt nano 3.1.2 版本，3.1.1也行</strong></li>
+</ol>
+
+<h1 id="step1-添加rt-thread-nano到裸机工程">step1：添加rt-thread nano到裸机工程</h1>
+
+<p>注意：step1 是参考了RTT文档中心的教程。</p>
+
+<h2 id="1-1-nano-pack-安装">1.1、Nano Pack 安装</h2>
+
+<p>Nano Pack 可以通过 MDK 联网安装，也可以手动安装。下面开始介绍两种安装方式。</p>
+
+<h3 id="方法一-pack-installer-安装">方法一：Pack Installer 安装</h3>
+
+<p>打开 MDK 软件，点击工具栏的 Pack Installer 图标：</p>
+
+<p><a href="https://img.it610.com/image/info8/31f60f880ef5428d8877f3ff7a56f228.jpg"><img src="https://img.it610.com/image/info8/31f60f880ef5428d8877f3ff7a56f228.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第1张图片" /></a></p>
+
+<p>点击右侧的 Pack，展开 Generic，可以找到 RealThread::RT-Thread，点击 Action 栏对应的 Install
+，就可以在线安装 Nano Pack 了。另外，如果需要安装其他版本，则需要展开 RealThread::RT-Thread，进行选择。</p>
+
+<p><a href="https://img.it610.com/image/info8/f2ab2b468c5a4e08bb079aeafed6cfe3.jpg"><img src="https://img.it610.com/image/info8/f2ab2b468c5a4e08bb079aeafed6cfe3.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第2张图片" /></a></p>
+
+<h3 id="方法二-手动安装">方法二：手动安装</h3>
+
+<p>我们也可以从官网下载安装文件， <strong>RT-Thread Nano 离线安装包下载</strong> ，下载结束后双击文件进行安装。</p>
+
+<p>RT-Thread Nano 离线安装包下载路径：<a href="https://www.rt-thread.org/download/mdk/RealThread.RT-">https://www.rt-thread.org/download/mdk/RealThread.RT-</a>
+Thread.3.0.3.pack</p>
+
+<h2 id="1-2-基础工程准备">1.2、基础工程准备</h2>
+
+<p>在开始创建 RT-Thread 小系统之前，我们需要准备一个能正常运行的裸机工程。作为示例，本文使用的是基于 STM32L475-Pandora 和 HAL
+库的一个 LED 闪烁程序。程序的主要截图如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/30eb6b5b649d4a8395eeda7f18da6aba.jpg"><img src="https://img.it610.com/image/info8/30eb6b5b649d4a8395eeda7f18da6aba.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第3张图片" /></a></p>
+
+<p>在我们的例程中主要做了系统初始化与LED闪烁功能，编译下载程序后，就可以看到 LED
+闪烁了。读者可以根据自己的需要使用其他芯片，完成一个简单的类似裸机工程。</p>
+
+<h2 id="1-3-开始移植rtt-nano到裸机工程">1.3、开始移植rtt nano到裸机工程</h2>
+
+<p>打开已经准备好的可以运行的裸机程序，将 RT-Thread 添加到工程。如下图，点击 Manage Run-Time Environment。、</p>
+
+<p><a href="https://img.it610.com/image/info8/314f8efd01174fbfa9f1351c5e9ff2b4.jpg"><img src="https://img.it610.com/image/info8/314f8efd01174fbfa9f1351c5e9ff2b4.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第4张图片" /></a></p>
+
+<p>在 Manage Rum-Time Environment 里”Software Component” 栏找到 RTOS，Variant 栏选择 RT-
+Thread，然后勾选 kernel，点击”OK” 就添加 RT-Thread 内核到工程了。</p>
+
+<p><a href="https://img.it610.com/image/info8/2dbe7cf79a2a4913b93165f5365694d5.jpg"><img src="https://img.it610.com/image/info8/2dbe7cf79a2a4913b93165f5365694d5.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第5张图片" /></a></p>
+
+<p>现在可以在 Project 看到 RT-Thread RTOS 已经添加进来了，展开 RTOS，可以看到添加到工程的文件：</p>
+
+<p><a href="https://img.it610.com/image/info8/241174f62c86495188ae7932a599d1b6.jpg"><img src="https://img.it610.com/image/info8/241174f62c86495188ae7932a599d1b6.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第6张图片" /></a></p>
+
+<p>Cortex-M 芯片内核移植代码：</p>
+
+<pre><code>context_rvds.s
+cpuport.c
+</code></pre>
+
+<p>kernel文件</p>
+
+<pre><code>clock.c
+components.c
+device.c
+idle.c
+ipc.c
+irq.c
+kservice.c
+mem.c
+object.c
+scheduler.c
+thread.c
+timer.c
+</code></pre>
+
+<p>应用代码及配置文件：</p>
+
+<pre><code>board.c
+rtconfig.h
+</code></pre>
+
+<h2 id="1-4-适配-rt-thread-nano">1.4、适配 RT-Thread nano</h2>
+
+<p>RT-Thread 会用到了异常处理函数 <code>HardFault_Handler()</code> 和悬挂处理函数 <code>PendSV_Handler()</code>，以及
+Systick 中断服务函数
+<code>SysTick_Handler()</code>，所以用户代码需要保证这几个函数没有被使用，若编译提示函数重复定义，请删除自己定义的函数。</p>
+
+<p>RT-Thread Nano 在 board.c 中默认完成了 systick 的配置，用户可以修改宏 RT_TICK_PER_SECOND 的值配置每秒
+systick 数。</p>
+
+<p><a href="https://img.it610.com/image/info8/d6467cb54b3f48c28860df810f17bb5a.jpg"><img src="https://img.it610.com/image/info8/d6467cb54b3f48c28860df810f17bb5a.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第7张图片" /></a></p>
+
+<p>RT-Thread Nano 默认是使用数组作为 heap。</p>
+
+<p><a href="https://img.it610.com/image/info8/d7ad99802e3346158ec4549006be4957.jpg"><img src="https://img.it610.com/image/info8/d7ad99802e3346158ec4549006be4957.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第8张图片" /></a></p>
+
+<p>替换例程中的 <code>delay</code> 函数：</p>
+
+<p>1). 包含 RT-Thread 的相关头文件 `` 。</p>
+
+<p>2). 删除之前在裸机工程中做的系统配置（如hal初始化、时钟初始化等），这是因为RT-Thread在系统启动时已经配置完成，否则会重复配置。</p>
+
+<p>3). 将 <code>delay()</code> 函数替换成 <code>rt_thread_mdelay()</code>，如 <code>rt_thread_mdelay(500)</code> 将延时
+500ms。</p>
+
+<p>下面是完成修改的代码：</p>
+
+<p><a href="https://img.it610.com/image/info8/e98fa27ccdd041829d050b94dc03f073.jpg"><img src="https://img.it610.com/image/info8/e98fa27ccdd041829d050b94dc03f073.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第9张图片" /></a></p>
+
+<p>编译程序之后下载到芯片就可以看到基于 RT-Thread 的程序运行起来了，LED 正常闪烁。</p>
+
+<p>注意事项：当添加 RT-Thread 之后，裸机中的 main() 函数会自动变成 RT-Thread 系统中 main 线程
+的入口函数。由于线程不能一直独占 CPU，所以此时在 main() 中使用 while(1) 时，需要有让出 CPU 的动作，比如使用
+<code>rt_thread_mdelay()</code> 系列的函数让出 CPU。另外3.0.3版本中还没有 <code>rt_thread_mdelay()</code> 接口，可以使用
+<code>rt_thread_delay()</code> 。</p>
+
+<h2 id="1-5-rt-thread-nano-配置-选配">1.5、RT-Thread Nano 配置（选配）</h2>
+
+<p>用户可以根据自己的需要通过修改 rtconfig.h 文件里面的宏定义配置相应功能。</p>
+
+<p>RT-Thread Nano 默认未开启宏 RT_USING_HEAP，故只支持静态方式创建任务及信号量。若要通过动态方式创建对象则需要在
+rtconfig.h 文件里开启 RT_USING_HEAP 宏定义。</p>
+
+<p>MDK 的配置向导 configuration Wizard 可以很方便的对工程进行配置，Value
+一栏可以选中对应功能及修改相关值，等同于直接修改配置文件 rtconfig.h。</p>
+
+<p><a href="https://img.it610.com/image/info8/61ef33fec56a40a0b1f974efc7b0b5da.jpg"><img src="https://img.it610.com/image/info8/61ef33fec56a40a0b1f974efc7b0b5da.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第10张图片" /></a></p>
+
+<h2 id="1-6-常见问题">1.6 常见问题</h2>
+
+<p>Q1：如何升级 pack?</p>
+
+<p>A：Pack 升级步骤基本如同软件包，展开 RealThread::RT-Thread 后，选择比较新的 Nano 版本，点击 Install
+进行安装。如下图所示，点击红色框中的 Install 进行升级，即可将 3.1.1 版本升级到 3.1.2。</p>
+
+<p><a href="https://img.it610.com/image/info8/aa09a0c9d90f47f685ba7ab50044e60d.png"><img src="https://img.it610.com/image/info8/aa09a0c9d90f47f685ba7ab50044e60d.png" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第11张图片" /></a></p>
+
+<h1 id="step2-添加finsh到工程">step2：添加finsh到工程</h1>
+
+<h2 id="2-1-添加finsh源码">2.1、添加finsh源码</h2>
+
+<p>点击Manage Run-Environment：</p>
+
+<p><a href="https://img.it610.com/image/info8/64f386f8778c4fdab8f10a730812321f.jpg"><img src="https://img.it610.com/image/info8/64f386f8778c4fdab8f10a730812321f.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第12张图片" /></a></p>
+
+<p>勾选device drivers与shell，这将自动把FinSH组件的源码到工程，并自动添加 <code>#define RTE_USING_DEVICE</code>
+与<code>#define RTE_USING_FINSH</code> 宏：</p>
+
+<p><a href="https://img.it610.com/image/info8/9b6292536c204e0d921478b18854954d.jpg"><img src="https://img.it610.com/image/info8/9b6292536c204e0d921478b18854954d.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第13张图片" /></a></p>
+
+<h2 id="2-2-实现uart驱动">2.2、实现uart驱动</h2>
+
+<p>实现uart驱动，主要实现初始化与读写接口，并借助了device注册接口，将uart注册到系统中，使其更方便的对接shell。需要实现的函数原型如下：</p>
+
+<pre><code>rt_err_t  (*init)   (rt_device_t dev);
+rt_err_t  (*open)   (rt_device_t dev, rt_uint16_t oflag);
+rt_size_t (*read)   (rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size);
+rt_size_t (*write)  (rt_device_t dev, rt_off_t pos, const void *buffer, rt_size_t size);
+
+//外加一个注册的函数，注册一个 rt_device 的实例，方便对接 FinSH 组件。
+</code></pre>
+
+<p>需要添加的代码如下所示：</p>
+
+<pre><code>rt_err_t uart_init(rt_device_t dev)
+{
+    ...
+}
+
+rt_err_t uart_open(rt_device_t dev, rt_uint16_t oflag)
+{
+    return  uart_init(dev);
+}
+
+rt_size_t uart_read(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size)
+{
+    ...                   
+}
+
+rt_size_t uart_write(rt_device_t dev, rt_off_t pos, const void *buffer, rt_size_t size)
+{
+    ...
+}               
+
+struct rt_device uart_dev;
+static int uart_register(void)     
+{
+    uart_dev.init  = uart_init;
+    uart_dev.open  = uart_open;
+    uart_dev.read  = uart_read;
+    uart_dev.write = uart_write;
+
+    rt_device_register(&amp;uart_dev,&quot;uart1&quot;,0);
+    return 0;
+}
+INIT_BOARD_EXPORT(uart_register);
+</code></pre>
+
+<ul>
+<li>uart_init()：初始化串口，包括硬件引脚的初始化与串口传输模式及波特率等的设置。</li>
+<li>uart_open()：打开串口，使用该接口仅仅是为了对接 FinSH，没有实际意义，直接返回串口初始化即可。</li>
+<li>uart_read()：读入字符，长度size。</li>
+<li>uart_write()：输出字符，长度size。注意输出打印时，在遇到 <code>\n</code> 时，就在输出 <code>\n</code> 之前先输出一个 <code>\r</code> 。</li>
+<li>uart_register()：注册函数，将uart设备注册到系统中，务必使用INIT_BOARD_EXPORT()初始化该函数。</li>
+</ul>
+
+<p>注意：RT-Thread 系统中已有的打印均以 “\n” 结尾，而并非
+“\r\n”，所以在字符输出时，需要在输出“\n”之前输出“\r”完成回车与换行，否则系统打印出来的信息将只有换行。</p>
+
+<h2 id="2-3-修改console名称">2.3、修改console名称</h2>
+
+<p>打开rtconfig.h文件：将console的名称修改为刚注册到系统中的uart名称，这样FinSH就对接到了UART端口上。如上面注册名为“uart1”，则在rtconfig.h中修改
+RT_CONSOLE_DEVICE_NAME 的定义为 uart1：</p>
+
+<pre><code>#define RT_CONSOLE_DEVICE_NAME      &quot;uart1&quot;
+</code></pre>
+
+<h2 id="2-4-下载验证">2.4、下载验证</h2>
+
+<p>下载到开发板进行验证，移植成功</p>
+
+<p><a href="https://img.it610.com/image/info8/07e8dfc345e64330ae81d1f0d0c7bc5a.jpg"><img src="https://img.it610.com/image/info8/07e8dfc345e64330ae81d1f0d0c7bc5a.jpg" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第14张图片" /></a></p>
+
+<h2 id="2-5-附录一份uart驱动供参考">2.5 附录一份uart驱动供参考</h2>
+
+<pre><code>static UART_HandleTypeDef UartHandle;
+rt_err_t uart_init(rt_device_t dev)
+{
+    UartHandle.Instance = USART1;
+    UartHandle.Init.BaudRate   = 115200;
+    UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+    UartHandle.Init.Mode       = UART_MODE_TX_RX;
+    UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
+    UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
+    UartHandle.Init.StopBits   = UART_STOPBITS_1;
+    UartHandle.Init.Parity     = UART_PARITY_NONE;
+
+    if (HAL_UART_Init(&amp;UartHandle) != HAL_OK)
+    {
+        while (1);
+    }
+
+    return 0;
+}
+
+rt_err_t uart_open(rt_device_t dev, rt_uint16_t oflag)
+{
+    return  uart_init(dev);
+}
+
+rt_size_t uart_read(rt_device_t dev,
+                    rt_off_t    pos,
+                    void       *buffer,
+                    rt_size_t   size)
+{
+    while (1)
+    {
+        if (HAL_UART_Receive(&amp;UartHandle, buffer, size, 20) == 0)
+        {
+            return size;
+        }
+    }
+}
+
+rt_size_t uart_write(rt_device_t dev,
+                     rt_off_t    pos,
+                     const void *buffer,
+                     rt_size_t   size)
+{
+    rt_size_t i = 0;
+    char a = '\r';
+    const char *val = 0;    
+
+    val = (const char *)(buffer);
+
+    __HAL_UNLOCK(&amp;UartHandle);
+
+    for (i = 0; i &lt; size; i++)
+    {
+        if (*(val + i) == '\n')
+        {
+            HAL_UART_Transmit(&amp;UartHandle, (uint8_t *)&amp;a, 1, 20);
+        }
+        HAL_UART_Transmit(&amp;UartHandle, (uint8_t *)(val + i), 1, 20);
+    }
+    return 1;
+}
+
+struct rt_device uart_dev;
+static int uart_register(void)
+{
+    uart_dev.init  = uart_init;
+    uart_dev.open  = uart_open;
+    uart_dev.read  = uart_read;
+    uart_dev.write = uart_write;
+
+    rt_device_register(&amp;uart_dev, &quot;uart1&quot;, 0);
+    return 0;
+}
+INIT_BOARD_EXPORT(uart_register);
+</code></pre>
+
+<h2 id="2-6-常见问题">2.6 常见问题</h2>
+
+<p>Q1：输出打印正常，却没有打印 <code>msh &gt;</code>，也不能输入。</p>
+
+<p><a href="https://img.it610.com/image/info8/d71343cd0fe34199a26c568ceda1752c.png"><img src="https://img.it610.com/image/info8/d71343cd0fe34199a26c568ceda1752c.png" alt="【超详细教程】移植RT-Thread nano，并基于 nano 添加
+FinSH/shell_第15张图片" /></a></p>
+
+<p>A：这是由于FinSH 没打开，所以只有打印功能，需要在rtconfig.h中打开 <code>#define RTE_USING_FINSH</code> 宏定义。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

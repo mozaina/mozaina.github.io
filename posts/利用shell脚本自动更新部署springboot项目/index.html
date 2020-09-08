@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>利用shell脚本自动更新部署SpringBoot项目 | 开发者问答集锦</title>
+    <meta property="og:title" content="利用shell脚本自动更新部署SpringBoot项目 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="利用shell脚本自动更新部署SpringBoot项目">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%88%A9%E7%94%A8shell%E8%84%9A%E6%9C%AC%E8%87%AA%E5%8A%A8%E6%9B%B4%E6%96%B0%E9%83%A8%E7%BD%B2springboot%E9%A1%B9%E7%9B%AE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">利用shell脚本自动更新部署SpringBoot项目</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<pre><code>    * 背景
+    * 脚本源码
+    * 脚本说明
+    * 脚本使用
+</code></pre>
+
+<h4 id="背景">背景</h4>
+
+<p>因为项目中有多个模块，每个模块需要打包成一个jar运行。每次更新到服务器比较麻烦，所以就想到利用脚本一键实现代码的更新、编译打包、备份、和启动工作。项目中模块除了一个是用gradle编译，其他都是采用maven管理依赖。</p>
+
+<h4 id="脚本源码">脚本源码</h4>
+
+<p><a href="https://img.it610.com/image/info8/030a9d4fd96a474cb545596cad8c7cd6.jpg"><img src="https://img.it610.com/image/info8/030a9d4fd96a474cb545596cad8c7cd6.jpg" alt="利用shell脚本自动更新部署SpringBoot项目_第1张图片" /></a><br />
+deploy.sh</p>
+
+<pre><code>#!/bin/bash
+#//////////////////////////微服务启动管理脚本//////////////////////////
+
+#模块列表，因为maven和gradle构建的差异，为了避免脚本出现过多if else判断，所以两部分分开。
+
+#///////////////////////////Maven部分/////////////////////////////////
+JarNames=(
+discover-1.0-SNAPSHOT.jar
+consumer-1.0-SNAPSHOT.jar
+)
+#--------------------------更新代码----------------------------------
+echo -e &quot;\e[1;32m 开始更新代码  \e[0m&quot;
+cd /home/boc/
+git pull
+echo -e &quot;\e[1;32m 代码更新完成  \e[0m&quot;
+#-------------------------循环对所有模块进行编译打包和启动--------------
+for JarName in ${JarNames[@]}
+do
+    #查看进程ID
+    PID=$(ps aux | grep ${JarName} | grep -v 'grep' | awk '{print $2}')
+    #要将模块名称分割开，获取到模块名称，同时也是目录名称。先存储旧的分隔符
+    OLD_IFS=&quot;$IFS&quot;
+    #设置分隔符
+    IFS=&quot;-&quot;
+    #如下会自动分隔    
+    arr=(${JarName})
+    # 将IFS恢复成原来的
+    IFS=&quot;$OLD_IFS&quot;
+    #------------1.关闭已有进程----------------
+    if [[ ! -z ${PID} ]];then
+        echo -e &quot;\e[1;32m ${arr[0]} 的进程ID是：$PID  \e[0m&quot;
+            echo -e &quot;\e[1;32m 即将关闭${arr[0]}  \e[0m&quot;
+        kill -9 ${PID}
+    else
+            echo -e &quot;\e[1;33m ${arr[0]} 没有启动  \e[0m&quot;
+    fi
+    #------------2.编译代码--------------------
+    echo -e &quot;\e[1;32m 开始编译代码  \e[0m&quot;
+    cd /home/boc/${arr[0]}/
+    mvn clean package -Dmaven.test.skip=true
+    echo -e &quot;\e[1;32m 编译完成  \e[0m&quot;
+    #------------3.移动备份jar包----------------
+    echo -e &quot;\e[1;32m 开始备份旧jar包,备份位置在：/home/script/serverJAR/bak  \e[0m&quot;
+    cd /home/script/serverJAR
+    if [[ -e ${JarName} ]];then
+        mv ${JarName} /home/script/serverJAR/bak/ -f
+        rm -rf ${JarName}
+        echo -e &quot;\e[1;32m JAR包备份完成  \e[0m&quot;
+    else
+            echo -e &quot;\e[1;37m JAR包不存在，直接下一步  \e[0m&quot;
+    fi
+    #------------4.移动新jar包到执行目录----------------
+    cd /home/boc/${arr[0]}/target
+    if [[ -e ${JarName} ]];then
+        mv ${JarName} /home/script/serverJAR -f
+        echo -e &quot;\e[1;32m 新JAR准备好 \e[0m&quot;
+    else
+        echo -e &quot;\e[1;31m JAR包不存在，直接下一步  \e[0m&quot;
+    fi
+    #------------5.开始启动jar包----------------
+    cd /home/script/serverJAR
+    echo -e &quot;\e[1;32m 开始启动${arr[0]}   \e[0m&quot;
+    nohup java -jar ${JarName} &gt;${arr[0]}_log 2&gt;&amp;1 &amp;
+    echo -e &quot;\e[1;32m 项目启动完成  \e[0m&quot;
+    #tail -f nohup.out
+done
+
+#///////////////////////////////Gradle构建的项目，该类型目前只有一个项目，所以不用循环///////////////////////////////
+weId=&quot;weid-1.0-SNAPSHOT.jar&quot;
+#查看进程ID
+PID_WeId=$(ps aux | grep ${weId} | grep -v 'grep' | awk '{print $2}')
+#------------1.关闭已有进程----------------
+if [[ ! -z ${PID_WeId} ]];then
+    echo -e &quot;\e[1;32m weId 的进程ID是：${PID_WeId}  \e[0m&quot;
+    echo -e &quot;\e[1;32m 即将关闭weId  \e[0m&quot;
+    kill -9 ${PID_WeId}
+else
+    echo -e &quot;\e[1;33m weId 没有启动  \e[0m&quot;
+fi
+#------------2.编译代码--------------------
+echo -e &quot;\e[1;32m 开始编译gradle项目  \e[0m&quot;
+cd /home/boc/weid
+chmod +x ./gradlew &amp;&amp; ./gradlew build -x test
+echo -e &quot;\e[1;32m 编译完成  \e[0m&quot;
+#------------3.移动备份jar包----------------
+echo -e &quot;\e[1;32m 开始备份旧jar包,备份位置在：/home/script/serverJAR/bak  \e[0m&quot;
+cd /home/script/serverJAR
+if [[ -e ${weId} ]];then
+    mv ${weId} /home/script/serverJAR/bak/ -f
+    rm -rf ${weId}
+    echo -e &quot;\e[1;32m JAR包备份完成  \e[0m&quot;
+else
+    echo -e &quot;\e[1;37m JAR包不存在，直接下一步  \e[0m&quot;
+fi
+#------------4.移动新jar包到执行目录----------------
+cd /home/boc/weid/build/libs
+if [[ -e ${weId} ]];then
+    mv ${weId} /home/script/serverJAR -f
+    echo -e &quot;\e[1;32m 新JAR准备好 \e[0m&quot;
+else
+    echo -e &quot;\e[1;31m JAR包不存在，直接下一步  \e[0m&quot;
+fi
+#------------5.开始启动jar包----------------
+cd /home/script/serverJAR
+echo -e &quot;\e[1;32m 开始启动weid  \e[0m&quot;
+nohup java -jar ${weId} &gt;weid_log 2&gt;&amp;1 &amp;
+echo -e &quot;\e[1;32m 项目启动完成  \e[0m&quot;
+</code></pre>
+
+<h4 id="脚本说明">脚本说明</h4>
+
+<p>脚本总体分为maven部分和gradle项目部分，因为maven项目较多，所以采用一个数组定义，并在循环中处理。gradle部分主要不同时编译命令不同，其他相似。为了清晰，把两部分分开写。</p>
+
+<p>总体思路就是：</p>
+
+<ul>
+<li>先判断服务进程运行情况，如果运行，则关闭进程</li>
+<li>然后进行代码更新和编译</li>
+<li>备份旧jar包，这一步很必要，如果启动出现问题，可以方便回滚到之前的服务</li>
+<li>拷贝新jar包后启动服务</li>
+</ul>
+
+<p>shell脚本部分语法说明：</p>
+
+<ul>
+<li><p>字符串分隔数组</p>
+
+<pre><code>    OLD_IFS=&quot;$IFS&quot;
+#设置分隔符
+IFS=&quot;-&quot;
+#如下会自动分隔    
+arr=(${JarName})
+# 将IFS恢复成原来的
+IFS=&quot;$OLD_IFS&quot;
+</code></pre></li>
+</ul>
+
+<p>IFS是系统默认的分隔符，这里是固定语法，用自己需要的分隔符分隔数组后，恢复系统默认即可。</p>
+
+<ul>
+<li><p>打印字符颜色</p>
+
+<pre><code>\e[1;37m xxx  \e[0m
+</code></pre></li>
+</ul>
+
+<p>不同的颜色有不同的序号表示，根据需要查阅即可。</p>
+
+<ul>
+<li>编译jar包命令</li>
+</ul>
+
+<p>maven项目打包并跳过测试代码：</p>
+
+<pre><code>    mvn clean package -Dmaven.test.skip=true
+</code></pre>
+
+<p>gradle项目打包并跳过测试：</p>
+
+<pre><code>    chmod +x ./gradlew &amp;&amp; ./gradlew build -x test
+</code></pre>
+
+<p>说明：如果服务器没有装gradle，则用gradlew命令。使用前需要先授权。如果服务器装有gradle。也可以采用下面的命令：</p>
+
+<pre><code>     gradle build -x test
+</code></pre>
+
+<h4 id="脚本使用">脚本使用</h4>
+
+<p>执行脚本时，可以进入到脚本所在目录执行下面命令：</p>
+
+<pre><code>sh deploy.sh
+</code></pre>
+
+<p>为了在不同目录执行，可以将脚本所在目录配置到环境变量，这样就可以在任意目录执行</p>
+
+<pre><code>vim /etc/profile
+增加PATH路径
+source /etc/profile
+</code></pre>
+
+<p>执行效果：<br />
+<a href="https://img.it610.com/image/info8/cbbe7b26f4a54458a5feeb84a94df43c.jpg"><img src="https://img.it610.com/image/info8/cbbe7b26f4a54458a5feeb84a94df43c.jpg" alt="利用shell脚本自动更新部署SpringBoot项目_第2张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

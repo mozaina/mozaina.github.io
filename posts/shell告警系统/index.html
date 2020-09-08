@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell告警系统 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell告警系统 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell告警系统">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%91%8A%E8%AD%A6%E7%B3%BB%E7%BB%9F/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell告警系统</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="shell项目-告警系统">shell项目-告警系统</h2>
+
+<ul>
+<li><p>需求背景<br />
+使用shell定制各种个性化告警工具，但需要统一化管理、规范化管理。当zabbix服务器之间因为网络原因而无法上报数据时，就可以先通过shell脚本来暂时监控。</p></li>
+
+<li><p>这样的告警系统属于分布式的，需要在每一台机器上去放置该shell脚本，每一台机器都独立监控，不需要依赖其他机器。</p></li>
+
+<li><p>思路：指定一个脚本包，其中包含以下内容<br />
+（1）主程序：作为整个脚本的入口，是整个系统的命脉<br />
+（2）配置文件：是一个控制中心，用他来开关各个子进程，指定各个相关联的日志文件<br />
+（3）子程序：这个才是真正的监控脚本，用来监控各个指标<br />
+（4）邮件引擎：是由一个pythen程序来实现，它可以定义发邮件的服务器、发邮件人以及发件人密码。<br />
+（5）输出日志：整个监控系统要有日志输出</p></li>
+
+<li><p>要求：机器角色很多种，但是所有机器上都要部署同样的监控系统，也就是说所有的机器不管什么角色，整个程序框架是一致的，不同之处在于根据不同的角色，定制不同的配置文件。</p></li>
+
+<li><p>程序框架</p></li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/dbe4375776904c329c027ee8993ff356.jpg"><img src="https://img.it610.com/image/info8/dbe4375776904c329c027ee8993ff356.jpg" alt="shell-
+告警系统_第1张图片" /></a></p>
+
+<hr />
+
+<h2 id="告警系统主脚本">告警系统主脚本</h2>
+
+<ul>
+<li><p>先定义各个监控系统的目录，然后再去定义主脚本，因为是分布式的，所以每一台机器都需要这样去做。可以在其他机器上创建那些目录，然后将这台机器上的脚本拷贝过去，并做一些更改。</p></li>
+
+<li><p>将脚本全部放在/usr/local/sbin目录下，方便以后的查找。</p></li>
+
+<li><p>创建mon目录，并创建bin 、 conf 、shares 、log 、mail这几个子目录。</p></li>
+</ul>
+
+<p>-主脚本放在/bin目录下，并写入以下内容</p>
+
+<pre><code>#!/bin/bash
+##written by zcy
+#是否发送邮件的开关，0为是指不发送
+export send=1  //所有的子脚本只是关闭告警，监控还是继续监控
+#过滤ip地址
+export addr=` /sbin/ifconfig |grep -A1 &quot;ens33: &quot;|awk '/inet/ {print $2}'`
+dir=`pwd`
+#只需要最后一些目录名
+last_dir=`echo $dir |awk -F '/' '{print $NF}'`
+#下面判断的目的是，保证执行脚本的时候，我们在bin目录里面，不然监控脚本、邮件和日志很有可能找不到
+if [ $last_dir == &quot;bin&quot; ] || [ $last_dir == &quot;/bin/&quot; ] ; 
+  then 
+  conf file=&quot;../conf/mon.conf&quot;
+else
+  echo &quot;you shoud cd bin dir&quot;
+  exit
+fi 
+exec 1 &gt;&gt; ../log/mon.log 2&gt;&gt; ../log.err.log
+echo &quot;`date+&quot;%F %T&quot;` load average&quot;
+#主脚本中调用了子脚本
+/bin/bash ../shares/load.sh  
+#先检查配置文件中舒服需要监控502
+if grep -q 'to_mon_502=1' $conf_files ; 
+then 
+ export log=`grep 'logfile='$conf file |awk -F  '=' '{print $2}' |sed 's/ //g'`
+ /bin/bash ../shares/502.sh
+fi
+</code></pre>
+
+<hr />
+
+<h2 id="告警系统配置文件">告警系统配置文件</h2>
+
+<ul>
+<li><p>它主要定义一些开关和日志的路径</p></li>
+
+<li><p>切换到conf子目录中创建配置文件mon.conf，并写入以下内容</p>
+
+<h2 id="to-config-the-options-if-to-monitor">to config the options if to monitor</h2>
+
+<h2 id="定义mysql的服务器地址-端口以及user-password">定义mysql的服务器地址、端口以及user 、password</h2>
+
+<p>to_mon_cdb=0 ##0 or 1, default 0,0 not monitor, 1 monitor
+db_ip=192.168.244.136
+db_port=3315
+db_user=zcy
+db_pass=xxxxx</p>
+
+<h2 id="httpd-如果是1则监控-为0不监控">httpd 如果是1则监控，为0不监控</h2>
+
+<p>to_mon_httpd=0</p>
+
+<h2 id="php-监控为1-不监控为0">php 监控为1 不监控为0</h2>
+
+<p>to_mon_php_socket=0</p>
+
+<h2 id="http-code-502-需要定义访问日志的路径">http_code_502 需要定义访问日志的路径</h2>
+
+<p>to_mon_502=1
+logfile=/data/log/xxx.xxx.com/access.log</p>
+
+<h2 id="request-count-定义日志路径以及域名">request_count  定义日志路径以及域名</h2>
+
+<p>to_mon_request_count=0  //是否监控请求数，为0不监控
+req_log=/data/log/www.discuz.net/access.log
+domainname=www.discuz.net</p></li>
+</ul>
+
+<p>配置文件怎么定义取决于子脚本里面需要用到的资源， 可以把用到的所有资源，比如日志、域名等全部写入到子脚本中，前提是机器不多才可以。</p>
+
+<p>将请求日志摘取到配置文件中，目的是为保证通用性。</p>
+
+<hr />
+
+<h2 id="告警系统监控项目">告警系统监控项目</h2>
+
+<ul>
+<li><p>监控项目放在shares目录下，创建load.sh,写入以下内容</p>
+
+<p>#!/bin/bash
+load=<code>uptime |awk -F 'average:' '{print $2}'|cut -d ',' -f1 |sed 's/  //g' |cut -d . -f1</code>   //系统负载的值
+if [ $load -gt 10 ] &amp;&amp; [ $send -eq &ldquo;1&rdquo; ]
+then
+   echo &ldquo;$addr <code>date+%T</code> load is $load&rdquo; &gt; ../log/load.tmp 这个日志是用来发邮件用到的日志。
+   /bin/bash ../mail/mail.sh $addr_load $load ../log/load.tmp
+fi
+echo &ldquo;<code>date+%T</code> load is $load&rdquo;</p></li>
+
+<li><p>创建502.sn</p>
+
+<p>#!/bin/bash
+d=<code>date -d &quot;-1 min&quot; +%H:$M</code>
+c_502=<code>grep :$d: $log |grep '502' |wc -l</code>
+if [ $c_502 -gt 10 ] &amp;&amp; [ $send == 1 ]; then
+    echo &ldquo;$addr $d 502 count is $c_502&rdquo;&gt;../log/502.tmp
+    /bin/bash../mail/mail.sh $addr_502 ../log/502.tmp
+fi
+echo &ldquo;<code>date+%T</code> 502 $c_502&rdquo;</p></li>
+
+<li><p>监控磁盘 使用率disk.sh</p>
+
+<p>#!/bin/bash
+rm -f ../log/disk.tmp
+for in <code>df -h |awk -F '[%]+' '{print $5}' |grep -v Use</code>
+do<br />
+ if [ $r -gt 90 ] &amp;&amp; [ $send -eq &ldquo;1&rdquo; ]
+ then
+   echo  &ldquo;$addr <code>date+%T</code> disk uesrage is $r&rdquo; &gt;&gt;../log/disk.tmp
+ fi
+ if [ -f ../log/disk.tmp ]
+ then
+ df -h &gt;&gt; ../log/disk.tmp
+ /bin/bash ../mail/mail.sh $addr _disk $r ../log/disk.tmp
+ echo &ldquo;<code>date+%T</code> disk uesrage in nook&rdquo;
+else
+ echo &ldquo;<code>date+%T</code> disk uesrage is ok&rdquo;
+fi</p></li>
+</ul>
+
+<p>awk -F ’ [ % ]+’ /表示以一个或多个空格或%作为分隔符</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

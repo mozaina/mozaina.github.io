@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell实例整理 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell实例整理 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell实例整理">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%AE%9E%E4%BE%8B%E6%95%B4%E7%90%86/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell实例整理</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="一-批量创建用户">一、批量创建用户</h2>
+
+<p>批量创建1000个用户<br />
+用户名为：班级+学号+昵称；每个班为一个组群<br />
+能够自动删除所创建的用户<br />
+每成功创建或删除一个用户，在屏幕上显示用户名</p>
+
+<pre><code>#!/bin/bash
+
+echo &quot;==========create the group==========&quot;
+read -p &quot;input the groupname what you want to create:&quot; a
+
+A=`cut -d: -f1 /etc/group|grep $a|wc -w`
+
+if [ $A -eq 1 ]
+then
+    echo &quot;groupname already exist,please go ahead&quot;
+
+else
+    groupadd $a
+fi
+
+echo &quot;==========how many users you want to add==========&quot;
+read -p &quot;input the numbers of users: &quot; num
+count=1
+
+while [ $count -le $num ]
+do
+    B=`cut -d: -f1 /etc/passwd|grep ${a}Student$count|wc -w`
+    if [ $B -eq 1 ]
+    then
+        echo &quot;The user ${a}Student$count is already exist!&quot;
+    else
+        useradd -G $a ${a}Student$count
+        echo &quot;user ${a}Student$count add successfully&quot;
+    fi
+    count=$(($count + 1))
+done
+
+read -p &quot;do you want remove the new users? y or n: &quot; do
+
+let count=count-1
+if [ &quot;$do&quot; = y ]
+then
+    for(( count; count &gt;= 1;count-- ))
+    do
+           userdel -r ${a}Student$count
+           echo &quot;user ${a}Student$count del successfully&quot;
+    done
+else exit
+fi
+</code></pre>
+
+<h2 id="二-批量创建目录和文件">二、批量创建目录和文件</h2>
+
+<p>目录名为：dir1, dir2, …, dir10<br />
+每个目录下分别新建10个文本文件，文件名为：目录名+file1~10<br />
+并设置每个文件的权限：<br />
+文件所有者：读+写+执行<br />
+同组用户：读+执行<br />
+其他用户：读+执行<br />
+等待键盘输入一个数字，范围为1~10<br />
+重命名该级目录（假设输入数字为“5”，则为“dir5”目录）下所有文件的扩展名为bak，并将该目录下所有文件名保存到一个文本文件<br />
+删除包含该数字的所有目录和文件</p>
+
+<pre><code>#!/bin/bash
+ #
+# 目录名为：dir1, dir2, …, dir10
+# 每个目录下分别新建10个文本文件，文件名为：目录名+file1~10
+# 并设置每个文件的权限：
+# 文件所有者：读+写+执行
+# 同组用户：读+执行
+# 其他用户：读+执行
+# 等待键盘输入一个数字，范围为1~10
+# 重命名该级目录（假设输入数字为“5”，则为“dir5”目录）下所有文件的扩展名为bak，
+# 并将该目录下所有文件名保存到一个文本文件
+# 删除包含该数字的所有目录和文件
+function addFile(){
+  for((i=1;i&lt;=10;i++))
+ do
+mkdir /usr/src/dir$i
+chmod 755 -R /usr/src/dir$i
+for((j=1;j&lt;=10;j++))
+do
+   touch /usr/src/dir$i/dir${i}file$j
+done
+done
+}
+read -p &quot;which files(1~10) do you want to option:&quot; num
+addFile
+ls /usr/src/dir$num &gt;&gt; /usr/src/fileOut.txt
+#mv /usr/src/dir$num/dir${num}file* /usr/src/dir$num/dir${num}file*.bak
+cd /usr/src/dir$num
+for f in `ls /usr/src/dir$num`
+do 
+   mv $f $f.bak
+done
+echo &quot;option successfully&quot;
+read -p &quot;are you sure to remove this directory which with this number:&quot; op
+case $op in
+y)
+rm -rf /usr/src/dir$num ;;
+ *)
+exit;; 
+esac
+</code></pre>
+
+<h2 id="三-定时备份文件">三、定时备份文件</h2>
+
+<p>每天18:00归档/etc目录下的所有文件，归档文件名为如下形式：etc-YYYY-MM-
+DD；保存在/home/user/backup目录下，其中user为当前登录用户名<br />
+需要编写一个脚本，放到/etc/cron.d/script ：</p>
+
+<pre><code>#！/bin/bash
+
+DATE=`date +%F`
+tar -cvf /etc-$DATE /etc
+mkdir /home/$USER/backup
+mv /etc-$DATE /home/$USER/backup
+</code></pre>
+
+<h2 id="四-查找统计">四、查找统计</h2>
+
+<p>查看/etc/passwd中所有包含字符串“aa”的用户，并将结果保存在文本文件中</p>
+
+<pre><code>grep &quot;aa.*&quot; /etc/passwd|cut -d: -f1 &gt;file   
+</code></pre>
+
+<p>查看/bin中包含字符串“ls”的文件名，并将结果保存在文本文件中</p>
+
+<pre><code>ls /bin|grep &quot;ls.*&quot; &gt;file                  
+</code></pre>
+
+<p>把/bin和/sbin下的文件名保存到文件commandview中</p>
+
+<pre><code>ls /bin /sbin &gt;commandview
+</code></pre>
+
+<p>统计/bin和/sbin下的文件数量</p>
+
+<pre><code>ls /bin |wc -l
+ls /sbin|wc -l
+</code></pre>
+
+<p>脚本代码：</p>
+
+<pre><code>#!/bin/bash
+#查看/etc/passwd中所有包含字符串“aa”的用户，并将结果保存在文本文件中
+grep &quot;aa.*&quot; /etc/passwd|cut -d : -f1 &gt;&gt; /home/luzy/practice1/text/file1
+echo ‘******************’ &gt;&gt; /home/luzy/practice1/text/file1
+#查看/bin中包含字符串“ls”的文件名，并将结果保存在文本文件
+ls /bin |grep &quot;ls.*&quot; &gt;&gt; /home/luzy/practice1/text/file1
+echo ‘******************’ &gt;&gt; /home/luzy/practice1/text/file1
+#把/bin和/sbin下的文件名保存到文件command中
+ls /bin /sbin &gt;&gt; /home/luzy/practice1/text/command
+#echo ‘******************’ &gt;&gt; /home/luzy/practice1/text/file1
+#统计/bin和/sbin下的文件数量
+ls /bin | wc -l  &gt;&gt; /home/luzy/practice1/text/file1
+ls /sbin | wc -l  &gt;&gt; /home/luzy/practice1/text/file1
+</code></pre>
+
+<h2 id="五-加减乘除运算">五、加减乘除运算</h2>
+
+<p>两个操作数和一个运算符由位置参数给出 在屏幕上分别显示操作数、运算符和运算结果</p>
+
+<pre><code>#!/bin/bash
+read -p &quot;input first num: &quot; a
+read -p &quot;input +-*/ : &quot; b
+read -p &quot;input second num: &quot; c
+
+jg=`echo &quot;scale=2; $a $b $c&quot;|bc`
+echo &quot; $a $b $c = $jg &quot;
+echo &quot;=========================================================================&quot;
+read -p &quot;Do you want to continue? y/n:&quot; C
+
+case $C in
+y) sh ys.sh;;
+n) exit;;
+esac    
+</code></pre>
+
+<h2 id="六-按照运行结果编写shell程序">六、按照运行结果编写Shell程序：</h2>
+
+<p>0<br />
+101<br />
+21012<br />
+3210123<br />
+432101234<br />
+54321012345<br />
+6543210123456<br />
+765432101234567<br />
+87654321012345678<br />
+9876543210123456789</p>
+
+<pre><code>#!/bin/bash
+
+for ((i=0;i&lt;=9;i++))
+do 
+    j=$i
+    for ((j;j&gt;=0;j--))
+    do
+        echo -n &quot;$j&quot;
+    done
+    k=1
+    for ((k;k&lt;=i;k++))
+    do 
+        echo -n &quot;$k&quot;
+    done
+echo
+done
+</code></pre>
+
+<h2 id="七-逆序输出一个字符串">七、逆序输出一个字符串</h2>
+
+<pre><code>#!/bin/bash
+#逆序输出一个字符串
+read -p &quot;please input string:&quot; str
+echo &quot;$str&quot; | rev
+</code></pre>
+
+<h2 id="八-冒泡法对10个数按升序排序">八、冒泡法对10个数按升序排序</h2>
+
+<pre><code>#!/bin/bash
+#冒泡排序十个数
+for((i=0;i&lt;=9;i++))
+do
+#使用内置随机变量产生十个1000以内的数
+  arr[i]=$(($RANDOM%1000)) 
+done
+echo &quot;${arr[@]}&quot;
+function fm(){
+for((a=0;a&lt;=9;a++))
+do
+  for((b=a+1;b&lt;=9;b++))
+  do
+   if [[ ${arr[a]} -gt ${arr[b]} ]]
+    then
+        x=${arr[a]}
+        arr[$a]=${arr[b]}
+        arr[$b]=$x
+    fi
+   done
+</code></pre>
+
+<h1 id="echo-arr-a">echo &ldquo;${arr[a]}&rdquo;</h1>
+
+<pre><code>done  
+echo &quot;${arr[@]}&quot;
+}
+fm
+</code></pre>
+
+<h2 id="九-编写一个menu的shell程序-执行后的界面为">九、编写一个menu的Shell程序，执行后的界面为：</h2>
+
+<p>NumberNameFor Linux Menu<br />
+1exitleave<br />
+2viedit a file<br />
+3datedate<br />
+4calcalendar<br />
+5wholist the users<br />
+6lslist the files in this directory<br />
+7catdisplay a file on the screen<br />
+Please input a number or a name for the action you wish:</p>
+
+<pre><code>#!/bin/bash
+
+echo &quot;NumberNameFor Linux Menu&quot;
+cat &lt;&lt; EOF
+1 exitleava
+2 viedit a file
+3 datedate
+4 calcalendar
+5 wholist the users
+6 lslist the files in this directory
+7 catdisplay a file on the screen
+EOF
+
+read -p &quot;Please input a number or a name for the action you wish:&quot; num
+
+case $num in
+1) exit;;
+2) read -p &quot;Input a filename:&quot; A
+   vi $A;;
+3) date;;
+4) cal;;
+5) cut -d: -f1 /etc/passwd;;
+6) ls -la .;;
+7) read -p &quot;Input a filename:&quot; B
+   cat $B;;
+esac
+echo &quot;=========================================================================&quot;
+read -p &quot;Do you want to continue? y/n:&quot; C
+
+case $C in
+y) sh menu.sh;;
+n) exit;;
+esac 
+</code></pre>
+
+<h2 id="十-求n的阶乘">十、求n的阶乘</h2>
+
+<pre><code>#!/bin/bash
+#求n的阶乘
+#方法一
+function mathod1(){
+  a=1
+  for((i=1;i&lt;=num;i++))
+  do
+    a=` expr $i \* $a `
+  done
+  echo &quot;${num}! = $a&quot;
+
+  }
+ #方法二
+  function m2(){
+   if [ $1 -eq 1 ]
+     then
+     echo &quot;1&quot;
+   else
+     local x=$[ $1 -1 ]
+     local y=`m2 $x`
+     a=`expr ${x} \* ${y}`
+  #  echo &quot; $[ $1 - 1 ]! = ${a}&quot;
+     echo &quot;$a&quot;
+      fi
+ }
+read -p &quot; please input a number(&gt;0):&quot; num
+read -p &quot; which mathod you chose(1 or 2) :&quot; m
+case $m in
+1)
+mathod1 ;;
+2)
+re=`m2 $[ $num + 1 ]`
+echo &quot;${num}!= $re&quot;;;
+*)
+echo &quot;no such mathod!&quot;
+;;
+esac
+</code></pre>
+
+<h2 id="shell实例二">Shell实例二</h2>
+
+<h3 id="一-需求分析">一、需求分析</h3>
+
+<p>1.任务目标</p>
+
+<p>Linux作为多用户、多任务的操作系统，其系统资源是所有用户共享的。对用户的管理是操作系统的重点。LINUX课程设计要用shell编程实现，将理论学习付诸实践。设计一个脚本（shell）程序能实现增加、删除、查找和显示特定用户信息的功能。</p>
+
+<p>2.系统要求</p>
+
+<p>程序要包括四个文件，即menu，add，delete，passwd四个文件。passwd文件是用来保存用户信息；menu文件是主菜单,要求运行的时候能显示一个菜单供用户选择；add文件是用来增加信息；delete文件是用来删除信息。在主Shell脚本文件里（必须以
+menu
+命名）要有一个多操作选项的菜单以便用户从中选择。对于任务6和7，需要编写单独的Shell脚本文件（必须分别命名为add和delete）并且在主脚本menu文件中调用这些脚本文件。在主目录下建立一个以
+07wl-0x-xx（x为班、座号）命名的目录，并且在作业中使用它作为工作目录。</p>
+
+<p>3.系统功能</p>
+
+<p>在主Shell脚本文件里（即menu 文件）要有一个多操作选项的菜单以便用户从中选择。在不同任务的中，这些操作能自动实现以下功能：</p>
+
+<p>1、在屏幕上显示当前所有用户的记录</p>
+
+<p>2、在屏幕上显示当前所有用户（经过格式化和排序的）的记录</p>
+
+<p>3、只在屏幕上显示用户名和用户ID</p>
+
+<p>4、只在屏幕上显示（经过格式化和排序的）用户名和用户ID</p>
+
+<p>5、查询并显示特定用户的记录</p>
+
+<p>6、往passwd文件里增加新的用户记录</p>
+
+<p>7、从passwd文件里删除某个用户记录</p>
+
+<p>其中:
+menu文件中的程序完成1,2,3,4,5功能;另外写一个add脚本文件和delete脚本文件分别实现选项6和7.当用户做了选择且所选的操作完成之后，可以再次显示主菜单以供用户做下一步选择。用while循环和case条件语句配合来完成此操作。</p>
+
+<h3 id="二-总体设计">二、总体设计</h3>
+
+<ol>
+<li><p>功能图</p></li>
+
+<li><p>流程图</p></li>
+</ol>
+
+<p>2.1 主菜单</p>
+
+<pre><code>2.2 add模块 
+
+![](http://i.imgur.com/pXkCndp.png)
+
+2.3 delete模块
+
+![](http://i.imgur.com/0GSv58g.png)
+</code></pre>
+
+<h3 id="三-详细设计">三、详细设计</h3>
+
+<p>一、 Menu主菜单</p>
+
+<p>（1）主菜单</p>
+
+<p>（2）创建如下菜单</p>
+
+<p>（3）无效输入</p>
+
+<p>当用户做了选择且所选的操作完成之后，应再次显示主菜单以供用户做下一步选择。在以上等待用户做出选择的菜单中，如果用户偶尔输入了一个代码而不是1、2、3、4、5、6、7或Q，就有信息提示“无效的代码，请按回车键继续”。等用户按了回车键之后，再次显示主菜单供用户做其他选择。如图：</p>
+
+<p>（4）无输入</p>
+
+<p>在以上等待用户做出选择的菜单中，如果用户简单地按了回车键，就会出现信息“无效的代码&rdquo;。等用户按了回车键之后，再次显示主菜单供用户做其他选择。</p>
+
+<p>（5）选择1时——打印当前所有用户记录</p>
+
+<p>（6）选择2时——打印当前经格式化的用户记录</p>
+
+<p>（7）选择3时——打印用户名和用户ID</p>
+
+<p>（8）选择4时——打印（格式化）用户名和用户ID</p>
+
+<p>（9）选择5时——查找特定的记录</p>
+
+<p>如果输入的关键字不在记录里</p>
+
+<p>如果用户简单地按回车键而不是输入关键字</p>
+
+<p>二、ADD文件</p>
+
+<p>（1）当用户在主菜单里选择6时你的add脚本文件就要被调用</p>
+
+<p>（2）输入用户名</p>
+
+<p>用户输入一个无效的用户名</p>
+
+<p>用户只按回车没有输入</p>
+
+<p>（3）输入密码</p>
+
+<p>输入密码时不显示</p>
+
+<p>要求密码长度至少达到6位以上</p>
+
+<p>确认密码如果与密码不符合应该让用户重新输入</p>
+
+<p>（4）用户ID</p>
+
+<p>若用户只是简单的按回车键</p>
+
+<p>若用户输入的是一个无效的ID或者是不符合格式的ID</p>
+
+<p>（5）组ID</p>
+
+<p>对组ID的要求类似与用户ID，一个有效的组ID（数字、一般非超级用户的ID大等于500）</p>
+
+<p>（6）登录shell</p>
+
+<p>一个有效的shell必须只能是bash、sh、kash、csh中的一种</p>
+
+<p>如果用户只按回车没有输入的话则显示信息：“没有输入！”，并提示用户再次输入shell名</p>
+
+<p>（7）保存记录</p>
+
+<p>三、DELETE文件</p>
+
+<p>（1）当用户在主菜单中选择7时，delete脚本文件必须被调用</p>
+
+<p>（2）用户输入一个无效的用户ID</p>
+
+<p>（3）用户简单的按回车键而没有任何输入</p>
+
+<p>（4）继续删除</p>
+
+<h3 id="四-附录-程序代码">四、附录（程序代码）</h3>
+
+<p>1、Menu主脚本文件代码</p>
+
+<pre><code>#!/bin/bash
+#在屏幕上操作选项菜单
+#声明全局变量
+dataSource=/home/luzy/practice2/passwd
+homePath=/home/luzy/practice2
+AddUser=/home/luzy/practice2/Add.sh
+DeleteUsers=/home/luzy/practice2/Delete.sh
+CheckDataSourceFileExist(){
+if [ -f $dataSource ]
+then
+  #文件存在
+  return 0;
+else
+  #文件不存在
+  clear;
+  echo -n &quot;警告【$dataSource】不存在！请确认！&quot;;
+  read;
+  return 1;
+fi
+}
+choice=&quot;F&quot;;
+while [ $choice != &quot;Q&quot; -a $choice != &quot;q&quot; ]
+do
+ CheckDataSourceFileExist;
+ if [ $? -ne 1 ]
+ then
+     clear;
+     echo &quot;                用户信息管理主菜单&quot;；
+     echo &quot;===================================================&quot;;
+     echo &quot;        1.显示当前所有记录&quot;
+     echo &quot;        2.格式化显示当前所有记录&quot;
+     echo &quot;        3.显示用户名和用户ID&quot;
+     echo &quot;        4.格式化显示用户名和ID&quot;
+     echo &quot;        5.查询特定用户信息&quot;
+     echo &quot;        6.添加新用户&quot;
+     echo &quot;        7.删除用户&quot;
+     echo &quot;        Q.退出&quot;
+     echo -n &quot;你的选择:&quot;
+     read choice
+
+
+
+     #作用是清除由于read到string.Empty的时候引发的bash参数过多的错误。
+        if [ -z $choice ]
+        then
+            choice=&quot;empty&quot;;
+        fi
+
+        clear;
+        if [ $choice = &quot;empty&quot; ];
+        then
+            echo &quot;选项尚未选择！&quot;;
+        else
+            case $choice in
+                1) CheckDataSourceFileExist;
+                    if [ $? -ne 1 ]
+                    then
+                        echo &quot;当前的所有的用户信息如下所示:&quot;;
+                        echo &quot;用户名 密码 ID GID 说明 工作目录 登录Shell&quot;
+                        cat $dataSource | tr &quot;:&quot; &quot; &quot; | more;
+                    fi;;
+                2)     CheckDataSourceFileExist;
+                        if [ $? -ne 1 ]
+                        then
+                            echo &quot;当前的所有的用户信息如下所示:&quot;;
+                            echo -e &quot;用户名\t密码\tID\tGID\t说明\t工作目录\t登录Shell&quot;
+                            sort -k 1 $dataSource | awk -F &quot;:&quot; '{print $1 &quot;\t&quot; $2 &quot;\t&quot; $3   
+                            &quot;\t&quot; $4 &quot;\t&quot; $5 &quot;\t&quot; $6 &quot;\t&quot; $7 &quot;\t&quot;}' | more;
+                        fi;;
+                3) CheckDataSourceFileExist;
+                    if [ $? -ne 1 ]
+                    then
+                        echo &quot;当前的所有的用户的用户名和用户ID如下所示:&quot;;
+                        echo -e &quot;用户名,ID&quot;;
+                        awk -F &quot;:&quot; '{print $1 &quot;,&quot; $3}' $dataSource | more;
+                    fi;;
+                4)     CheckDataSourceFileExist;
+                        if [ $? -ne 1 ]
+                        then
+                            echo &quot;当前的所有的用户的用户名和用户ID如下所示:&quot;;
+                            echo -e &quot;用户名 \t ID&quot;;
+                            awk -F &quot;:&quot; '{print $1 &quot;\t &quot;  $3}' $dataSource | more;
+                        fi;;
+                5) CheckDataSourceFileExist;
+                    if [ $? -ne 1 ]
+                    then
+                        keyWords=&quot;&quot;;
+                        while [ -z $keyWords ]
+                        do
+                            echo -n &quot;输入搜索关键词:&quot;;
+                            read keyWords;
+
+                            if [ -z $keyWords ]
+                            then
+                                echo &quot;搜索关键词不能为空，请重新输入！&quot;;
+                            fi
+                        done
+
+                    CheckDataSourceFileExist;
+                    if [ $? -ne 1 ]
+                    then
+                        grep -i $keyWords $dataSource;
+
+                        if [ $? -eq 1 ]
+                        then
+                            echo &quot;很遗憾，【$dataSource】文件中，并不存在与 $keyWords 一致的信息。&quot;;
+                        fi
+                    fi
+                    fi;;
+                6) $AddUser ;;
+                7) $DeleteUsers ;;
+                Q) printf &quot;程序已经退出。&quot;;;
+                q) printf &quot;程序已经退出。&quot;;;
+                *) echo $choice &quot;：此选项不是默认提供的功能。请确认。&quot;;;
+            esac
+        fi
+
+        echo -n &quot;确认？？&quot;;
+        read ;
+    fi
+done
+</code></pre>
+
+<p>2、ADD脚本文件代码</p>
+
+<pre><code>#!/bin/bash
+#添加用户
+dataSource=/home/luzy/practice2/passwd
+clear;    
+  isContinue=&quot;y&quot;;
+  userName=&quot;&quot;;
+  while [ $isContinue = &quot;y&quot; -o $isContinue = &quot;Y&quot; ]
+  do
+    #用户名处理，输入一致到字符串长度不为0为止
+    userName=&quot;&quot;;
+    while [ -z $userName ]
+    do
+        echo -n &quot;用户名:&quot;;
+        read userName;
+        if [ -z $userName ]
+        then
+            echo &quot;错误！用户名是不能为空的，请重新输入！&quot;;
+            continue;
+        fi
+
+        if [ `expr match $userName &quot;[a-zA-Z][0-9a-zA-Z]*&quot;` -ne `expr length $userName` ]
+        then
+            echo &quot;错误！用户名的只能由非数字打头的字符和数字组成，请重新输入！&quot;;
+            userName=&quot;&quot;;
+            continue;
+        fi
+    done
+
+    #密码处理：1.验空，3.密码长度要6位，由大小写字母、数字和控制字符组成，2.验两次输入的一致性，
+    passWord=&quot;&quot;;
+    passWordAgain=&quot;&quot;;
+    while [ -z $passWord ]
+    do
+        echo -n &quot;密码:&quot;;
+        read passWord;
+
+        if [ -z $passWord ]
+        then
+            echo &quot;错误！密码是不能为空的，请重新输入！&quot;;
+            continue;
+        fi
+
+        if [ `expr length $passWord` -ne 6 ]
+        then
+            echo &quot;密码长度为6位，请重新输入!&quot;;
+            passWord=&quot;&quot;;
+            continue;
+        fi
+
+        if [ `expr match $passWord &quot;[0-9a-zA-Z]*&quot;` -ne `expr length $passWord` ]
+        then
+            echo &quot;密码由大小写字母、数字和控制字符组成，请重新输入!&quot;;
+            passWord=&quot;&quot;;
+            continue;
+        fi
+
+        echo -n &quot;请在输入一次密码：&quot;;
+        read passWordAgain;
+
+        if [ $passWordAgain != $passWord ]
+        then
+            echo &quot;两次输入的密码不一样，请重新输入！&quot;;
+            passWord=&quot;&quot;;
+            continue;
+        fi
+    done
+
+    #用户UID输入处理,UID为数字、一般非超级用户的ID大等于500
+    uID=&quot;&quot;;
+    while [ -z $uID ]
+    do
+        echo -n &quot;用户UID:&quot;;
+        read uID;
+
+        if [ -z $uID ]
+        then
+            echo &quot;错误！用户UID是不能为空的，请重新输入！&quot;;
+            continue;
+        fi
+
+        if [ `expr match $uID &quot;[0-9]*&quot;` -ne `expr length $uID` ]
+        then
+            echo &quot;错误！用户的UID必须为数字，请重新输入！&quot;;
+            uID=&quot;&quot;;
+            continue;
+        fi
+
+        if [ $uID -lt 500 -o $uID -gt 60000 ]
+        then
+            echo &quot;错误！一般非超级用户的ID范围为500～60000，请重新输入!&quot;;
+            uID=&quot;&quot;;
+            continue;
+        fi
+    done
+
+
+    #用户组GID处理
+    gID=&quot;&quot;;
+    while [ -z $gID ]
+    do
+        echo -n &quot;用户组GID:&quot;;
+        read gID;
+
+        if [ -z $gID ]
+        then
+            echo &quot;错误！用户GID是不能为空的，请重新输入！&quot;;
+            continue;
+        fi
+
+        if [ `expr match $gID &quot;[0-9]*&quot;` -ne `expr length $gID` ]
+        then
+            echo &quot;错误！用户的GID必须为数字，请重新输入！&quot;;
+            gID=&quot;&quot;;
+            continue;
+        fi
+
+        if [ $gID -lt 500 -o $gID -gt 60000 ]
+        then
+            echo &quot;错误！用户组的ID范围为500～60000，请重新输入!&quot;;
+            gID=&quot;&quot;;
+            continue;
+        fi
+    done
+
+    echo -n &quot;说明:&quot;;read note;
+
+    #bash,sh,csh,ksh
+    shellVersion=&quot;&quot;;
+    while [ -z $shellVersion ]
+    do
+        echo -n &quot;登录SHELL（bash,sh,csh,ksh）:&quot;;
+        read shellVersion;
+        if [ $shellVersion != &quot;bash&quot; -a $shellVersion != &quot;sh&quot; 
+            -a $shellVersion != &quot;csh&quot; -a $shellVersion != &quot;ksh&quot; ]
+        then
+            echo &quot;输入的Shell类型【$shellVersion】不在本系统支持范围内，请重新输入！&quot;;
+            shellVersion=&quot;&quot;;
+        fi
+    done
+
+    echo -n &quot;用户工作目录:&quot;;
+    mkdir /home/$userName;
+    if [ $? -eq 0 ]
+    then
+        echo $userName &quot;成功创建！&quot;;
+    fi
+
+    userInfo=&quot;${userName}:${passWord}:${uID}:${gID}:${note}:${userName}:${shellVersion}&quot;;
+    echo &quot;$userInfo&quot; &gt;&gt; ${dataSource};
+
+    if [ $? -eq 0 ]
+    then
+        echo &quot;$userName用户信息添加成功！&quot;;
+    else
+        echo &quot;$userName用户信息添加失败！&quot;;
+    fi
+
+
+    echo -n &quot;是否继续添加其他用户？？（y/n）&quot;;
+    read isContinue;    
+done
+</code></pre>
+
+<p>3、DELETE脚本文件代码</p>
+
+<pre><code>#!/bin/bash
+#删除用户
+clear;
+dataSource=/home/luzy/practice2/passwd
+CheckDataSourceFileExist()
+{
+if [ -f $dataSource ]
+then
+    #文件存在
+    return 0;
+
+else
+    #文件不存在
+    clear;
+    echo -n &quot;警告 【$dataSource】 不存在！请确认！&quot;;
+    read ;
+    return 1;
+fi
+}
+
+isContinue=&quot;y&quot;;
+userName=&quot;&quot;;
+while [ $isContinue = &quot;y&quot; -o $isContinue = &quot;Y&quot; ]
+do
+    while [ $isContinue = &quot;y&quot; -o $isContinue = &quot;Y&quot; ]
+    do
+        echo -n &quot;输入用户的名称:&quot;;
+        read userName;
+        if [ -z &quot;$userName&quot; ]
+        then
+            echo &quot;用户名不能为空，请重新输入！&quot;;
+            isContinue=&quot;Y&quot;;
+            continue;
+        fi
+
+        CheckDataSourceFileExist;
+        if [ $? -ne 1 ]
+        then
+            deleteUser=$(awk -F &quot;:&quot; '$1 == &quot;'$userName'&quot; { print $0 }' $dataSource);
+
+            if [ $deleteUser ]
+            then
+                echo &quot;目标帐号确认：&quot; $deleteUser;
+                echo -n &quot;是否删除该信息？？（y/n）&quot;;
+                read isContinue;
+                if [ -z $isContinue ]
+                then
+                    isContinue=&quot;N&quot;;
+                fi
+
+                if [ $isContinue = &quot;y&quot; -o $isContinue = &quot;Y&quot;  ]
+                then
+                    CheckDataSourceFileExist;
+                    if [ $? -ne 1 ]
+                    then
+                        rowID=$(grep -n $deleteUser $dataSource | awk -F &quot;:&quot; '{print $1}');
+                         sed -e &quot;$rowID d&quot; $dataSource &gt; tempFile;
+                        cat tempFile &gt; $dataSource;
+                        rm tempFile;
+                    fi
+
+                    if [ $? -eq 0 ]
+                    then
+                        echo &quot;删除成功！&quot;;
+                    else
+                        echo &quot;系统错误，删除失败！&quot;;
+                    fi
+
+                    isContinue=&quot;N&quot;;
+                fi
+            else
+                echo &quot;你输入的 【$userName】 用户不存在！&quot;;
+                isContinue=&quot;N&quot;;
+            fi
+        fi
+    done
+
+    if [ -n &quot;$userName&quot; ]
+    then
+        echo -n &quot;是否继续删除其他用户？？（y/n）&quot;;
+        read isContinue;
+        if [ -z $isContinue ]
+        then
+            isContinue=&quot;N&quot;;
+        fi
+    fi
+ done
+</code></pre>
+
+<p>4、passwd文件</p>
+
+<pre><code>raccoon:123321:600:700:nothing:raccoon:sh
+wangjun:000000:601:701:gogo:wangjun:sh
+English:888888:602:702:Hi:English:sh
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

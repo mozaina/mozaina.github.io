@@ -1,0 +1,1590 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Zabbix34通过shell脚本监控redis服务 | 开发者问答集锦</title>
+    <meta property="og:title" content="Zabbix34通过shell脚本监控redis服务 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Zabbix34通过shell脚本监控redis服务">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/zabbix34%E9%80%9A%E8%BF%87shell%E8%84%9A%E6%9C%AC%E7%9B%91%E6%8E%A7redis%E6%9C%8D%E5%8A%A1/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Zabbix34通过shell脚本监控redis服务</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>公司最近网站改版，增加了redis服务器，现领导要求需要测试redis的监控，于是从网上找了个redis的监控脚本，简单的修改了一下，测试中没出现任何问题。生产环境中，可根据实际要监控的参数值修改脚本内容，并添加相应的触发器。<br />
+Redis有自带的redis-
+cli客户端，通过info命令可以查询到redis的运行情况，我们可以写个shell脚本，通过zabbix来调用这个脚本实现redis的监控。</p>
+
+<h1 id="一-info命令的使用">一、info命令的使用</h1>
+
+<p>要获得redis的当前情况，可以使用info命令。<br />
+命令格式：</p>
+
+<pre><code>redis-cli -h [hostname] -p [port] -a [password] info [参数]
+</code></pre>
+
+<p><strong>1、查询server信息</strong></p>
+
+<pre><code>redis-cli -h 127.0.0.1 -p 6379 -a 'password' info server
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/a29598e681fa4402843ae04358b4c88e.jpg"><img src="https://img.it610.com/image/info8/a29598e681fa4402843ae04358b4c88e.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第1张图片" /></a><br />
+2 <strong>、查询客户端连接情况</strong></p>
+
+<pre><code>redis-cli -h 127.0.0.1 -p 6379 -a 'password' info clients
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/99b3ae70e2bd4a6fbda30164d0d6b186.jpg"><img src="https://img.it610.com/image/info8/99b3ae70e2bd4a6fbda30164d0d6b186.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第2张图片" /></a><br />
+<strong>3、查询内存使用情况</strong></p>
+
+<pre><code>redis-cli -h 127.0.0.1 -p 6379 -a 'password' info memory
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/e6ff4e5089ff428481ef6e8e177f02fe.jpg"><img src="https://img.it610.com/image/info8/e6ff4e5089ff428481ef6e8e177f02fe.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第3张图片" /></a><br />
+<strong>4、查询CPU使用情况</strong></p>
+
+<pre><code>redis-cli -h 127.0.0.1 -p 6379 -a 'password' info cpu
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/b88806f76b4a4d2d978e97e11b9522c7.jpg"><img src="https://img.it610.com/image/info8/b88806f76b4a4d2d978e97e11b9522c7.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第4张图片" /></a></p>
+
+<h1 id="二-创建redis监控脚本">二、创建redis监控脚本</h1>
+
+<p><strong>1、编写监控脚本</strong><br />
+<code>vim /etc/zabbix/zabbix_agentd.d/redis_status.sh</code></p>
+
+<pre><code>#!/bin/bash
+REDISCLI=&quot;/usr/local/bin/redis-cli&quot;
+HOST=&quot;127.0.0.1&quot;
+PORT=6379
+PASS=&quot;password&quot;
+
+if [[ $# == 1 ]];then
+    case $1 in
+        version)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info server | grep -w &quot;redis_version&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        uptime)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info server | grep -w &quot;uptime_in_seconds&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        connected_clients)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info clients | grep -w &quot;connected_clients&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        blocked_clients)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info clients | grep -w &quot;blocked_clients&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info memory | grep -w &quot;used_memory&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory_rss)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info memory | grep -w &quot;used_memory_rss&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory_peak)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info memory | grep -w &quot;used_memory_peak&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory_lua)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info memory | grep -w &quot;used_memory_lua&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_sys)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info cpu | grep -w &quot;used_cpu_sys&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_user)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info cpu | grep -w &quot;used_cpu_user&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_sys_children)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info cpu | grep -w &quot;used_cpu_sys_children&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_user_children)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info cpu | grep -w &quot;used_cpu_user_children&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        rdb_last_bgsave_status)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info Persistence | grep -w &quot;rdb_last_bgsave_status&quot; | awk -F':' '{print $2}' | grep -c ok`
+            echo $result
+        ;;
+        aof_last_bgrewrite_status)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info Persistence | grep -w &quot;aof_last_bgrewrite_status&quot; | awk -F':' '{print $2}' | grep -c ok`
+            echo $result
+        ;;
+        aof_last_write_status)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info Persistence | grep -w &quot;aof_last_write_status&quot; | awk -F':' '{print $2}' | grep -c ok`
+            echo $result
+        ;;
+        *)
+            echo -e &quot;\033[33mUsage: $0 {connected_clients|blocked_clients|used_memory|used_memory_rss|used_memory_peak|used_memory_lua|used_cpu_sys|used_cpu_user|used_cpu_sys_children|used_cpu_user_children|rdb_last_bgsave_status|aof_last_bgrewrite_status|aof_last_write_status}\033[0m&quot;
+        ;;
+    esac
+elif [[ $# == 2 ]];then
+    case $2 in
+        keys)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info | grep -w &quot;$1&quot; | grep -w &quot;keys&quot; | awk -F'=|,' '{print $2}'`
+            echo $result
+        ;;
+        expires)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info | grep -w &quot;$1&quot; | grep -w &quot;keys&quot; | awk -F'=|,' '{print $4}'`
+            echo $result
+        ;;
+        avg_ttl)
+            result=`$REDISCLI -h $HOST -a $PASS -p $PORT info | grep -w &quot;$1&quot; | grep -w &quot;avg_ttl&quot; | awk -F'=|,' '{print $6}'`
+            echo $result
+        ;;
+        *)
+            echo -e &quot;\033[33mUsage: $0 {db0 keys|db0 expires|db0 avg_ttl}\033[0m&quot; 
+        ;;
+    esac
+fi
+</code></pre>
+
+<p><strong>2、赋予脚本可执行权限</strong></p>
+
+<pre><code>chmod +x /etc/zabbix/zabbix_agentd.d/redis_status.sh
+</code></pre>
+
+<p><strong>3、脚本测试</strong><br />
+查看redis的客户端连接数</p>
+
+<pre><code>/etc/zabbix/zabbix_agentd.d/redis_status.sh connected_clients
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/518dc1bf7d944a01a922c1ae9d5d5458.png"><img src="https://img.it610.com/image/info8/518dc1bf7d944a01a922c1ae9d5d5458.png" alt="Zabbix3.4通过shell脚本监控redis服务" /></a></p>
+
+<h1 id="三-创建redis监控配置文件">三、创建redis监控配置文件</h1>
+
+<p><strong>1、编写redis监控配置文件</strong><br />
+<code>vim /etc/zabbix/zabbix_agentd.d/redis.conf</code></p>
+
+<pre><code>UserParameter=Redis.Status,status=`/usr/local/bin/redis-cli -h 127.0.0.1 -a 'password' -p 6379 ping|grep -c PONG` &amp;&amp;echo $status
+UserParameter=Redis.Info[*],/etc/zabbix/zabbix_agentd.d/redis_status.sh $1 $2
+</code></pre>
+
+<p><strong>2、重启zabbix-agent</strong></p>
+
+<pre><code>systemctl restart zabbix-agent
+</code></pre>
+
+<p><strong>3、在zabbix server端测试</strong></p>
+
+<pre><code>zabbix_get -s 192.168.2.235 -p 10050 -k &quot;Redis.Info[used_cpu_user]&quot;
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/7d39736ab6a9479c8314b6d572a08e0b.jpg"><img src="https://img.it610.com/image/info8/7d39736ab6a9479c8314b6d572a08e0b.jpg" alt="Zabbix3.4通过shell脚本监控redis服务" /></a></p>
+
+<h1 id="四-创建并导入监控模板">四、创建并导入监控模板</h1>
+
+<p><strong>1、创建监控模板文件</strong><br />
+redis-template.xml文件内容如下</p>
+
+<pre><code>    2.0
+    2014-08-07T10:04:35Z
+
+
+            RedisMontior
+
+
+            Templates
+
+
+
+
+            RedisMontior
+            RedisMontior
+
+
+                    RedisMontior
+
+
+                    Templates
+
+
+
+
+                    Redis Clients
+
+
+                    Redis CPU
+
+
+                    Redis DbKey
+
+
+                    Redis Memory
+
+
+                    Redis WriteStatus
+
+
+
+
+                    Redis.Info[aof_last_bgrewrite_status]
+                    0
+
+                    0
+
+                    Redis.Info[aof_last_bgrewrite_status]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis WriteStatus
+
+
+
+
+
+                    Redis.Info[aof_last_write_status]
+                    0
+
+                    0
+
+                    Redis.Info[aof_last_write_status]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis WriteStatus
+
+
+
+
+
+                    Redis.Info[blocked_clients]
+                    0
+
+                    0
+
+                    Redis.Info[blocked_clients]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis Clients
+
+
+
+
+
+                    Redis.Info[connected_clients]
+                    0
+
+                    0
+
+                    Redis.Info[connected_clients]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis Clients
+
+
+
+
+
+                    Redis.Info[db0,avg_ttl]
+                    0
+
+                    0
+
+                    Redis.Info[db0,avg_ttl]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis DbKey
+
+
+
+
+
+                    Redis.Info[db0,expires]
+                    0
+
+                    0
+
+                    Redis.Info[db0,expires]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis DbKey
+
+
+
+
+
+                    Redis.Info[db0,keys]
+                    0
+
+                    0
+
+                    Redis.Info[db0,keys]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis DbKey
+
+
+
+
+
+                    Redis.Info[rdb_last_bgsave_status]
+                    0
+
+                    0
+
+                    Redis.Info[rdb_last_bgsave_status]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis WriteStatus
+
+
+
+
+
+                    Redis.Info[uptime]
+                    0
+
+                    0
+
+                    Redis.Info[uptime]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+                    uptime
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+
+
+                    Redis.Info[used_cpu_sys]
+                    0
+
+                    0
+
+                    Redis.Info[used_cpu_sys]
+                    30
+                    90
+                    365
+                    0
+                    0
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis CPU
+
+
+
+
+
+                    Redis.Info[used_cpu_sys_children]
+                    0
+
+                    0
+
+                    Redis.Info[used_cpu_sys_children]
+                    30
+                    90
+                    365
+                    0
+                    0
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis CPU
+
+
+
+
+
+                    Redis.Info[used_cpu_user]
+                    0
+
+                    0
+
+                    Redis.Info[used_cpu_user]
+                    30
+                    90
+                    365
+                    0
+                    0
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis CPU
+
+
+
+
+
+                    Redis.Info[used_cpu_user_children]
+                    0
+
+                    0
+
+                    Redis.Info[used_cpu_user_children]
+                    30
+                    90
+                    365
+                    0
+                    0
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis CPU
+
+
+
+
+
+                    Redis.Info[used_memory]
+                    0
+
+                    0
+
+                    Redis.Info[used_memory]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis Memory
+
+
+
+
+
+                    Redis.Info[used_memory_lua]
+                    0
+
+                    0
+
+                    Redis.Info[used_memory_lua]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis Memory
+
+
+
+
+
+                    Redis.Info[used_memory_peak]
+                    0
+
+                    0
+
+                    Redis.Info[used_memory_peak]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis Memory
+
+
+
+
+
+                    Redis.Info[used_memory_rss]
+                    0
+
+                    0
+
+                    Redis.Info[used_memory_rss]
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+                            Redis Memory
+
+
+
+
+
+                    Redis.Info[version]
+                    0
+
+                    0
+
+                    Redis.Info[version]
+                    30
+                    90
+                    365
+                    0
+                    1
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+
+
+                    Redis Status
+                    0
+
+                    0
+
+                    Redis.Status
+                    30
+                    90
+                    365
+                    0
+                    3
+
+
+                    0
+
+
+                    0
+                    0
+
+                    0
+
+                    1
+
+
+
+                    0
+                    0
+
+
+
+
+
+
+                    0
+
+
+
+
+
+
+
+
+
+
+
+
+            {RedisMontior:Redis.Status.last(0)}=0
+            Redis is down
+
+            0
+            5
+
+            0
+
+
+
+
+
+            Redis Client
+            900
+            200
+            0.0000
+            100.0000
+            1
+            1
+            0
+            1
+            0
+            0.0000
+            0.0000
+            0
+            0
+            0
+            0
+
+
+                    0
+                    0
+                    C80000
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[blocked_clients]
+
+
+
+                    1
+                    0
+                    00C800
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[connected_clients]
+
+
+
+
+
+            Redis CPU
+            900
+            200
+            0.0000
+            100.0000
+            1
+            1
+            0
+            1
+            0
+            0.0000
+            0.0000
+            0
+            0
+            0
+            0
+
+
+                    0
+                    2
+                    C80000
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[used_cpu_sys]
+
+
+
+                    1
+                    2
+                    00C800
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[used_cpu_user]
+
+
+
+                    2
+                    2
+                    0000C8
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[used_cpu_sys_children]
+
+
+
+                    3
+                    2
+                    C800C8
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[used_cpu_user_children]
+
+
+
+
+
+            Redis DbKeys
+            900
+            200
+            0.0000
+            100.0000
+            1
+            1
+            0
+            1
+            0
+            0.0000
+            0.0000
+            0
+            0
+            0
+            0
+
+
+                    0
+                    2
+                    C80000
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[db0,avg_ttl]
+
+
+
+                    1
+                    2
+                    00C800
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[db0,expires]
+
+
+
+                    2
+                    2
+                    0000C8
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[db0,keys]
+
+
+
+
+
+            Redis Memory
+            900
+            200
+            0.0000
+            100.0000
+            1
+            1
+            0
+            1
+            0
+            0.0000
+            0.0000
+            0
+            0
+            0
+            0
+
+
+                    0
+                    2
+                    C80000
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[used_memory]
+
+
+
+                    1
+                    2
+                    00C800
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[used_memory_lua]
+
+
+
+                    2
+                    2
+                    0000C8
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[used_memory_peak]
+
+
+
+                    3
+                    2
+                    C800C8
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[used_memory_rss]
+
+
+
+
+
+            Redis WriteStatus
+            900
+            200
+            0.0000
+            100.0000
+            1
+            1
+            0
+            1
+            0
+            0.0000
+            0.0000
+            0
+            0
+            0
+            0
+
+
+                    0
+                    2
+                    C80000
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[aof_last_bgrewrite_status]
+
+
+
+                    1
+                    2
+                    0000C8
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[rdb_last_bgsave_status]
+
+
+
+                    2
+                    2
+                    00C800
+                    0
+                    2
+                    0
+
+                        RedisMontior
+                        Redis.Info[aof_last_write_status]
+</code></pre>
+
+<p><strong>2、导入监控模板</strong><br />
+配置—模板—导入<br />
+<a href="https://img.it610.com/image/info8/31936671cc304766b0b5c58d95317757.jpg"><img src="https://img.it610.com/image/info8/31936671cc304766b0b5c58d95317757.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第5张图片" /></a><br />
+点击“选择文件”，找到redis-template.xml文件，将其导入<br />
+<a href="https://img.it610.com/image/info8/414795bccb114113beedd3652d69452d.jpg"><img src="https://img.it610.com/image/info8/414795bccb114113beedd3652d69452d.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第6张图片" /></a></p>
+
+<h1 id="五-给主机添加监控模板">五、给主机添加监控模板</h1>
+
+<p><a href="https://img.it610.com/image/info8/4044d2eb47244aa9a7cc8c6b6b369994.jpg"><img src="https://img.it610.com/image/info8/4044d2eb47244aa9a7cc8c6b6b369994.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第7张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/a2e0590e100d46d8bfcba520e588ba5f.jpg"><img src="https://img.it610.com/image/info8/a2e0590e100d46d8bfcba520e588ba5f.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第8张图片" /></a></p>
+
+<h1 id="六-监控效果图">六、监控效果图</h1>
+
+<p><a href="https://img.it610.com/image/info8/496e5e8682bc414ca8203a4f5e7d66b4.jpg"><img src="https://img.it610.com/image/info8/496e5e8682bc414ca8203a4f5e7d66b4.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第9张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/2856be475b984774969b1dcd71db104a.jpg"><img src="https://img.it610.com/image/info8/2856be475b984774969b1dcd71db104a.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第10张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/1a0097b545d34aebbdb0bf3582f528bb.jpg"><img src="https://img.it610.com/image/info8/1a0097b545d34aebbdb0bf3582f528bb.jpg" alt="Zabbix3.4通过shell脚本监控redis服务_第11张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

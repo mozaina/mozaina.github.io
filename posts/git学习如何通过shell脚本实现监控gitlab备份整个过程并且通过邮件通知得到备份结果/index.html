@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Git学习如何通过Shell脚本实现监控Gitlab备份整个过程并且通过邮件通知得到备份结果 | 开发者问答集锦</title>
+    <meta property="og:title" content="Git学习如何通过Shell脚本实现监控Gitlab备份整个过程并且通过邮件通知得到备份结果 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Git学习如何通过Shell脚本实现监控Gitlab备份整个过程并且通过邮件通知得到备份结果">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/git%E5%AD%A6%E4%B9%A0%E5%A6%82%E4%BD%95%E9%80%9A%E8%BF%87shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0%E7%9B%91%E6%8E%A7gitlab%E5%A4%87%E4%BB%BD%E6%95%B4%E4%B8%AA%E8%BF%87%E7%A8%8B%E5%B9%B6%E4%B8%94%E9%80%9A%E8%BF%87%E9%82%AE%E4%BB%B6%E9%80%9A%E7%9F%A5%E5%BE%97%E5%88%B0%E5%A4%87%E4%BB%BD%E7%BB%93%E6%9E%9C/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Git学习如何通过Shell脚本实现监控Gitlab备份整个过程并且通过邮件通知得到备份结果</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="一-背景">一、背景</h1>
+
+<ul>
+<li><p>Git学习–&gt;如何通过Shell脚本自动定时将Gitlab备份文件复制到远程服务器?<br />
+<a href="http://blog.csdn.net/ouyang_peng/article/details/77334215">http://blog.csdn.net/ouyang_peng/article/details/77334215</a></p></li>
+
+<li><p>git学习——&gt; Gitlab如何进行备份恢复与迁移？<br />
+<a href="http://blog.csdn.net/ouyang_peng/article/details/77070977">http://blog.csdn.net/ouyang_peng/article/details/77070977</a></p></li>
+
+<li><p>Linux学习–&gt;如何通过Shell脚本实现发送邮件通知功能？<br />
+<a href="http://blog.csdn.net/ouyang_peng/article/details/77363437">http://blog.csdn.net/ouyang_peng/article/details/77363437</a></p></li>
+</ul>
+
+<p>通过前面的几篇博客，我已经实现了整个Gitlab本机备份、迁移、恢复以及备份到远程服务器的整个流程。</p>
+
+<blockquote>
+<p>1、每天凌晨2点在Gitlab服务器上执行Gitlab备份功能。<br />
+ 2、每天凌晨3点在Gitlab服务器上执行scp命令将最新的Gitlab备份文件复制到远程的文件备份服务器。<br />
+ 3、每天凌晨4点在远程的文件备份服务器上检测备份文件的时间，自动删除超过30天的备份文件。</p>
+</blockquote>
+
+<p>但是这三个步骤，有可能每个过程都会出现失败的情况。因此领导第二天在我将整个Gitlab备份自动化运行之后，并且三个步骤都成功运行之后，要求我增加
+<strong>监控Gitlab备份整个过程并且邮件提醒备份结果</strong> 的功能。</p>
+
+<h1 id="二-修改gitlab服务器上的脚本">二、修改Gitlab服务器上的脚本</h1>
+
+<p>首先 我们查看Gitlab服务器上的定时任务，使用<code>vi /etc/crontab</code>命令打开 <strong>/etc/crontab</strong> 文件</p>
+
+<pre><code>vi /etc/crontab
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/e95a68ac915a4ec98dcb7e97ae9ea138.jpg"><img src="https://img.it610.com/image/info8/e95a68ac915a4ec98dcb7e97ae9ea138.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第1张图片" /></a></p>
+
+<pre><code> # /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# m h dom mon dow user  command
+17 *    * * *   root    cd / &amp;&amp; run-parts --report /etc/cron.hourly
+25 6    * * *   root    test -x /usr/sbin/anacron || ( cd / &amp;&amp; run-parts --report /etc/cron.daily )
+47 6    * * 7   root    test -x /usr/sbin/anacron || ( cd / &amp;&amp; run-parts --report /etc/cron.weekly )
+52 6    1 * *   root    test -x /usr/sbin/anacron || ( cd / &amp;&amp; run-parts --report /etc/cron.monthly )
+#
+
+# edited by ouyang 2017-8-11 添加定时任务，每天凌晨两点，执行gitlab备份
+#0  2    * * *   root    /opt/gitlab/bin/gitlab-rake gitlab:backup:create CRON=1  
+
+#也可以按照如下所示的方法，定时执行 auto_backup.sh脚本，脚本内容就填写： /opt/gitlab/bin/gitlab-rake gitlab:backup:create CRON=1 
+0 2    * * *   root    /data/gitlabData/backups/auto_backup.sh -D 1    
+
+
+# edited by ouyang 2017-8-17 添加定时任务，每天凌晨三点，执行gitlab备份到远程服务器
+0  3    * * *   root   /data/gitlabData/backups/auto_backup_to_remote.sh 
+</code></pre>
+
+<p>可以看到</p>
+
+<blockquote>
+<p>1、每天凌晨2点在Gitlab服务器上执行Gitlab备份功能，对应着
+<strong>/data/gitlabData/backups/auto_backup.sh</strong> 脚本<br />
+ 2、每天凌晨3点在Gitlab服务器上执行scp命令将最新的Gitlab备份文件复制到远程的文件备份服务器,对应着
+<strong>/data/gitlabData/backups/auto_backup_to_remote.sh</strong> 脚本</p>
+</blockquote>
+
+<h2 id="2-1-修改gitlab本机自动备份脚本">2.1 修改Gitlab本机自动备份脚本</h2>
+
+<p><strong>/data/gitlabData/backups/auto_backup.sh</strong> 脚本</p>
+
+<h3 id="2-1-1-原来的脚本内容">2.1.1 原来的脚本内容</h3>
+
+<pre><code>gitlab-rake gitlab:backup:create
+</code></pre>
+
+<h3 id="2-1-2-增加邮件提醒后的脚本内容">2.1.2 增加邮件提醒后的脚本内容</h3>
+
+<pre><code>#!/bin/bash
+
+# gitlab 机房备份路径
+LocalBackDir=/data/gitlabData/backups
+
+#当前系统日期
+DATE=`date +&quot;%Y-%m-%d&quot;`
+
+#邮件写入的文件
+mailcontent=$LocalBackDir/mail/mailcontent_$DATE
+
+mailToUser=ouyangpeng@oaserver.dw.gdbbk.com
+
+#Log存放路径
+LogFile=$LocalBackDir/log/backup_$DATE.log
+
+#新建日志文件
+touch $LogFile
+
+#追加日志到日志文件
+echo &quot;Gitlab auto backup at local server, start at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;  $LogFile
+echo &quot;---------------------------------------------------------------------------&quot; &gt;&gt; $LogFile
+
+
+#执行gitlab本地备份功能
+gitlab-rake gitlab:backup:create
+# $?符号显示上一条命令的返回值，如果为0则代表执行成功，其他表示失败
+if [ $? -eq 0 ];then
+   #追加日志到日志文件
+   echo &quot;-----------------------------------Success!----------------------------------------&quot; &gt;&gt; $LogFile
+   echo &quot;Gitlab auto backup at local server, end at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;&gt;  $LogFile
+
+   #写Email的正文内容
+   &gt; &quot;$mailcontent&quot;
+   echo &quot;GitLab Backup Daily Report,backup at local server Success ! Please Check your Email and read the following log file&quot; &gt;&gt; $mailcontent
+
+   #读取mailcontent内容当做邮件正文 ，附件为Log文件
+   cat $mailcontent | mail -s &quot;Congratulation! GitLab backup at local server Success Report.&quot; $mailToUser -A $LogFile
+else
+   #追加日志到日志文件
+   echo &quot;-----------------------------------Failed!---------------------------------------&quot; &gt;&gt; $LogFile
+   echo &quot;Gitlab auto backup at local server failed at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;&gt;  $LogFile
+
+   #写Email的正文内容
+   &gt; &quot;$mailcontent&quot;
+   echo &quot;GitLab Backup Daily Report,Backup at local server failed Failed !  Please Check your Email and read the following log file !&quot; &gt;&gt; $mailcontent
+
+   #读取mailcontent内容当做邮件正文 ，附件为Log文件
+   cat $mailcontent | mail -s &quot;Warning! GitLab Backup at local server Failed Report.&quot; $mailToUser -A $LogFile
+fi
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/77f8616e0e80413d84bcee6552129d58.jpg"><img src="https://img.it610.com/image/info8/77f8616e0e80413d84bcee6552129d58.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第2张图片" /></a></p>
+
+<h3 id="2-1-3-测试执行成功后触发邮件提醒">2.1.3 测试执行成功后触发邮件提醒</h3>
+
+<p>手动执行脚本</p>
+
+<pre><code>root@ubuntu4146:/data/gitlabData/backups# ./auto_backup.sh 
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/685ff25c0da6480db394c06af4e2a144.jpg"><img src="https://img.it610.com/image/info8/685ff25c0da6480db394c06af4e2a144.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第3张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/fc76340dd3bf4472b8546519b6e15b3a.jpg"><img src="https://img.it610.com/image/info8/fc76340dd3bf4472b8546519b6e15b3a.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第4张图片" /></a></p>
+
+<p>本次备份成功，因此OA收到的邮件为：</p>
+
+<p><a href="https://img.it610.com/image/info8/9888454167654713887f2d4b464a21eb.png"><img src="https://img.it610.com/image/info8/9888454167654713887f2d4b464a21eb.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第5张图片" /></a></p>
+
+<p>附件log为：</p>
+
+<pre><code>Gitlab auto backup at local server, start at  2017-08-18 18:57:39
+---------------------------------------------------------------------------
+-----------------------------------Success!----------------------------------------
+Gitlab auto backup at local server, end at  2017-08-18 18:58:11
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/ecaa13f2030d48d2a5fcb0590e4e5d5c.png"><img src="https://img.it610.com/image/info8/ecaa13f2030d48d2a5fcb0590e4e5d5c.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第6张图片" /></a></p>
+
+<h3 id="2-1-4-测试执行失败后触发邮件提醒">2.1.4 测试执行失败后触发邮件提醒</h3>
+
+<p>测试了很久，没出现过备份失败的情况，因此比较难以复现，但是脚本应该没问题。如果出现备份失败的话，我也会收到警告邮件的！</p>
+
+<h2 id="2-2-修改gitlab自动备份到远程文件备份服务器的脚本">2.2 修改Gitlab自动备份到远程文件备份服务器的脚本</h2>
+
+<p>之前的 <strong>/data/gitlabData/backups/auto_backup_to_remote.sh</strong> 脚本，脚本内容如下</p>
+
+<h3 id="2-2-1-原来的脚本内容">2.2.1 原来的脚本内容</h3>
+
+<pre><code>#!/bin/bash
+
+# gitlab 机房备份路径
+LocalBackDir=/data/gitlabData/backups
+
+# 远程备份服务器 gitlab备份文件存放路径
+RemoteBackDir=/root/gitlabDataBackup
+
+# 远程备份服务器 登录账户
+RemoteUser=root
+
+# 远程备份服务器 IP地址
+RemoteIP=（你的远程服务器地址）请自己修改
+
+#当前系统日期
+DATE=`date +&quot;%Y-%m-%d&quot;`
+
+#Log存放路径
+LogFile=$LocalBackDir/log/$DATE.log
+
+# 查找 本地备份目录下 时间为60分钟之内的，并且后缀为.tar的gitlab备份文件
+BACKUPFILE_SEND_TO_REMOTE=$(find /data/gitlabData/backups -type f -mmin -60  -name '*.tar*')
+
+#新建日志文件
+touch $LogFile
+
+#追加日志到日志文件
+echo &quot;Gitlab auto backup to remote server, start at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;&gt;  $LogFile
+echo &quot;---------------------------------------------------------------------------&quot; &gt;&gt; $LogFile
+
+# 输出日志，打印出每次scp的文件名
+echo &quot;---------------------The file to scp to remote server is: $BACKUPFILE_SEND_TO_REMOTE-------------------------------&quot; &gt;&gt; $LogFile
+
+
+#备份到远程服务器
+scp $BACKUPFILE_SEND_TO_REMOTE $RemoteUser@$RemoteIP:$RemoteBackDir
+
+#追加日志到日志文件
+echo &quot;---------------------------------------------------------------------------&quot; &gt;&gt; $LogFile
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/955e6aad282744c7984b23a35caee067.jpg" alt="这里写图片描述" /></p>
+
+<h3 id="2-2-2-增加邮件提醒后的脚本内容">2.2.2 增加邮件提醒后的脚本内容</h3>
+
+<p>现在要对scp命令的执行结果进行判断，根据命令执行是否成功，发送不同的Email邮件通知相关负责人。</p>
+
+<pre><code>#!/bin/bash
+
+# gitlab 机房备份路径
+LocalBackDir=/data/gitlabData/backups
+
+# 远程备份服务器 gitlab备份文件存放路径
+RemoteBackDir=/root/gitlabDataBackup
+
+# 远程备份服务器 登录账户
+RemoteUser=root
+
+# 远程机房代码备份服务器 IP地址
+RemoteIP1=（你的远程服务器地址）请自己修改
+
+# 远程备份服务器 IP地址 (办公室)
+#RemoteIP2=（你的远程服务器地址2）请自己修改
+
+#当前系统日期
+DATE=`date +&quot;%Y-%m-%d&quot;`
+
+#Log存放路径
+LogFile=$LocalBackDir/log/$DATE.log
+
+# 查找 本地备份目录下 时间为120分钟之内的，并且后缀为.tar的gitlab备份文件
+BACKUPFILE_SEND_TO_REMOTE=$(find /data/gitlabData/backups -type f -mmin -120  -name '*.tar*')
+
+
+#邮件写入的文件
+mailcontent=$LocalBackDir/mail/mailcontent_$DATE
+
+mailToUser=ouyangpeng@oaserver.dw.gdbbk.com
+
+#新建日志文件
+touch $LogFile
+
+#追加日志到日志文件
+echo &quot;Gitlab auto backup to remote server, start at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;  $LogFile
+echo &quot;---------------------------------------------------------------------------&quot; &gt;&gt; $LogFile
+
+# 输出日志，打印出每次scp的文件名
+echo &quot;---------------------The file to scp to remote server is: $BACKUPFILE_SEND_TO_REMOTE-------------------------------&quot; &gt;&gt; $LogFile
+
+#备份到 远程备份服务器 (办公室)
+#scp $BACKUPFILE_SEND_TO_REMOTE $RemoteUser@$RemoteIP2:$RemoteBackDir
+
+#备份到 远程机房代码备份服务器
+scp $BACKUPFILE_SEND_TO_REMOTE $RemoteUser@$RemoteIP1:$RemoteBackDir
+# $?符号显示上一条命令的返回值，如果为0则代表执行成功，其他表示失败
+if [ $? -eq 0 ];then
+   #追加日志到日志文件
+   echo &quot;-----------------------------------Success!----------------------------------------&quot; &gt;&gt; $LogFile
+   echo &quot;Gitlab auto backup to remote server, end at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;&gt;  $LogFile
+
+   #写Email的正文内容
+   &gt; &quot;$mailcontent&quot;
+   echo &quot;GitLab Backup Daily Report, backup to remote server Success ! Please Check your Email and read the following log file&quot; &gt;&gt; $mailcontent
+
+   #读取mailcontent内容当做邮件正文 ，附件为Log文件
+   cat $mailcontent | mail -s &quot;Congratulation! GitLab backup to remote server Success Report.&quot; $mailToUser -A $LogFile
+else
+   #追加日志到日志文件
+   echo &quot;-----------------------------------Failed!---------------------------------------&quot; &gt;&gt; $LogFile
+   echo &quot;Gitlab auto backup to remote server failed at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;&gt;  $LogFile
+
+   #写Email的正文内容
+   &gt; &quot;$mailcontent&quot;
+   echo &quot;GitLab Backup Daily Report,Backup to remote server Failed !  Please Check your Email and read the following log file !&quot; &gt;&gt; $mailcontent
+
+   #读取mailcontent内容当做邮件正文 ，附件为Log文件
+   cat $mailcontent | mail -s &quot;Warning! GitLab Backup to remote server Failed Report.&quot; $mailToUser -A $LogFile
+fi
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/c3b72d30ccf046c691a4a6b6722bb25e.jpg"><img src="https://img.it610.com/image/info8/c3b72d30ccf046c691a4a6b6722bb25e.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第7张图片" /></a></p>
+
+<p>加上最后一段判断scp命令是否正常，然后根据命令执行结果，发送不同的Email邮件到相关责任人。</p>
+
+<h3 id="2-2-3-测试执行失败后触发邮件提醒">2.2.3 测试执行失败后触发邮件提醒</h3>
+
+<p>现在我们手动触发一下刚才的脚本，发现scp命令执行失败，因为find命令没有找到匹配的要传输到远程服务器的文件，因此失败。</p>
+
+<pre><code>root@ubuntu4146:/data/gitlabData/backups# ./auto_backup_to_remote.sh 
+usage: scp [-12346BCpqrv] [-c cipher] [-F ssh_config] [-i identity_file]
+           [-l limit] [-o ssh_option] [-P port] [-S program]
+           [[user@]host1:]file1 ... [[user@]host2:]file2
+root@ubuntu4146:/data/gitlabData/backups# 
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/8fc6db9c58ec4595a51d38a37c389c44.png"><img src="https://img.it610.com/image/info8/8fc6db9c58ec4595a51d38a37c389c44.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第8张图片" /></a></p>
+
+<p>接着我们在OA邮件收到 失败的报警邮件，如下所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/e1f2bb46c7194bfea34cf65901e0f598.png"><img src="https://img.it610.com/image/info8/e1f2bb46c7194bfea34cf65901e0f598.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第9张图片" /></a></p>
+
+<p>上面的主题以及正文还有附件log文件，这样我就可以根据收到这封邮件的话就去紧急查看下为什么会失败，并进行相应的补救措施。</p>
+
+<p>log附件内容为：</p>
+
+<pre><code>Gitlab auto backup to remote server, start at  2017-08-18 18:25:51
+---------------------------------------------------------------------------
+---------------------The file to scp to remote server is: -------------------------------
+-----------------------------------Failed!---------------------------------------
+Gitlab auto backup to remote server failed at  2017-08-18 18:25:51
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/b0c43cbc5f2c421bbfcf26fc9354e56b.png"><img src="https://img.it610.com/image/info8/b0c43cbc5f2c421bbfcf26fc9354e56b.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第10张图片" /></a></p>
+
+<h3 id="2-2-4-测试执行成功后触发邮件提醒">2.2.4 测试执行成功后触发邮件提醒</h3>
+
+<pre><code>root@ubuntu4146:/data/gitlabData/backups# vi auto_backup_to_remote.sh 
+root@ubuntu4146:/data/gitlabData/backups# touch -t 201708181830 test2.tar
+root@ubuntu4146:/data/gitlabData/backups# ./auto_backup_to_remote.sh 
+test2.tar                                                                                                                                                  100%    0     0.0KB/s   00:00    
+root@ubuntu4146:/data/gitlabData/backups# 
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/3682b4c641734650a8355f04ee09a508.jpg"><img src="https://img.it610.com/image/info8/3682b4c641734650a8355f04ee09a508.jpg" alt="这里写图片描述" /></a></p>
+
+<p>新建一个test2.tar,文件创建时间为18:30分，现在时间是18点34分，因此可以执行成功。</p>
+
+<p>接着我们在OA邮件收到 成功的邮件，如下所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/75c6fb719f95453d95d64f6a98a5b969.png"><img src="https://img.it610.com/image/info8/75c6fb719f95453d95d64f6a98a5b969.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第11张图片" /></a></p>
+
+<p>log附件内容为：</p>
+
+<pre><code>Gitlab auto backup to remote server, start at  2017-08-18 18:33:07
+---------------------------------------------------------------------------
+---------------------The file to scp to remote server is: /data/gitlabData/backups/test2.tar-------------------------------
+-----------------------------------Success!----------------------------------------
+Gitlab auto backup to remote server, end at  2017-08-18 18:33:32
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/7eb032fffa88477b9741e72a48010fd3.png"><img src="https://img.it610.com/image/info8/7eb032fffa88477b9741e72a48010fd3.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第12张图片" /></a></p>
+
+<h1 id="三-修改远程备份服务器上的脚本">三、修改远程备份服务器上的脚本</h1>
+
+<p>切换到远程备份服务器，查看定时任务</p>
+
+<pre><code>#编辑 /etc/crontab
+vi /etc/crontab 
+</code></pre>
+
+<p>可以看到已经在计划中的定时任务为 每天凌晨4点，执行删除过期的Gitlab备份文件</p>
+
+<pre><code>SHELL=/bin/bash
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+HOME=/
+
+# For details see man 4 crontabs
+
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name command to be executed
+
+
+# edited by ouyang 2017-8-17 添加定时任务，每天凌晨4点，执行删除过期的Gitlab备份文件
+0  4    * * *   root  /root/gitlabDataBackup/auto_remove_old_backup.sh
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/aabb37bb148a46fb9f6e2db5d890fd24.jpg"><img src="https://img.it610.com/image/info8/aabb37bb148a46fb9f6e2db5d890fd24.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第13张图片" /></a></p>
+
+<h2 id="2-1-修改自动删除过期的gitlab备份文件的脚本">2.1 修改自动删除过期的Gitlab备份文件的脚本</h2>
+
+<p>之前的 <strong>/root/gitlabDataBackup/auto_remove_old_backup.sh</strong> 脚本内容为：</p>
+
+<pre><code>#!/bin/bash
+
+# 远程备份服务器 gitlab备份文件存放路径
+GitlabBackDir=/root/gitlabDataBackup
+
+# 查找远程备份路径下，超过7天 且文件后缀为.tar 的 Gitlab备份文件 然后删除
+find $GitlabBackDir -type f -mtime +7 -name '*.tar*' -exec rm {} \;
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/cb098ba69b074f55a46774509a901a19.jpg"><img src="https://img.it610.com/image/info8/cb098ba69b074f55a46774509a901a19.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第14张图片" /></a></p>
+
+<p>现在新增加邮件通知的脚本内容为：</p>
+
+<pre><code>#!/bin/bash
+
+#当前系统日期
+DATE=`date +&quot;%Y-%m-%d&quot;`
+
+# 远程备份服务器 gitlab备份文件存放路径
+GitlabBackDir=/root/gitlabDataBackup
+
+#Log存放路径
+LogFile=$GitlabBackDir/log/$DATE.log
+
+#邮件写入的文件
+mailcontent=$GitlabBackDir/mail/mailcontent_$DATE
+
+mailToUser=ouyangpeng@oaserver.dw.gdbbk.com
+
+#新建日志文件
+touch $LogFile
+
+#追加日志到日志文件
+echo &quot;Gitlab auto clean old backupFiles , start at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;  $LogFile
+echo &quot;---------------------------------------------------------------------------&quot; &gt;&gt; $LogFile
+
+
+
+# 查找远程备份路径下，超过7天 且文件后缀为.tar 的 Gitlab备份文件 然后删除
+find $GitlabBackDir -type f -mtime +7 -name '*.tar*' -exec rm {} \;
+
+# $?符号显示上一条命令的返回值，如果为0则代表执行成功，其他表示失败
+if [ $? -eq 0 ];then
+   #追加日志到日志文件
+   echo &quot;-----------------------------------Success!----------------------------------------&quot; &gt;&gt; $LogFile
+   echo &quot;Gitlab auto clean old backupFiles, end at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;&gt;  $LogFile
+
+   #写Email的正文内容
+   &gt; &quot;$mailcontent&quot;
+   echo &quot;GitLab Backup Daily Report, auto clean old backupFiles Success ! Please Check your Email and read the following log file&quot; &gt;&gt; $mailcontent
+
+   #读取mailcontent内容当做邮件正文 ，附件为Log文件
+   cat $mailcontent | mail -s &quot;Congratulation! GitLab clean old backupFiles Success Report.&quot; $mailToUser -A $LogFile
+else
+   #追加日志到日志文件
+   echo &quot;-----------------------------------Failed!---------------------------------------&quot; &gt;&gt; $LogFile
+   echo &quot;Gitlab auto backup to remote server failed at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;&gt;  $LogFile
+
+   #写Email的正文内容
+   &gt; &quot;$mailcontent&quot;
+   echo &quot;GitLab Backup Daily Report,auto clean old backupFiles Failed !  Please Check your Email and read the following log file !&quot; &gt;&gt; $mailcontent
+
+   #读取mailcontent内容当做邮件正文 ，附件为Log文件
+   cat $mailcontent | mail -s &quot;Warning! GitLab clean old backupFiles Failed  Report.&quot; $mailToUser -A $LogFile
+fi
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/95f3f8e284374e4aa66b3d221f1c88cf.jpg"><img src="https://img.it610.com/image/info8/95f3f8e284374e4aa66b3d221f1c88cf.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第15张图片" /></a></p>
+
+<h2 id="2-2-手动执行自动删除过期的gitlab备份文件的脚本触发失败后的邮件通知">2.2 手动执行自动删除过期的Gitlab备份文件的脚本触发失败后的邮件通知</h2>
+
+<pre><code>[root@localhost gitlabDataBackup]# ./auto_remove_old_backup.sh 
+touch: missing file operand
+Try `touch --help' for more information.
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/edfa41ec267048e4a211c8defb091bdc.png"><img src="https://img.it610.com/image/info8/edfa41ec267048e4a211c8defb091bdc.png" alt="这里写图片描述" /></a><br />
+手动执行该自动删除过期的Gitlab备份文件的脚本，执行失败，因为没有超过七天的文件存在。</p>
+
+<p><a href="https://img.it610.com/image/info8/562cc845140947418d9e146cbd5153a7.jpg"><img src="https://img.it610.com/image/info8/562cc845140947418d9e146cbd5153a7.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第16张图片" /></a></p>
+
+<p>此时收到的OA邮件如下所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/cf974f28cb2c4476857fe1e22ec0f558.png"><img src="https://img.it610.com/image/info8/cf974f28cb2c4476857fe1e22ec0f558.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第17张图片" /></a></p>
+
+<h2 id="2-3-手动执行自动删除过期的gitlab备份文件的脚本触发成功后的邮件通知">2.3 手动执行自动删除过期的Gitlab备份文件的脚本触发成功后的邮件通知</h2>
+
+<pre><code>[root@localhost gitlabDataBackup]# touch -t 201707031230 test3.tar
+[root@localhost gitlabDataBackup]# touch -t 201707041230 test4.tar
+[root@localhost gitlabDataBackup]# ll
+total 4154376
+-rw-------. 1 root root 1401958400 Aug 17 20:05 1502906429_2017_08_17_9.4.3_gitlab_backup.tar
+-rw-------. 1 root root 1425950720 Aug 18 11:59 1502972105_2017_08_17_9.4.3_gitlab_backup.tar
+-rw-------. 1 root root 1426145280 Aug 18 14:27 1502992830_2017_08_18_9.4.3_gitlab_backup.tar
+-rwxrwxrwx. 1 root root       2108 Aug 18 19:20 auto_remove_old_backup.sh
+drwxr-xr-x. 2 root root       4096 Aug 18 19:20 log
+drwxr-xr-x. 2 root root       4096 Aug 18 19:20 mail
+-rw-r--r--. 1 root root          0 Aug 18 15:27 test1.tar
+-rw-r--r--. 1 root root          0 Aug 18 18:33 test2.tar
+-rw-r--r--. 1 root root          0 Jul  3 12:30 test3.tar
+-rw-r--r--. 1 root root          0 Jul  4 12:30 test4.tar
+[root@localhost gitlabDataBackup]# 
+</code></pre>
+
+<p>先手动创建两个7月份的test3.tar,test4.tar文件用于测试。<br />
+<a href="https://img.it610.com/image/info8/1f1626c1a5c6444d959bf3e16275612f.jpg"><img src="https://img.it610.com/image/info8/1f1626c1a5c6444d959bf3e16275612f.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第18张图片" /></a></p>
+
+<p>接着手动执行自动删除过期的Gitlab备份文件的脚本</p>
+
+<pre><code>[root@localhost gitlabDataBackup]# ll
+total 4154376
+-rw-------. 1 root root 1401958400 Aug 17 20:05 1502906429_2017_08_17_9.4.3_gitlab_backup.tar
+-rw-------. 1 root root 1425950720 Aug 18 11:59 1502972105_2017_08_17_9.4.3_gitlab_backup.tar
+-rw-------. 1 root root 1426145280 Aug 18 14:27 1502992830_2017_08_18_9.4.3_gitlab_backup.tar
+-rwxrwxrwx. 1 root root       2108 Aug 18 19:20 auto_remove_old_backup.sh
+drwxr-xr-x. 2 root root       4096 Aug 18 19:20 log
+drwxr-xr-x. 2 root root       4096 Aug 18 19:20 mail
+-rw-r--r--. 1 root root          0 Aug 18 15:27 test1.tar
+-rw-r--r--. 1 root root          0 Aug 18 18:33 test2.tar
+-rw-r--r--. 1 root root          0 Jul  3 12:30 test3.tar
+-rw-r--r--. 1 root root          0 Jul  4 12:30 test4.tar
+[root@localhost gitlabDataBackup]# ./auto_remove_old_backup.sh 
+touch: missing file operand
+Try `touch --help' for more information.
+[root@localhost gitlabDataBackup]# vi auto_remove_old_backup.sh 
+[root@localhost gitlabDataBackup]# ll
+total 4154376
+-rw-------. 1 root root 1401958400 Aug 17 20:05 1502906429_2017_08_17_9.4.3_gitlab_backup.tar
+-rw-------. 1 root root 1425950720 Aug 18 11:59 1502972105_2017_08_17_9.4.3_gitlab_backup.tar
+-rw-------. 1 root root 1426145280 Aug 18 14:27 1502992830_2017_08_18_9.4.3_gitlab_backup.tar
+-rwxrwxrwx. 1 root root       2108 Aug 18 19:20 auto_remove_old_backup.sh
+drwxr-xr-x. 2 root root       4096 Aug 18 19:20 log
+drwxr-xr-x. 2 root root       4096 Aug 18 19:20 mail
+-rw-r--r--. 1 root root          0 Aug 18 15:27 test1.tar
+-rw-r--r--. 1 root root          0 Aug 18 18:33 test2.tar
+You have new mail in /var/spool/mail/root
+[root@localhost gitlabDataBackup]# 
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/77cbd0b5c1f24a2eadb9f0e1881a75fd.jpg"><img src="https://img.it610.com/image/info8/77cbd0b5c1f24a2eadb9f0e1881a75fd.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第19张图片" /></a></p>
+
+<p>此时收到的OA邮件如下所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/85dc85dabadb4d43b83be8052a4c761e.png"><img src="https://img.it610.com/image/info8/85dc85dabadb4d43b83be8052a4c761e.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第20张图片" /></a></p>
+
+<blockquote>
+<p>1、每天凌晨2点在Gitlab服务器上执行Gitlab备份功能。<br />
+ 2、每天凌晨3点在Gitlab服务器上执行scp命令将最新的Gitlab备份文件复制到远程的文件备份服务器。<br />
+ 3、每天凌晨4点在远程的文件备份服务器上检测备份文件的时间，自动删除超过30天的备份文件。</p>
+</blockquote>
+
+<p>至此，Gitlab备份与远程备份以及定期清理过期备份文件的三个流程都增加了邮件提醒功能。当然如果嫌邮件收的太多，可以自己修改逻辑，当成功的时候都不发邮件提醒了，只有失败的时候才去发送邮件提醒。</p>
+
+<h1 id="验证自动化脚本">验证自动化脚本</h1>
+
+<p>第二天查看公司的OA邮箱，可以看到</p>
+
+<p><a href="https://img.it610.com/image/info8/cbaeb0aafc6d4430b27bc1b4316b9f2d.png"><img src="https://img.it610.com/image/info8/cbaeb0aafc6d4430b27bc1b4316b9f2d.png" alt="这里写图片描述" /></a></p>
+
+<blockquote>
+<p>1、每天凌晨2点在Gitlab服务器上执行Gitlab备份功能。<br />
+ 2、每天凌晨3点在Gitlab服务器上执行scp命令将最新的Gitlab备份文件复制到远程的文件备份服务器。<br />
+ 3、每天凌晨4点在远程的文件备份服务器上检测备份文件的时间，自动删除超过30天的备份文件。</p>
+</blockquote>
+
+<p>上面的三个步骤都成功了，发了三封邮件通知我！</p>
+
+<p><a href="https://img.it610.com/image/info8/d51fbdb76d1e4885a4d10a91a75a79ea.png"><img src="https://img.it610.com/image/info8/d51fbdb76d1e4885a4d10a91a75a79ea.png" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第21张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/86a7406b0c794ce4ab57ecac1c0164fd.jpg"><img src="https://img.it610.com/image/info8/86a7406b0c794ce4ab57ecac1c0164fd.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第22张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/65b547e0b71e4b619a9970937b9ebcf5.jpg"><img src="https://img.it610.com/image/info8/65b547e0b71e4b619a9970937b9ebcf5.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第23张图片" /></a></p>
+
+<p>Gitlab服务器 凌晨2点自动备份成功截图<br />
+<a href="https://img.it610.com/image/info8/2ad8841c7f30467b8e24ac1c8683958a.jpg"><img src="https://img.it610.com/image/info8/2ad8841c7f30467b8e24ac1c8683958a.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第24张图片" /></a></p>
+
+<p>Gitlab服务器凌晨3点 scp 备份文件到 远程的文件备份服务器 成功截图<br />
+<a href="https://img.it610.com/image/info8/290af362a24e4c75968c7f1e3f4b2af9.jpg"><img src="https://img.it610.com/image/info8/290af362a24e4c75968c7f1e3f4b2af9.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第25张图片" /></a></p>
+
+<p>而且可以看到， 远程的文件备份服务器上已经没有了超过7天的Gitlab备份文件。</p>
+
+<h1 id="新增邮件接收者">新增邮件接收者</h1>
+
+<p>上面的几个shell脚本，我都是只发送给我自己的OA邮箱。但是领导说这些邮件也要给他们发送一份，因此我需要修改脚本来改变收件人列表，使领导也能够收到相应的邮件</p>
+
+<p>之前最后发送的相关命令如下所示，只发送给我自己的OA邮箱。</p>
+
+<pre><code>#读取mailcontent内容当做邮件正文 ，附件为Log文件
+cat $mailcontent | mail -s &quot;Warning! GitLab Backup at local server Failed Report.&quot; $mailToUser -A $LogFile
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/0838c911bfde492b8a6eb14f8de5d1d6.jpg"><img src="https://img.it610.com/image/info8/0838c911bfde492b8a6eb14f8de5d1d6.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第26张图片" /></a></p>
+
+<p>Gitlab服务器是部署在Ubuntu系统，</p>
+
+<pre><code>root@ubuntu4146:~# lsb_release -a
+No LSB modules are available.
+Distributor ID: Ubuntu
+Description:    Ubuntu 14.04.3 LTS
+Release:    14.04
+Codename:   trusty
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/28b8328081824e24b8429003a8cd9573.jpg"><img src="https://img.it610.com/image/info8/28b8328081824e24b8429003a8cd9573.jpg" alt="这里写图片描述" /></a></p>
+
+<p>因此我们查看下 mail 的帮助文档</p>
+
+<pre><code>root@ubuntu4146:/data/gitlabData/backups# mail --help
+Usage: mail [OPTION...] [address...]
+  or:  mail [OPTION...] -f [OPTION...] [file]
+  or:  mail [OPTION...] --file [OPTION...] [file]
+  or:  mail [OPTION...] --file=file [OPTION...]
+GNU mail -- process mail messages.
+If -f or --file is given, mail operates on the mailbox named by the first
+argument, or the user's mbox, if no argument given.
+
+  -a, --append=HEADER: VALUE append given header to the message being sent
+  -A, --attach=FILE          attach FILE
+      --content-type=TYPE    set content type for subsequent --attach options
+  -e, --exist                return true if mail exists
+      --encoding=NAME        set encoding for subsequent --attach options
+  -E, --exec=COMMAND         execute COMMAND
+  -F, --byname               save messages according to sender
+  -H, --headers              write a header summary and exit
+  -i, --ignore               ignore interrupts
+  -n, --norc                 do not read the system mailrc file
+  -N, --nosum                do not display initial header summary
+  -p, --print, --read        print all mail to standard output
+  -q, --quit                 cause interrupts to terminate program
+  -r, --return-address=ADDRESS   use address as the return address when sending
+                             mail
+  -s, --subject=SUBJ         send a message with the given SUBJECT
+  -t, --to                   precede message by a list of addresses
+  -u, --user=USER            operate on USER's mailbox
+
+ Common options
+      --config-file=FILE, --rcfile=FILE
+                             load this configuration file
+      --config-help          show configuration file summary
+      --config-lint, --rcfile-lint
+                             check configuration file syntax and exit
+      --config-verbose, --rcfile-verbose
+                             verbosely log parsing of the configuration files
+      --no-site-config, --no-site-rcfile
+                             do not load site configuration file
+      --no-user-config, --no-user-rcfile
+                             do not load user configuration file
+      --set=PARAM=VALUE      set configuration parameter
+      --show-config-options  show compilation options
+
+
+ Global debugging settings
+      --debug-level=LEVEL    set Mailutils debugging level
+      --debug-line-info      show source info with debugging messages
+
+  -?, --help                 give this help list
+      --usage                give a short usage message
+  -V, --version              print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Report bugs to .
+root@ubuntu4146:/data/gitlabData/backups# 
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/aa3411ee330b441299dd37450e85c917.png" alt="这里写图片描述" /></p>
+
+<p>查看上面的mail帮助文档，我们可以使用 mail 命令的 -t 选项来，指定一个收件人列表。</p>
+
+<pre><code>mailToUser=ouyangpeng@oaserver.dw.gdbbk.com
+mailToUser1=领导1邮箱
+mailToUser2=领导2邮箱
+
+#读取mailcontent内容当做邮件正文 ，附件为Log文件
+cat $mailcontent | mail -s &quot;Warning! GitLab Backup at local server Failed Report.&quot; -t $mailToUser $mailToUser1 $mailToUser2 -A $LogFile
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/cf52b91293134bf09d8b8d8ff8757254.jpg"><img src="https://img.it610.com/image/info8/cf52b91293134bf09d8b8d8ff8757254.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第27张图片" /></a></p>
+
+<p>这样发送之后，领导也能收到相应的邮件。如果出现什么问题的话，也有多个责任人知道，能够及时处理备份问题。</p>
+
+<p>但是备份服务器是部署在Center OS系统上，两个不同系统的mail命令有所不同，在Center OS上的mail命令的 -t
+选项不是指定一个userlist。</p>
+
+<p>首先通过如下命令lsb_release -a 查看系统版本</p>
+
+<pre><code>[root@localhost gitlabDataBackup]# lsb_release -a
+LSB Version:    :base-4.0-amd64:base-4.0-noarch:core-4.0-amd64:core-4.0-noarch:graphics-4.0-amd64:graphics-4.0-noarch:printing-4.0-amd64:printing-4.0-noarch
+Distributor ID: CentOS
+Description:    CentOS release 6.8 (Final)
+Release:    6.8
+Codename:   Final
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/4b65df0c08b14acfa95f330bb9d20411.jpg" alt="这里写图片描述" /></p>
+
+<p>然后使用命令 man help 查看mail命令的用法</p>
+
+<pre><code>[root@localhost gitlabDataBackup]# mail --help
+mail: illegal option -- -
+Usage: mail -eiIUdEFntBDNHRV~ -T FILE -u USER -h hops -r address -s SUBJECT -a FILE -q FILE -f FILE -A ACCOUNT -b USERS -c USERS -S OPTION users
+[root@localhost gitlabDataBackup]# 
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/fa3a3003b3e94371a9f7d53ee197e3ee.jpg" alt="这里写图片描述" /></p>
+
+<p>按照如上所示的用法，我们改写脚本</p>
+
+<p>之前的发送给我一个人的脚本为</p>
+
+<pre><code>#读取mailcontent内容当做邮件正文 ，附件为Log文件
+   cat $mailcontent | mail -s &quot;Warning! GitLab clean old backupFiles Failed  Report.&quot; $mailToUser -A $LogFile
+</code></pre>
+
+<p>现在新增两个领导的邮箱，然后脚本改为</p>
+
+<pre><code>mailToUser=ouyangpeng@oaserver.dw.gdbbk.com
+mailToUser1=领导1邮箱
+mailToUser2=领导2邮箱
+
+#读取mailcontent内容当做邮件正文 ，附件为Log文件
+cat $mailcontent | mail -s &quot;Congratulation! GitLab clean old backupFiles Success Report.&quot; -a $LogFile $mailToUser -c $mailToUser1,$mailToUser2
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/4cb9b90da8ec48bd913e15d8246702c1.jpg"><img src="https://img.it610.com/image/info8/4cb9b90da8ec48bd913e15d8246702c1.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第28张图片" /></a></p>
+
+<p>完整的代码如下所示：</p>
+
+<pre><code>#!/bin/bash
+
+#当前系统日期
+DATE=`date +&quot;%Y-%m-%d&quot;`
+
+# 远程备份服务器 gitlab备份文件存放路径
+GitlabBackDir=/root/gitlabDataBackup
+
+#Log存放路径
+LogFile=$GitlabBackDir/log/$DATE.log
+
+#邮件写入的文件
+mailcontent=$GitlabBackDir/mail/mailcontent_$DATE
+
+mailToUser=ouyangpeng@oaserver.dw.gdbbk.com
+mailToUser1=领导1邮箱
+mailToUser2=领导2邮箱
+
+#新建日志文件
+touch $LogFiled
+
+#追加日志到日志文件
+echo &quot;Gitlab auto clean old backupFiles , start at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;  $LogFile
+echo &quot;---------------------------------------------------------------------------&quot; &gt;&gt; $LogFile
+
+
+
+# 查找远程备份路径下，超过7天 且文件后缀为.tar 的 Gitlab备份文件 然后删除
+find $GitlabBackDir -type f -mtime +7 -name '*.tar*' -exec rm {} \;
+
+# $?符号显示上一条命令的返回值，如果为0则代表执行成功，其他表示失败
+if [ $? -eq 0 ];then
+   #追加日志到日志文件
+   echo &quot;-----------------------------------Success!----------------------------------------&quot; &gt;&gt; $LogFile
+   echo &quot;Gitlab auto clean old backupFiles, end at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;&gt;  $LogFile
+
+   #写Email的正文内容
+   &gt; &quot;$mailcontent&quot;
+   echo &quot;GitLab Backup Daily Report, auto clean old backupFiles Success ! Please Check your Email and read the following log file&quot; &gt;&gt; $mailcontent
+
+   #读取mailcontent内容当做邮件正文 ，附件为Log文件
+   #cat $mailcontent | mail -s &quot;Congratulation! GitLab clean old backupFiles Success Report.&quot; -a $LogFile $mailToUser -c $mailToUser1,$mailToUser2
+
+   #如果成功的话，只需要发送给我一个人即可
+   cat $mailcontent | mail -s &quot;Congratulation! GitLab clean old backupFiles Success Report.&quot; -a $LogFile $mailToUser
+else
+   #追加日志到日志文件
+   echo &quot;-----------------------------------Failed!---------------------------------------&quot; &gt;&gt; $LogFile
+   echo &quot;Gitlab auto backup to remote server failed at  $(date +&quot;%Y-%m-%d %H:%M:%S&quot;)&quot; &gt;&gt;  $LogFile
+
+   #写Email的正文内容
+   &gt; &quot;$mailcontent&quot;
+   echo &quot;GitLab Backup Daily Report,auto clean old backupFiles Failed !  Please Check your Email and read the following log file !&quot; &gt;&gt; $mailcontent
+
+   #读取mailcontent内容当做邮件正文 ，附件为Log文件
+   cat $mailcontent | mail -s &quot;Warning! GitLab clean old backupFiles Failed  Report.&quot; -a $LogFile $mailToUser -c $mailToUser1,$mailToUser2
+fi
+</code></pre>
+
+<p>执行脚本后，OA收到的邮件信息为：<br />
+<a href="https://img.it610.com/image/info8/180be5e76a7349aa8740609b4cbe87b2.jpg"><img src="https://img.it610.com/image/info8/180be5e76a7349aa8740609b4cbe87b2.jpg" alt="Git学习--&gt;如何通过Shell脚本实现
+监控Gitlab备份整个过程并且通过邮件通知得到备份结果？_第29张图片" /></a></p>
+
+<h1 id="相关链接">相关链接</h1>
+
+<ul>
+<li><p>Git学习–&gt;如何通过Shell脚本自动定时将Gitlab备份文件复制到远程服务器?<br />
+<a href="http://blog.csdn.net/ouyang_peng/article/details/77334215">http://blog.csdn.net/ouyang_peng/article/details/77334215</a></p></li>
+
+<li><p>git学习——&gt; Gitlab如何进行备份恢复与迁移？<br />
+<a href="http://blog.csdn.net/ouyang_peng/article/details/77070977">http://blog.csdn.net/ouyang_peng/article/details/77070977</a></p></li>
+
+<li><p>Linux学习–&gt;如何通过Shell脚本实现发送邮件通知功能？<br />
+<a href="http://blog.csdn.net/ouyang_peng/article/details/77363437">http://blog.csdn.net/ouyang_peng/article/details/77363437</a></p></li>
+</ul>
+
+<hr />
+
+<p><img src="https://img.it610.com/image/info8/bcaad8d673a0499bb67fbc527c9f38d8.jpg" alt="这里写图片描述" /></p>
+
+<blockquote>
+<p>作者：欧阳鹏 欢迎转载，与人分享是进步的源泉！<br />
+ 转载请保留原文地址：<a href="http://blog.csdn.net/ouyang_peng/article/details/77371161">http://blog.csdn.net/ouyang_peng/article/details/77371161</a></p>
+
+<p>如果觉得本文对您有所帮助，欢迎您扫码下图所示的 <strong>支付宝</strong> 和 <strong>微信支付</strong> 二维码对本文进行随意打赏。您的支持将鼓励我继续创作！</p>
+</blockquote>
+
+<p><img src="https://img.it610.com/image/info8/3e7d271a7f3b4a1eb5da267deebbd230.jpg" alt="这里写图片描述" /></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

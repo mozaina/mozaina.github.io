@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>监控linux中CPU内存磁盘数据的shell脚本图文 | 开发者问答集锦</title>
+    <meta property="og:title" content="监控linux中CPU内存磁盘数据的shell脚本图文 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="监控linux中CPU内存磁盘数据的shell脚本图文">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%9B%91%E6%8E%A7linux%E4%B8%ADcpu%E5%86%85%E5%AD%98%E7%A3%81%E7%9B%98%E6%95%B0%E6%8D%AE%E7%9A%84shell%E8%84%9A%E6%9C%AC%E5%9B%BE%E6%96%87/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">监控linux中CPU内存磁盘数据的shell脚本图文</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>分享一个shell脚本，用来监控linux服务器的CPU、内存、磁盘数据等信息，有需要的朋友参考下。</p>
+
+<p>在linux下监控cpu、内存、磁盘数据等信息，用shell脚本是最合适不过的了。</p>
+
+<p>以下脚本用来测试CPU压力，接收一个参数为：CPU数量。</p>
+
+<p>例如：<br />
+ <strong># ./killcpu.sh 2</strong><br />
+产生两个进程号，记住这2个进程号，测试完后杀掉进程，释放CPU资源。</p>
+
+<p>代码如下：</p>
+
+<p>复制代码代码示例:</p>
+
+<p>#!/bin/sh</p>
+
+<h1 id="filename-killcpu-sh">filename killcpu.sh</h1>
+
+<p>for i in <code>seq $1</code><br />
+do<br />
+echo -ne &ldquo;<br />
+i=0;<br />
+while true<br />
+do<br />
+ii=i+1;<br />
+done&rdquo; | /bin/sh &amp;<br />
+pid_array[$i]=$! ;<br />
+done<br />
+for i in &ldquo;${pid_array[@]}&ldquo;; do<br />
+echo &lsquo;kill &rsquo; $i &lsquo;;&rsquo;;<br />
+done</p>
+
+<p>调用示例，如下图：</p>
+
+<p>以下是今天要介绍的主要脚本，监测服务器CPU、内存MEM、磁盘DISK数据。<br />
+代码如下：</p>
+
+<p>复制代码代码示例:</p>
+
+<p>#!/bin/bash<br />
+#filename seerver_moniter.sh</p>
+
+<p>mem_quota=20<br />
+hd_quota=50<br />
+cpu_quota=80</p>
+
+<h1 id="watch-memory-usage">watch memory usage</h1>
+
+<p>watch_mem()<br />
+{<br />
+memtotal=<code>cat /proc/meminfo |grep &quot;MemTotal&quot;|awk '{print $2}'</code><br />
+memfree=<code>cat /proc/meminfo |grep &quot;MemFree&quot;|awk '{print $2}'</code><br />
+cached=<code>cat /proc/meminfo |grep &quot;^Cached&quot;|awk '{print $2}'</code><br />
+buffers=<code>cat /proc/meminfo |grep &quot;Buffers&quot;|awk '{print $2}'</code></p>
+
+<p>mem_usage=$((100-memfree*100/memtotal-buffers*100/memtotal-
+cached*100/memtotal))</p>
+
+<p>if [ $mem_usage -gt $mem_quota ];then<br />
+mem_message=&ldquo;WARN! The Memory usage is over than $mem_usage%&rdquo;<br />
+return 1<br />
+else<br />
+return 0<br />
+fi<br />
+}</p>
+
+<h1 id="watch-disk-usage">watch disk usage</h1>
+
+<p>watch_hd()<br />
+{<br />
+sda1_usage=<code>df |grep 'sda1'|awk '{print $5}'|sed 's/%//g'</code><br />
+sda2_usage=<code>df |grep 'sda2'|awk '{print $5}'|sed 's/%//g'</code><br />
+lv01_usage=<code>df |grep opt|awk '{print $4}'|sed 's/\%//g'</code></p>
+
+<p>if [ $sda1_usage -gt $hd_quota ] || [ $sda2_usage -gt $hd_quota ] || [
+$lv01_usage -gt $hd_quota ]; then<br />
+hd_message=&ldquo;WARN! The Hard Disk usage is over than $hd_quota%&rdquo;<br />
+return 1<br />
+else<br />
+return 0<br />
+fi<br />
+}</p>
+
+<h1 id="watch-cpu-usage-in-one-minute">watch cpu usage in one minute</h1>
+
+<p>get_cpu_info()<br />
+{<br />
+cat /proc/stat|grep &lsquo;^cpu[0-9]&lsquo;|awk &lsquo;{used+=$2+$3+$4;unused+=$5+$6+$7+$8}
+END{print used,unused}&rsquo;<br />
+}</p>
+
+<p>watch_cpu()<br />
+{<br />
+time_point_1=<code>get_cpu_info</code><br />
+sleep 60<br />
+time_point_2=<code>get_cpu_info</code><br />
+cpu_usage=<code>echo $time_point_1 $time_point_2|awk
+'{used=$3-$1;total=$3+$4-$1-$2;print used*100/total}'</code></p>
+
+<p>if [[ $cpu_usage &gt; $cpu_quota ]]; then<br />
+cpu_message=&ldquo;WARN! The CPU Usage is over than $cpu_quota%&rdquo;<br />
+return 1<br />
+else<br />
+return 0<br />
+fi<br />
+}</p>
+
+<p>proc_cpu_top10()<br />
+{<br />
+proc_busiest=<code>ps aux|sort -nk3r|head -n 11</code><br />
+}</p>
+
+<p>report=/root/server_report.log<br />
+watch_mem<br />
+if [ $? -eq 1 ]; then<br />
+date &gt;&gt; $report<br />
+echo &ldquo;$mem_message&rdquo; &gt;&gt; $report<br />
+fi</p>
+
+<p>watch_hd<br />
+if [ $? -eq 1 ]; then<br />
+date &gt;&gt; $report<br />
+echo &ldquo;$hd_message&rdquo; &gt;&gt; $report<br />
+fi</p>
+
+<p>watch_cpu<br />
+if [ $? -eq 1 ]; then<br />
+date &gt;&gt; $report<br />
+echo &ldquo;$cpu_message&rdquo; &gt;&gt; $report<br />
+proc_cpu_top10<br />
+echo &ldquo;$proc_busiest&rdquo; &gt;&gt; $report<br />
+fi</p>
+
+<p>if [ -a $report ]; then<br />
+mail -s &ldquo;CUP/MEM/DISK Stat of Alarm&rdquo; monitor@jbxue.com &lt; $report<br />
+rm -rf $report #为看到测试结果，可注释此行<br />
+fi</p>
+
+<p>脚本说明：</p>
+
+<h1 id="服务器cpu-mem-disk监控脚本-server-moniter-sh">服务器CPU/MEM/DISK监控脚本(server_moniter.sh)</h1>
+
+<p>#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p>
+
+<h1 id="对服务器的cpu-mem-disk设定阈值-动态监控利用率-超过阈值发送邮件">对服务器的CPU/MEM/DISK设定阈值，动态监控利用率，超过阈值发送邮件</h1>
+
+<h1 id="或者短信告警">或者短信告警</h1>
+
+<h1 id="本脚本通过调用watch-mem函数实现内存利用率监控-这里的内存利用率计算是进程实">本脚本通过调用watch_mem函数实现内存利用率监控，这里的内存利用率计算是进程实</h1>
+
+<h1 id="际使用的内存-也就是used-buffer-cache-超过阈值发送息">际使用的内存，也就是used-buffer/cache，超过阈值发送息。</h1>
+
+<h1 id="通过调用watch-hd函数实现磁盘利用率监控-这里的磁盘利用率-我采用">通过调用watch_hd函数实现磁盘利用率监控，这里的磁盘利用率，我采用</h1>
+
+<h1 id="一个一个磁盘或分区检索-这种方式对于磁盘或分区较多时-可能不太方">一个一个磁盘或分区检索，这种方式对于磁盘或分区较多时，可能不太方</h1>
+
+<h1 id="便-可以采用循环判断">便，可以采用循环判断。</h1>
+
+<h1 id="通过调用wath-cpu函数实现cpu利用率监控-这里是通过在一分钟内2次采">通过调用wath_cpu函数实现CPU利用率监控，这里是通过在一分钟内2次采</h1>
+
+<h1 id="集-proc-stat中的cpu数据-再对每1次采集点的数据中的使用cpu时间与空闲cpu时">集/proc/stat中的CPU数据，再对每1次采集点的数据中的使用CPU时间与空闲CPU时</h1>
+
+<h1 id="间累加求和-最后将2次采集点运算结果求差-获得cpu在一分钟类-使用时间利用率">间累加求和，最后将2次采集点运算结果求差，获得CPU在一分钟类# 使用时间利用率，</h1>
+
+<h1 id="这种计算方式比较准确-如果超过阈值发送消息">这种计算方式比较准确，如果超过阈值发送消息。</h1>
+
+<h1 id="在每一个函数中设置一个判断返回值-如果超过阈值-条件为真则返回1-如果返回值">在每一个函数中设置一个判断返回值，如果超过阈值，条件为真则返回1，如果返回值</h1>
+
+<h1 id="为1则-将告警消息附加到report中-最后如果report这个文件">为1则 将告警消息附加到report中，最后如果report这个文件</h1>
+
+<h1 id="存在-发送邮件通知管理员-将report做为邮件的正文">存在，发送邮件通知管理员，将report做为邮件的正文。</h1>
+
+<h1 id="可以将这个脚本添加到定时任务-每隔10分种执行一次检查">可以将这个脚本添加到定时任务，每隔10分种执行一次检查。</h1>
+
+<p>#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p>
+
+<p>加入定时任务：</p>
+
+<p>复制代码代码示例:</p>
+
+<p>10 * * * * /home/topgkw/server_moniter.sh</p>
+
+<p>每10分钟调用一次本脚本。<br />
+调用示例，如下图：</p>
+
+<p>来源于：<a href="http://www.jbxue.com/article/10788.html">http://www.jbxue.com/article/10788.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

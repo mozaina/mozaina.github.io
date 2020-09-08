@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linux下c运行shell获取返回值 | 开发者问答集锦</title>
+    <meta property="og:title" content="linux下c运行shell获取返回值 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linux下c运行shell获取返回值">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E4%B8%8Bc%E8%BF%90%E8%A1%8Cshell%E8%8E%B7%E5%8F%96%E8%BF%94%E5%9B%9E%E5%80%BC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linux下c运行shell获取返回值</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>c++中运行shell脚本一般有三种方法，分别是system、exec和popen，都是调用</p>
+
+<p>/bin/sh来执行参数指定的命令，/bin/sh
+一般是一个软连接，指向某个具体的shell，比如bash，-c选项是告诉shell从字符串command中读取命令；</p>
+
+<p>在该command执行期间，SIGCHLD是被阻塞的，好比在说：hi，内核，这会不要给我送SIGCHLD信号，等我忙完再说；</p>
+
+<p>在该command执行期间，SIGINT和SIGQUIT是被忽略的，意思是进程收到这两个信号后没有任何动作。</p>
+
+<p>system执行步骤：</p>
+
+<p>1.fork一个子进程；</p>
+
+<p>2.在子进程中调用exec函数去执行command；</p>
+
+<p>3.在父进程中调用wait去等待子进程结束。</p>
+
+<p>对于fork失败，system()函数返回-1。</p>
+
+<p>如果exec执行成功，也即command顺利执行完毕，则返回command通过exit或return返回的值。</p>
+
+<p>（注意，command顺利执行不代表执行成功，比如command：&rdquo;rm debuglog.txt&rdquo;，不管文件存不存在该command都顺利执行了）</p>
+
+<p>如果exec执行失败，也即command没有顺利执行，比如被信号中断，或者command命令根本不存在，system()函数返回127.</p>
+
+<p>如果command为NULL，则system()函数返回非0值，一般为1.</p>
+
+<p>最近写了c++shell混合编程，用到了system和popen函数，其中system函数只有运行成功与否的，不能从脚本里面取出变量值，只能获取shell是否运行成功的取值，成功返回0，失败返回-1。具体实现是</p>
+
+<p>int ret, status;</p>
+
+<p>ret = system(&rdquo; ./xxx.sh&rdquo;);<br />
+if (WIFEXITED(ret)) {<br />
+status = WEXITSTATUS(status);<br />
+} else {<br />
+status = -1;<br />
+}</p>
+
+<p>是利用WEXITSTATUS这个宏来监听实现运行成功与否。当然命令行也可以用$？来实现。</p>
+
+<p>popen函数是利用管道来实现对于脚本和脚本内数据的读取，可以
+对脚本内的变量进行赋值，然后利用popen的&rdquo;r&rdquo;功能取出来，N=“1”//赋值，&rdquo;=&ldquo;中间不能有空格</p>
+
+<p>echo $N//提取变量</p>
+
+<p>具体实现先定义文件指针，再创建一个字符数组。</p>
+
+<p>FILE *stream;//<br />
+char buffer[12];<br />
+static int ret = 0；<br />
+memset(buffer,&rsquo;\0&rsquo;,sizeof(buffer));//清零</p>
+
+<p>system(&ldquo;chmod 777 VerifyNand.sh&rdquo;);//加权限<br />
+stream = popen(&ldquo;./VerifyNand.sh&rdquo;,&ldquo;r&rdquo;);//运行脚本，用只读方式打开脚本，读取脚本变量<br />
+printf(&ldquo;script runing&hellip;\n&rdquo;);//log，便于掌握程序跑到哪里了</p>
+
+<p>if((stream = popen(&ldquo;./VerifyNand.sh&rdquo;,&ldquo;r&rdquo;)) ！= NULL)//判断是否为空，等于则是打开失败<br />
+{<br />
+printf(&ldquo;VerifyNand script error\n&rdquo;);<br />
+exit(1);<br />
+}<br />
+else<br />
+while(fgets(buffer,sizeof(buffer),stream))//用fgets函数循环读取，自动最后加\0，遇空停止，一行一行读取，这个函数还有待研究，我在这里使用有bug<br />
+{<br />
+int x = 0;<br />
+ret = buffer[x] - &lsquo;0&rsquo;;//转变成int数值<br />
+printf(&ldquo;ret = %d\n,ret&rdquo;);</p>
+
+<p>if(buffer[x] == &lsquo;0&rsquo;)//判断从脚本中取出来的数值<br />
+{<br />
+printf(&ldquo;Verification FAILED\n&rdquo;);<br />
+printf(&ldquo;ret = %d\n,ret&rdquo;);</p>
+
+<p>pclose(stream);//关闭文件<br />
+kernel.TaskSleep(10000);//休眠<br />
+return ret;<br />
+}<br />
+else<br />
+{<br />
+printf(&ldquo;Verification Passed\n&rdquo;);<br />
+printf(&ldquo;buffer2 = %c\n&rdquo;,buffer[x]);<br />
+printf(&ldquo;ret2 = %d\n,ret&rdquo;);<br />
+kernel.TaskSleep(10000);</p>
+
+<p>pclose(stream);<br />
+x++;<br />
+return ret;<br />
+}<br />
+}</p>
+
+<p>这是对于popen函数的应用实例。</p>
+
+<p>对于fgets函数，这是一点解释</p>
+
+<p>原型 char * fgets(char * s, int n,FILE *stream);</p>
+
+<p>参数：</p>
+
+<p>s: 字符型指针，指向存储读入数据的缓冲区的地址。</p>
+
+<p>n: 从流中读入n-1个字符</p>
+
+<p>stream ： 指向读取的流。</p>
+
+<p>返回值：</p>
+
+<p>1. 当n&lt;=0 时返回NULL，即空指针。</p>
+
+<p>2. 当n=1 时，返回空串&rdquo;&ldquo;.</p>
+
+<p>3. 如果读入成功，则返回缓冲区的地址。</p>
+
+<p>4. 如果读入错误或遇到文件结尾(EOF)，则返回NULL.</p>
+
+<p>以上是两种运行shell获取返回值的实现方法，shell很方便，需要多学习一下，有时间再发文章记录。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

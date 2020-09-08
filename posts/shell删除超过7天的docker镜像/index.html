@@ -1,0 +1,1211 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell删除超过7天的docker镜像 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell删除超过7天的docker镜像 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell删除超过7天的docker镜像">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%88%A0%E9%99%A4%E8%B6%85%E8%BF%877%E5%A4%A9%E7%9A%84docker%E9%95%9C%E5%83%8F/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell删除超过7天的docker镜像</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <pre><code>#!/bin/sh
+# From https://github.com/HardySimpson/docker-cleanup
+
+
+# 创建文件  $$表示脚本执行的进程id
+&gt;/tmp/run_image_ids.$$
+
+DOCKER_BIN=/usr/bin/docker
+LOG=/tmp/docker-cleanup.log
+
+rm /tmp/run_image_ids.$$
+
+echo &quot;$(date) start-----&quot; &gt;&gt;$LOG
+
+
+# docker ps -a 列出所有容器的容器id  如图
+$DOCKER_BIN ps --no-trunc -a -q | while read cid
+do
+  running=$($DOCKER_BIN inspect -f '{{.State.Running}}' $cid )
+  # 如果容器处于running 会返回true 
+  if [ &quot;$running&quot;x = &quot;true&quot;x ]
+  then
+    id=$($DOCKER_BIN inspect -f '{{.Image}}' $cid )
+    echo $id &gt;&gt;/tmp/run_image_ids.$$
+    continue
+  fi 
+
+
+  fini=$($DOCKER_BIN inspect -f '{{.State.FinishedAt}}' $cid | awk -F. '{print $1}')
+  diff=$(expr $(date +&quot;%s&quot;) - $(date --date=&quot;$fini&quot; +&quot;%s&quot;))    
+  #for MacOs 
+  #diff=$(expr $(date +&quot;%s&quot;) - $(date -j -f %Y-%m-%dT%H:%M:%S &quot;$fini&quot; +&quot;%s&quot;))
+  # if [[ $diff -gt 86400*7 ]] 改成这样可以限制时间7天
+  if [ $diff -gt 86400 ]
+  then
+     $DOCKER_BIN rm -v $cid &gt;&gt;$LOG 2&gt;&amp;1
+  fi 
+done
+
+# 获取镜像信息  如图
+$DOCKER_BIN images --no-trunc | grep -v REPOSITORY | while read line
+do
+# 把镜像和tag拼起来
+  repo_tag=$(echo $line | awk '{print $1&quot;:&quot;$2}')
+# 输出镜像id
+  image_id=$(echo $line | awk '{print $3}')
+# 判断镜像id是否是正在运行的容器的基础镜像，如果是，不操作，如果不是，判断镜像是否有镜像名称和tag，有的话通过镜像名称和tag删除，如果没有镜像名称和tag，则用镜像id删除。
+  grep -q $image_id /tmp/run_image_ids.$$
+  if [ $? -eq 0 ]
+  then
+    continue
+  fi
+  if [ &quot;$repo_tag&quot;x = &quot;:&quot;x ]
+  then
+    $DOCKER_BIN rmi $image_id &gt;&gt;$LOG 2&gt;&amp;1
+  else
+    $DOCKER_BIN rmi $repo_tag &gt;&gt;$LOG 2&gt;&amp;1
+  fi
+done
+
+rm /tmp/run_image_ids.$$
+
+
+echo &quot;$(date) end-----&quot; &gt;&gt;$LOG
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/c392dd45fec54694bbfd67651e69cf16.jpg"><img src="https://img.it610.com/image/info8/c392dd45fec54694bbfd67651e69cf16.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/14165b10b8c54461912d6cd92a7b5cbb.jpg"><img src="https://img.it610.com/image/info8/14165b10b8c54461912d6cd92a7b5cbb.jpg" alt="shell删除超过7天的docker镜像_第1张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/e8a4fb10e22b40c7b6c21ad1bfd8db5f.jpg"><img src="https://img.it610.com/image/info8/e8a4fb10e22b40c7b6c21ad1bfd8db5f.jpg" alt="shell删除超过7天的docker镜像_第2张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/033213b1af94419ea8c368e30fc40f0b.jpg"><img src="https://img.it610.com/image/info8/033213b1af94419ea8c368e30fc40f0b.jpg" alt="" /></a></p>
+
+<p>对大佬的脚本修改了一下 避免7天内的镜像被删除 万一需要回滚之类的 脚本如下</p>
+
+<pre><code>#!/bin/sh
+# From https://github.com/HardySimpson/docker-cleanup
+
+# 创建文件  $$表示脚本执行的进程id
+&gt;/tmp/run_image_ids.$$
+
+DOCKER_BIN=/usr/bin/docker
+LOG=/tmp/docker-cleanup.log
+
+rm /tmp/run_image_ids.$$
+
+echo &quot;$(date) start-----&quot; &gt;&gt;$LOG
+
+# docker ps -a 列出所有容器的容器id
+$DOCKER_BIN ps --no-trunc -a -q | while read cid; do
+  running=$($DOCKER_BIN inspect -f '{{.State.Running}}' $cid)
+  # 如果容器处于running 会返回true
+  if [ &quot;$running&quot;x = &quot;true&quot;x ]; then
+    id=$($DOCKER_BIN inspect -f '{{.Image}}' $cid)
+    echo $id &gt;&gt;/tmp/run_image_ids.$$
+    continue
+  fi
+
+  fini=$($DOCKER_BIN inspect -f '{{.State.FinishedAt}}' $cid | awk -F. '{print $1}')
+  diff=$(expr $(date +&quot;%s&quot;) - $(date --date=&quot;$fini&quot; +&quot;%s&quot;))
+  #for MacOs
+  #diff=$(expr $(date +&quot;%s&quot;) - $(date -j -f %Y-%m-%dT%H:%M:%S &quot;$fini&quot; +&quot;%s&quot;))
+  # if [[ $diff -gt 86400*7 ]] 改成这样可以限制时间7天
+  if [ $diff -gt 86400 ]; then
+    echo &quot;$DOCKER_BIN rm -v $cid &gt;&gt;$LOG 2&gt;&amp;1&quot;
+    $DOCKER_BIN rm -v $cid &gt;&gt;$LOG 2&gt;&amp;1
+  fi
+done
+
+echo &quot;容器结束&quot;
+
+$DOCKER_BIN images --no-trunc | grep -v REPOSITORY | while read line; do
+  sha_num=`echo $line|awk '{print $3}'`
+  echo $sha_num
+  repo_tag=$(echo $line | awk '{print $1&quot;:&quot;$2}')
+  image_id=$(echo $line | awk '{print $3}')
+  echo 1
+  grep -q $image_id /tmp/run_image_ids.$$
+  if [ $? -eq 0 ]; then
+    continue
+  fi
+
+  echo &quot;2&quot;
+  creat_time=$(docker inspect -f '{{.Created}}' $sha_num | awk -F. '{print $1}')
+  echo $creat_time
+
+  echo &quot;3&quot;
+
+  echo &quot;输出创建时间&quot;
+  img_diff=$(expr $(date +&quot;%s&quot;) - $(date --date=&quot;$creat_time&quot; +&quot;%s&quot;))
+
+  echo &quot;时间差为 $img_diff&quot;
+
+  echo &quot;4&quot;
+  if [[ $img_diff -gt 86400*7 ]]; then
+    if [ &quot;$repo_tag&quot;x = &quot;:&quot;x ]; then
+      echo &quot;$DOCKER_BIN rmi $image_id &gt;&gt;$LOG 2&gt;&amp;1&quot;
+      echo &quot;删除没有tag 及 name的镜像&quot;
+      #echo &quot;5.1&quot;
+      $DOCKER_BIN rmi $image_id &gt;&gt;$LOG 2&gt;&amp;1
+    else
+      echo &quot;$DOCKER_BIN rmi $repo_tag &gt;&gt;$LOG 2&gt;&amp;1 &quot;
+      #echo &quot;5.2&quot;
+      $DOCKER_BIN rmi $repo_tag &gt;&gt;$LOG 2&gt;&amp;1
+    fi
+  fi
+
+done
+
+rm /tmp/run_image_ids.$$
+echo &quot;rm /tmp/run_image_ids.$$&quot;
+echo &quot;$(date) end-----&quot; &gt;&gt;$LOG
+</code></pre>
+
+<p>执行过程部分如下</p>
+
+<p><a href="https://img.it610.com/image/info8/c9e72c5fff464b6d810f298f7d099403.jpg"><img src="https://img.it610.com/image/info8/c9e72c5fff464b6d810f298f7d099403.jpg" alt="shell删除超过7天的docker镜像_第3张图片" /></a></p>
+
+<p>实际操作如下</p>
+
+<p><a href="https://img.it610.com/image/info8/b86a018cf8514786ab48dde991e59796.jpg"><img src="https://img.it610.com/image/info8/b86a018cf8514786ab48dde991e59796.jpg" alt="shell删除超过7天的docker镜像_第4张图片" /></a></p>
+
+<pre><code>[root@op-xujiamin ~]# sh /tmp/t.5.sh
+容器结束
+sha256:4a6f7a6df2dcbfe87719dad94a970e88f128f8888b7c32ecfa08d21dbf401fb3
+1
+sha256:3ff77b4b0ca5a1226336327682048f7f84116a4acd522696e4ff4ac0e2853082
+1
+sha256:ed5b5f9c29d5fed7f5d0bccb10c5671b6341df629db445c9225a86ef95e3f664
+1
+sha256:dc1f36d974bfe7ab2f71de3d6728248b4513f7d5f308c3f7fcec6063fb2b3cbd
+1
+sha256:cc40c500125b1fba81b5416e4693d73c17574b1d3ce9f35f16a956679a5c5e13
+1
+2
+2020-07-02T09:05:44
+3
+输出创建时间
+时间差为 807932
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-search:v53 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:19dafb554b8ecbf12081cbae0fcde915f9fe9662a056a10000ec4c55215d45d8
+1
+2
+2020-07-02T09:05:08
+3
+输出创建时间
+时间差为 807968
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-system:v53 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:4d0e1b8b586af1f28478e929aed657eb896f5d30ad21ace6179a400511c6dc69
+1
+2
+2020-07-02T09:04:23
+3
+输出创建时间
+时间差为 808013
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-shoppingmall:v53 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:e0c5249fccc7833d475b8d53158b5f570632ff3bf092e6d6070dd12a30c54592
+1
+sha256:789f468c1212732ae811d86c0b2d8314452044ba10429f727f3dd411988607e3
+1
+2
+2020-07-02T09:03:10
+3
+输出创建时间
+时间差为 808087
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-openapi:v53 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:f3e8e445bfddd31da732d95731fc0edee9087619f1dbc0048dd3d401141b7e8e
+1
+sha256:8719974e381c8867c0ee1fe67b05da537251efe004a29e16694d927cbadd4234
+1
+sha256:12a45659fb0be4d34dc65151b2e73164568adb97f3acb40431793acb7e33b4cf
+1
+sha256:2ac1c6d6d443342bafcf2be17ac8ee4f83f0e1ff27d4ba018c2fcaa38b8eb47c
+1
+2
+2020-07-02T08:59:41
+3
+输出创建时间
+时间差为 808296
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-health-manager:v53 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:747c7fffbc3029578303bf821e759b0fcdaa7347e72d35dedea80265d5365a9c
+1
+sha256:ae4677a87a5b15e6dfc473d3504b4034bc63c485d42b7d4a891ae0869d5690da
+1
+sha256:ba50198ff0a821a9027de6ad7ba57aa81e9b0f3c0dfdaafc3412933175847ede
+1
+2
+2020-07-02T08:55:51
+3
+输出创建时间
+时间差为 808526
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-check:v53 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:3481734936838a0e42496498cbdfa683e727a7972dbe4efc0ba0112b444b841b
+1
+sha256:63d5a7dfb974ec16f48b293780808b0e5584608abdc667f923de006208f2f895
+1
+2
+2020-07-02T07:53:39
+3
+输出创建时间
+时间差为 812258
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-health-manager:v50 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:29b41b7e66f2c7a9fcd16a14e11659903b692783c3721d9b43aa07c5dd03db92
+1
+2
+2020-07-02T04:22:37
+3
+输出创建时间
+时间差为 824920
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-shoppingmall:v41 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:cb4b1e81b16ba3bb3b242496ccbfd198d9b2baef1dc5d0d35f99765b9c8e84ea
+1
+2
+2020-07-02T03:45:23
+3
+输出创建时间
+时间差为 827154
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-video:v40 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:ebe0538bf3bd2717985a45c933bed488f851cbbdf5ba8e87ee43051c659618f8
+1
+2
+2020-07-02T03:42:42
+3
+输出创建时间
+时间差为 827315
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-system:v40 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:e8d6ac9e83f3772f5fe27bbad53f7adca34686f479733b17288f45f2219569d3
+1
+2
+2020-07-02T03:40:02
+3
+输出创建时间
+时间差为 827476
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-point:v38 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:4c005019b02df64ab3c85fe0ca555e9fc2092dbb09bee008d36c3417e0d050a6
+1
+2
+2020-07-02T03:39:32
+3
+输出创建时间
+时间差为 827506
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-openapi:v38 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:6fc1128dbc9553fa0c162ff12dc4cfde1750b1c04bc25f3b7eb95ccf04d375df
+1
+2
+2020-07-02T03:36:35
+3
+输出创建时间
+时间差为 827683
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-job:v37 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:80d7e318aa5a1f73942a6afa4e1dbad70659e4f06dae44bd6324fcbca787e313
+1
+2
+2020-07-02T03:34:52
+3
+输出创建时间
+时间差为 827786
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-info:v37 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:1f4923f55d2e3038323eedd88d729d50312632b7dd39494459c06c1aeac6770c
+1
+2
+2020-07-02T03:26:49
+3
+输出创建时间
+时间差为 828269
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-hm:v35 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:666d2c41416134b6dd983ef555fc5a5f2657c655262674e194bedb5c6256f1fd
+1
+2
+2020-07-02T03:23:36
+3
+输出创建时间
+时间差为 828462
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-family:v35 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:6a731b1beafd36c793f06921eb06405be90d4fea10c7e5be0cb206e1f653dd27
+1
+2
+2020-07-02T03:19:38
+3
+输出创建时间
+时间差为 828700
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-disc:v35 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:a2e290ae6e99a565e7d9fb864817f3ef0e661380b87991eb5a2b323f51b2f09c
+1
+2
+2020-07-02T03:17:55
+3
+输出创建时间
+时间差为 828803
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-search:v35 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:13b6f93d21dae24c641365411e9ba388fa497581835a7251d1dc688a790f5b86
+1
+2
+2020-07-02T03:14:03
+3
+输出创建时间
+时间差为 829036
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-disc:v34 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:ed8233ee734361f0f78b957b8043d0fb1da672fba3fa075fe2ada550e159fb64
+1
+2
+2020-07-02T03:12:35
+3
+输出创建时间
+时间差为 829124
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-search:v34 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:faa9fbaba0186a7f96d4e0b94c7c1ca001b04c9fc9d8279c57125c22235cf864
+1
+2
+2020-07-02T03:09:40
+3
+输出创建时间
+时间差为 829299
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-check:v33 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:11b0ae186b3b324708c4a26489ed28d16dd1221efef8cd00e58d1228e90e904f
+1
+2
+2020-07-02T03:08:25
+3
+输出创建时间
+时间差为 829374
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-card:v33 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:395f50436d080b6fb4b8ac0d4746669cd7a431bf2260500941c07c118e622718
+1
+2
+2020-06-22T04:11:53
+3
+输出创建时间
+时间差为 1689566
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-video:v158 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:3d895275cda8833047a2071e2ff16ad0375f828352a12b6c4700157af7296fd5
+1
+2
+2020-06-22T03:29:50
+3
+输出创建时间
+时间差为 1692089
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-video:v157 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:f394f2b0fb8bb84a3ea3f2a3e98c072fd0c19fe0916ea9df6519eed666c391a2
+1
+2
+2020-06-22T03:13:31
+3
+输出创建时间
+时间差为 1693068
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-video:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:001d0271444e17af44148927a66694108c31cd48edae64b2f3902e03491b61fa
+1
+2
+2020-06-22T03:10:42
+3
+输出创建时间
+时间差为 1693237
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-system:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:850055a1154b7e73a715997140ab3fcec932c366f7fe30cb9d480e39e333e40e
+1
+2
+2020-06-22T03:08:38
+3
+输出创建时间
+时间差为 1693362
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-shoppingmall:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:a27e0db86142947caf28b9daaef17199ba5acce4dc950b1849ed1d0e71f3c709
+1
+2
+2020-06-22T03:06:00
+3
+输出创建时间
+时间差为 1693520
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-point:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:faaf2e0f11a4c45f11b8e3a7185a46473416b8f427576f12866c1650867c8cfc
+1
+2
+2020-06-22T03:05:33
+3
+输出创建时间
+时间差为 1693547
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-openapi:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:c721c0e1e1e9bb7aec91b46a2ec71382da72c1ce0eab07704d6ea51cac630ac2
+1
+2
+2020-06-22T03:03:55
+3
+输出创建时间
+时间差为 1693645
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-job:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:1b1b39366c32e83cd775bb47dd94bf0629785cac17241a5f71d4b293cbe3fc6d
+1
+2
+2020-06-22T03:02:07
+3
+输出创建时间
+时间差为 1693753
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-info:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:3f4a890542b9837ff4cacf7605b41d9ad9d51cf51af818a287022d41c91ea4db
+1
+2
+2020-06-22T03:00:36
+3
+输出创建时间
+时间差为 1693844
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-hm:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:082ed6e6c5316acfc8d2db0b6bfca4e2eec2c8b8f65436488aeb58a50281a7f9
+1
+2
+2020-06-22T02:57:20
+3
+输出创建时间
+时间差为 1694040
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-family:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:32d5d80fa26629070f8fb14d9f387c382b4ceb9205d02c9b75acd47467711108
+1
+2
+2020-06-22T02:53:49
+3
+输出创建时间
+时间差为 1694251
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-disc:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:1f41dca782f14c13c0107dad86120089383dacc818f406460e1850702385ad8a
+1
+2
+2020-06-22T02:52:10
+3
+输出创建时间
+时间差为 1694351
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-search:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:41b007b313474f8edf4536b5701d2eda574a91ea76311cedb3fe47d8ed62cb4e
+1
+2
+2020-06-22T02:50:33
+3
+输出创建时间
+时间差为 1694448
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-check:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:7438577f796050ce7a001e0839bec641be2fe91ad76e2ba1092d185c779c668c
+1
+2
+2020-06-22T02:49:17
+3
+输出创建时间
+时间差为 1694524
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-card:v155 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:4d5215abd2662333e79633cad771bcbe8031ecdb1a00bbdddb40e395fee78e17
+1
+2
+2020-06-22T01:41:51
+3
+输出创建时间
+时间差为 1698570
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-video:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:e392f24f5db207bba6af7eedd2beceea13da03e410a357b3134950c401fcf57f
+1
+2
+2020-06-22T01:40:09
+3
+输出创建时间
+时间差为 1698672
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-system:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:01522f6811ef3be625fe9d14215a0f418f987ef2e579c91e80b10047a9ab7c15
+1
+2
+2020-06-22T01:37:57
+3
+输出创建时间
+时间差为 1698804
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-shoppingmall:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:2cb8ad4b099670f268cfa49746dd12244519f79c08d6b20f55af933d3e575cf4
+1
+2
+2020-06-22T01:34:57
+3
+输出创建时间
+时间差为 1698984
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-point:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:6de5b03ab31c93acde56870999c91a99d967a2cd1fcffc4f926802938faf751d
+1
+2
+2020-06-22T01:33:49
+3
+输出创建时间
+时间差为 1699052
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-openapi:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:adebd4a5768a4e1555a811955983ac0d1b3fa71b510e3e088e448f0381a41b51
+1
+2
+2020-06-22T01:31:58
+3
+输出创建时间
+时间差为 1699164
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-job:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:a4d209d79934acbfc77d5eaa9abae489302d7fc8e950caf68d4bf43d9316ea24
+1
+2
+2020-06-22T01:29:57
+3
+输出创建时间
+时间差为 1699285
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-info:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:4b49bc72053318cf1308e2770eb194bfab39dc48778420af2990c4d78cc32be7
+1
+2
+2020-06-22T01:28:16
+3
+输出创建时间
+时间差为 1699386
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-hm:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:1dd72d97cfb51ed1fd1797a6bc7dfe7e17e0923b701646518bfa1e4e39b5d23a
+1
+2
+2020-06-22T01:26:17
+3
+输出创建时间
+时间差为 1699505
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-family:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:6749db4735702c562c980a3690cc4389ef885fe6db55abefdcfb307fa8181f88
+1
+2
+2020-06-22T01:22:31
+3
+输出创建时间
+时间差为 1699731
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-disc:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:abf424c973fc18ee2ba2eebc1cf3442ef4b2becc0451dcf5b3f7cfb4a7252f30
+1
+2
+2020-06-22T01:20:49
+3
+输出创建时间
+时间差为 1699833
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-search:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:c094ee24a7058aa0229f721164df4f186719acfb8b64f8cadab1f3fdb64a4178
+1
+2
+2020-06-22T01:18:59
+3
+输出创建时间
+时间差为 1699943
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-check:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:b2ac407388bb51163aa675c2669bcd12d9fec2c00eace9830e0c50a0b544070a
+1
+2
+2020-06-22T01:17:33
+3
+输出创建时间
+时间差为 1700029
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-card:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:5dc2f11b3a8f56c43a33bb46c37fd9db9b4950fe6eddf4d5b99a6a788877d1d9
+1
+2
+2020-06-22T01:16:21
+3
+输出创建时间
+时间差为 1700102
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-admin:v153 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:22b0de05e9e402c4ea8b3b54177235cf56dfd05fea381c41bf5b88dd19996143
+1
+2
+2020-06-22T00:10:03
+3
+输出创建时间
+时间差为 1704080
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-health:v150 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:4bcd61640cb6258b12fe4f060487067e3a2dc81e112e54758b096099fcf6e677
+1
+2
+2020-06-20T10:52:26
+3
+输出创建时间
+时间差为 1838337
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-basic:v129 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:e437b2c2ca4d0823e0e1d7ca019ab1084b1a15086dcc8918213d71f4ec95743f
+1
+2
+2020-06-20T10:47:14
+3
+输出创建时间
+时间差为 1838649
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-basic:v128 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:322b0c1ad08c269af77eaba2a6faa2fac6b1141684f2a484f4a956632cdd985a
+1
+2
+2020-06-20T10:45:32
+3
+输出创建时间
+时间差为 1838751
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-video:v128 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:5c3a35533d77ed72766cbb06c183a95c5ab2d6a9760c89cf60868ba02527156a
+1
+2
+2020-06-20T10:43:58
+3
+输出创建时间
+时间差为 1838845
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-system:v128 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:99f3914a91267d04774b50e3b98d67c7f755e311c42dedae4b98a779d7b88e12
+1
+2
+2020-06-20T10:41:48
+3
+输出创建时间
+时间差为 1838975
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-shoppingmall:v128 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:6621df3d7a4d8fae122d5dc2f77c7f32c93ecce43293620e127b7190c3106234
+1
+2
+2020-06-20T08:09:13
+3
+输出创建时间
+时间差为 1848130
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-point:v127 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:2f4b811273457f1cd637931dca57ddb901edc8fbb54d3f71d64ac30cdaf52e03
+1
+2
+2020-06-20T08:08:39
+3
+输出创建时间
+时间差为 1848165
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-openapi:v127 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:162587b94a088f50dc19563270591de38cce8e035807be5a4e13b68293402ecb
+1
+2
+2020-06-20T08:06:38
+3
+输出创建时间
+时间差为 1848286
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-job:v127 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:88486c7688345a878c1b6c2a9191084fa8e91c502f6d6e35bbc8fe2b4b542bfa
+1
+2
+2020-06-20T08:04:19
+3
+输出创建时间
+时间差为 1848425
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-info:v127 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:d9e57c1426a7e3f3cb0c25439c0c85ab3e930c1627abf374e759e9def265008c
+1
+2
+2020-06-20T07:58:34
+3
+输出创建时间
+时间差为 1848770
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-hm:v125 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:05ba3eefbbfc785f4e912716571382634b50b4c2874d5ff83503fe1a99f543f9
+1
+2
+2020-06-20T07:50:25
+3
+输出创建时间
+时间差为 1849259
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-hm:v122 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:8f6b9e7f7c33afc25248afefb398c4dcb3bc2b31ee835a22d179902c70ada62e
+1
+2
+2020-06-20T07:42:22
+3
+输出创建时间
+时间差为 1849742
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-hm:v120 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:64a67a5ff90680692f96b53ad4bb95afc4dc5182070a3b3b83c02f00522e4a98
+1
+2
+2020-06-20T07:32:12
+3
+输出创建时间
+时间差为 1850352
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-health:v116 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:fba12f485f5eb86080d9d41ad442ed3ac9d67d766414b9634cfb7d2a27ad214f
+1
+2
+2020-06-20T07:23:44
+3
+输出创建时间
+时间差为 1850860
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-family:v114 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:b6ec83c66b4ce0eb6912b57ebf95b0bc4882f2de6f52f902d6dd49ed0c6ae7f2
+1
+2
+2020-06-20T07:21:40
+3
+输出创建时间
+时间差为 1850985
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-ec:v114 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:1965ea11e5e526342dcea7d7f97f55becd83716cbe1fa26d0cfe44041ed23500
+1
+2
+2020-06-20T07:20:12
+3
+输出创建时间
+时间差为 1851073
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-disc:v114 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:66673c3ae0ab5acb44b7c606214e8047eb0123914cc926492849fd3c9250a794
+1
+2
+2020-06-20T07:18:29
+3
+输出创建时间
+时间差为 1851176
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-search:v114 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:53ace513f836319cd38f48d1a1f4886eab9ef4b08607c67c0c8993b16d22d432
+1
+2
+2020-06-20T07:12:09
+3
+输出创建时间
+时间差为 1851556
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-check:v113 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:c6da82efc52392bc026c6eecd550ec0653c477b5bce1b0aecbba6cef507b21e9
+1
+2
+2020-06-20T07:10:46
+3
+输出创建时间
+时间差为 1851639
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-card:v113 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:c4cd39d0cd9604cd38126f4e44aeba07169bc768ccc1c045b0b6fa27273b7528
+1
+2
+2020-06-20T07:01:58
+3
+输出创建时间
+时间差为 1852167
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-card:v112 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:7a888bb863576595b9e708098f74a0830492cb85f3999c3bead1efb6f69e1ef5
+1
+2
+2020-06-20T06:42:51
+3
+输出创建时间
+时间差为 1853314
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-search:v108 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:fbf484624b20c12f334a9d0d1eaa397c171d4784a679b3c14d4b4fe9a9542c18
+1
+2
+2020-06-20T05:36:46
+3
+输出创建时间
+时间差为 1857279
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-card:v104 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:962bdd2f2a74d2559ae4768bd1235ce6a58537a60af17758dbae9a9b57aaa12b
+1
+2
+2020-06-20T05:33:13
+3
+输出创建时间
+时间差为 1857493
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-admin:v103 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:8d40ec3bf6d2b94869c501810cb590b91b0d2e3f6c5ca2a57dec63ef28a421de
+1
+2
+2020-06-12T08:25:56
+3
+输出创建时间
+时间差为 2538330
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-admin:v99 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:38128fb95a26394526dcdd10c5d73c1c0cc7bc022d2add033890abbdc8db7dc5
+1
+2
+2020-06-12T08:21:54
+3
+输出创建时间
+时间差为 2538572
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-admin:v98 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:c923b874e1d4df389fb63e8f4483da392a4880d1cc7baefd73d5951f75515bf5
+1
+2
+2020-06-12T08:14:50
+3
+输出创建时间
+时间差为 2538996
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-search:v97 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:026eb042fe9901796df4207c8f23ed877265a773e46616127a6c4feac12bbe74
+1
+2
+2020-06-12T08:10:51
+3
+输出创建时间
+时间差为 2539235
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-admin:v96 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:cee08f2f0a0596b9fcdf22eab9044739188383c537bf7aa9707585f83aebb7e1
+1
+2
+2020-06-12T07:58:33
+3
+输出创建时间
+时间差为 2539973
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-account:v95 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:bb542fde923d3a2fe6b48b4d2f41515e501edd21ef5ab822bcf50af4e927a008
+1
+2
+2020-06-12T06:12:04
+3
+输出创建时间
+时间差为 2546362
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-video:v94 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:80eed7772296506abd9879f7f43a0d2fa279c42999c5b4886d04e5a64e6f5347
+1
+2
+2020-06-12T06:03:41
+3
+输出创建时间
+时间差为 2546866
+4
+/usr/bin/docker rmi registry.cn-shanghai.aliyuncs.com/yjk-datag/haozhuo-video:v93 &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:2888deb59dfc1aae137a7c9a313c9cf8ada42dbf996345c5f433c1b9ecbae138
+1
+2
+2018-09-05T05:22:47
+3
+输出创建时间
+时间差为 58363720
+4
+/usr/bin/docker rmi rabbitmq:3.7.7-management &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+sha256:e934aafc22064b7322c0250f1e32e5ce93b2d19b356f4537f5864bd102e8531f
+1
+2
+2018-04-06T21:01:51
+3
+输出创建时间
+时间差为 71440176
+4
+/usr/bin/docker rmi centos:latest &gt;&gt;/tmp/docker-cleanup.log 2&gt;&amp;1
+rm /tmp/run_image_ids.9506
+</code></pre>
+
+<p>清理完之后 镜像如下。</p>
+
+<p><a href="https://img.it610.com/image/info8/e2f7f96cba0642d6a92b4b08d755d422.jpg"><img src="https://img.it610.com/image/info8/e2f7f96cba0642d6a92b4b08d755d422.jpg" alt="shell删除超过7天的docker镜像_第5张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

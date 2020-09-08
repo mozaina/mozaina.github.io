@@ -1,0 +1,3067 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>WindowsShell编程第七章 | 开发者问答集锦</title>
+    <meta property="og:title" content="WindowsShell编程第七章 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="WindowsShell编程第七章">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/windowsshell%E7%BC%96%E7%A8%8B%E7%AC%AC%E4%B8%83%E7%AB%A0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">WindowsShell编程第七章</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>第七章</strong> ****<strong>侵入</strong> <strong>Shell</strong> ****</p>
+
+<p>与所有其它Win32进程一样，Shell也有其自己的内存地址空间，这是其它应用完全不可知的地址空间。为了进入这个地址空间，我们必须传递一定数量的控制点，就象我们正在跨过国家边界一样。在Windows
+Shell这块陆地上什么是我们感兴趣的呢，它是一个伊甸园吗，它有丰富的金矿吗，它是天堂的宝库吗？不幸，它都不是。进入Shell，只是简单地允许我们编写代码执行在Shell外面不能执行的操作。通过注入代码到一个Win32进程的地址空间，我们能够控制这个程序的行为，能够过滤它的事件，查看消息流，以及强迫它做(或不做)一定的操作。</p>
+
+<p>为了达到这个目的，我们可以采取几种不同的方法。有力的方法是使用某些Windows的特征(或弱点)进入进程的地址空间和子类化它的窗口。此外，有些程序明确地允许外部模块介入，且可以一同工作。此时我们要做的是写一个具有必要接口的模块(一般是一个COM进程内服务器)，并且在主模块要求的地方注册它。</p>
+
+<p>第三种方法是让每个进程都在自己的空间中运行，但是建立一个通道，使它们之间可以通讯。你可以想象一个程序合理地影响另一个程序行的情形—或者，一个程序能够做一些使另一个程序能够知道的操作。在这种情况下，有一个潜在的通道连接这些模块—允许探测器知道你可能对文件或文件夹作出的任何改变就使用了这种方式。</p>
+
+<p>在这一章中，我们将给出实现上述三种模块的例子。另外还解释：</p>
+
+<p>Shell怎样感知文件系统的变化</p>
+
+<p>你的事件怎样才能通知到Shell</p>
+
+<p>怎样进入到Shell的地址空间</p>
+
+<p>作为上述结果，怎样改变‘开始’按钮的行为</p>
+
+<p>我们重点使用Win32软件的两个部分： <strong>钩子</strong> 和 <strong>通知对象</strong> 。在我们将要研讨的很多关键点上这些机理都是隐含的。</p>
+
+<p><strong>Shell</strong> <strong>通知事件</strong> ****</p>
+
+<p>你一定已经注意到了，探测器能非常快地感知文件系统的任何变化，周期地刷新当前观察和反映其它应用引起的任何改变。例如，当你打开DOS窗口和探测器窗口时，在两者中选择相同的目录，然后在DOS窗口中建立一个目录，后者将没有任何迟滞地更新显示。</p>
+
+<p>似乎有某件事情告诉探测器已经建立了一个新的文件夹。在这个外壳下，使所有这些成为可能的控件是 <strong>通知对象</strong> 。</p>
+
+<p>通知对象</p>
+
+<p>通知对象是同步线程的核心对象，其概念是你建立这样一个对象，并给它赋予某些用以配置事件的属性，然后在其上阻塞线程等待事件的发生。如果你愿意，你可以把通知对象当成专门的事件，在它感觉到文件系统改变时自动获得信号。通过通知对象，你可以控制目录，子树，甚至整个驱动器，以及监视文件和文件夹事件—建立，重命名，删除，属性更改等。</p>
+
+<p><em>通知对象的用法</em> __</p>
+
+<p>Win32 SDK定义了三个操作通知对象的函数，它们是：</p>
+
+<p>FindFirstChangeNotification()</p>
+
+<p>FindNextChangeNotification()</p>
+
+<p>FindCloseChangeNotification()</p>
+
+<p>第一个函数‘建立’新通知对象，最后一个函数删除这个对象。奇怪的是，你不必象对待其它核对象那样使用CloseHandle()来释放通知对象。</p>
+
+<p>前面讲过，在通知对象背后是一个标准的Win32同步对象，但是它已经增加了监视文件系统的特殊行为。在FindFirstChangeNotification()和FindNextChangeNotification()函数的背后有捕捉这个核对象信号状态的秘密任务。在通过调用FindFirstChangeNotification()建立对象时，它是非信号状态的，当它感觉到一个满足滤波条件的活动时，状态改变信号发送给等待线程。为了继续查询事件，必须显式地重置初始状态，这就是FindNextChangeNotification()所要做的。</p>
+
+<p><em>同步对象包括‘互斥体</em> <em>(</em> <em>mutexes</em> <em>)</em> <em>’，‘信号灯</em> <em>(</em> <em>semaphores</em> <em>)</em> <em>’，‘事件</em> <em>(</em>
+<em>events</em> <em>)</em> <em>’和‘临界节</em> <em>(</em> <em>critical sections</em> <em>)</em> <em>’等等，在</em> <em>VC++</em>
+<em>帮助文件中有完备描述。它们有不同的行为，但是基本上都作用于线程的同步过程。从高层观点上考虑，你可以认为它们是线程相遇的控制点。</em> __</p>
+
+<p>__<em>同步对象有两种状态：信号状态和非信号状态。线程停止在非信号状态，在捕捉到信号状态后继续执行。</em> __</p>
+
+<p><strong>建立参数</strong> _ ___</p>
+
+<p>FindFirstChangeNotification()声明如下：</p>
+
+<p>HANDLE FindFirstChangeNotification(LPCTSTR lpPathName,</p>
+
+<p>BOOL bWatchSubtree,</p>
+
+<p>DWORD dwNotifyFilter);</p>
+
+<p>lpPathName是包含要监视目录名的缓冲指针。bWatchSubtree布尔值指定是否路径中包含子树。dwNotifyFilter使你能设置通知的实际触发规则。通过在dwNotifyFilter上使用可能的组合标志，你能够决定监视哪种类型的文件系统事件。可用的标志是：</p>
+
+<p><strong>标志</strong> ****</p>
+
+<p>|</p>
+
+<p><strong>描述</strong> ****</p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>FILE_NOTIFY_CHANGE_FILE_NAME</p>
+
+<p>|</p>
+
+<p>文件被建立，删除，移动</p>
+
+<p>FILE_NOTIFY_CHANGE_DIR_NAME</p>
+
+<p>|</p>
+
+<p>文件夹被建立，删除，移动</p>
+
+<p>FILE_NOTIFY_CHANGE_ATTRIBUTES</p>
+
+<p>|</p>
+
+<p>文件或文件夹的任何属性改变</p>
+
+<p>FILE_NOTIFY_CHANGE_SIZE</p>
+
+<p>|</p>
+
+<p>文件或文件夹的尺寸改变，仅当任何缓存写回到磁盘时才有这个感觉。</p>
+
+<p>FILE_NOTIFY_CHANGE_LAST_WRITE</p>
+
+<p>|</p>
+
+<p>文件或文件夹的最近写入时间改变，仅当任何缓存写回到磁盘时才有这个感觉。</p>
+
+<p>FILE_NOTIFY_CHANGE_SECURITY</p>
+
+<p>|</p>
+
+<p>文件或文件夹的任何安全描述符改变</p>
+
+<p>显然在监视路径时这些事件必然发生。例如，如果你发起一个如下调用：</p>
+
+<p>HANDLE hNotify = FindFirstChangeNotification(__TEXT(&ldquo;c://&ldquo;), TRUE,</p>
+
+<p>FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |</p>
+
+<p>FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SIZE);</p>
+
+<p>在C驱动器上建立任何新文件，都将唤醒等待这个通知对象的线程。如果在第二个参数中指定FALSE，则仅仅C驱动器根目录下的变化被感觉。调用FindFirstChangeNotification()产生的返回对象是在非信号状态的，意思是，要求使用这个对象同步的线程将停止。</p>
+
+<p><strong>监视目录</strong> _ ___</p>
+
+<p>现在我们已经知道了怎样建立一个变动通知对象，另一个问题是：这是否就能完全能监视目录活动。实际上不能，就象其它监视活动一样，目录监视需要耐心，因此，你还必须准备捕捉任何时间发生的事件。用软件术语讲，你需要在代码中设置某种循环。每当处理完一个事件后，你还要立即通知准备处理事件的下一次发生或准备处理同时发生的其它事件。FindNextChangeNotification()就是此时要使用的函数。</p>
+
+<p>BOOL FindNextChangeNotification(HANDLE hChangeHandle);</p>
+
+<p>下面是从示例应用中截取的一段代码，显示了函数的典型用法：</p>
+
+<p>// 注意线程外设置的逻辑保护.</p>
+
+<p>// 这是一段工作线程上摘下来的代码.</p>
+
+<p>while(g_bContinue)</p>
+
+<p>{</p>
+
+<p>// 等待改变发生</p>
+
+<p>WaitForSingleObject(hNotify, INFINITE);</p>
+
+<p>// 改变已经发生, 通知主窗口.</p>
+
+<p>// 使之有机会来刷新程序的UI.</p>
+
+<p>// WM_EX_XXX 是应用定义的客户消息.</p>
+
+<p>PostMessage(ci.hWnd, WM_EX_CHANGENOTIFICATION, 0, 0);</p>
+
+<p>// 准备下一次改变到达</p>
+
+<p>FindNextChangeNotification(hNotify);</p>
+
+<p>// NB:</p>
+
+<p>// 在这一点上由hNotify封装的同步对象处于非信号状态，所以当这个线程再次执行</p>
+
+<p>// WaitForSingleObject()时,它将停止，直到新的改变发生和变成信号状态</p>
+
+<p>}</p>
+
+<p>如上所见，在循环内部没有使循环终止的事件。g_bContinue逻辑变量是线程外设置的全程变量，也就是说，这段代码暗示有两个线程:主应用线程和涉及到通知对象的工作线程。</p>
+
+<p>由于这段代码假定在调用FindFirstChangeNotification()后执行，因此在执行了一段后将停止在WaitForSingleObject()的调用上，因为此时的通知对象已经变成非信号状态了。当满足hNotify通知对象条件的事件发生时，对象的状态改变成信号状态，执行继续，并抛出一个客户消息到指定窗口，给它一个刷新用户界面或做进一步处理的机会，然后再一次停止，等待新的事件发生。调用FindNextChangeNotification()之后包含在hNotify中的同步对象的状态又变回到非信号状态。</p>
+
+<p>在处理通知对象时，明智的选择是用不同的工作线程隔离所有等待事件的代码。这样能够避免主程序不确定的阻塞。如果你不想要多线程应用，则应该使用MsgWaitForMultipleObjects()代替WaitForSingleObject()来等待消息或事件。同时设置多个通知对象也是可能的。例如，你可能需要对相同或不同驱动器上的不同目录进行分别监视，如果需要这样做，WaitForMultipleObjects()可以帮助你一起同步化所有通知对象。</p>
+
+<p><strong>停止监视</strong> _ ___</p>
+
+<p>释放通知对象必须调用FindCloseChangeNotification()，传递的唯一变量是由FindFirstChangeNotification()建立的Handle：</p>
+
+<p>BOOL FindCloseChangeNotification(HANDLE hChangeHandle);</p>
+
+<p><em>总体示例</em> __</p>
+
+<p>让我们看一个示例应用，这个程序概念性的展示探测器在屏幕后面的工作。这个程序让你选择路径和建立监视整个子树的通知对象，所有变动通知的处理都在不同的线程中完成。每一次事件的感觉都有消息抛给应用主窗口。作为示范，我们仅简单地增加一个包含当前时间的行到报告列表观察中。而在实际工作中你可能需要做更多的处理。工作线程接受窗口Handle和监视路径，窗口Handle用于发送消息到应用主窗口，使用用户定义的结构传递数据。程序的用户界面显示如图：</p>
+
+<p><a href="https://img.it610.com/image/info8/4277cb505f2f480cb47a573a14c773d9.jpg"><img src="https://img.it610.com/image/info8/4277cb505f2f480cb47a573a14c773d9.jpg" alt="Windows Shell 编程
+第七章_第1张图片" /></a></p>
+
+<p>在你单击按钮时，通知对象使用上面调用的属性安装：</p>
+
+<p>FILE_NOTIFY_CHANGE_FILE_NAME，</p>
+
+<p>FILE_NOTIFY_CHANGE_DIR_NAME，</p>
+
+<p>FILE_NOTIFY_CHANGE_ATTRIBUTES，</p>
+
+<p>FILE_NOTIFY_CHANGE_SIZE</p>
+
+<p>下面是需要加入框架的代码：</p>
+
+<p>// 数据</p>
+
+<p>HICON g_hIconLarge;</p>
+
+<p>HICON g_hIconSmall;</p>
+
+<p>bool g_bContinue; // 在WinMain()中应该设置为FALSE</p>
+
+<p>const int WM_EX_CHANGENOTIFICATION = WM_APP + 1;</p>
+
+<p>// 传递给线程的客户数据</p>
+
+<p>struct CUSTOMINFO</p>
+
+<p>{</p>
+
+<p>HWND hWnd;</p>
+
+<p>TCHAR pszDir[MAX_PATH];</p>
+
+<p>};</p>
+
+<p>typedef CUSTOMINFO* LPCUSTOMINFO;</p>
+
+<p>在上面的代码中我们显式地声明了WM_EX_CHANGENOTIFICATION消息常量。一般在定义常量作为Windows消息时，应该使用RegisterWindowMessage()函数，以确保系统唯一的消息号。然而在相关的单个应用中，如果没有广播消息，使用基于WM_APP的显式声明常量是安全的。WM_APP是一个基本常量，它以后的消息常量不能与Windows系统消息冲突。唯一的冒险是可能与来自其它应用的客户消息冲突，这一点在这个例子中是不能发生的。</p>
+
+<p>有一个新处理器要加到APP_DlgProc()中，它在通知对象感觉到变化时被唤醒，你好需要在IDCANCEL处理器上做一点小的改变，用以在程序关闭时终止线程。</p>
+
+<p>BOOL CALLBACK APP_DlgProc(HWND hDlg, UINT uiMsg, WPARAM wParam, LPARAM lParam)</p>
+
+<p>{</p>
+
+<p>switch(uiMsg)</p>
+
+<p>{</p>
+
+<p>case WM_INITDIALOG:</p>
+
+<p>OnInitDialog(hDlg);</p>
+
+<p>break;</p>
+
+<p>case WM_EX_CHANGENOTIFICATION:</p>
+
+<p>UpdateView(hDlg);</p>
+
+<p>break;</p>
+
+<p>case WM_COMMAND:</p>
+
+<p>switch(wParam)</p>
+
+<p>{</p>
+
+<p>case IDOK:</p>
+
+<p>OnOK(hDlg);</p>
+
+<p>return FALSE;</p>
+
+<p>case IDCANCEL:</p>
+
+<p>g_bContinue = false;</p>
+
+<p>EndDialog(hDlg, FALSE);</p>
+
+<p>return FALSE;</p>
+
+<p>}</p>
+
+<p>break;</p>
+
+<p>}</p>
+
+<p>return FALSE;</p>
+
+<p>}</p>
+
+<p>再有，这个处理器对于‘安装通知对象’按钮，仍然调用OnOK()，因为我没有改变按钮的ID，而仅仅是标签改变了。</p>
+
+<p>void OnOK(HWND hDlg)</p>
+
+<p>{</p>
+
+<p>TCHAR szDir[MAX_PATH] = {0};</p>
+
+<p>GetDlgItemText(hDlg, IDC_EDIT, szDir, MAX_PATH);</p>
+
+<p>SHInstallNotifier(hDlg, szDir);</p>
+
+<p>}</p>
+
+<p>OnOK()调用SHInstallNotifier()函数，这个函数建立一个CUSTOMINFO对象并传递给调用Notify()的线程函数：</p>
+
+<p>HANDLE SHInstallNotifier(HWND hwndParent, LPCTSTR pszDir)</p>
+
+<p>{</p>
+
+<p>DWORD dwID = 0;</p>
+
+<p>CUSTOMINFO ci;</p>
+
+<p>ZeroMemory(&amp;ci, sizeof(CUSTOMINFO));</p>
+
+<p>ci.hWnd = hwndParent;</p>
+
+<p>lstrcpy(ci.pszDir, pszDir);</p>
+
+<p>// 建立工作线程</p>
+
+<p>g_bContinue = true;</p>
+
+<p>HANDLE hThread = CreateThread(NULL, 0, Notify, &amp;ci, 0, &amp;dwID);</p>
+
+<p>return hThread;</p>
+
+<p>}</p>
+
+<p>Notify()本身存在产生调用FindXXXChangeNotification()函数的地方，并在循环中保持对指定目录树的监视：</p>
+
+<p>DWORD WINAPI Notify(LPVOID lpv)</p>
+
+<p>{</p>
+
+<p>CUSTOMINFO ci;</p>
+
+<p>ci.hWnd = static_cast(lpv)-&gt;hWnd;</p>
+
+<p>lstrcpy(ci.pszDir, static_cast(lpv)-&gt;pszDir);</p>
+
+<p>HANDLE hNotify = FindFirstChangeNotification(ci.pszDir, TRUE,</p>
+
+<p>FILE_NOTIFY_CHANGE_FILE_NAME |</p>
+
+<p>FILE_NOTIFY_CHANGE_DIR_NAME |</p>
+
+<p>FILE_NOTIFY_CHANGE_ATTRIBUTES |</p>
+
+<p>FILE_NOTIFY_CHANGE_SIZE);</p>
+
+<p>if(hNotify == INVALID_HANDLE_VALUE)</p>
+
+<p>{</p>
+
+<p>SPB_SystemMessage(GetLastError());</p>
+
+<p>return 0;</p>
+
+<p>}</p>
+
+<p>while(g_bContinue)</p>
+
+<p>{</p>
+
+<p>WaitForSingleObject(hNotify, INFINITE);</p>
+
+<p>PostMessage(ci.hWnd, WM_EX_CHANGENOTIFICATION, 0, 0);</p>
+
+<p>FindNextChangeNotification(hNotify);</p>
+
+<p>}</p>
+
+<p>FindCloseChangeNotification(hNotify);</p>
+
+<p>return 1;</p>
+
+<p>}</p>
+
+<p>当事件变为信号事件时，WM_EX_CHANGENOTIFICATION类型的消息被发送，引起UpdateView()函数调用：</p>
+
+<p>void UpdateView(HWND hDlg)</p>
+
+<p>{</p>
+
+<p>TCHAR szTime[100] = {0};</p>
+
+<p>HWND hwndList = GetDlgItem(hDlg,IDC_LIST);</p>
+
+<p>GetTimeFormat(LOCALE_SYSTEM_DEFAULT, 0, NULL, NULL, szTime, 100);</p>
+
+<p>AddStringToReportView(hwndList, szTime, 1);</p>
+
+<p>}</p>
+
+<p>你可以看到这段代码使用了AddStringToReportView()函数，这是我们在上一章中开发的发送串到报告观察的函数。其伴随函数是MakeReportView()，在OnInitDialog()中被调用，以设置报告观察。</p>
+
+<p>void OnInitDialog(HWND hDlg)</p>
+
+<p>{</p>
+
+<p>// 设置图标T/F 大/小图标)</p>
+
+<p>SendMessage(hDlg, WM_SETICON, FALSE, reinterpret_cast(g_hIconSmall));</p>
+
+<p>SendMessage(hDlg, WM_SETICON, TRUE, reinterpret_cast(g_hIconLarge));</p>
+
+<p>LPTSTR psz[] = {__TEXT(&ldquo;Date and Time&rdquo;), reinterpret_cast(400)};</p>
+
+<p>MakeReportView(GetDlgItem(hDlg, IDC_LIST), psz, 1);</p>
+
+<p>}</p>
+
+<p>要加#include
+resource.h到源文件的顶部，并编译连接这个应用。运行这个应用之后，你会注意到，如果拷贝文件，你能够获得两个通知，删除可以有三个通知，如果删除所有标志，仅保留FILE_NOTIFY_CHANGE_FILE_NAME，并且重复拷贝操作，通知数被减少到1，因为我们不再对属性和尺寸的变化感兴趣。尽管如此，在删除操作时仍然有两个通知发生。为了查看为什么这样，按住Shift键后试着删除文件—你将发现现在只有一个通知了。这种情况说明，此次删除文件是直接销毁文件而不是保存到‘回收站’中。因此消除了正常文件删除的两个步骤中的一个—拷贝到‘回收站’，然后删除文件。</p>
+
+<p>简单地删除文件在文件被实际删除时产生一个通知。</p>
+
+<p><em>探测器和通知对象</em> __</p>
+
+<p>概略地讲，探测器的行为与这个应用一样：它设置通知对象到当前显示的文件夹上，每次接收到某个事件变动的通知，它都重新装入这个文件夹以响应那些变化。稍微思考一下，你就会认识到通知对象的机理就是为探测器的需要而精确定制的。</p>
+
+<p>探测器不是文件系统的监视例程，它需要知道当前被观察的文件夹中某些东西是否被改变了，以及改变所影响的显示数据：文件和子文件夹名，属性，尺寸，日期，安全等。无论确切的操作如何，重要的是已经发生了某些事情。这个机理似乎在系统与探测器性能方面是一个好的折中。</p>
+
+<p><em>揭示文件系统的监视例程</em> __</p>
+
+<p>就象我们已经看到的，通知对象的最大缺陷是对于实际发生事件所能提供的信息十分贫乏，通知对象就像一个防盗和火灾报警铃：在铃声响时，你不知道是被盗了还是着火了，或者二者都发生了。这个限制使它很难(不是不可能)应用于建立文件系统监视实用程序来使我们知道在整个系统中程序正在处理哪些文件。</p>
+
+<p>以后我们将考虑使用ICopyHook Shell扩展方法解决这个问题。即使这是一个重大进步，但是与我们的最终目标仍然有一定的距离。</p>
+
+<p><strong>关于</strong> _ _Windows NT__ _ _的说明__ _ ___</p>
+
+<p>到目前为止，我们并没有讨论不同的操作系统。你可能认为在Windows95，Windows98和Windows
+NT之间没有什么重大的差别，但事实上，我们所希望的事情出现在Windows NT4.0以上版本中。Windows NT的Win32
+SDK输出和说明了ReadDirectoryChangesW()函数，它有一个类似于FindFirstChangeNotification()的原型，但是有一个很大的差别：它使用活动发生的特殊信息和所涉及的活动者信息填充一个缓冲。</p>
+
+<p><em>关于</em> <em>ReadDirectoryChangesW()</em> <em>函数和通知对象的更多信息，一般来讲可以在</em> <em>Advanced Windows</em>
+<em>资料中找到</em> 。</p>
+
+<p>SHChangeNotify()函数</p>
+
+<p>当系统变动的事情发生时，探测器本身能够感知到它们(特别是文件的变化)，但是还不需要显式地告知程序执行的什么变化。为了使这容易些，Shell
+API定义了SHChangeNotify()函数，他唯一的目的就是通知探测器，某些系统设置已经被修改。概念上，SHChangeNotify()与通知对象产生相同的效果，但是，它遵从不同的逻辑。因此，一个外部应用可以用来向探测器通报某些它所制造的变化。在响应这个通知中，探测器将刷新用户界面。这是一个明显的例子，它说明了我们前面提到的在应用与Shell之间的‘通道’。</p>
+
+<p><em>调用</em> <em>SHChangeNotify()</em> <em>函数</em> __</p>
+
+<p>这个函数定义在shlobj.h中，下面是它的原型：</p>
+
+<p>void WINAPI SHChangeNotify(LONG wEventId,</p>
+
+<p>UINT uFlags,</p>
+
+<p>LPCVOID dwItem1,</p>
+
+<p>LPCVOID dwItem2);</p>
+
+<p>wEventId参数指定通知系统的事件，它接收一个或多个可能值的集合。最常用的值列表如下:</p>
+
+<p><strong>事件</strong> ****</p>
+
+<p>|</p>
+
+<p><strong>描述</strong> ****</p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>SHCNE_ASSOCCHANGED</p>
+
+<p>|</p>
+
+<p>一个文件关联的类型已经改变，没有指定具体是哪一个。</p>
+
+<p>SHCNE_NETSHARE</p>
+
+<p>|</p>
+
+<p>一个本地文件夹正在被共享，这引起图标的变化。dwItem1应包含文件夹名，文件夹名可以是全路径名或PIDL(见下面)。</p>
+
+<p>SHCNE_NETUNSHARE</p>
+
+<p>|</p>
+
+<p>一个本地文件夹不再被共享。这引起图标改变。dwItem1中包含文件夹名(全路径名或PIDL)。</p>
+
+<p>SHCNE_SERVERDISCONNECT</p>
+
+<p>|</p>
+
+<p>这台PC已经与服务器断开。dwItem1中包含服务器名。</p>
+
+<p>SHCNE_UPDATEDIR</p>
+
+<p>|</p>
+
+<p>给出文件夹的内容已经改变，但是这个变化并不影响文件系统。dwItem1中包含文件夹名(全路径名或PIDL)。</p>
+
+<p>SHCNE_UPDATEIMAGE</p>
+
+<p>|</p>
+
+<p>系统图像列表中的图标已经改变。dwItem1包含图标索引。这引起探测器刷新用户界面，必要时绘制新图标。探测器使用的所有图标都存储在称为‘系统图像列表’的全程结构中或‘探测器内部图标缓存’中。在第四章中已经显示了怎样获得这个图像列表的Handle。</p>
+
+<p>SHCNE_UPDATEITEM</p>
+
+<p>|</p>
+
+<p>一个非文件夹项已经改变。dwItem1中包含全文件名或PIDL。</p>
+
+<hr />
+
+<p>这个事件列表不是完整的，我们将在后面给出剩余的标志。完整的标志列表可以参考MSDN库。</p>
+
+<p>SHChangeNotify()的另外三个参数受wEventId变量指定的事件标识符影响，dwItem1和
+dwItem2变量包含事件相关的值。uFlags参数用于表示dwItem1和dwItem2的类型。它可以表示DWORD数(SHCNF_DWORD),PIDL(SHCNF_IDLIST),串(SHNCF_PATH)或指针名(SHCNF_PRINTER)。此外，uFlags还能指出函数是否应该等待通知被处理完。SHCNF_FLUSH常量表示等待；SHCNF_FLUSHNOWAIT则表示不等待，使函数立即返回。</p>
+
+<p><em>SHChangeNotify()</em> <em>函数的作用</em> __</p>
+
+<p>函数SHChangeNotify()是作为通知对象的补充功能而提出的，换句话说，它确实是绝对需要的函数。这个函数努力提供与通知对象相同的功能(尽管使用不同的逻辑)，但是，它并不仅仅限于文件系统对象。正象我们在第五章中看到过的，Windows
+Shell是由文件对象组成，并且绝大多数文件对象都映射到文件系统的物理实体上，但并不总是这样。比如文件对象‘我的计算机’和‘打印机’就没有对应的目录。更进一步，即使你有一个连接到目录的文件夹，它们所包含的项也不一定是文件。也就是说，你可以添加新项(或删除项)到文件夹对文件系统没有任何影响。此时探测器怎样感觉这些变化？</p>
+
+<p>对这个问题有了深层次的了解之后，我们反而困惑了，是否能够设计出监视系统整个范围可能活动的软件程序呢？后面我们将看到，命名空间扩展通过文件夹风格的接口可以用于显示很多东西。例如，Internet客户端SDK有一个示例RegView，在探测器层次观察上加了一个新节点，就象一个普通文件夹一样，其特征是所包含的内容是系统注册表，实际上是一两个文件的内容。探测器或其它工具怎样感觉这里的变化？你可以写一段软件来钩住注册表的活动，但是，如果某人用另一个命名空间扩展替换了RegView，并且做完全不同的操作，怎么办？</p>
+
+<p>只要操作超出了传统文件系统关联的范围，我们就需要改变通知的方式。它不再是探测器本身感觉变化，而是应用发送通知的事情。这就是SHChangeNotify()所设想的方式。某些用于调用SHChangeNotify()而定义的事件可能是多余的，例如，事件SHCNE_CREATE可能没有用—它表示建立一个新文件，但是探测器已经知道了这个事件，回想一下通知对象。反之，如果这个项不是文件系统对象，你就必须调用SHChangeNotify()，使探测器知道这个变化：</p>
+
+<p>SHChangeNotify(SHCNE_CREATE, SHCNF_IDLIST, pidl, NULL);</p>
+
+<p><em>SHChangeNotify()</em> <em>的其他事件</em> __</p>
+
+<p>现在SHChangeNotify()函数的基本概念已经有点清楚了，但是还需要时间来进一步补充说明。下面是全部可以通过wEventId变量传递给函数的事件：</p>
+
+<p><strong>事件</strong> ****</p>
+
+<p>|</p>
+
+<p><strong>描述</strong> ****</p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>SHCNE_ATTRIBUTES</p>
+
+<p>|</p>
+
+<p>文件或文件夹的属性改变。dwItem1是文件或文件夹名(全路径名或PIDL)。</p>
+
+<p>SHCNE_CREATE</p>
+
+<p>|</p>
+
+<p>已经建立了一个文件对象。dwItem1是文件对象名。</p>
+
+<p>SHCNE_DELETE</p>
+
+<p>|</p>
+
+<p>已经删除了一个文件对象。dwItem1是文件对象名。</p>
+
+<p>SHCNE_DRIVEADD</p>
+
+<p>|</p>
+
+<p>添加了一个驱动器。dwItem1是驱动器的根，有形式：C:/。</p>
+
+<p>SHCNE_DRIVEADDGUI</p>
+
+<p>|</p>
+
+<p>添加了一个驱动器并且需要一个新窗口。dwItem1是驱动器的根，有形式：C:/。</p>
+
+<p>SHCNE_DRIVEREMOVED</p>
+
+<p>|</p>
+
+<p>删除了一个驱动器。dwItem1是驱动器的根。</p>
+
+<p>SHCNE_FREESPACE</p>
+
+<p>|</p>
+
+<p>驱动器上可用空间量变化。dwItem1是驱动器的根，有形式：C:/。</p>
+
+<p>SHCNE_MEDIAINSERTED</p>
+
+<p>|</p>
+
+<p>存储介质已经插入到驱动器中。dwItem1是驱动器的根，有形式：C:/。</p>
+
+<p>SHCNE_MEDIAREMOVED</p>
+
+<p>|</p>
+
+<p>存储介质已经从驱动器中删除。dwItem1是驱动器的根，有形式：C:/。</p>
+
+<p>SHCNE_MKDIR</p>
+
+<p>|</p>
+
+<p>已经建立了一个文件夹。dwItem1是文件对象名。</p>
+
+<p>SHCNE_RENAMEFOLDER</p>
+
+<p>|</p>
+
+<p>文件夹已经重命名。dwItem1是老文件夹名，dwItem2是新文件夹名。名字可以是全路径名或PIDLs。</p>
+
+<p>SHCNE_RENAMEITEM</p>
+
+<p>|</p>
+
+<p>重命名了一个文件对象。dwItem1是老文件对象名，dwItem2是新文件对象名。</p>
+
+<p>SHCNE_RMDIR</p>
+
+<p>|</p>
+
+<p>删除了一个文件对象。dwItem1是文件对象名。</p>
+
+<p><em>使用</em> <em>SHChangeNotify()</em> __</p>
+
+<p>在开始写命名空间扩展程序时，SHChangeNotify()函数是非常有用的，因为它使你向探测器隐藏了一个项或文件夹可能不是实际文件系统对象这样一个事实。在第十六章中我们将开发一个命名空间扩展程序，它以窗口本身作为文件夹的内容显示系统中当前存在窗口的信息。通过扩展与全程钩子的组合，程序能够感知任何新窗口的建立，并使用SHCNE_CREATE标志调用SHChangeNotify()，并将使探测器能够有规律地刷新这个客户文件夹的内容。</p>
+
+<p><em>尽管在第二章中我们已经提到了，在这里我们还是不想论及</em> <em>Windows</em> <em>钩子。你可以参考</em> <em>MSDN</em> <em>库来得到更多信息。</em> __</p>
+
+<p>相反，一般的应用很少需要开发SHChangeNotify()服务。动态改变文件关联类型的程序可能需要使用—即，它改变了程序用于处理特殊类文档的信息，这些信息存储在注册表的下面指定的位置：</p>
+
+<p>HKEY_LOCAL_MACHINE</p>
+
+<p>/Software</p>
+
+<p>/Microsoft</p>
+
+<p>/Windows</p>
+
+<p>/CurrentVersion</p>
+
+<p>/Extensions</p>
+
+<p>为了通知探测器更新，你可以调用：</p>
+
+<p>SHChangeNotify(SHCNE_ASSOCCHANGED, 0, NULL, NULL);</p>
+
+<p><strong>入侵</strong> <strong>Shell</strong> <strong>存储空间</strong> ****</p>
+
+<p>如果你是一个有经验的Win32程序员，就会知道每一个进程都在它自己的地址空间中运行，并且只有在这个地址空间内，内存地址才有一个一致的值。例如，你不能子类化由另一个进程建立的窗口，因为新窗口过程的地址仅能指向你在另一个地址空间中可以看到它的地方。事实上，SetWindowLong()函数阻止了这种努力，如果你试图这样做，它就返回零。</p>
+
+<p>但是使你的程序代码映射进另一个应用进程的地址空间确实是可能的，这需要几个步骤。微软之所以阻止这样做是因为它产生的潜在错误比使用其它更普通的编程技术要高，然而，访问另一个应用的地址空间是安全的，只要你知道你打算做什么，你必须做什么，以及上面的全部知识。突破进程边界没有阻碍和实质危险的事情。就象使用指针一样—如果不正常使用的话，能够引起Bug。</p>
+
+<p>Shell是一个Win32进程，你可以使用与侵入Notepad应用一样的方法侵入它的内存空间。为什么我们需要侵入Shell呢，这与你进入任何其他Win32或Win16进程的理由是一样的：需要改变(或过滤)一个程序的行为。你是否已经注意到Notepad的拷贝有一种维持某些交叉会话设置的能力。运行Notepad，并打开‘词重叠’模式，这个设置会永久保持，在每次打开时都会恢复。如果你要在Windows95或Windows98下实现这个功能，你就必须客户化Notepad的标准行为。换句话说，你需要使你的代码侵入到它的地址空间中。</p>
+
+<p>在这一章的剩余部分，我们将显示三种进入探测器的地址空间的方法。头一个是传统的SDK技术，如钩子和子类化。第二种探索不为人知的Shell
+API函数SHLoadInProc()。这两项技术都能在Win32平台上工作，除了WindowsCE
+。第三种选择仅在4.71以上版才可用，探索探测器与IE共有的特征： <strong>浏览辅助对象</strong> 。</p>
+
+<p>强制进入方式</p>
+
+<p>在认识到不通过菜单就没有办法建立文件夹的时候，我们考虑子类化探测器窗口。我不相信我是唯一的没有找到梦幻组合键的人，我努力添加一个快速建立新文件夹的键盘加速器。即使在包含Windows键盘快捷键列表的知识库文章中也没有提到建立新文件夹的组合键。我不知道别人怎样，我却发现所有这些工作都相当失败：右击(或单击‘文件’菜单)，然后选择两项，最后再次单击。</p>
+
+<p>我的目的就是建立一个小应用程序，把它放进‘启动’文件夹，它安装一个系统范围的钩子，用以保持属于一定类的窗口建立轨迹，在这个问题中，这个窗口类是探测器窗口‘ExploreWClass’。</p>
+
+<p><em>我们使用了</em> <em>Spy++</em> <em>探测存在的窗口栈才找到这个类名字</em> 。</p>
+
+<p>一旦获得了探测器窗口的Handle，我们就可以安装键盘钩子到建立这个窗口的特定线程。第二个钩子响应键盘活动，和在键盘组合满足指定的规则时建立文件夹。这个任务可以分解成两个部分：</p>
+
+<p>进入探测器</p>
+
+<p>用与探测器相同的方法建立文件夹</p>
+
+<p>在Win32中，没有太多使你的代码映射进另一个进程地址空间的方法。如果想使你的代码兼容于Windows9x和WindowsNT，则只有一种可能：建立系统范围内的钩子。</p>
+
+<p><em>为什么使用钩子</em> __</p>
+
+<p>即使最终目标不是钩子而是简单地子类化窗口，如果这个窗口属于另一个进程的话，在做这个子类化工作之前，你也必须安装一个钩子。不管你使用什么钩子，问题在于它施加到系统所有线程上的是什么。</p>
+
+<p>如第二章中介绍的概念，使用钩子意思是指定了一个回调函数，当一定的(相关于这个钩子的)事件发生时系统将唤醒这个函数。如果想要监视所有运行中的进程，函数就必须驻留在一个DLL中，因为系统需要将它映射进那些进程中。</p>
+
+<p><strong>进入到探测器内部</strong> _ ___</p>
+
+<p>我们的程序将寻找正在建立的窗口(特别，寻找探测器窗口)。类型为WH_CBT的钩子过程需要在程序启动时安装以便系统在窗口上执行任何活动(建立，删除，激活等)时触发这个函数：</p>
+
+<hr />
+
+<p>g_hShellHook = SetWindowsHookEx(WH_CBT, ShellDll_MainHook, g_hThisDll, 0);</p>
+
+<p>这个钩子在退出时必须被删除：</p>
+
+<p>if(g_hShellHook != NULL)</p>
+
+<p>UnhookWindowsHookEx(g_hShellHook);</p>
+
+<p>显然，在整个系统范围内有一个钩子存在会影响到它的性能。任何系统范围内的钩子因为它们的存在都将影响到系统性能。它使系统做附加的工作，这毋庸置疑地等比例缩减系统性能。因此我们建议，系统的钩子要尽可能地小。我这里是最小的一个，它极大地缩减了性能损失的风险。这个钩子的过程如下：</p>
+
+<p>LRESULT CALLBACK ShellDll_MainHook(int nCode, WPARAM wParam, LPARAM lParam)</p>
+
+<p>{</p>
+
+<p>TCHAR szClass[MAX_PATH] = {0};</p>
+
+<p>// 任何钩子过程都有的典型开头</p>
+
+<p>if(nCode &lt; 0)</p>
+
+<p>return CallNextHookEx(g_hShellHook, nCode, wParam, lParam);</p>
+
+<p>// 系统正在建立窗口。注意钩子从这段代码内被唤醒CreateWindow() and CreateWindowEx()。</p>
+
+<p>// 在这一点上，窗口已经存在，HWND是有效的，即使我们仍然在建立过程中间。</p>
+
+<p>if(nCode == HCBT_CREATEWND)</p>
+
+<p>{</p>
+
+<p>// 获得窗口的HWND</p>
+
+<p>HWND hwndExplorer = reinterpret_cast(wParam);</p>
+
+<p>//比较&rsquo;ExploreWClass&rsquo;和安装键盘钩子</p>
+
+<p>GetClassName(hwndExplorer, szClass, MAX_PATH);</p>
+
+<p>if(!lstrcmpi(szClass, __TEXT(&ldquo;ExploreWClass&rdquo;)))</p>
+
+<p>InstallKeyboardHook(hwndExplorer);</p>
+
+<p>}</p>
+
+<p>return CallNextHookEx(g_hShellHook, nCode, wParam, lParam);</p>
+
+<p>}</p>
+
+<p>每当有窗口建立时都执行这段代码。如果窗口类名与探测器窗口类名匹配(为ExploreWClass)，则安装键盘钩子，在这一点上，我们就已经进入到探测器的地址空间了。注意，‘键盘’钩子可以是局部于探测器线程的，它拥有窗口类ExploreWClass，不必在整个系统上钩住键盘活动，因为当我们在建立新文件夹时，输入焦点自然在探测器上(在编写辅助对象那一节我们将进一步说明)。</p>
+
+<p><strong>怎样建立新文件夹</strong> _ ___</p>
+
+<p>为了使钩子代码映射到一个进程的地址空间，充分的条件是从进程内部唤醒一个系统范围的钩子过程。现在这个问题缩减到要建立一个新文件夹。显然我们希望获得与手动建立习惯相同的操作方式。所以最容易的方法是精确地重复探测器使用‘新建|文件夹’菜单时的操作。</p>
+
+<p><em>你可能要问为什么不选择采用前面讨论过的方法—也就是说，为什么不使用</em> <em>Shell API</em>
+<em>，取得当前目录和建立新目录。原因就是在这种情况下那些方法已经失效了。首先，你怎么知道探测器当前显示的是哪一个文件夹？</em>
+<em>GetCurrentDirectory()</em> <em>返回的名字是不完备的。其次，很多特殊文件夹不允许建立子文件夹，如果这样做将引起麻烦。</em> __</p>
+
+<p>我论述了探测器在响应发送到主窗口的WM_COMMAND消息时建立新文件夹的原理。为了便于研究，我写了一段程序，子类化了ExploreWClass窗口，以便在每次处理WM_COMMAND消息时探测它的参数。通过这个方法，我们发现，要请求探测器建立新文件夹，你只需要向这个窗口发送如下消息即可:</p>
+
+<p>PostMessage(hwndExplorer, WM_COMMAND, 29281, 0);</p>
+
+<p>魔力数29281是‘新建|文件夹’菜单项的ID。这是非官方信息，而且它可能在新版本的Shell中被改动。但是，现在，它能与Windows9x和WindowsNT一起工作。如果将来这个数改变，除非Shell的本质结构变化，你只需要简单地找出新的ID号就可以了。这个数从4.00到4.71一直都没有变。</p>
+
+<p>安装了键盘钩子后，Shell可以响应一键建立新文件夹操作。我们选择了F12键—没有什么特殊的原因，可以自由地采用任何其它的键。当键盘钩子过程感觉到F12按下时，它简单地恢复探测器窗口，和发送一个消息。</p>
+
+<p><strong>示例程序</strong> _ ___</p>
+
+<p>正象说明的那样，示例程序必然分为两个部分：DLL和可执行程序。首先是DLL程序源码，包含了两个钩子，它是基于DLL框架的，我们取名为ExpHook工程(project)。全程变量和函数声明加到ExpHook.h文件中：</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</em>/</p>
+
+<p>// 原型节</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</em>/</p>
+
+<p>HHOOK g_hShellHook;</p>
+
+<p>HHOOK g_hKeybHook;</p>
+
+<p>HWND g_hwndExplorer;</p>
+
+<p>void InstallKeyboardHook(HWND hwnd);</p>
+
+<p>void APIENTRY ShellDll_Hook();</p>
+
+<p>void APIENTRY ShellDll_Unhook();</p>
+
+<p>LRESULT CALLBACK ShellDll_KeybHook(int nCode, WPARAM wParam, LPARAM lParam);</p>
+
+<p>LRESULT CALLBACK ShellDll_MainHook(int nCode, WPARAM wParam, LPARAM lParam);</p>
+
+<p>自然，原型的实现在ExpHook.cpp，这些函数正好实现了我们讨论过的原理：</p>
+
+<p>// 设置钩子来感觉探测器的启动</p>
+
+<p>void APIENTRY ShellDll_Hook()</p>
+
+<p>{</p>
+
+<p>g_hShellHook = SetWindowsHookEx(WH_CBT, ShellDll_MainHook, g_hThisDll, 0);</p>
+
+<p>}</p>
+
+<p>void APIENTRY ShellDll_Unhook()</p>
+
+<p>{</p>
+
+<p>if(g_hKeybHook != NULL)</p>
+
+<p>UnhookWindowsHookEx(g_hKeybHook);</p>
+
+<p>if(g_hShellHook != NULL)</p>
+
+<p>UnhookWindowsHookEx(g_hShellHook);</p>
+
+<p>}</p>
+
+<p>// 列表中的ShellDll_MainHook()钩子插入这段代码</p>
+
+<p>LRESULT CALLBACK ShellDll_KeybHook(int nCode, WPARAM wParam, LPARAM lParam)</p>
+
+<p>{</p>
+
+<p>// 任何钩子过程典型的开头</p>
+
+<p>if(nCode &lt; 0)</p>
+
+<p>return CallNextHookEx(g_hKeybHook, nCode, wParam, lParam);</p>
+
+<p>// 一般这段代码在键盘按下和松开时都执行.状态变换信息存储在lParam的最高两位中</p>
+
+<p>//因此，我们仅处理一次键盘操作。</p>
+
+<p>if((lParam &amp; 0x80000000) || (lParam &amp; 0x40000000))</p>
+
+<p>return CallNextHookEx(g_hKeybHook, nCode, wParam, lParam);</p>
+
+<p>if(wParam == VK_F12)</p>
+
+<p>{</p>
+
+<p>//取得探测器窗口Handle和发送消息。</p>
+
+<p>g_hwndExplorer = FindWindow(&ldquo;ExploreWClass&rdquo;, NULL);</p>
+
+<p>PostMessage(g_hwndExplorer, WM_COMMAND, 29281, 0);</p>
+
+<p>}</p>
+
+<p>return CallNextHookEx(g_hKeybHook, nCode, wParam, lParam);</p>
+
+<p>}</p>
+
+<p>// 安装键盘钩子</p>
+
+<p>void InstallKeyboardHook(HWND hwnd)</p>
+
+<p>{</p>
+
+<p>g_hwndExplorer = hwnd;</p>
+
+<p>DWORD dwThread = GetWindowThreadProcessId(g_hwndExplorer, NULL);</p>
+
+<p>g_hKeybHook = SetWindowsHookEx(WH_KEYBOARD, ShellDll_KeybHook,</p>
+
+<p>g_hThisDll, dwThread);</p>
+
+<p>}</p>
+
+<p>为了使这个库输出我们需要的函数，还应该把这些行加到.def文件：</p>
+
+<p>EXPORTS</p>
+
+<p>ShellDll_Hook @2</p>
+
+<p>ShellDll_Unhook @3</p>
+
+<p>ShellDll_KeybHook @4</p>
+
+<p>ShellDll_MainHook @5</p>
+
+<p>这就是我们需要的DLL，编译连接之后移到主程序一起，运行后将在托盘通知区域增加一个图标，便于你容易地卸载这个钩子。除了建立图标，主程序本身还包含安装和卸载WH_CBT钩子功能。由于这个应用程序的特性，不象一般的应用程序那样有多少客户需求。首先建立一个基于对话框的应用ExpFold，加一个#include语句，包含DLL函数定义：</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</em>/</p>
+
+<p>// 包含节</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</em>/</p>
+
+<p>#include &ldquo;ExpFold.h&rdquo;</p>
+
+<p>#include &ldquo;ExpHook.h&rdquo;</p>
+
+<p>其次需要两个新常量：一是客户消息，当托盘图标被点击时发送的消息，再有就是图标的ID：</p>
+
+<p>// Data</p>
+
+<p>const int WM_MYMESSAGE = WM_APP + 1; // 托盘图标消息</p>
+
+<p>const int ICON_ID = 13;</p>
+
+<p>HICON g_hIconLarge;</p>
+
+<p>HICON g_hIconSmall;</p>
+
+<p>HINSTANCE g_hInstance;</p>
+
+<p>新的全程变量用于存储应用实例的Handle ，这在后来调用LoadMenu()时是必须的。下面是对WinMain()需要作出的改变：</p>
+
+<p>int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevious,LPTSTR lpsz, int
+iCmd)</p>
+
+<p>{</p>
+
+<p>// 保存全程数据</p>
+
+<p>g_hInstance = hInstance;</p>
+
+<p>g_hIconSmall = static_cast(LoadImage(hInstance, &ldquo;APP_ICON&rdquo;,</p>
+
+<p>IMAGE_ICON, GetSystemMetrics(SM_CXSMICON),</p>
+
+<p>GetSystemMetrics(SM_CXSMICON), 0));</p>
+
+<p>// 建立不可视对话框获得来自图表的消息</p>
+
+<p>HWND hDlg = CreateDialog(hInstance, &ldquo;DLG_MAIN&rdquo;, NULL, APP_DlgProc);</p>
+
+<p>// 在托盘区域显示图标</p>
+
+<p>TrayIcon(hDlg, NIM_ADD);</p>
+
+<p>// 安装探测器钩子</p>
+
+<p>ShellDll_Hook();</p>
+
+<p>MSG msg;</p>
+
+<p>while(GetMessage(&amp;msg, NULL, 0, 0))</p>
+
+<p>{</p>
+
+<p>if(!IsDialogMessage(hDlg, &amp;msg))</p>
+
+<p>{</p>
+
+<p>TranslateMessage(&amp;msg);</p>
+
+<p>DispatchMessage(&amp;msg);</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>// 卸载钩子</p>
+
+<p>ShellDll_Unhook();</p>
+
+<p>// 删除图标</p>
+
+<p>TrayIcon(hDlg, NIM_DELETE);</p>
+
+<p>DestroyWindow(hDlg);</p>
+
+<p>DestroyIcon(g_hIconSmall);</p>
+
+<p>return 1;</p>
+
+<p>}</p>
+
+<p>与显示的对话框不一样，这个应用通过调用CreateDialog()而不是DialogBox()建立了一个不可视对话框，对话框过程如下：</p>
+
+<p>BOOL CALLBACK APP_DlgProc(HWND hDlg, UINT uiMsg, WPARAM wParam, LPARAM lParam)</p>
+
+<p>{</p>
+
+<p>switch(uiMsg)</p>
+
+<p>{</p>
+
+<p>case WM_COMMAND:</p>
+
+<p>switch(wParam)</p>
+
+<p>{</p>
+
+<p>case IDCANCEL:</p>
+
+<p>PostQuitMessage(0);</p>
+
+<p>return FALSE;</p>
+
+<p>}</p>
+
+<p>break;</p>
+
+<p>case WM_MYMESSAGE:</p>
+
+<p>if(wParam == ICON_ID)</p>
+
+<p>{</p>
+
+<p>switch(lParam)</p>
+
+<p>{</p>
+
+<p>case WM_RBUTTONUP:</p>
+
+<p>ContextMenu(hDlg);</p>
+
+<p>break;</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>break;</p>
+
+<p>}</p>
+
+<p>return FALSE;</p>
+
+<p>}</p>
+
+<p>TrayIcon()函数由WinMain()在对话框设置后调用，它显示一个图标到任务条托盘，退出时要删除它：</p>
+
+<p>// 在托盘区域显示图标</p>
+
+<p>BOOL TrayIcon(HWND hWnd, DWORD msg)</p>
+
+<p>{</p>
+
+<p>NOTIFYICONDATA nid;</p>
+
+<p>ZeroMemory(&amp;nid, sizeof(NOTIFYICONDATA));</p>
+
+<p>nid.cbSize = sizeof(NOTIFYICONDATA);</p>
+
+<p>nid.hWnd = hWnd;</p>
+
+<p>nid.uID = ICON_ID;</p>
+
+<p>nid.uFlags = NIF_TIP | NIF_ICON | NIF_MESSAGE;</p>
+
+<p>nid.uCallbackMessage = WM_MYMESSAGE;</p>
+
+<p>nid.hIcon = g_hIconSmall;</p>
+
+<p>lstrcpyn(nid.szTip, __TEXT(&ldquo;Explorer&rsquo;s Hook&rdquo;), 64);</p>
+
+<p>return Shell_NotifyIcon(msg, &amp;nid);</p>
+
+<p>}</p>
+
+<p>最后当用户点击托盘图标时ContextMenu()函数被调用。为了正常工作，需要加一个IDR_MENU类型的菜单资源到工程(project)中，菜单中应该包含一个项‘关闭’，它的ID是IDCANCEL。</p>
+
+<p>// 显示图标的关联菜单</p>
+
+<p>void ContextMenu(HWND hwnd)</p>
+
+<p>{</p>
+
+<p>POINT pt;</p>
+
+<p>GetCursorPos(&amp;pt);</p>
+
+<p>HMENU hmenu = LoadMenu(g_hInstance, MAKEINTRESOURCE(IDR_MENU));</p>
+
+<p>HMENU hmnuPopup = GetSubMenu(hmenu, 0);</p>
+
+<p>SetMenuDefaultItem(hmnuPopup, IDOK, FALSE);</p>
+
+<p>SetForegroundWindow(hwnd);</p>
+
+<p>TrackPopupMenu(hmnuPopup, TPM_LEFTALIGN, pt.x, pt.y, 0, hwnd, NULL);</p>
+
+<p>SetForegroundWindow(hwnd);</p>
+
+<p>DestroyMenu(hmnuPopup);</p>
+
+<p>DestroyMenu(hmenu);</p>
+
+<p>}</p>
+
+<p><strong>程序活动</strong> _ ___</p>
+
+<p>包含#include
+&ldquo;resource.h&rdquo;，并编译程序后，连接库exphook.lib，将获得.exe和.dll两个文件。而后建立可执行文件的快捷方式，把这个快捷方式拷贝到‘启动’文件夹下。</p>
+
+<p><a href="https://img.it610.com/image/info8/792b0ed0df23486496823f6cf059f539.jpg"><img src="https://img.it610.com/image/info8/792b0ed0df23486496823f6cf059f539.jpg" alt="" /></a></p>
+
+<p>这个程序可以通过右击托盘图标并选择‘关闭’删除。只要它被安装，就能钩住每一个探测器窗口，并在响应线程中建立和安装键盘钩子，这个键盘过程查寻F12
+并向相应窗口发送消息。</p>
+
+<p><strong>进入</strong> <strong>Shell</strong> <strong>存储空间</strong> ****</p>
+
+<p>把外部代码注入到Shell地址空间有两种方法。侵入(我们已经看到的)，和邀请(一种友好的方法，仅当我们可以找到一种办法这么做)。前一种方式下，主程序完全不知道它正在运行什么。相反，后一种方法主程序直接控制每一件事情的发生。</p>
+
+<p>Windows Shell 正是通过邀请而不是侵入提供了一种方法来进入它的存储空间—Shell
+API提供了一个经常不受重视的函数SHLoadInProc()，它定义在shlobj.h中，并且有令人惊讶的能力。然而，这个函数的说明资料确是十分贫乏的，根据仅有的资料，你可能会怀疑这个函数是否有想象的能力。正是为了说明它的能力，在这一节我们打算建立一个DLL的例子，这个例子允许我们恢复和置换Windows‘开始’按钮。在开始这个任务之前，更进一的说明是必要的。</p>
+
+<p>SHLoadInProc()函数</p>
+
+<p>在坚固的外壳下，SHLoadInProc()函数将你的模块装入到Shell的地址空间。这实际上是你在上一节中努力要达到的目的。SHLoadInProc()装入模块，然后保留它独自作任何操作。下面是Internet
+客户端SDK中对它的描述资料：</p>
+
+<p>WINSHELLAPI HRESULT WINAPI SHLoadInProc(REFCLSID rclsid);</p>
+
+<p>在关联的Shell进程内建立一个指定对象的实例，如果成功，返回NOERROR，否则返回OLE定义的错误结果。</p>
+
+<p><em>rclsid</em></p>
+
+<p>要建立的对象类的CLSID。</p>
+
+<p>这个资料是绝对正确的，问题是一点也没有提到‘对象类’的结构。哪些接口是必须要实现的，哪些特殊的规则是必须要遵循的，没有特定接口的COM服务器能做什么，如果不要求特定的接口，对象如何启动工作。</p>
+
+<p>所有这些问题在资料中都没有回答，诚实地讲，我们不能理解怎样做才能使这个函数工作。</p>
+
+<p>最小COM对象</p>
+
+<p>SHLoadInProc()函数是把我们的代码引入Shell地址空间最快和最有效的方法，但是，这个代码必须是一个COM对象。然而，为了探索这个函数，我们没有必要建立一个完整的COM对象—只使用部分COM和DLL代码。但是它必须实现COM服务器的规则(因而需要自注册和一个CLSID)，而实际上它更象一个老的DLL而不象进程内COM服务器。</p>
+
+<p><em>怎样建立</em> <em>COM</em> <em>对象</em> __</p>
+
+<p>一个进程内COM对象是一个DLL，即，它有一个DllMain()函数。更重要的是，一个COM对象输出四个全程函数，这些函数是由与进程内对象一同工作的任何容器来操作的。它们是：</p>
+
+<p>DllGetClassObject()</p>
+
+<p>DllCanUnloadNow()</p>
+
+<p>DllRegisterServer()</p>
+
+<p>DllUnregisterServer()</p>
+
+<p>后两个是自动注册和注销函数，如果承诺手动注册和注销，可以不用实现这两个函数。我们的COM对象现在就减去这两个函数，此时只有两个全程函数输出：DllGetClassObject()和DllCanUnloadNow()。</p>
+
+<p><em>DllGetClassObject()</em> <em>函数的作用</em> __</p>
+
+<p>任何COM对象的客户必须首先加载包含这个COM对象的库，然后通过DllGetClassObject()函数取得接口指针：</p>
+
+<p>STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID* ppv);</p>
+
+<p>重点是在类对象被装入后，总是立即调用这个函数。换言之，这段代码总能得到执行。更重要的是，它是在Shell的关联空间中执行的。</p>
+
+<p><strong>满足客户的期望</strong> _ ___</p>
+
+<p>一般，加载类对象的模块调用DllGetClassObject()，请求IClassFactory接口，我们的客户—当前情况下是探测器—期望一个由DllGetClassObject()函数返回的接口指针。由于我们并没有实现这个接口，怎样才能应对这个期望呢？</p>
+
+<p>对我们而言，显式地说明请求的类不可用就足够了，这仅需简单地返回一个适当的错误码：</p>
+
+<p>STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID* ppv)</p>
+
+<p>{</p>
+
+<p>return CLASS_E_CLASSNOTAVAILABLE;</p>
+
+<p>}</p>
+
+<p>上面是一种DllGetClassObject()函数可能的实现，它产生的一个感觉是不支持特定的接口。</p>
+
+<p><strong>使用</strong> _ _Shell__ _ _地址空间__ _ ___</p>
+
+<p>除了返回错误码以外，这个函数还可以同任何驻留在Shell地址空间上的对象一道做任何想要做的工作。在DllGetClassObject()被调用时，我们就已经在Shell的关联空间中了，因此，这将允许我们子类化‘开始’按钮。在花一点时间讨论DllCanUnloadNow()函数之后，我们将很快开始证实这一点。</p>
+
+<p><em>DllCanUnloadNow()</em> <em>函数的作用</em> __</p>
+
+<p>通过DllGetClassObject()加载COM对象的客户模块调用DllCanUnloadNow()函数来保证DLL可以被安全地卸载和释放。探测器周期地执行这个检查，尽管这个周期可能延迟十秒或十分钟。在第十五章的Shell扩展中我们将展开讨论这一点。</p>
+
+<p>如果DllCanUnloadNow()返回S_OK，则宿主DLL将被卸载。如果它总是返回S_FALSE，或DLL没有输出具有这个名字的函数，则只有在主应用程序调用CoUninitialize()函数关闭COM库时，这个DLL库才被释放。因为此时的主应用是探测器，所以调用CoUninitialize()函数之后的一段时间才发生DLL库被释放操作。</p>
+
+<p><em>COM</em> <em>对象源码</em> __</p>
+
+<p>接下来是这个‘假冒’COM对象的最小源代码，用来结合SHLoadInProc()函数，并且作为一个例程的种子，它将逐步成长为‘开始’按钮子类化的应用。在VC++
+中建立一个新的Win32动态链接库起名为‘Start’(选择‘简单DLL’选项)，添加下述代码到start.ccp：</p>
+
+<p>#include &ldquo;start.h&rdquo;</p>
+
+<p>HINSTANCE g_hInstance;</p>
+
+<p>BOOL APIENTRY DllMain(HINSTANCE hInstance,</p>
+
+<p>DWORD ul_reason_for_call,</p>
+
+<p>LPVOID lpReserved)</p>
+
+<p>{</p>
+
+<p>g_hInstance = hModule;</p>
+
+<p>return TRUE;</p>
+
+<p>}</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</em>/</p>
+
+<p>// DllGetClassObject</p>
+
+<p>// COM 进程内对象住函数</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</em>/</p>
+
+<p>STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID* ppv)</p>
+
+<p>{</p>
+
+<p>// 在这了做一些操作</p>
+
+<p>return CLASS_E_CLASSNOTAVAILABLE;</p>
+
+<p>}</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</em>/</p>
+
+<p>// DllCanUnloadNow</p>
+
+<p>// 确认卸载COM库</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</em>/</p>
+
+<p>STDAPI DllCanUnloadNow()</p>
+
+<p>{</p>
+
+<p>return S_OK;</p>
+
+<p>}</p>
+
+<p>start.h头文件包含有上面定义的‘假冒’COM对象的CLSID：</p>
+
+<p>#include</p>
+
+<p>#include</p>
+
+<p>#include</p>
+
+<p>#include</p>
+
+<p>DEFINE_GUID(CLSID_NewStart, 0x20051998, 0x0020,0x0005,</p>
+
+<p>0x19, 0x98, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);</p>
+
+<p>对于库的输出函数，还需要定义start.def文件：</p>
+
+<p>LIBRARY START</p>
+
+<p>EXPORTS</p>
+
+<p>DllCanUnloadNow @1 PRIVATE</p>
+
+<p>DllGetClassObject @2 PRIVATE</p>
+
+<p>作为这一节的结束，这里是一段代码，它使用SHLoadInProc()函数加载COM到探测器地址空间：</p>
+
+<p>void DoGoInsideExplorer()</p>
+
+<p>{</p>
+
+<p>const CLSID clsid = {0x20051998,0x0020,0x0005,</p>
+
+<p>{0x19,0x98,0x00,0x00,0x00,0x00,0x00,0x00}};</p>
+
+<p>SHLoadInProc(clsid);</p>
+
+<p>}</p>
+
+<p>注册COM对象</p>
+
+<p>本质上有两种方法可以注册COM对象：在DllRegisterServer()函数中插入代码，或手动地注册—最好用一个注册脚本。现在让我们关注一下这两种方法。先从最简单的注册脚本开始。</p>
+
+<p>下面是一个脚本文件REG的内容，它由注册表编辑器自动处理。它添加两个注册CLSID的键到HKEY_CLASSES_ROOT的CLSID节点下，并且存储实现COM的可执行文件名。</p>
+
+<p>REGEDIT4</p>
+
+<p>[HKEY_CLASSES_ROOT/CLSID/{20051998-0020-0005-1998-000000000000}]</p>
+
+<p>@= &ldquo;Start Button&rdquo;</p>
+
+<p>[HKEY_CLASSES_ROOT/CLSID/{20051998-0020-0005-1998-000000000000}/InProcServer32]</p>
+
+<p>@= &ldquo;C://Chap07//Source//Start//start.dll&rdquo;</p>
+
+<p>&ldquo;ThreadingModel&rdquo; = &ldquo;Apartment&rdquo;</p>
+
+<p>当然，一定要保证注册的路径是实际文件所在的路径。实际，一个需要加到CLSID下的键应该具有封装为如下用括号括起来的CLSID名字：</p>
+
+<p>HKEY_CLASSES_ROOT</p>
+
+<p>/CLSID</p>
+
+<p>/{20051998-0020-0005-1998-000000000000}</p>
+
+<p>此外，我们还需要在这个键下添加另一个称为InProcServer32的键，其默认值指向实际服务器的名。值ThreadingModel指示必须的线程模型。要注册这个服务器，需要在探测器上双击这个REG文件，或使用注册编辑器引入它。</p>
+
+<p>正规的方法是把这些内容全部编写进DllRegisterServer()函数中，这要求我们使用Win32注册表API编程。我们在第十章中将说明在Shell4.71以上版中包含了涉及到注册表的新的高层函数集。在这里我们可以使用这些函数，但是，这段代码将只能在4.71或以上版使用。下面的代码使用传统的Win32
+注册表API：</p>
+
+<p>STDAPI DllRegisterServer()</p>
+
+<p>{</p>
+
+<p>TCHAR szSubKey[MAX_PATH] = {0};</p>
+
+<p>TCHAR szCLSID[MAX_PATH] = {0};</p>
+
+<p>TCHAR szModule[MAX_PATH] = {0};</p>
+
+<p>HKEY hKey;</p>
+
+<p>DWORD dwDisp;</p>
+
+<p>//设置CLSID</p>
+
+<p>lstrcpy(szCLSID, __TEXT(&ldquo;{20051998-0020-0005-1998-000000000000}&rdquo;));</p>
+
+<p>// 取得模块名</p>
+
+<p>GetModuleFileName(g_hInstance, szModule, MAX_PATH);</p>
+
+<p>// HKCR: CLSID/{&hellip;}</p>
+
+<p>wsprintf(szSubKey, __TEXT(&ldquo;CLSID//%s&rdquo;), szCLSID);</p>
+
+<p>LRESULT lResult = RegCreateKeyEx(HKEY_CLASSES_ROOT, szSubKey, 0, NULL,</p>
+
+<p>REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &amp;hKey, &amp;dwDisp);</p>
+
+<p>if(lResult == NOERROR)</p>
+
+<p>{</p>
+
+<p>TCHAR szData[MAX_PATH] = {0};</p>
+
+<p>wsprintf(szData, __TEXT(&ldquo;Start Button&rdquo;), szModule);</p>
+
+<p>lResult = RegSetValueEx(hKey, NULL, 0, REG_SZ,</p>
+
+<p>reinterpret_cast(szData), lstrlen(szData) + 1);</p>
+
+<p>RegCloseKey(hKey);</p>
+
+<p>}</p>
+
+<p>// HKCR: CLSID/{&hellip;}/InProcServer32</p>
+
+<p>wsprintf(szSubKey, __TEXT(&ldquo;CLSID//%s//InProcServer32&rdquo;), szCLSID);</p>
+
+<p>lResult = RegCreateKeyEx(HKEY_CLASSES_ROOT, szSubKey, 0, NULL,</p>
+
+<p>REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &amp;hKey, &amp;dwDisp);</p>
+
+<p>if(lResult == NOERROR)</p>
+
+<p>{</p>
+
+<p>lResult = RegSetValueEx(hKey, NULL, 0, REG_SZ,</p>
+
+<p>reinterpret_cast(szModule), lstrlen(szModule) + 1);</p>
+
+<p>TCHAR szData[MAX_PATH] = {0};</p>
+
+<p>lstrcpy(szData, __TEXT(&ldquo;Apartment&rdquo;));</p>
+
+<p>lResult = RegSetValueEx(hKey, __TEXT(&ldquo;ThreadingModel&rdquo;), 0, REG_SZ,</p>
+
+<p>reinterpret_cast(szData), lstrlen(szData) + 1);</p>
+
+<p>RegCloseKey(hKey);</p>
+
+<p>}</p>
+
+<p>return S_OK;</p>
+
+<p>}</p>
+
+<p>COM对象在DEF文件中输出了DllRegisterServer()，可以使用系统实用程序regsvr32.exe来进行注册：</p>
+
+<p>**regsvr32.exe **</p>
+
+<p><em>注销</em> <em>COM</em> <em>对象</em> __</p>
+
+<p>REG脚本不允许注销设置，所以要这样做的唯一方法是通过注册表编辑器的帮助手动删除。如果安装了Windows脚本环境(WSH)则可以有另一种方案，写一个VB脚本或Java脚本函数，使用WSH注册表对象来删除键和值。由于使用脚本语言比REG更灵活和通用，因此这种方法在未来将可能成为流行的方法。</p>
+
+<p>说到脚本语言，其价值在于用ATL写的COM对象可以用RGS文件提供注册和注销。RGS脚本并不是注册表编辑器REG文件的增强版。</p>
+
+<p>返回到我们关于API函数的讨论，要使COM对象自己注销，你应该使用下面的编码：</p>
+
+<p>STDAPI DllUnregisterServer()</p>
+
+<p>{</p>
+
+<p>TCHAR szSubKey[MAX_PATH] = {0};</p>
+
+<p>TCHAR szCLSID[MAX_PATH] = {0};</p>
+
+<p>TCHAR szModule[MAX_PATH] = {0};</p>
+
+<p>HKEY hKey;</p>
+
+<p>DWORD dwDisp;</p>
+
+<p>// 设置CLSID</p>
+
+<p>lstrcpy(szCLSID, __TEXT(&ldquo;{20051998-0020-0005-1998-000000000000}&rdquo;));</p>
+
+<p>// 打开HKCR</p>
+
+<p>LRESULT lResult = RegCreateKeyEx(HKEY_CLASSES_ROOT, &ldquo;&rdquo;, 0, NULL,</p>
+
+<p>REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &amp;hKey, &amp;dwDisp);</p>
+
+<p>if(lResult == NOERROR)</p>
+
+<p>{</p>
+
+<p>wsprintf(szSubKey, __TEXT(&ldquo;CLSID//%s//InProcServer32&rdquo;), szCLSID);</p>
+
+<p>RegDeleteKey(hKey, szSubKey);</p>
+
+<p>wsprintf(szSubKey, __TEXT(&ldquo;CLSID//%s&rdquo;), szCLSID);</p>
+
+<p>RegDeleteKey(hKey, szSubKey);</p>
+
+<p>RegCloseKey(hKey);</p>
+
+<p>}</p>
+
+<p>return S_OK;</p>
+
+<p>}</p>
+
+<p>在这个函数中，我们打开HKEY_CLASSES_ROOT，和删除其中的键。RegDeleteKey()在Windows9x和Windows
+NT下稍微有点差别。前者允许包含子键的键，这种递归删除在NT下不支持，如果给定键不空，这个函数失败。注意‘空’意思是没有子键，而不是他表示的值。由于上述代码首先删除最内部的键，所以在两个平台上都能工作。</p>
+
+<p>输出DllUnregisterServer()的COM对象可以由regsvr32.exe系统实用程序加以注销：</p>
+
+<p>**regsvr32.exe /u **</p>
+
+<p>一个崭新的开始按钮</p>
+
+<p>为了说明SHLoadInProc()的能力，我们给出了扩展DllGetClassObject()函数的代码，建立了一个崭新的‘开始’按钮，它具有不同的图像和菜单。我们将通过以下步骤达到这个目标：</p>
+
+<p>取得‘开始’按钮的Handle</p>
+
+<p>置换它的图像</p>
+
+<p>子类化按钮窗口，改变菜单和光标</p>
+
+<p>建立和显示客户化菜单</p>
+
+<p>而后，你就可以控制‘Windows’键和‘Ctrl+Esc’组合键。你也可以限制它们，让它们显示标准的‘开始’菜单，或用新的客户化的菜单连接它们。期望的结果显示如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/581d8acafdd648b68fc16c94c524a7fe.jpg"><img src="https://img.it610.com/image/info8/581d8acafdd648b68fc16c94c524a7fe.jpg" alt="Windows Shell 编程
+第七章_第2张图片" /></a></p>
+
+<p>第一件事情是建立在DllGetClassObject()中调用的主函数。这是进入Shell未可知领域的第一步。</p>
+
+<p>STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID* ppv)</p>
+
+<p>{</p>
+
+<p>InstallHandler();</p>
+
+<p>return CLASS_E_CLASSNOTAVAILABLE;</p>
+
+<p>}</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</em>/</p>
+
+<p>// InstallHandler</p>
+
+<p>// 置换开始菜单和安装钩子</p>
+
+<p>/<em>&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</em>/</p>
+
+<p>void InstallHandler()</p>
+
+<p>{</p>
+
+<p>if(g_bInstalled)</p>
+
+<p>{</p>
+
+<p>int irc = MessageBox(HWND_DESKTOP,</p>
+
+<p>__TEXT(&ldquo;The extension is installed. Would you like to uninstall?&rdquo;),</p>
+
+<p>__TEXT(&ldquo;Start&rdquo;), MB_ICONQUESTION | MB_YESNO | MB_SETFOREGROUND);</p>
+
+<p>if(irc == IDYES)</p>
+
+<p>UninstallHandler();</p>
+
+<p>return;</p>
+
+<p>}</p>
+
+<p>// 记住是否已经安装了处理器</p>
+
+<p>g_bInstalled = TRUE;</p>
+
+<p>// 设置新的‘开始’按钮</p>
+
+<p>SetNewStartButton(TRUE);</p>
+
+<p>}</p>
+
+<p>在完成以后并需要恢复标准行为时，调用卸载其函数：</p>
+
+<p>void UninstallHandler()</p>
+
+<p>{</p>
+
+<p>// 恢复标准设置</p>
+
+<p>SetNewStartButton(FALSE);</p>
+
+<p>// 处理器卸载</p>
+
+<p>g_bInstalled = FALSE;</p>
+
+<p>}</p>
+
+<p>在探测器调用DllCanUnloadNow()来探索我们的库是否可以卸载时，这个处理器的存在现在就变成了关键因素。在这一节的最后我们要做的则是确保在安装这个处理器期间没有有威胁的事件发生。</p>
+
+<p>STDAPI DllCanUnloadNow()</p>
+
+<p>{</p>
+
+<p>return (g_bInstalled ? S_FALSE : S_OK);</p>
+
+<p>}</p>
+
+<p>给出了这个函数之后，现在我们就可以操作安装和卸载‘开始’按钮的处理器了，现在让我们看一下完成任务所需要的几个步骤。</p>
+
+<p><em>取得按钮的</em> <em>Handle</em> __</p>
+
+<p>因为我们正在变换一个熟知的Windows界面部件，其结果是明显的，但是事实上我们正在做进入Shell地址空间这个工作的最艰难部分。剩余的工作仅简单地是把Win32编程技术应用于某些Shell对象而已。注意，这里真正重要的是我们的最小COM对象(在start.dll中)正工作在与探测器相同的环境中。‘开始’按钮是一个普通的‘Button’类窗口，就象在Spy++中显示的那样：</p>
+
+<p><a href="https://img.it610.com/image/info8/06b0afbf3c6d4b20a6f77a95fd9dc6fa.jpg"><img src="https://img.it610.com/image/info8/06b0afbf3c6d4b20a6f77a95fd9dc6fa.jpg" alt="Windows Shell 编程
+第七章_第3张图片" /></a></p>
+
+<p>使用Spy++搜索工具在大量窗口栈中查找这个按钮是比较容易的：只要拖动搜索器到期望的窗口，它将在窗口列表中被选中。这个搜索工具在‘搜索|
+查找窗口…’菜单下。</p>
+
+<p>如果想要编程恢复子窗口的Handle，应该使用FindWindowEx()，而不是FindWindow()，其差别在于，前者可以指定搜索开始的根窗口。在我们的情况下，‘开始’按钮是任务条的子窗口，在系统中它是Shell_TrayWnd窗口类的唯一窗口。</p>
+
+<p>hwndTray = FindWindowEx(NULL, NULL, &ldquo;Shell_TrayWnd&rdquo;, NULL);</p>
+
+<p>hwndStart = FindWindowEx(hwndTray, NULL, &ldquo;Button&rdquo;, NULL);</p>
+
+<p>上面片断首先恢复任务条窗口的Handle，然后恢复类为‘Button’的第一个子窗口。</p>
+
+<p><em>不管它们的外貌如何，你所看到的任务条上的其他‘按钮’都不是按钮。事实上它们也不是窗口—它们仅仅是类按钮的</em> <em>tab</em> <em>控件。</em> __</p>
+
+<p><em>置换图像</em> __</p>
+
+<p>再次观察上面的Spy++截图，你会注意到‘开始’按钮没有标题，也就是说，‘开始’这个词(对非英文版的Windows是被本地化的)是一个bitmap图像。然而在shell32.dll，或explorer.exe，或任何其它系统模块中你都不能找到这个图像的踪迹。这个图像是通过合并Windows标记图和一个资源中的串动态地建立的。二者均被存储在explorer.exe之中。</p>
+
+<p><a href="https://img.it610.com/image/info8/ef076ea791d448d2816410991a1be3d5.jpg"><img src="https://img.it610.com/image/info8/ef076ea791d448d2816410991a1be3d5.jpg" alt="" /></a></p>
+
+<p>Windows标记图的ID是143，而‘开始’串在串表中的位置ID是578。</p>
+
+<p><a href="https://img.it610.com/image/info8/504851a43998496788ace6d9c96de143.jpg"><img src="https://img.it610.com/image/info8/504851a43998496788ace6d9c96de143.jpg" alt="Windows Shell 编程
+第七章_第4张图片" /></a></p>
+
+<p>组合图像在内存设备关联中通过拷贝Windows标记图和绘制文字建立。</p>
+
+<p><strong>探测器资源的反向工程</strong> _ ___</p>
+
+<p>如果查看探测器资源，你将发现，很多各种对话框中流行的图像(例如，‘任务条属性’对话框中显示的)都是动态建立的，以节省存储空间。事实上，explorer.exe文件中仅包含某些元素图像，而不是最终显示的结果图像。</p>
+
+<p>要浏览某个应用的资源，下面是建议德操作步骤：</p>
+
+<p>建立要浏览文件的备份，这是必要的，因为这个文件可能正在使用中。</p>
+
+<p>用VC++打开它，一定要保证在‘打开’时的下拉框中指定‘资源’条件。</p>
+
+<p>在Windows9x下，IDE将警告，不能更新资源。不管它。</p>
+
+<p>在显示出资源树后，很容易就可以把它们保存到不同文件中。只需右击希望保存的资源和选择‘输出…’。这个操作仅仅适用于映射到文件的资源，如Bitmap，图表和光标。以及象AVI文件那样的客户资源。你不能保存对话框模版到文本文件。</p>
+
+<p><strong>开始按钮的风格</strong> _ ___</p>
+
+<p>‘开始’按钮有BS_BITMAP风格，即，它的表面由图像而不是通常的文字覆盖，(你可以通过在Spy++列表中右击窗口，然后选择‘属性…|风格’来证实这一点)。调用下面函数可以很容易地得到这个图像的Handle
+：</p>
+
+<p>g_hbmStart = reinterpret_cast(SendMessage(hwndStart,</p>
+
+<p>BM_GETIMAGE, IMAGE_BITMAP, 0));</p>
+
+<p>置换这个图像也不太困难。首先是用LoadImage()函数从应用的资源中装载一个新图像，其次SendMessage()函数允许我们把图像赋值给具有BS_BITMAP风格的按钮。lParam参数引用由LoadImage()返回的Handle。</p>
+
+<p>HBITMAP hbm = reinterpret_cast(LoadImage(g_hInstance,</p>
+
+<p>MAKEINTRESOURCE(IDB_NEWSTART), IMAGE_BITMAP, 0, 0, LR_DEFAULTSIZE));</p>
+
+<p>SendMessage(hwndStart, BM_SETIMAGE,IMAGE_BITMAP, reinterpret_cast(hbm));</p>
+
+<p>我们在示例中使用的图像，其ID是IDB_NEWSTART，在resource.h文件中定义：</p>
+
+<p><img src="https://img.it610.com/image/info8/391346c977e143d1988fd88c3a2b961a.jpg" alt="" /></p>
+
+<p>对这个示例我们选择了一个类似超链的图像，为了简化编码，我们把这个图像放进模块的资源中。这个图像与‘开始’按钮有相同的尺寸(48X16)，你可以使用任何你喜欢的图像，但是建议你保持这个尺寸。简单地改变图像不能必然地导致按钮表面的立即刷新，按钮需要重新绘制它的非客户区域来反映我们所作的改变。我们可以通过调用SetWindowPos()函数强制执行这个操作：</p>
+
+<p>SetWindowPos(hwndStart, NULL, 0, 0, 0, 0,</p>
+
+<p>SWP_NOSIZE | SWP_NOZORDER | SWP_NOMOVE | SWP_DRAWFRAME);</p>
+
+<p>为了看到工作的效果，我们需要实现SetNewStartButton()函数，它把我们前面给出的所有代码段穿成串，如下所示：</p>
+
+<p>void SetNewStartButton(BOOL fNew)</p>
+
+<p>{</p>
+
+<p>// 取得‘开始’按钮的 handle</p>
+
+<p>HWND hwndTray = FindWindowEx(NULL, NULL, &ldquo;Shell_TrayWnd&rdquo;, NULL);</p>
+
+<p>HWND hwndStart = FindWindowEx(hwndTray, NULL, &ldquo;Button&rdquo;, NULL);</p>
+
+<p>// 改变图像</p>
+
+<p>g_hbmStart = NewStartBitmap(hwndStart, fNew);</p>
+
+<p>}</p>
+
+<p>取得按钮的Handle是微不足道的工作，而使用一种方法置换其图像的操作就要求有一点逻辑了。这就是为什么我们将这段代码分离出来组成NewStartBitmap()函数调用的原因：</p>
+
+<p>HBITMAP NewStartBitmap(HWND hwndStart, BOOL fNew)</p>
+
+<p>{</p>
+
+<p>if(!fNew)</p>
+
+<p>{</p>
+
+<p>if(g_hbmStart)</p>
+
+<p>SendMessage(hwndStart, BM_SETIMAGE, IMAGE_BITMAP,</p>
+
+<p>reinterpret_cast(g_hbmStart));</p>
+
+<p>// 刷新按钮响应变化</p>
+
+<p>SetWindowPos(hwndStart, NULL, 0, 0, 0, 0,</p>
+
+<p>SWP_NOSIZE | SWP_NOZORDER | SWP_NOMOVE | SWP_DRAWFRAME);</p>
+
+<p>return NULL;</p>
+
+<p>}</p>
+
+<p>// 保存当前图像</p>
+
+<p>g_hbmStart = reinterpret_cast(SendMessage(hwndStart,</p>
+
+<p>BM_GETIMAGE, IMAGE_BITMAP, 0));</p>
+
+<p>// 装如何设置新图像</p>
+
+<p>HBITMAP hbm = reinterpret_cast(LoadImage(g_hInstance,</p>
+
+<p>MAKEINTRESOURCE(IDB_NEWSTART), IMAGE_BITMAP, 0, 0, LR_DEFAULTSIZE));</p>
+
+<p>SendMessage(hwndStart, BM_SETIMAGE, IMAGE_BITMAP,</p>
+
+<p>reinterpret_cast(hbm));</p>
+
+<p>// 刷新按钮享用变化</p>
+
+<p>SetWindowPos(hwndStart, NULL, 0, 0, 0, 0,</p>
+
+<p>SWP_NOSIZE | SWP_NOZORDER | SWP_NOMOVE | SWP_DRAWFRAME);</p>
+
+<p>return g_hbmStart;</p>
+
+<p>}</p>
+
+<p>现在有了一个需要建立工作DLL的全部代码，注册之后，就可以使用DoGoInsideExplorer()这样的函数来调用SHLoadInProc()，并且可以使这个假冒的COM对象进入探测器的地址空间。</p>
+
+<p><em>子类化窗口</em> __</p>
+
+<p>改变‘开始’按钮图像是一个重大结果，但是我们还可以达到更大的。下一个目标是改变这个按钮的行为，即：</p>
+
+<p>设置一个手形光标代替通常的光标</p>
+
+<p>删除关联菜单</p>
+
+<p>客户化窗口工具标签</p>
+
+<p>最激动的事情是在‘开始’按钮上的点击产生一个不同的菜单。</p>
+
+<p><strong>手形光标</strong> _ ___</p>
+
+<p>由于我们已经使‘开始’按钮像一个超链了，所以它上面的光标也应该应该变化成手指指针的形状，就象通常出现在HTML链上一样。使用与上面在探测器上使用的相同技术，从IE的资源中取出这个光标，称之为IDC_HAND(在我们的应用资源中)。</p>
+
+<p>每次Windows需要为窗口显示光标时，他都发送WM_SETCURSOR消息。如果应用不处理它，Windows为这个类设置预定义的光标。在使用RegisterClass()或RegisterClassEx()注册类时，定义类的光标—它是WNDCLASS(或WNDCLASSEX)结构的一个字段。对于系统控件(如按钮)，预定义的光标是标准的矢量，唯一的例外是编辑控件。</p>
+
+<p>如果我们打算开始处理由系统发送到‘开始’按钮的消息，我们现在就需要子类化它。从添加代码到SetNewStartButton()开始，安装一个称为NewStartProc()的过程：</p>
+
+<p>void SetNewStartButton(BOOL fNew)</p>
+
+<p>{</p>
+
+<p>// 取得‘开始’按钮的 handle</p>
+
+<p>HWND hwndTray = FindWindowEx(NULL, NULL, &ldquo;Shell_TrayWnd&rdquo;, NULL);</p>
+
+<p>HWND hwndStart = FindWindowEx(hwndTray, NULL, &ldquo;Button&rdquo;, NULL);</p>
+
+<p>// 改变图像</p>
+
+<p>g_hbmStart = NewStartBitmap(hwndStart, fNew);</p>
+
+<p>// 子类化按钮</p>
+
+<p>if(fNew)</p>
+
+<p>{</p>
+
+<p>if(!g_bSubclassed)</p>
+
+<p>{</p>
+
+<p>g_pfnStartProc = SubclassWindow(hwndStart, NewStartProc);</p>
+
+<p>g_bSubclassed = TRUE;</p>
+
+<p>}</p>
+
+<p>}else{</p>
+
+<p>if(g_pfnStartProc != NULL)</p>
+
+<p>SubclassWindow(hwndStart, g_pfnStartProc);</p>
+
+<p>g_bSubclassed = FALSE;</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>当鼠标指针在这个窗口上时为了显示不同的光标，我们需要指令它响应WM_SETCURSOR消息，这是由我们子类化‘开始’按钮时窗口过程接收的消息：</p>
+
+<p>LRESULT CALLBACK NewStartProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
+lParam)</p>
+
+<p>{</p>
+
+<p>switch(uMsg)</p>
+
+<p>{</p>
+
+<p>case WM_SETCURSOR:</p>
+
+<p>SetCursor(LoadCursor(g_hInstance, MAKEINTRESOURCE(IDC_HAND)));</p>
+
+<p>return 0;</p>
+
+<p>}</p>
+
+<p>return CallWindowProc(g_pfnStartProc, hwnd, uMsg, wParam, lParam);</p>
+
+<p>}</p>
+
+<p>在处理了WM_SETCURSOR消息之后，从这个窗口过程返回是极其重要的。如果不这样，则Windows将终止，执行默认的消息代码并恢复矢量光标。</p>
+
+<p><strong>删除标准关联菜单</strong> _ ___</p>
+
+<p>隐藏标准关联菜单更简单，只需要在接收到WM_CONTEXTMENU消息时返回0：</p>
+
+<p>switch(uMsg)</p>
+
+<p>{</p>
+
+<p>case WM_SETCURSOR:</p>
+
+<p>SetCursor(LoadCursor(g_hInstance, MAKEINTRESOURCE(IDC_HAND)));</p>
+
+<p>return 0;</p>
+
+<p>case WM_CONTEXTMENU:</p>
+
+<p>// 在这里建立自己的弹出菜单</p>
+
+<p>return 0;</p>
+
+<p>}</p>
+
+<p>当然，谁也不能阻止你在标准菜单显示的地方显示你自己的弹出菜单，要做的仅仅是在上段代码中用你自己的代码替换注释行。</p>
+
+<p><strong>客户化工具标签</strong> _ ___</p>
+
+<p>另一个可以客户化的形状是工具标签—可以考虑改变默认的讯息，‘点击这里开始’。尽管在Win32程序中你从来没有使用过工具标签，也应该知道这是一个很难打开的坚果。没有容易的方法来感觉当前哪个工具标签是活动的，而且即使捕捉到了TTN_SHOW通知(当工具标签窗口在显示中时，发送的通知消息)，你也不能取消这个标签。</p>
+
+<p>‘开始’按钮的工具标签处理代码在远离按钮处理代码的地方，在启动时，任务条建立工具标签窗口，设置一些工具。因而，要获得这个窗口的Handle用于显示‘开始’按钮的工具标签，一个可能的方法是使用EnumThreadWindows()函数遍历由当前线程建立的所有窗口。条件是只有一个工具标签窗口：仅一个。下面的代码给出怎样获得工具标签窗口和相关‘开始’按钮的工具。(这里的
+<strong>工具</strong> 是一个标签出现的区域—在‘开始’按钮的情况下是客户区域)。</p>
+
+<p>void RemoveTooltip(HWND hwndStart)</p>
+
+<p>{</p>
+
+<p>EnumThreadWindows(GetCurrentThreadId(), EnumThreadWndProc,</p>
+
+<p>reinterpret_cast(hwndStart));</p>
+
+<p>}</p>
+
+<p>// 这个线程仅建立一个工具标签窗口，所有属于这个线程的窗口都被枚举，以找到这个工具标签</p>
+
+<p>// 回调函数接收所有由这个线程建立的窗口Handle。lParam是(hwndStart)开始按钮的Handle。</p>
+
+<p>BOOL CALLBACK EnumThreadWndProc(HWND hwnd, LPARAM lParam)</p>
+
+<p>{</p>
+
+<p>TCHAR szClass[MAX_PATH] = {0};</p>
+
+<p>GetClassName(hwnd, szClass, MAX_PATH);</p>
+
+<p>if(0 == lstrcmpi(szClass, TOOLTIPS_CLASS))</p>
+
+<p>{</p>
+
+<p>// 找到工具标签窗口，试着查找工具</p>
+
+<p>int iNumOfTools = SendMessage(hwnd, TTM_GETTOOLCOUNT, 0, 0);</p>
+
+<p>for(int i = 0 ; i &lt; iNumOfTools ; i++)</p>
+
+<p>{</p>
+
+<p>// 取得第 I 个工具的信息</p>
+
+<p>TOOLINFO ti;</p>
+
+<p>ti.cbSize = sizeof(TOOLINFO);</p>
+
+<p>SendMessage(hwnd, TTM_ENUMTOOLS, i, reinterpret_cast(&amp;ti));</p>
+
+<p>if(ti.uId == static_cast(lParam))</p>
+
+<p>{</p>
+
+<p>// 找到‘开始’按钮的相关工具。</p>
+
+<p>ti.lpszText = __TEXT(&ldquo;Buy this book!&rdquo;);</p>
+
+<p>SendMessage(hwnd, TTM_UPDATETIPTEXT, 0,</p>
+
+<p>reinterpret_cast(&amp;ti));</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>return FALSE;</p>
+
+<p>}</p>
+
+<p>return TRUE;</p>
+
+<p>}</p>
+
+<p>获得了工具标签窗口的Handle之后，我们利用工具标签的接口来枚举各个工具。 <strong>工具</strong>
+是一个规则区域，当鼠标在其上盘旋时，引发一个提示，它由TOOLINFO结构描述。在枚举工具期间，‘开始’按钮的工具通过对比TOOLINFO的uId字段与‘开始’按钮的Handle来识别。然后可以删除它，最好保留，文字可以通过TTM_UPDATETIPTEXT消息替换掉。</p>
+
+<p>这段代码有两个方面的限制，一是，当前线程仅建立一个工具标签窗口，其次，相关于‘开始’按钮的工具有TTF_IDISHWND标志，即，工具相关于窗口的客户区域，而不是一个一般的矩形。再有，TOOLINFO结构的uId成员包含了相关窗口的HWND。这实际一点也不奇怪，因为在对一个窗口定义工具标签时，赋值TTF_IDISHWND标志是普遍习惯。了解了这些事情就极大地简化了我们的工作。因为你可以很容易地鉴别(甚至删除)‘开始’按钮的工具。TOOLTIPS_CLASS是由通用工具库—显示工具标签的一些控件—提供的一个窗口类名。</p>
+
+<p>__<em>如果想要改变工具标签的文字，记住，这个变化并不邦定在运行的模块上。即使安装它的模块已经卸载，它仍然继续出现。唯一恢复老标签的方法是把它改回到前一个设置。</em>
+__</p>
+
+<p><em>新菜单</em> __</p>
+
+<p>当用户点击这个按钮时，显示默认的‘开始’菜单。更精确地讲，当按钮接收到BM_SETSTATE消息并且wParam设置到TRUE时，显示菜单。BM_SETSTATE是按钮专有的消息，用于请求按钮绘制‘按下’或‘释放’模式。wParam值为TRUE说明按钮要求按下，而FALSE则是释放。如果你的目标就是简单地隐藏标准菜单，只需要处理BM_SETSTATE消息和返回0。</p>
+
+<p>__<em>当敲击</em> <em>Windows</em> <em>键或按</em> <em>Ctrl+Esc</em> <em>时，能够引起</em> _BM<em>SETSTATE</em>
+<em>消息发送到这个按钮。通过处理这个消息的操作，你也能捕捉这些键的组合。</em> __</p>
+
+<p><strong>正确的行为</strong> _ ___</p>
+
+<p>假设你有一个要显示的菜单。你可以通过处理WM_LBUTTONDOWN消息试着显示它：</p>
+
+<p>TrackPopupMenu(hmnuPopup, uFlags, ix, iy, 0, hwnd, NULL);</p>
+
+<p>如果指定了正确的坐标，菜单将显示在靠近按钮的地方。然而，按钮将不能绘制成‘按下’模式。</p>
+
+<p>如此，你需要发送BM_SETSTATE消息来‘按下’和‘释放’这个按钮。反之，给按钮本身发送这个消息，它将终止并由初始窗口过程进行处理，这是我们已经置换的。结果，显示标准的‘开始’菜单。</p>
+
+<p>这个问题是因为‘开始’按钮是任务条的子窗口。每次点击(或发送BM_SETSTATE消息)，Windows都自动地通知父窗口这个事件。对于按钮就是BN_CLICKED消息。通过处理BN_CLICKED消息，任务条(不是按钮)显示标准菜单。</p>
+
+<p>我们想要按钮提供菜单，但是需要绘制‘按下’的方法。我们怎样获得这个行为呢？我们需要一个独立绘制按钮外观的函数，这要借助于初始的按钮过程—是以正常方式绘制按钮的过程，不作任何其它的操作或引起任何其它事情发生的过程。这个过程的地址可以在GetClassInfo()恢复的WNDCLASS结构中找到：</p>
+
+<p>switch(uMsg)</p>
+
+<p>{</p>
+
+<p>case WM_SETCURSOR:</p>
+
+<p>SetCursor(LoadCursor(g_hInstance, MAKEINTRESOURCE(IDC_HAND)));</p>
+
+<p>return 0;</p>
+
+<p>case WM_CONTEXTMENU:</p>
+
+<p>return 0;</p>
+
+<p>case WM_LBUTTONDOWN:</p>
+
+<p>{</p>
+
+<p>WNDCLASS wc;</p>
+
+<p>GetClassInfo(NULL, &ldquo;Button&rdquo;, &amp;wc);</p>
+
+<p>CallWindowProc(wc.lpfnWndProc, hwnd, BM_SETSTATE, TRUE, 0);</p>
+
+<p>// 在这里调用 TrackPopupMenu()</p>
+
+<p>CallWindowProc(wc.lpfnWndProc, hwnd, BM_SETSTATE, FALSE, 0);</p>
+
+<p>return 0;</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>上面这段代码保证了我们的‘开始’按钮有正确的行为并在菜单出现时显示‘按下’。这一行代码：</p>
+
+<p>CallWindowProc(wc.lpfnWndProc, hwnd, BM_SETSTATE, TRUE, 0);</p>
+
+<p>现在就象一个外部函数一样，以‘开始’按钮的Handle作为参数。</p>
+
+<p>__<em>可能会奇怪，还有另一种方法做这些：子类化任务条窗口和解释</em> _BN<em>CLICKED</em> <em>消息。然而，我更喜欢这个方法，因为它减少了子类化窗口的数量。</em>
+__</p>
+
+<p><strong>怎样捕获</strong> _ _Ctrl-Esc__ _ _和__ _ _Windows__ _ _键__ _ ___</p>
+
+<p>在按下Ctrl-
+Esc和Windows键发送BM_SETSTATE消息(使wParam设置为TRUE)到‘开始’按钮时，引起它显示‘开始’菜单。子类化‘开始’按钮，我们就可以决定忽略那个事件：</p>
+
+<p>case BM_SETSTATE:</p>
+
+<p>return 0;</p>
+
+<p>或选择显示我们自己的替代菜单：</p>
+
+<p>case BM_SETSTATE:</p>
+
+<p>case WM_LBUTTONDOWN:</p>
+
+<p>{</p>
+
+<p>&hellip;</p>
+
+<p>}</p>
+
+<p>建立自绘制菜单</p>
+
+<p>TrackPopupMenu()是在一定的屏幕位置显示菜单的好方法，但是‘开始’有两个附加的属性，这使它有别于普通的菜单。第一，它是自绘制菜单，第二，它必须显示在严格定义的位置—靠近任务条和‘开始’按钮的位置。如果任务条停泊在屏幕的底部，菜单就必须显示在‘开始’按钮之上；如果它在顶部，菜单应该在它下方。因而，为了决定菜单的正确坐标，我们首先需要知道系统任务条的位置。</p>
+
+<p><em>确定菜单的屏幕位置</em> __</p>
+
+<p>TrackPopupMenu()需要表示为(x,y)屏幕坐标的位置。有趣的是，你可以告诉函数怎样解释每一个坐标，和怎样排列这个菜单。例如，如果指定TPM_BOTTOMALIGN标志，y坐标就是菜单的底，如果指定TPM_RIGHTALIGN，则x坐标是菜单的右边。</p>
+
+<p>弹出菜单的位置依赖于这三个信息片：x-和y-
+坐标，以及一堆标志。我们把它封装在一个称之为STARTMENUPOS结构中，并定义一个辅助函数检查任务条的位置和统一填充这个结构：</p>
+
+<p>struct STARTMENUPOS</p>
+
+<p>{</p>
+
+<p>int ix;</p>
+
+<p>int iy;</p>
+
+<p>UINT uFlags;</p>
+
+<p>};</p>
+
+<p>typedef STARTMENUPOS* LPSTARTMENUPOS;</p>
+
+<p>void GetStartMenuPosition(LPSTARTMENUPOS lpsmp)</p>
+
+<p>{</p>
+
+<p>// 取得任务条的边缘和位置</p>
+
+<p>APPBARDATA abd;</p>
+
+<p>abd.cbSize = sizeof(APPBARDATA);</p>
+
+<p>SHAppBarMessage(ABM_GETTASKBARPOS, &amp;abd);</p>
+
+<p>switch(abd.uEdge)</p>
+
+<p>{</p>
+
+<p>case ABE_BOTTOM:</p>
+
+<p>lpsmp-&gt;ix = 0;</p>
+
+<p>lpsmp-&gt;iy = abd.rc.top;</p>
+
+<p>lpsmp-&gt;uFlags = TPM_LEFTALIGN | TPM_BOTTOMALIGN;</p>
+
+<p>break;</p>
+
+<p>case ABE_TOP:</p>
+
+<p>lpsmp-&gt;ix = 0;</p>
+
+<p>lpsmp-&gt;iy = abd.rc.bottom;</p>
+
+<p>lpsmp-&gt;uFlags = TPM_LEFTALIGN | TPM_TOPALIGN;</p>
+
+<p>break;</p>
+
+<p>case ABE_LEFT:</p>
+
+<p>lpsmp-&gt;ix = abd.rc.right;</p>
+
+<p>lpsmp-&gt;iy = 0;</p>
+
+<p>lpsmp-&gt;uFlags = TPM_LEFTALIGN | TPM_TOPALIGN;</p>
+
+<p>break;</p>
+
+<p>case ABE_RIGHT:</p>
+
+<p>lpsmp-&gt;ix = abd.rc.left;</p>
+
+<p>lpsmp-&gt;iy = 0;</p>
+
+<p>lpsmp-&gt;uFlags = TPM_RIGHTALIGN | TPM_TOPALIGN;</p>
+
+<p>break;</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>SHAppBarMessage()是一个API函数，定义在shellapi.h中，返回系统任务条的边和位置。它也可以提供其它的服务(在第九章中)。GetStartMenuPosition()函数允许我们在相对任务条的正确位置显示‘开始’菜单。这段显示弹出菜单的程序代码如下：</p>
+
+<p>case WM_LBUTTONDOWN:</p>
+
+<p>{</p>
+
+<p>WNDCLASS wc;</p>
+
+<p>GetClassInfo(NULL, __TEXT(&ldquo;Button&rdquo;), &amp;wc);</p>
+
+<p>CallWindowProc(wc.lpfnWndProc, hwnd, BM_SETSTATE, TRUE, 0);</p>
+
+<p>STARTMENUPOS smp;</p>
+
+<p>GetStartMenuPosition(&amp;smp);</p>
+
+<p>HMENU hmenu = LoadMenu(g_hInstance, MAKEINTRESOURCE(IDR_MENU));</p>
+
+<p>HMENU hmnuPopup = GetSubMenu(hmenu, 0);</p>
+
+<p>TrackPopupMenu(hmnuPopup, smp.uFlags, smp.ix, smp.iy, 0, hwnd, NULL);</p>
+
+<p>CallWindowProc(wc.lpfnWndProc, hwnd, BM_SETSTATE, FALSE, 0);</p>
+
+<p>return 0;</p>
+
+<p>}</p>
+
+<p>我们选中的每一个菜单项都发送WM_COMMAND消息到hwnd窗口，这与按钮本身没有区别。因而，我们的子类化过程也处理用户的选择。过一会作进一步的解释。</p>
+
+<p><em>装入新菜单</em> __</p>
+
+<p>让我们建立一个非常简单的预定义菜单来置换标准菜单，把它命名为IDR_MENU。你可以自己通过TrackPopupMenu()函数装入它和显示它，但是，你很快就会认识到这是相当失败的。事实上我们得到的是一个传统的文字风格菜单：</p>
+
+<p><a href="https://img.it610.com/image/info8/d8c0abfd268e4a9385eb4c81cc472c5b.jpg"><img src="https://img.it610.com/image/info8/d8c0abfd268e4a9385eb4c81cc472c5b.jpg" alt="Windows Shell 编程
+第七章_第5张图片" /></a></p>
+
+<p>相反，Windows的‘开始’菜单是一个自绘制菜单，其中的每一个项都由用户定义的过程分别绘制。然而不幸的是，VC++
+的资源编辑器不允许你以‘可视’方式建立自绘制菜单，所以必须编程做每一件事情。</p>
+
+<p>如果你想要绘制的菜单已经存在(如果它被存储在模块的资源中)，则第一步应该是遍历所有的项，为每一个菜单项指派特殊的MF_OWNERDRAW属性。这个标志限定了其内容必须由用户定义的过程绘制。下面是代码段，取得弹出菜单和为每一项设置自绘制风格：</p>
+
+<p>// 允许项目名的最大尺寸</p>
+
+<p>const int ITEMSIZE = 100;</p>
+
+<p>struct MENUSTRUCT</p>
+
+<p>{</p>
+
+<p>TCHAR szText[ITEMSIZE];</p>
+
+<p>int iItemID;</p>
+
+<p>TCHAR szFile[MAX_PATH];</p>
+
+<p>};</p>
+
+<p>typedef MENUSTRUCT* LPMENUSTRUCT;</p>
+
+<p>void MakePopupOwnerDraw(HWND hwnd, HMENU hmnuPopup)</p>
+
+<p>{</p>
+
+<p>// 循环遍历弹出项</p>
+
+<p>for(int i = 0 ; i &lt; GetMenuItemCount(hmnuPopup) ; i++)</p>
+
+<p>{</p>
+
+<p>// 为自绘制函数保留一些数据</p>
+
+<p>LPMENUSTRUCT lpms = GlobalAllocPtr(GHND, sizeof(MENUSTRUCT));</p>
+
+<p>int iItemID = static_cast(GetMenuItemID(hmnuPopup, i));</p>
+
+<p>GetMenuString(hmnuPopup, iItemID, lpms-&gt;szText, ITEMSIZE, MF_BYCOMMAND);</p>
+
+<p>lpms-&gt;iItemID = iItemID;</p>
+
+<p>UINT uiState = GetMenuState(hmnuPopup, iItemID, MF_BYCOMMAND);</p>
+
+<p>ModifyMenu(hmnuPopup, iItemID, uiState | MF_BYCOMMAND | MF_OWNERDRAW,</p>
+
+<p>iItemID, reinterpret_cast(lpms));</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>在为菜单项赋值自绘制风格时，可能想要保存一些项的信息，如显示串，此时可以通过客户结构MENUSTRUCT存储它们，一个指向这个结构的指针作为ModifyMenu()函数的最后一个参数传递给函数，存储缓冲也就传递到了那个实际绘制菜单的函数。这个内存必须由一个类似的例程释放，它应该在完成菜单操作时被调用。</p>
+
+<p><strong>自绘制分隔线</strong> _ ___</p>
+
+<p>如果我们真正打算产生一个类似于Windows标准‘开始’菜单的菜单，还需要生成自绘制分隔线。由于‘开始’菜单沿着一个边缘产生连续垂直的没有分隔线的带，因而有效地缩减了项和分隔线占用的水平区域。默认情况下，分隔线在运行时作为插入的线绘制，即，我们需要把分隔线作为项来绘制。</p>
+
+<p><em>动态采集菜单项</em> __</p>
+
+<p>为了这个例子，我们决定不从工程(project)的资源中装入新菜单。‘开始’菜单是一个半动态菜单，因此，菜单项可以部分地运行时确定。如果你建立了一个‘开始菜单’特殊文件夹(见第六章)的快捷方式，你就可以引进新项，使之显示在菜单上。我们的处理器也定义类似的机理。</p>
+
+<p>建立一个目录(硬编码为C:/MyStartMenu)，用加到菜单的快捷方式填充。除了这些动态项，我们的‘开始’菜单总是包含一个‘固定的’命令以恢复前面的设置和初始菜单。点击快捷方式将调用目标文件，点击固定项引起处理器卸载。</p>
+
+<p>下面的函数GetMenuHandle()建立由新‘开始’按钮显示的菜单。它扫视C:/MyStartMenu目录搜索LNK文件，解析之，并添加相关图标和名字到菜单中。</p>
+
+<p>HMENU GetMenuHandle(LPTSTR szPath)</p>
+
+<p>{</p>
+
+<p>LPMENUSTRUCT lpms;</p>
+
+<p>int iItemID = 1;</p>
+
+<p>// 这些全程变量提示菜单绘制现在开始</p>
+
+<p>g_bAlreadyDrawn = FALSE; // 没开始绘制</p>
+
+<p>g_bFirstTime = TRUE; // 第一次进入</p>
+
+<p>// 建立空菜单</p>
+
+<p>HMENU hmenu = CreatePopupMenu();</p>
+
+<p>// 滤波串 *.lnk</p>
+
+<p>TCHAR szDir[MAX_PATH] = {0};</p>
+
+<p>lstrcpy(szDir, szPath);</p>
+
+<p>if(szDir[lstrlen(szDir) - 1] != &lsquo;//&rsquo;)</p>
+
+<p>lstrcat(szDir, __TEXT(&ldquo;//&rdquo;));</p>
+
+<p>TCHAR szBuf[MAX_PATH] = {0};</p>
+
+<p>wsprintf(szBuf, __TEXT(&ldquo;%s*.lnk&rdquo;), szDir);</p>
+
+<p>// 搜索.lnk</p>
+
+<p>WIN32_FIND_DATA wfd;</p>
+
+<p>HANDLE h = FindFirstFile(szBuf, &amp;wfd);</p>
+
+<p>while(h != INVALID_HANDLE_VALUE)</p>
+
+<p>{</p>
+
+<p>// 解析快捷方式</p>
+
+<p>SHORTCUTSTRUCT ss;</p>
+
+<p>ZeroMemory(&amp;ss, sizeof(SHORTCUTSTRUCT));</p>
+
+<p>wsprintf(szBuf, __TEXT(&ldquo;%s//%s&rdquo;), szDir, wfd.cFileName);</p>
+
+<p>SHResolveShortcut(szBuf, &amp;ss);</p>
+
+<p>// 用ID，描述和目标文件构造每一个项</p>
+
+<p>lpms = reinterpret_cast(GlobalAllocPtr(GHND,</p>
+
+<p>sizeof(MENUSTRUCT)));</p>
+
+<p>lpms-&gt;iItemID = iItemID;</p>
+
+<p>if(!lstrlen(ss.pszDesc))</p>
+
+<p>lstrcpy(lpms-&gt;szText, wfd.cFileName);</p>
+
+<p>else</p>
+
+<p>lstrcpy(lpms-&gt;szText, ss.pszDesc);</p>
+
+<p>lstrcpy(lpms-&gt;szFile, ss.pszTarget);</p>
+
+<p>// 添加菜单项</p>
+
+<p>AppendMenu(hmenu, MF_OWNERDRAW, iItemID++, reinterpret_cast(lpms));</p>
+
+<p>// 下一个循环</p>
+
+<p>if(!FindNextFile(h, &amp;wfd))</p>
+
+<p>{</p>
+
+<p>FindClose(h);</p>
+
+<p>break;</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>// 添加分隔线和‘恢复’项</p>
+
+<p>AppendMenu(hmenu, MF_OWNERDRAW | MF_SEPARATOR, 0, NULL);</p>
+
+<p>lpms = reinterpret_cast(</p>
+
+<p>GlobalAllocPtr(GHND, sizeof(MENUSTRUCT)));</p>
+
+<p>lpms-&gt;iItemID = ID_FILE_EXIT;</p>
+
+<p>lstrcpy(lpms-&gt;szText, __TEXT(&ldquo;Restore Previous Settings&rdquo;));</p>
+
+<p>lstrcpy(lpms-&gt;szFile, &ldquo;&rdquo;);</p>
+
+<p>AppendMenu(hmenu, MF_OWNERDRAW, ID_FILE_EXIT,reinterpret_cast(lpms));</p>
+
+<p>return hmenu;</p>
+
+<p>}</p>
+
+<p>这个函数引进两个全程布尔变量。g_bAlreadyDrawn用于记住是否图像已经绘制到了垂直带上，因为我们仅仅需要绘制一次。g_bFirstTime则用于记住项是否头一次绘制在菜单中。如果这个变量是TRUE，菜单项矩形的顶部边缘被保存以确定菜单的高度。在下面的函数中将看到这些值的变化。</p>
+
+<p>菜单项从顶到底顺序绘制，而且最后的项在这个实现中由ID确定—它是固定项，用于卸载这个处理器。这个项存在于DLL的资源中，有一个32x32像素的图标，和标识符ID_FILE_EXIT。其它菜单项都在于调用函数SHResolveShortcut()获得，这个我们在前一章中已经说明了。</p>
+
+<p><em>设置尺寸</em> __</p>
+
+<p>自绘制资源引发两个消息发送给他们的父窗口过程，在这种情况下，这些消息将到达我们的新‘开始’按钮过程，它们是：</p>
+
+<p>WM_MEASUREITEM</p>
+
+<p>WM_DRAWITEM</p>
+
+<p>第一个消息用于获得单个菜单项的宽度和高度(像素单位)，我们必须填写与消息同来的结构。第二个要求做所需的绘制工作。下面是处理WM_MEASUREITEM消息的函数：</p>
+
+<p>// 这些是绝对常量(像素单位表示的)定义绘制项的尺寸</p>
+
+<p>const int DEFBITMAPSIZE = 32; // 32 x 32 是保留给图像的区域</p>
+
+<p>const int DEFBANDSIZE = 25; // 垂直带的宽度</p>
+
+<p>const int DEFSEPSIZE = 6; // 保留给分隔线区域的高度</p>
+
+<p>const int DEFBORDERSIZE = 2; // 项文字与菜单边缘的空隙</p>
+
+<p>void MeasureItem(HWND hwnd, LPMEASUREITEMSTRUCT lpmis)</p>
+
+<p>{</p>
+
+<p>SIZE size;</p>
+
+<p>int iItemID = lpmis-&gt;itemID;</p>
+
+<p>LPMENUSTRUCT lpms = reinterpret_cast(lpmis-&gt;itemData);</p>
+
+<p>// 计算菜单项串尺寸</p>
+
+<p>HDC hdc = GetDC(hwnd);</p>
+
+<p>GetTextExtentPoint32(hdc, lpms-&gt;szText, lstrlen(lpms-&gt;szText), &amp;size);</p>
+
+<p>ReleaseDC(hwnd, hdc);</p>
+
+<p>// 设置项的宽度和高度</p>
+
+<p>lpmis-&gt;itemWidth = DEFBITMAPSIZE + DEFBANDSIZE + size.cx;</p>
+
+<p>// 分隔线的ID = 0</p>
+
+<p>if(iItemID)</p>
+
+<p>lpmis-&gt;itemHeight = DEFBITMAPSIZE;</p>
+
+<p>else</p>
+
+<p>lpmis-&gt;itemHeight = DEFSEPSIZE;</p>
+
+<p>}</p>
+
+<p>WM_MEASUREITEM消息的lParam变量指向一个MEASUREITEMSTRUCT结构，其itemHeight和
+itemWidth字段必须用项的实际尺寸填写。在上面代码中，高度设置为32像素，宽度依赖于文字的长度，为图像(图标)保留的空间，和菜单边缘的带宽(例如Windows98的标志)。</p>
+
+<p>注意，这里显式地使用了常量，所以‘开始’菜单的外观保持相同，无论其项设置是什么。</p>
+
+<p><em>关于这里采用的结构和自绘制机理的更多信息请参看</em> <em>MSDN</em> <em>库的官方资料</em> 。</p>
+
+<p><em>绘制菜单项</em> __</p>
+
+<p>每当Windows需要描绘给定的菜单项时都发送WM_DRAWITEM消息。这个消息的lParam变量指向DRAWITEMSTRUCT结构，它提供了绘制操作所需要的所有信息。基本上我们需要菜单窗口左边有一个垂直带，然后每一个项有一个图标和一个字符串，左边的区域将由一个图像充填。</p>
+
+<p>绘制图标和字符串可以直接用通用API函数完成，如，DrawIcon()和ExtTextOut()。在绘制菜单项时，我们在一项上操作，仅能看到菜单窗口的一部分。在沿菜单窗口的边缘绘制图像时，过程有点不同。在选择改变时，逐项调用绘制过程，而我们需要找出一种仅绘制一次图像的方法，使用全程变量记住图像已经被绘制就是我们的解决方案。然而对于绘制图像，有更多的工作要做。</p>
+
+<p>怎样绘制图像，使用BitBlt()或许是一个好方法。Windows使用从上到下的逻辑描绘它的自绘制菜单。所以，如果传递(0,0)作为目的关联设备原点，图像将在菜单顶部排列。如果察看Windows95，98和NT的‘开始’菜单，你将发现，图像总是排列在菜单底部，这就使问题复杂化了—传递给BitBlt()的正确坐标是什么？x-坐标是0，或一个相对左边缘的绝对偏移值，y-坐标应该由菜单窗口的高度减去我们使用的图像高度给出。因为BitBlt()从顶到底绘制，所以，图像将排列在底部。对这个问题，有一个找出菜单窗口高度的简单方法，我们知道，DRAWITEMSTRUCT结构中包含了当前项的矩形，所以如果记住了第一个元素的顶部和最后一个元素的底部，窗口的高度必然是二者之差。</p>
+
+<p>如此，我们知道了图像的高度，以及窗口的高度。这就使得为BitBlt()函数确定正确的y坐标变得容易了。显示现在应该与标准的‘开始’菜单一样了。下面给出必要的代码：</p>
+
+<p>void DrawItem(LPDRAWITEMSTRUCT lpdis)</p>
+
+<p>{</p>
+
+<p>TCHAR szItem[ITEMSIZE] = {0};</p>
+
+<p>TCHAR szFile[MAX_PATH] = {0};</p>
+
+<p>COLORREF crText, crBack;</p>
+
+<p>HICON hIcon = NULL;</p>
+
+<p>LPMENUSTRUCT lpms = reinterpret_cast(lpdis-&gt;itemData);</p>
+
+<p>int iItemID = lpdis-&gt;itemID;</p>
+
+<p>int iTopEdge = 0;</p>
+
+<p>// 保存项文字和目标文件</p>
+
+<p>if(lpms)</p>
+
+<p>{</p>
+
+<p>lstrcpy(szItem, lpms-&gt;szText);</p>
+
+<p>lstrcpy(szFile, lpms-&gt;szFile);</p>
+
+<p>}</p>
+
+<p>// 管理绘制操作</p>
+
+<p>if(lpdis-&gt;itemAction &amp; (ODA_DRAWENTIRE | ODA_SELECT))</p>
+
+<p>{</p>
+
+<p>COLORREF clr;</p>
+
+<p>RECT rtBand, rtBmp, rtText, rtItem, rt;</p>
+
+<p>SIZE size;</p>
+
+<p>// 定义将要使用的矩形:</p>
+
+<p>// lpdis-&gt;rcItem 是菜单项的矩形</p>
+
+<p>// rtBand: 菜单项的垂直带区域部分</p>
+
+<p>// rtBmp: 菜单项的图标区域部分</p>
+
+<p>// rtText: 菜单项的文字区域部分</p>
+
+<p>CopyRect(&amp;rt, &amp;(lpdis-&gt;rcItem));</p>
+
+<p>CopyRect(&amp;rtBand, &amp;rt);</p>
+
+<p>rtBand.right = rtBand.left + DEFBANDSIZE;</p>
+
+<p>CopyRect(&amp;rtBmp, &amp;rt);</p>
+
+<p>rtBmp.left = rtBand.right + DEFBORDERSIZE;</p>
+
+<p>rtBmp.right = rtBmp.left + DEFBITMAPSIZE;</p>
+
+<p>CopyRect(&amp;rtText, &amp;rt);</p>
+
+<p>rtText.left = rtBmp.right + 2 * DEFBORDERSIZE;</p>
+
+<p>CopyRect(&amp;rtItem, &amp;rt);</p>
+
+<p>rtItem.left += DEFBANDSIZE + DEFBORDERSIZE;</p>
+
+<p>// 如果是第一项，保存y坐标</p>
+
+<p>if(g_bFirstTime)</p>
+
+<p>{</p>
+
+<p>iTopEdge = rtBand.top;</p>
+
+<p>g_bFirstTime = FALSE;</p>
+
+<p>}</p>
+
+<p>// 绘制带矩形和垂直图像</p>
+
+<p>if(!g_bAlreadyDrawn)</p>
+
+<p>{</p>
+
+<p>// 带区域为蓝色</p>
+
+<p>clr = SetBkColor(lpdis-&gt;hDC, RGB(0, 0, 255));</p>
+
+<p>ExtTextOut(lpdis-&gt;hDC, 0, 0,</p>
+
+<p>ETO_CLIPPED | ETO_OPAQUE, &amp;rtBand, NULL, 0, NULL);</p>
+
+<p>SetBkColor(lpdis-&gt;hDC, clr);</p>
+
+<p>// 如果最后一项，确定菜单高度，装入和绘制图像</p>
+
+<p>if(iItemID == ID_FILE_EXIT)</p>
+
+<p>{</p>
+
+<p>int iMenuHeight = rtBand.bottom - iTopEdge;</p>
+
+<p>HBITMAP hbm = LoadBitmap(g_hInstance, MAKEINTRESOURCE(IDB_LOGO));</p>
+
+<p>DrawBitmap(lpdis-&gt;hDC, 0, iMenuHeight, hbm);</p>
+
+<p>DeleteObject(hbm);</p>
+
+<p>g_bAlreadyDrawn = TRUE;</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>// 到目前为止选择状态没有影响到任何事情。</p>
+
+<p>// 绘制图标，文字以及相关的背景色</p>
+
+<p>if(lpdis-&gt;itemState &amp; ODS_SELECTED)</p>
+
+<p>{</p>
+
+<p>crText = SetTextColor(lpdis-&gt;hDC, GetSysColor(COLOR_HIGHLIGHTTEXT));</p>
+
+<p>crBack = SetBkColor(lpdis-&gt;hDC, GetSysColor(COLOR_HIGHLIGHT));</p>
+
+<p>}</p>
+
+<p>// 应正确的背景色清除区域</p>
+
+<p>ExtTextOut(lpdis-&gt;hDC, rtText.left, rtText.left,</p>
+
+<p>ETO_CLIPPED | ETO_OPAQUE, &amp;rtItem, NULL, 0, NULL);</p>
+
+<p>// 获得要绘制的图标，如果是最后一项，从资源中装入。</p>
+
+<p>// 否则从快捷方式的目标文件中确定系统图标。</p>
+
+<p>if(iItemID == ID_FILE_EXIT)</p>
+
+<p>hIcon = LoadIcon(g_hInstance, MAKEINTRESOURCE(iItemID));</p>
+
+<p>else{</p>
+
+<p>SHFILEINFO sfi;</p>
+
+<p>ZeroMemory(&amp;sfi, sizeof(SHFILEINFO));</p>
+
+<p>SHGetFileInfo(szFile, 0, &amp;sfi, sizeof(SHFILEINFO), SHGFI_ICON);</p>
+
+<p>hIcon = sfi.hIcon;</p>
+
+<p>}</p>
+
+<p>// 绘制图标(自动透明)</p>
+
+<p>if(hIcon)</p>
+
+<p>{</p>
+
+<p>DrawIcon(lpdis-&gt;hDC, rtBmp.left, rtBmp.top, hIcon);</p>
+
+<p>DestroyIcon(hIcon);</p>
+
+<p>}</p>
+
+<p>// 绘制文字(一行垂直居中)</p>
+
+<p>if(!iItemID)</p>
+
+<p>{</p>
+
+<p>// 是一个分隔线</p>
+
+<p>rt.top++;</p>
+
+<p>rt.bottom = rt.top + DEFBORDERSIZE;</p>
+
+<p>rt.left = rt.left + DEFBANDSIZE + DEFBORDERSIZE;</p>
+
+<p>DrawEdge(lpdis-&gt;hDC, &amp;rt, EDGE_ETCHED, BF_RECT);</p>
+
+<p>}else{</p>
+
+<p>// 取得对应字体的文字尺寸</p>
+
+<p>GetTextExtentPoint32(lpdis-&gt;hDC, szItem, lstrlen(szItem), &amp;size);</p>
+
+<p>// 垂直居中</p>
+
+<p>int iy = ((lpdis-&gt;rcItem.bottom - lpdis-&gt;rcItem.top) - size.cy) / 2;</p>
+
+<p>iy = lpdis-&gt;rcItem.top + (iy &gt;= 0 ? iy : 0);</p>
+
+<p>rtText.top = iy;</p>
+
+<p>DrawText(lpdis-&gt;hDC, szItem, lstrlen(szItem),</p>
+
+<p>&amp;rtText, DT_LEFT | DT_EXPANDTABS);</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p>上面这个相对直接的大函数处理了文字和图标的绘制，但是，它把绘制垂直标记图(这是一个25像素宽的资源IDB_LOGO)的工作留给了下一个例程，
+DrawBitmap()：</p>
+
+<p>void DrawBitmap(HDC hdc, int x, int iHeight, HBITMAP hbm)</p>
+
+<p>{</p>
+
+<p>// 这个函数计算基于覆盖区域高度的y坐标图像将与底部的一起排列</p>
+
+<p>BITMAP bm;</p>
+
+<p>// 建立存储关联设备选择其中的图像</p>
+
+<p>HDC hdcMem = CreateCompatibleDC(hdc);</p>
+
+<p>HBITMAP hOldBm = static_cast(SelectObject(hdcMem, hbm));</p>
+
+<p>// 获得图像信息</p>
+
+<p>GetObject(hbm, sizeof(BITMAP), &amp;bm);</p>
+
+<p>// 确定y坐标</p>
+
+<p>int y = iHeight - bm.bmHeight;</p>
+
+<p>y = (y &lt; 0 ? 0 : y);</p>
+
+<p>// 转换图像从存储DC到菜单DC</p>
+
+<p>BitBlt(hdc, x, y, bm.bmWidth, bm.bmHeight, hdcMem, 0, 0, SRCCOPY);</p>
+
+<p>// 释放存储DC</p>
+
+<p>SelectObject(hdcMem, hOldBm);</p>
+
+<p>DeleteDC(hdcMem);</p>
+
+<p>}</p>
+
+<p>最后修正按钮子类化窗口过程，使它能正确地构建我们的客户菜单，和处理WM_MEASUREITEM环和 WM_DRAWITEM消息：</p>
+
+<p>switch(uMsg)</p>
+
+<p>{</p>
+
+<p>case WM_SETCURSOR:</p>
+
+<p>SetCursor(LoadCursor(g_hInstance, MAKEINTRESOURCE(IDC_HANDY)));</p>
+
+<p>return 0;</p>
+
+<p>case WM_MEASUREITEM:</p>
+
+<p>MeasureItem(HWND_DESKTOP, reinterpret_cast(lParam));</p>
+
+<p>break;</p>
+
+<p>case WM_DRAWITEM:</p>
+
+<p>DrawItem(reinterpret_cast(lParam));</p>
+
+<p>break;</p>
+
+<p>case WM_CONTEXTMENU:</p>
+
+<p>return 0;</p>
+
+<p>case BM_SETSTATE:</p>
+
+<p>case WM_LBUTTONDOWN:</p>
+
+<p>{</p>
+
+<p>WNDCLASS wc;</p>
+
+<p>GetClassInfo(NULL, &ldquo;Button&rdquo;, &amp;wc);</p>
+
+<p>CallWindowProc(wc.lpfnWndProc, hwnd, BM_SETSTATE, TRUE, 0);</p>
+
+<p>STARTMENUPOS smp;</p>
+
+<p>GetStartMenuPosition(&amp;smp);</p>
+
+<p>HMENU hmnuPopup = GetMenuHandle(&ldquo;c://myStartMenu&rdquo;);</p>
+
+<p>int iCmd = TrackPopupMenu(hmnuPopup,</p>
+
+<p>smp.uFlags | TPM_RETURNCMD | TPM_NONOTIFY,</p>
+
+<p>smp.ix, smp.iy, 0, hwnd, NULL);</p>
+
+<p>// 处理用户鼠标点击</p>
+
+<p>HandleResults(hmnuPopup, iCmd);</p>
+
+<p>// 释放内存</p>
+
+<p>DestroyMenu(hmnuPopup);</p>
+
+<p>CallWindowProc(wc.lpfnWndProc, hwnd, BM_SETSTATE, FALSE, 0);</p>
+
+<p>return 0;</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<p><em>执行命令</em> __</p>
+
+<p>现在菜单是完整的和可操作的，但是其唯一的缺点是菜单上没有任何一项可以有实际的动作。从上面的清单中你可以看到答案，HandleResults()函数应该做某些工作，问题是菜单上我们选择的是哪一种项。他们正好是应用命令，还是文档和程序的快捷方式？</p>
+
+<p>当然这最终依赖于你的需求。我们有选择地读出磁盘目录中的内容和动态地安排菜单。(当添加了快捷方式到‘开始’或‘程序’菜单时Shell确实做这个工作。)。
+如前所述，假设这个处理器查找文件对象的快捷方式，然后解析它，并附加到菜单中，最后加一个分隔线和标准的‘退出’项。</p>
+
+<p>快捷方式的描述变成了菜单项的文字，如果快捷方式没有描述(一个普通情况)，则使用文件名。当这个菜单项被选中时，处理器模块简单地调用快捷方式指向的文件。</p>
+
+<p>void HandleResults(HMENU hmenu, int iCmd)</p>
+
+<p>{</p>
+
+<p>MENUITEMINFO mii;</p>
+
+<p>LPMENUSTRUCT lpms;</p>
+
+<p>if(iCmd &lt;= 0)</p>
+
+<p>return;</p>
+
+<p>if(iCmd == ID_FILE_EXIT)</p>
+
+<p>{</p>
+
+<p>UninstallHandler();</p>
+
+<p>return;</p>
+
+<p>}</p>
+
+<p>mii.cbSize = sizeof(MENUITEMINFO);</p>
+
+<p>mii.fMask = MIIM_DATA;</p>
+
+<p>GetMenuItemInfo(hmenu, iCmd, FALSE, &amp;mii);</p>
+
+<p>lpms = reinterpret_cast(mii.dwItemData);</p>
+
+<p>ShellExecute(NULL, __TEXT(&ldquo;open&rdquo;), lpms-&gt;szFile, NULL, NULL, SW_SHOW);</p>
+
+<p>}</p>
+
+<p>如果点击的项是‘恢复前一个设置’则调用UninstallHandler()函数退出。对于任何其它的选择，都从项数据中抽取执行文件路径，然后调用ShellExecute()API函数，以执行这个文件。我们的客户菜单到此就全部完成了。</p>
+
+<p><strong>浏览器辅助对象</strong> ****</p>
+
+<p>SHLoadInProc()是一个桥梁，它允许你的程序插入COM对象到Shell中。我们已经使用了一个最小的COM对象演示了这种操作。你当然也可以使用正常的COM对象做这些。要指出的是，要开发这个功能，你不必是一个专门的COM程序员。只是要求你所构建的程序本身能表述为COM对象：它必须有一个CLSID，必须被注册，和必须实现任何COM服务器的最小功能。不要求你实现任何接口，也不禁止你做需要做的操作。
+相反， <strong>浏览器辅助</strong>
+对象则是一个完整的进程内COM服务器，IE(和探测器)在创建自己的新实例时加载这个对象。注意，这些对象总是需要一个浏览器实例来打开才能活动。后面的
+<em>活动原理</em> 一节将有简短的说明。</p>
+
+<p>使用SHLoadInProc()，是你的程序决定什么时候进入探测器的地址空间，以及是否应该阻止进入探测器地址空间。使用浏览器扶助对象的最大差别在于是浏览器(探测器或IE)自动加载在注册表特定区域注册的所有模块。</p>
+
+<p>__<em>就象它们的名字提示的那样，浏览器辅助对象仅影响探测器的特定部分—浏览器部分，让你浏览文件和文件夹的那部分。</em> __</p>
+
+<p>现在你可以在两个互补的方法之间进行选择—由你来决定两个选择中最能适合特殊需要的方法。为了帮助你选择，我们将探讨两种方法各自的优缺点。主要的不同点是：</p>
+
+<p>向后兼容性</p>
+
+<p>活动原理</p>
+
+<p>注册</p>
+
+<p>COM对象结构</p>
+
+<p>与主程序的通讯</p>
+
+<p>用途</p>
+
+<p>记住这两种选择都是加载COM对象到Shell存储空间的有效方法，我们也将以这样的术语来评价它们。从技术角度讲，这两者完全不同：SHLoadInProc()是一个函数，而浏览器辅助对象是一个COM对象。</p>
+
+<p>向后兼容性</p>
+
+<p>在4.00版本以后的Shell中支持SHLoadInProc()，而浏览器辅助对象则特指到Shell4.71版—它们都与IE4.0一道出现。二者在除了WindowsCE以外的所有Win32平台上都能很好工作。</p>
+
+<p>记住，Shell4.71版是指你必须有IE4.0或更高版和活动桌面。在Windows98中包括了这二者。</p>
+
+<p>活动机理</p>
+
+<p>从这个观点上看，两种方法是很不相同。SHLoadInProc()允许你的应用编程地加载COM对象到Shell的关联空间。相反，浏览器辅助对象是注册对象，在IE和探测器每次启动新实例时加载到内存中的你不能控制浏览器辅助对象的加载时间。</p>
+
+<p>为了使辅助对象活动，你必须打开探测器或浏览器的一个实例。进一步，一个辅助对象的实例与探测器或浏览器关联—一旦相关联的实例关闭，辅助对象就被卸载。</p>
+
+<p>注册</p>
+
+<p>SHLoadInProc()可以装入任何正确注册定COM对象。浏览器辅助对象必须注册在指定的注册表路径上，此时探测器或浏览器才能看到它(参考注册辅助对象一节)。</p>
+
+<p>COM对象结构</p>
+
+<p>正如上面所看到的，SHLoadInProc()可以管理和成功地加载任何COM对象—甚至是假冒的，没有实现任何接口的对象。浏览器辅助对象必须有一个明确定义的，由浏览器(IE或探测器)验证的格式。也就是实现IObjectWithSite接口的规则。</p>
+
+<p>与主程序通讯</p>
+
+<p>经由SHLoadInProc()加载的对象不接受指向Shell的IUnknown接口的指针。这可能是一个有意义的限制，因此如果你的目标仅是简单地子类化Shell对象，则不需要那样的指针。子类化，指的是允许你使用强制手段修改和滤波对象(如，‘开始’按钮)行为的任何技术，是一种对象‘不知道’你所做活动的方法。</p>
+
+<p>反过来，当主环境的对象有一个引用时，允许通过公共编程接口关联它们，这是一种简洁而安全得多的方法。这也开启了探索功能的新途径，其中的 <strong>事件处理</strong>
+是最有用的。通过浏览器加载的辅助对象能够接受指向IWebBrowser2的指针，和处理所有浏览器引起的事件。这种通讯为IObjectWithSite接口所支持。</p>
+
+<p>使用方法</p>
+
+<p>SHLoadInProc()有可以加载任何对象，包括假冒对象的优点，原理上，你也可以用SHLoadInProc()加载辅助对象。不幸的是它并不允许你使用IUnknown接口与Shell通讯。所以在这方面，浏览器辅助对象更通用，尽管它不能编程地加载。SHLoadInProc()仅与探测器一起工作，而辅助对象可以与IE和探测器二者一起工作。然而，SHLoadInProc()不需要探测器或IE的实例。</p>
+
+<p>我们已经有了一个假冒的COM模块，现在试着把它注册为辅助对象，它能很好地工作。在这种情况下，这个‘最小’COM对象与使用SHLoadInProc()加载时有相同的工作方式：它输出一个总是被调用的函数DllGetClassObject()。</p>
+
+<p>注册辅助对象</p>
+
+<p>浏览器辅助对象是一个COM模块，它必须自注册到下面的路径上：</p>
+
+<p>HKEY_LOCAL_MACHINE</p>
+
+<p>/Software</p>
+
+<p>/Microsoft</p>
+
+<p>/Windows</p>
+
+<p>/CurrentVersion</p>
+
+<p>/Explorer</p>
+
+<p>/Browser Helper Objects</p>
+
+<p>所有被允许模块的CLSIDs都列出在‘Browser Helper
+Objects’键下。探测器(和IE)逐一加载它们。记住当你打开‘回收站’或‘打印机’文件夹时，也建立浏览器的新实例。也就是说辅助对象经常获得调用—至少比期望的要频繁(留心查看对话框或模式窗口…)。注册表中这个辅助对象的列表是不被缓存的，总是重新从磁盘读出，所以只需花费一点时间就能清除掉那些不再有用的模块—你只需删除注册表中对应的CLSID行。幸运的是，从这个子树删除对象并不影响这个服务器的全程注册状态。别的应用仍然可以在CLSID键下用和以前一样的方法找到它。</p>
+
+<p>IObjectWithSite 接口</p>
+
+<p>使用SHLoadInProc()，模块可以加载到探测器地址空间，但是它没有基于COM的连接。换言之，他不能接受浏览器的IUnknown指针，它也不能访问这个目标模型。辅助对象通过实现IObjectWithSite接口，修补了这个不足。</p>
+
+<p>当浏览器加载一个注册表中列出的COM服务器时，它查询IObjectWithSite接口，如果找到，则经由SetSite()方法传递指向浏览器IUnknown接口的指针到这个模块。IObjectWithSite仅包含附加IUnknown的两个方法SetSite()和GetSite()。</p>
+
+<p>HRESULT IObjectWithSite::SetSite(IUnknown* pUnkSite);</p>
+
+<p>HRESULT IObjectWithSite::GetSite(REFIID riid, void** ppvSite);</p>
+
+<p>SetSite()方法由浏览器调用，并作为入口点。GetSite()方法工作与QueryInterface()十分相象。返回由SetSite()最后在这里设置的特定接口指针。</p>
+
+<p>编写辅助对象</p>
+
+<p>如果你计划写一个浏览器辅助对象，ATL可以提供重要的帮助。一旦使用ATL
+COM大师建立了一个框架，你就可以使用对象大师添加新对象和从IObjectWithSiteImpl导出它。所有其余的工作就是使用辅助逻辑编写SetSite()方法的实体。</p>
+
+<p>为了说明这一点，我们将重写按下指定键建立新文件夹的工具为一个辅助对象。浏览器辅助对象比普通的Shell对象扩展更适用于建立增强探测器的小实用程序，所以浏览器扶助对象似乎就是添加新探测器加速器的理想方法。我们不再需要应用注入代码到探测器关联空间，相反是必须建立实现IObjectWithSite接口的COM对象。下面两点是要考虑的：</p>
+
+<p>找出探测器窗口的Handle</p>
+
+<p>感觉这个加速器的键盘钩子</p>
+
+<p>我们前面的方案是基于窗口建立的全程钩子。当钩子过程感觉到一定类型(ExploreWClass)的窗口建立时，它在键盘的活动上安装一个局部钩子。当F12按下时，探测器窗口接收命令消息引起建立新文件夹。相反，辅助对象在探测器窗口已经存在时被加载。然而，FindWindow()并不是一个查找探测器窗口必然正确的函数，因为它返回指定类的顶层窗口Handle。因此，如果有多个探测器的副本在同时运行，我们就不能保证返回的就是我们的窗口。</p>
+
+<p>如果多个探测器副本同时运行，每一个都在其自己的线程中运行。对于浏览器辅助对象，找出探测器窗口Handle的较好方法是枚举当前线程所拥有的窗口，代码如下：</p>
+
+<p>EnumThreadWindows(GetCurrentThreadId(), WndEnumProc,</p>
+
+<p>reinterpret_cast(&amp;m_hwndExplorer));</p>
+
+<p>if(!IsWindow(m_hwndExplorer))</p>
+
+<p>return E_FAIL;</p>
+
+<p>EnumThreadWindows()函数是一个枚举由指定线程建立的所有窗口的API函数。每一个窗口都作为第二个变量传递给回调函数进行处理。下面是回调函数WndEnumProc()的处理过程：</p>
+
+<p>BOOL CALLBACK CNewFolder::WndEnumProc(HWND hwnd, LPARAM lParam)</p>
+
+<p>{</p>
+
+<p>TCHAR szClassName[MAX_PATH] = {0};</p>
+
+<p>GetClassName(hwnd, szClassName, MAX_PATH);</p>
+
+<p>if(!lstrcmpi(szClassName, __TEXT(&ldquo;ExploreWClass&rdquo;)))</p>
+
+<p>{</p>
+
+<p>HWND* phWnd = reinterpret_cast(lParam);</p>
+
+<p>*phWnd = hwnd;</p>
+
+<p>return FALSE;</p>
+
+<p>}</p>
+
+<p>return TRUE;</p>
+
+<p>}</p>
+
+<p>EnumThreadWindows()的第三个参数是一个32位值，这个值可以被调用者用于任何目的。我们需要一种使得探测器窗口(如果有一个)Handle被返回的方法。因此使用第三个参数传递一个指向HWND变量的指针。当WndEnumProc()找到了一个类型为ExploreWClass的窗口时，它就拷贝这个Handle到指针中，然后通过返回FALSE停止枚举过程。</p>
+
+<p>无论外观如何，探测器窗口实际上由整个窗口栈组成，下图将显示一个轮廓概念，详细请参看Spy++中精确的窗口类和风格。</p>
+
+<p><a href="https://img.it610.com/image/info8/583d0c5428504e32b491ee754e24d362.jpg"><img src="https://img.it610.com/image/info8/583d0c5428504e32b491ee754e24d362.jpg" alt="Windows Shell 编程
+第七章_第6张图片" /></a></p>
+
+<p>每次敲击键盘都根据焦点输入窗口进行不同的处理。由于安装了局部键盘钩子，我们可以在击键进入窗口的传统通道之前对其进行处理。</p>
+
+<p><em>ATL COM</em> <em>对象</em> __</p>
+
+<p>让我们看一下浏览器辅助对象的源码，这里已经使用ATL COM大师生成了代码的框架。一个新的‘简单对象’NewFolder</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

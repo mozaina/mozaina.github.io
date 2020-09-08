@@ -1,0 +1,1589 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linux系统获取基础硬件信息的shell | 开发者问答集锦</title>
+    <meta property="og:title" content="linux系统获取基础硬件信息的shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linux系统获取基础硬件信息的shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E7%B3%BB%E7%BB%9F%E8%8E%B7%E5%8F%96%E5%9F%BA%E7%A1%80%E7%A1%AC%E4%BB%B6%E4%BF%A1%E6%81%AF%E7%9A%84shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linux系统获取基础硬件信息的shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>来自[url]<a href="http://code.google.com/p/aspersa/[/url">http://code.google.com/p/aspersa/[/url</a>]</p>
+
+<pre><code>#!/bin/sh  
+# This program is part of Aspersa (http://code.google.com/p/aspersa/)  
+
+# ########################################################################  
+# A script to summarize system information in a nice way.  
+# Goals: work well on Linux; create a compact diff-able report that is  
+# easy to paste into a wiki or email, and easy to scan and compare too.  
+#  
+# Usage: $ wget -O- http://aspersa.googlecode.com/svn/trunk/summary |bash  
+# Options are set through the ASPERSA_SKIP environment variable.  Set this  
+# variable to a comma-separated list of things you want to omit.  
+# Options:  
+#  MOUNT:   Don't print out mounted filesystems and disk fullness.  
+#  NETWORK: Don't print out information on network controllers &amp; config.  
+#  PROCESS: Don't print out top processes and vmstat information.  
+#  
+# Authors:  
+#  Baron Schwartz  
+#  Kevin van Zonneveld (kvz@php.net || http://kevin.vanzonneveld.net)  
+# ########################################################################  
+
+# ########################################################################  
+# Globals, settings, helper functions  
+# ########################################################################  
+POSIXLY_CORRECT=1  
+export POSIXLY_CORRECT  
+
+# The awk code for fuzzy rounding.  (It's used in a few places, so makes sense  
+# not to duplicate).  It fuzzy-rounds the variable named fuzzy_var.  It goes in  
+# steps of 5, 10, 25, then repeats by a factor of 10 larger (50, 100, 250), and  
+# so on, until it finds a number that's large enough.  The pattern is slightly  
+# broken between the initial 1 and 50, because rounding to the nearest 2.5  
+# doesn't seem right to me.  
+fuzzy_formula='  
+   rounded = 0;  
+   if (fuzzy_var &lt;= 10 ) {  
+      rounded   = 1;  
+   }  
+   factor = 1;  
+   while ( rounded == 0 ) {  
+      if ( fuzzy_var &lt;= 50 * factor ) {  
+         fuzzy_var = sprintf(&quot;%.0f&quot;, fuzzy_var / (5 * factor)) * 5 * factor;  
+         rounded   = 1;  
+      }  
+      else if ( fuzzy_var &lt;= 100  * factor) {  
+         fuzzy_var = sprintf(&quot;%.0f&quot;, fuzzy_var / (10 * factor)) * 10 * factor;  
+         rounded   = 1;  
+      }  
+      else if ( fuzzy_var &lt;= 250  * factor) {  
+         fuzzy_var = sprintf(&quot;%.0f&quot;, fuzzy_var / (25 * factor)) * 25 * factor;  
+         rounded   = 1;  
+      }  
+      factor = factor * 10;  
+   }'  
+
+# Does fuzzy rounding: rounds to nearest interval, but the interval gets larger  
+# as the number gets larger.  This is to make things easier to diff.  
+fuzz () {  
+   echo $1 | $AP_AWK &quot;{fuzzy_var=\$1; ${fuzzy_formula} print fuzzy_var;}&quot;  
+}  
+
+# The temp files are for storing working results so we don't call commands many  
+# times (gives inconsistent results, maybe adds load on things I don't want to  
+# such as RAID controllers).  They must not exist -- if they did, someone would  
+# symlink them to /etc/passwd and then run this program as root.  Call this  
+# function with &quot;rm&quot; or &quot;touch&quot; as an argument.  
+temp_files() {  
+   for file in /tmp/aspersa /tmp/aspersa2; do  
+      case &quot;$1&quot; in  
+      touch)  
+         if ! touch &quot;${file}&quot;; then  
+            echo &quot;I can't make my temp file ${file}&quot;;  
+            exit 1;  
+         fi  
+         ;;  
+      rm)  
+         rm -f &quot;${file}&quot;  
+         ;;  
+      esac  
+   done  
+}  
+
+# Print a space-padded string into $line.  Then translate spaces to hashes, and  
+# underscores to spaces.  End result is a line of hashes with words at the  
+# start.  
+section () {  
+   echo &quot;$1&quot; | awk '{l=sprintf(&quot;#_%-60s&quot;, $0 &quot;_&quot;); print l}' | sed -e 's/ /#/g' -e 's/_/ /g'  
+}  
+
+# Print a &quot;name | value&quot; line.  
+name_val() {  
+   printf &quot;%12s | %s\n&quot; &quot;$1&quot; &quot;$(echo $2)&quot;  
+}  
+
+# Converts a value to units of power of 2.  Arg 1: the value.  Arg 2: precision (defaults to 2).  
+shorten() {  
+   echo $@ | awk '{  
+      unit = &quot;k&quot;;  
+      size = 1024;  
+      val  = $1;  
+      prec = 2;  
+      if ( $2 ~ /./ ) {  
+         prec = $2;  
+      }  
+      if ( val &gt;= 1099511627776 ) {  
+         size = 1099511627776;  
+         unit = &quot;T&quot;;  
+      }  
+      else if ( val &gt;= 1073741824 ) {  
+         size = 1073741824;  
+         unit = &quot;G&quot;;  
+      }  
+      else if ( val &gt;= 1048576 ) {  
+         size = 1048576;  
+         unit = &quot;M&quot;;  
+      }  
+      printf &quot;%.&quot; prec &quot;f%s&quot;, val / size, unit;  
+   }'  
+}  
+
+# ##############################################################################  
+# Function to take a file and collapse it into an aggregated list.  This  
+# function works on $1, which it expects to be created with 'sort |  
+# uniq -c'.  Leading whitespace is deleted.  The result will look like  
+# &quot;4xabc, 1xdef&quot;  Copy any changes to 'mysql-summary' too.  
+# ##############################################################################  
+group_concat () {  
+   sed -e '{H; $!d}' -e 'x' -e 's/\n[[:space:]]*\([[:digit:]]*\)[[:space:]]*/, \1x/g' -e 's/[[:space:]][[:space:]]*/ /g' -e 's/, //' ${1}  
+   # In words: save the whole file into the hold space,  
+   # {H; $!d}  
+   # Swap it back into the pattern space,  
+   # x  
+   # Join lines with a comma, delete leading whitespace, and put an 'x' between  
+   # the number and the text that follows,  
+   # s/\n[[:space:]]*\([[:digit:]]*\)[[:space:]]*/, \1x/g  
+   # Collapse whitespace,  
+   # s/[[:space:]][[:space:]]*/ /g  
+   # And delete the leading comma-space.  
+   # s/, //  
+}  
+
+# ##############################################################################  
+# Functions for parsing specific files and getting desired info from them.  
+# These are called from within main() and are separated so they can be tested  
+# easily.  The calling convention is that the data they need to run is prepared  
+# first by putting it into /tmp/aspersa.  Then code that's testing just needs to  
+# put sample data into /tmp/aspersa and call it.  
+# ##############################################################################  
+
+# ##############################################################################  
+# Parse Linux's /proc/cpuinfo, which should be stored in /tmp/aspersa.  
+# ##############################################################################  
+parse_proc_cpuinfo () {  
+   # Physical processors are indicated by distinct 'physical id'.  Virtual CPUs  
+   # are indicated by paragraphs -- one per paragraph.  We assume that all  
+   # processors are identical, i.e. that there are not some processors with dual  
+   # cores and some with quad cores.  
+   virtual=$(grep -c ^processor /tmp/aspersa);  
+   physical=$(grep 'physical id' /tmp/aspersa | sort -u | wc -l);  
+   cores=$(grep 'cpu cores' /tmp/aspersa | head -n 1 | cut -d: -f2);  
+
+   # Older kernel won't have 'physical id' or 'cpu cores'.  
+   if [ &quot;${physical}&quot; = &quot;0&quot; ]; then physical=${virtual}; fi  
+   if [ -z &quot;${cores}&quot; ]; then cores=0; fi  
+
+   # Test for HTT; cannot trust the 'ht' flag.  If physical * cores &lt; virtual,  
+   # then hyperthreading is in use.  
+   cores=$((${cores} * ${physical}));  
+   if [ ${cores} -gt 0 -a $cores -lt $virtual ]; then htt=yes; else htt=no; fi  
+
+   name_val &quot;Processors&quot; &quot;physical = ${physical}, cores = ${cores}, virtual = ${virtual}, hyperthreading = ${htt}&quot;  
+
+   awk -F: '/cpu MHz/{print $2}' /tmp/aspersa \  
+      | sort | uniq -c &gt; /tmp/aspersa2  
+   name_val &quot;Speeds&quot; &quot;$(group_concat /tmp/aspersa2)&quot;  
+
+   awk -F: '/model name/{print $2}' /tmp/aspersa \  
+      | sort | uniq -c &gt; /tmp/aspersa2  
+   name_val &quot;Models&quot; &quot;$(group_concat /tmp/aspersa2)&quot;  
+
+   awk -F: '/cache size/{print $2}' /tmp/aspersa \  
+      | sort | uniq -c &gt; /tmp/aspersa2  
+   name_val &quot;Caches&quot; &quot;$(group_concat /tmp/aspersa2)&quot;  
+}  
+
+# ##############################################################################  
+# Parse sysctl -a output on FreeBSD, and format it as CPU info.  The file is the  
+# first argument.  
+# ##############################################################################  
+parse_sysctl_cpu_freebsd() {  
+   virtual=&quot;$(awk '/hw.ncpu/{print $2}' &quot;$1&quot;)&quot;  
+   name_val &quot;Processors&quot; &quot;virtual = ${virtual}&quot;  
+   name_val &quot;Speeds&quot; &quot;$(awk '/hw.clockrate/{print $2}' &quot;$1&quot;)&quot;  
+   name_val &quot;Models&quot; &quot;$(awk -F: '/hw.model/{print substr($2, 2)}' &quot;$1&quot;)&quot;  
+}  
+
+# ##############################################################################  
+# Parse CPU info from psrinfo -v  
+# ##############################################################################  
+parse_psrinfo_cpus() {  
+   name_val Processors $(grep -c 'Status of .* processor' &quot;$1&quot;)  
+   awk '/operates at/ {  
+      start = index($0, &quot; at &quot;) + 4;  
+      end   = length($0) - start - 4  
+      print substr($0, start, end);  
+   }' &quot;$1&quot; | sort | uniq -c &gt; /tmp/aspersa2  
+   name_val &quot;Speeds&quot; &quot;$(group_concat /tmp/aspersa2)&quot;  
+}  
+
+# ##############################################################################  
+# Parse the output of 'free -b' plus the contents of /proc/meminfo  
+# ##############################################################################  
+parse_free_minus_b () {  
+   physical=$(awk '/Mem:/{print $3}' &quot;${1}&quot;)  
+   swap=$(awk '/Swap:/{print $3}' &quot;${1}&quot;)  
+   virtual=$(shorten $(($physical + $swap)))  
+
+   name_val Total   $(shorten $(awk '/Mem:/{print $2}' &quot;${1}&quot;))  
+   name_val Free    $(shorten $(awk '/Mem:/{print $4}' &quot;${1}&quot;))  
+   name_val Used    &quot;physical = $(shorten ${physical}), swap = $(shorten ${swap}), virtual = ${virtual}&quot;  
+   name_val Buffers $(shorten $(awk '/Mem:/{print $6}' &quot;${1}&quot;))  
+   name_val Caches  $(shorten $(awk '/Mem:/{print $7}' &quot;${1}&quot;))  
+   name_val Dirty  &quot;$(awk '/Dirty:/ {print $2, $3}' &quot;${1}&quot;)&quot;  
+}  
+
+# ##############################################################################  
+# Parse FreeBSD memory info from sysctl output.  
+# ##############################################################################  
+parse_memory_sysctl_freebsd() {  
+   physical=$(awk '/hw.realmem:/{print $2}' &quot;${1}&quot;)  
+   mem_hw=$(awk '/hw.physmem:/{print $2}' &quot;${1}&quot;)  
+   mem_used=$(awk '  
+      /hw.physmem/                   { mem_hw       = $2; }  
+      /vm.stats.vm.v_inactive_count/ { mem_inactive = $2; }  
+      /vm.stats.vm.v_cache_count/    { mem_cache    = $2; }  
+      /vm.stats.vm.v_free_count/     { mem_free     = $2; }  
+      /hw.pagesize/                  { pagesize     = $2; }  
+      END {  
+         mem_inactive *= pagesize;  
+         mem_cache    *= pagesize;  
+         mem_free     *= pagesize;  
+         print mem_hw - mem_inactive - mem_cache - mem_free;  
+      }  
+   ' &quot;$1&quot;);  
+   name_val Total   $(shorten ${mem_hw} 1)  
+   name_val Virtual $(shorten ${physical} 1)  
+   name_val Used    $(shorten ${mem_used} 1)  
+}  
+
+# ##############################################################################  
+# Parse memory devices from the output of 'dmidecode', which should be stored in  
+# /tmp/aspersa.  
+# ##############################################################################  
+parse_dmidecode_mem_devices () {  
+   echo &quot;  Locator   Size     Speed             Form Factor   Type          Type Detail&quot;  
+   echo &quot;  ========= ======== ================= ============= ============= ===========&quot;  
+   # Print paragraphs containing 'Memory Device\n', extract the desired bits,  
+   # concatenate them into one long line, then format as a table.  The data  
+   # comes out in this order for each paragraph:  
+   # $2  Size         2048 MB  
+   # $3  Form Factor    
+   # $4  Locator      DIMM1  
+   # $5  Type           
+   # $6  Type Detail  Synchronous  
+   # $7  Speed        667 MHz (1.5 ns)  
+   sed    -e '/./{H;$!d;}' \  
+          -e 'x;/Memory Device\n/!d;' \  
+          -e 's/: /:/g' \  
+          -e 's/{/g' \  
+          -e 's/&gt;/}/g' \  
+          -e 's/[ \t]*\n/\n/g' \  
+       /tmp/aspersa \  
+       | awk -F: '/Size|Type|Form.Factor|Type.Detail|[^ ]Locator/{printf(&quot;|%s&quot;, $2)}/Speed/{print &quot;|&quot; $2}' \  
+       | sed -e 's/No Module Installed/{EMPTY}/' \  
+       | sort \  
+       | awk -F'|' '{printf(&quot;  %-9s %-8s %-17s %-13s %-13s %-8s\n&quot;, $4, $2, $7, $3, $5, $6);}'  
+}  
+
+# ##############################################################################  
+# Parse the output of 'netstat -antp'  
+# ##############################################################################  
+parse_ip_s_link () {  
+   echo &quot;  interface  rx_bytes rx_packets  rx_errors   tx_bytes tx_packets  tx_errors&quot;  
+   echo &quot;  ========= ========= ========== ========== ========== ========== ==========&quot;  
+
+   awk &quot;/^[1-9][0-9]*:/ {  
+      save[\&quot;iface\&quot;] = substr(\$2, 0, index(\$2, \&quot;:\&quot;) - 1);  
+      new = 1;  
+   }  
+   \$0 !~ /[^0-9 ]/ {  
+      if ( new == 1 ) {  
+         new = 0;  
+         fuzzy_var = \$1; ${fuzzy_formula} save[\&quot;bytes\&quot;] = fuzzy_var;  
+         fuzzy_var = \$2; ${fuzzy_formula} save[\&quot;packs\&quot;] = fuzzy_var;  
+         fuzzy_var = \$3; ${fuzzy_formula} save[\&quot;errs\&quot;]  = fuzzy_var;  
+      }  
+      else {  
+         fuzzy_var = \$1; ${fuzzy_formula} tx_bytes   = fuzzy_var;  
+         fuzzy_var = \$2; ${fuzzy_formula} tx_packets = fuzzy_var;  
+         fuzzy_var = \$3; ${fuzzy_formula} tx_errors  = fuzzy_var;  
+         printf \&quot;  %-8s %10d %10d %10d %10d %10d %10d\\n\&quot;, save[\&quot;iface\&quot;], save[\&quot;bytes\&quot;], save[\&quot;packs\&quot;], save[\&quot;errs\&quot;], tx_bytes, tx_packets, tx_errors;  
+      }  
+   }&quot; $@  
+}  
+
+# ##############################################################################  
+# Parse the output of 'netstat -antp' which should be in /tmp/aspersa.  
+# ##############################################################################  
+parse_netstat () {  
+   echo &quot;  Connections from remote IP addresses&quot;  
+   awk '$1 ~ /^tcp/ &amp;&amp; $5 ~ /^[1-9]/ {  
+      print substr($5, 0, index($5, &quot;:&quot;) - 1);  
+   }' /tmp/aspersa | sort | uniq -c \  
+      | awk &quot;{  
+         fuzzy_var=\$1;  
+         ${fuzzy_formula}  
+         printf \&quot;    %-15s %5d\\n\&quot;, \$2, fuzzy_var;  
+         }&quot; \  
+      | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4  
+   echo &quot;  Connections to local IP addresses&quot;  
+   awk '$1 ~ /^tcp/ &amp;&amp; $5 ~ /^[1-9]/ {  
+      print substr($4, 0, index($4, &quot;:&quot;) - 1);  
+   }' /tmp/aspersa | sort | uniq -c \  
+      | awk &quot;{  
+         fuzzy_var=\$1;  
+         ${fuzzy_formula}  
+         printf \&quot;    %-15s %5d\\n\&quot;, \$2, fuzzy_var;  
+         }&quot; \  
+      | sort -n -t . -k 1,1 -k 2,2 -k 3,3 -k 4,4  
+   echo &quot;  Connections to top 10 local ports&quot;  
+   awk '$1 ~ /^tcp/ &amp;&amp; $5 ~ /^[1-9]/ {  
+      print substr($4, index($4, &quot;:&quot;) + 1);  
+   }' /tmp/aspersa | sort | uniq -c | sort -rn | head -n10 \  
+      | awk &quot;{  
+         fuzzy_var=\$1;  
+         ${fuzzy_formula}  
+         printf \&quot;    %-15s %5d\\n\&quot;, \$2, fuzzy_var;  
+         }&quot; | sort  
+   echo &quot;  States of connections&quot;  
+   awk '$1 ~ /^tcp/ {  
+      print $6;  
+   }' /tmp/aspersa | sort | uniq -c | sort -rn \  
+      | awk &quot;{  
+         fuzzy_var=\$1;  
+         ${fuzzy_formula}  
+         printf \&quot;    %-15s %5d\\n\&quot;, \$2, fuzzy_var;  
+         }&quot; | sort  
+}  
+
+# ##############################################################################  
+# Parse the joined output of 'mount' and 'df -hP'.  $1 = file; $2 = ostype.  
+# ##############################################################################  
+parse_filesystems () {  
+   # Filesystem names and mountpoints can be very long.  We try to align things  
+   # as nicely as possible by making columns only as wide as needed.  This  
+   # requires two passes through the file.  The first pass finds the max size of  
+   # these columns and prints out a printf spec, and the second prints out the  
+   # file nicely aligned.  
+   cat &gt; /tmp/aspersa.awk &lt;      BEGIN {  
+         device     = 10;  
+         fstype     = 4;  
+         options    = 4;  
+      }  
+      /./ {  
+         f_device     = \$1;  
+         f_fstype     = \$10;  
+         f_options    = substr(\$11, 2, length(\$11) - 2);  
+         if ( &quot;$2&quot; == &quot;FreeBSD&quot; ) {  
+            f_fstype  = substr(\$9, 2, length(\$9) - 2);  
+            f_options = substr(\$0, index(\$0, &quot;,&quot;) + 2);  
+            f_options = substr(f_options, 1, length(f_options) - 1);  
+         }  
+         if ( length(f_device) &gt; device ) {  
+            device=length(f_device);  
+         }  
+         if ( length(f_fstype) &gt; fstype ) {  
+            fstype=length(f_fstype);  
+         }  
+         if ( length(f_options) &gt; options ) {  
+            options=length(f_options);  
+         }  
+      }  
+      END{  
+         print &quot;%-&quot; device &quot;s %5s %4s %-&quot; fstype &quot;s %-&quot; options &quot;s %s&quot;;  
+      }  
+    EOF  
+   spec=&quot;$( awk -f /tmp/aspersa.awk &quot;$1&quot; )&quot;;  
+   #awk -f /tmp/aspersa.awk &quot;$1&quot;  
+   #return;  
+
+   cat &gt; /tmp/aspersa.awk &lt;      BEGIN {  
+         spec=&quot;  ${spec}\\n&quot;;  
+         printf spec, &quot;Filesystem&quot;, &quot;Size&quot;, &quot;Used&quot;, &quot;Type&quot;, &quot;Opts&quot;, &quot;Mountpoint&quot;;  
+      }  
+      {  
+         f_fstype     = \$10;  
+         f_options    = substr(\$11, 2, length(\$11) - 2);  
+         if ( &quot;$2&quot; == &quot;FreeBSD&quot; ) {  
+            f_fstype  = substr(\$9, 2, length(\$9) - 2);  
+            f_options = substr(\$0, index(\$0, &quot;,&quot;) + 2);  
+            f_options = substr(f_options, 1, length(f_options) - 1);  
+         }  
+         printf spec, \$1, \$2, \$5, f_fstype, f_options, \$6;  
+      }  
+    EOF  
+   awk -f /tmp/aspersa.awk &quot;$1&quot;  
+}  
+
+# ##############################################################################  
+# Parse the output of fdisk -l, which should be in /tmp/aspersa; there might be  
+# multiple fdisk -l outputs in the file.  
+# ##############################################################################  
+parse_fdisk () {  
+   awk '  
+      BEGIN {  
+         format=&quot;%-12s %4s %10s %10s %18s\n&quot;;  
+         printf(format, &quot;Device&quot;, &quot;Type&quot;, &quot;Start&quot;, &quot;End&quot;, &quot;Size&quot;);  
+         printf(format, &quot;============&quot;, &quot;====&quot;, &quot;==========&quot;, &quot;==========&quot;, &quot;==================&quot;);  
+      }  
+      /Disk.*bytes/ {  
+         disk = substr($2, 1, length($2) - 1);  
+         size = $5;  
+         printf(format, disk, &quot;Disk&quot;, &quot;&quot;, &quot;&quot;, size);  
+      }  
+      /Units/ {  
+         units = $9;  
+      }  
+      /^\/dev/ {  
+         if ( $2 == &quot;*&quot; ) {  
+            start = $3;  
+            end   = $4;  
+         }  
+         else {  
+            start = $2;  
+            end   = $3;  
+         }  
+         printf(format, $1, &quot;Part&quot;, start, end, sprintf(&quot;%.0f&quot;, (end - start) * units));  
+      }  
+   ' /tmp/aspersa  
+}  
+
+# ##############################################################################  
+# Parse the output of dmesg, which should be in /tmp/aspersa, and detect  
+# virtualization.  
+# ##############################################################################  
+parse_virtualization_dmesg () {  
+   if grep -qi -e vmware -e vmxnet -e 'paravirtualized kernel on vmi' /tmp/aspersa; then  
+      echo &quot;VMWare&quot;;  
+   elif grep -qi -e 'paravirtualized kernel on xen' -e 'Xen virtual console' /tmp/aspersa; then  
+      echo &quot;Xen&quot;;  
+   elif grep -qi qemu /tmp/aspersa; then  
+      echo &quot;QEmu&quot;;  
+   elif grep -qi 'paravirtualized kernel on KVM' /tmp/aspersa; then  
+      echo &quot;KVM&quot;;  
+   elif grep -q VBOX /tmp/aspersa; then  
+      echo &quot;VirtualBox&quot;;  
+   elif grep -qi 'hd.: Virtual .., ATA.*drive' /tmp/aspersa; then  
+      echo &quot;Microsoft VirtualPC&quot;;  
+   fi  
+}  
+
+# ##############################################################################  
+# Try to figure out if a system is a guest by looking at prtdiag, smbios, etc.  
+# ##############################################################################  
+parse_virtualization_generic() {  
+   if grep -i -e virtualbox &quot;$1&quot; &gt;/dev/null; then  
+      echo VirtualBox  
+   elif grep -i -e vmware &quot;$1&quot; &gt;/dev/null; then  
+      echo VMWare  
+   fi  
+}  
+
+# ##############################################################################  
+# Parse the output of lspci, which should be in /tmp/aspersa, and detect  
+# Ethernet cards.  
+# ##############################################################################  
+parse_ethernet_controller_lspci () {  
+   grep -i ethernet /tmp/aspersa | cut -d: -f3 | while read line; do  
+      name_val Controller &quot;${line}&quot;  
+   done  
+}  
+
+# ##############################################################################  
+# Parse the output of lspci, which should be in /tmp/aspersa, and detect RAID  
+# controllers.  
+# ##############################################################################  
+parse_raid_controller_lspci () {  
+   if grep -q &quot;RAID bus controller: LSI Logic / Symbios Logic MegaRAID SAS&quot; /tmp/aspersa; then  
+      echo 'LSI Logic MegaRAID SAS'  
+   elif grep -q &quot;Fusion-MPT SAS&quot; /tmp/aspersa; then  
+      echo 'Fusion-MPT SAS'  
+   elif grep -q &quot;RAID bus controller: LSI Logic / Symbios Logic Unknown&quot; /tmp/aspersa; then  
+      echo 'LSI Logic Unknown'  
+   elif grep -q &quot;RAID bus controller: Adaptec AAC-RAID&quot; /tmp/aspersa; then  
+      echo 'AACRAID'  
+   elif grep -q &quot;3ware [0-9]* Storage Controller&quot; /tmp/aspersa; then  
+      echo '3Ware'  
+   elif grep -q &quot;Hewlett-Packard Company Smart Array&quot; /tmp/aspersa; then  
+      echo 'HP Smart Array'  
+   elif grep -q &quot; RAID bus controller: &quot; /tmp/aspersa; then  
+      awk -F: '/RAID bus controller\:/ {print $3&quot; &quot;$5&quot; &quot;$6}' /tmp/aspersa  
+   fi  
+}  
+
+# ##############################################################################  
+# Parse the output of dmesg, which should be in /tmp/aspersa, and detect RAID  
+# controllers.  
+# ##############################################################################  
+parse_raid_controller_dmesg () {  
+   pat='scsi[0-9].*: .*'  
+   if grep -qi &quot;${pat}megaraid&quot; /tmp/aspersa; then  
+      echo 'LSI Logic MegaRAID SAS'  
+   elif grep -q &quot;Fusion MPT SAS&quot; /tmp/aspersa; then  
+      echo 'Fusion-MPT SAS'  
+   elif grep -q &quot;${pat}aacraid&quot; /tmp/aspersa; then  
+      echo 'AACRAID'  
+   elif grep -q &quot;${pat}3ware [0-9]* Storage Controller&quot; /tmp/aspersa; then  
+      echo '3Ware'  
+   fi  
+}  
+
+# ##############################################################################  
+# Parse the output of &quot;hpacucli ctrl all show config&quot;, which should be stored in  
+# /tmp/aspersa  
+# ##############################################################################  
+parse_hpacucli () {  
+   grep 'logicaldrive\|physicaldrive' /tmp/aspersa  
+}  
+
+# ##############################################################################  
+# Parse the output of arcconf, which should be stored in /tmp/aspersa  
+# ##############################################################################  
+parse_arcconf () {  
+   model=$(awk -F: '/Controller Model/{print $2}' /tmp/aspersa)  
+   chan=&quot;$(awk -F: '/Channel description/{print $2}' /tmp/aspersa)&quot;  
+   cache=&quot;$(awk -F: '/Installed memory/{print $2}' /tmp/aspersa)&quot;  
+   status=&quot;$(awk -F: '/Controller Status/{print $2}' /tmp/aspersa)&quot;  
+   name_val Specs &quot;${model/ /},${chan},${cache} cache,${status}&quot;  
+
+   battery=$(grep -A5 'Controller Battery Info' /tmp/aspersa \  
+      | awk '/Capacity remaining/ {c=$4}  
+             /Status/             {s=$3}  
+             /Time remaining/     {t=sprintf(&quot;%dd%dh%dm&quot;, $7, $9, $11)}  
+             END                  {printf(&quot;%d%%, %s remaining, %s&quot;, c, t, s)}')  
+   name_val Battery &quot;${battery}&quot;  
+
+   # ###########################################################################  
+   # Logical devices  
+   # ###########################################################################  
+   echo  
+   echo &quot;  LogicalDev Size      RAID Disks Stripe Status  Cache&quot;  
+   echo &quot;  ========== ========= ==== ===== ====== ======= =======&quot;  
+   for dev in $(awk '/Logical device number/{print $4}' /tmp/aspersa); do  
+      sed -n -e &quot;/^Logical device .* ${dev}$/,/^$\|^Logical device number/p&quot; \  
+         /tmp/aspersa \  
+      | awk '  
+         /Logical device name/               {d=$5}  
+         /Size/                              {z=$3 &quot; &quot; $4}  
+         /RAID level/                        {r=$4}  
+         /Group [0-9]/                       {g++}  
+         /Stripe-unit size/                  {p=$4 &quot; &quot; $5}  
+         /Status of logical/                 {s=$6}  
+         /Write-cache mode.*Ena.*write-back/ {c=&quot;On (WB)&quot;}  
+         /Write-cache mode.*Ena.*write-thro/ {c=&quot;On (WT)&quot;}  
+         /Write-cache mode.*Disabled/        {c=&quot;Off&quot;}  
+         END {  
+            printf(&quot;  %-10s %-9s %4d %5d %-6s %-7s %-7s\n&quot;,  
+               d, z, r, g, p, s, c);  
+         }'  
+   done  
+
+   # ###########################################################################  
+   # Physical devices  
+   # ###########################################################################  
+   echo  
+   echo &quot;  PhysiclDev State   Speed         Vendor  Model        Size        Cache&quot;  
+   echo &quot;  ========== ======= ============= ======= ============ =========== =======&quot;  
+
+   # Find the paragraph with physical devices, tabularize with assoc arrays.  
+   tempresult=&quot;&quot;  
+   sed -n -e '/Physical Device information/,/^$/p' /tmp/aspersa \  
+      | awk -F: '  
+         /Device #[0-9]/ {  
+            device=substr($0, index($0, &quot;#&quot;));  
+            devicenames[device]=device;  
+         }  
+         /Device is a/ {  
+            devices[device &quot;,isa&quot;] = substr($0, index($0, &quot;is a&quot;) + 5);  
+         }  
+         /State/ {  
+            devices[device &quot;,state&quot;] = substr($2, 2);  
+         }  
+         /Transfer Speed/ {  
+            devices[device &quot;,speed&quot;] = substr($2, 2);  
+         }  
+         /Vendor/ {  
+            devices[device &quot;,vendor&quot;] = substr($2, 2);  
+         }  
+         /Model/ {  
+            devices[device &quot;,model&quot;] = substr($2, 2);  
+         }  
+         /Size/ {  
+            devices[device &quot;,size&quot;] = substr($2, 2);  
+         }  
+         /Write Cache/ {  
+            if ( $2 ~ /Enabled .write-back./ )  
+               devices[device &quot;,cache&quot;] = &quot;On (WB)&quot;;  
+            else  
+               if ( $2 ~ /Enabled .write-th/ )  
+                  devices[device &quot;,cache&quot;] = &quot;On (WT)&quot;;  
+               else  
+                  devices[device &quot;,cache&quot;] = &quot;Off&quot;;  
+         }  
+         END {  
+            for ( device in devicenames ) {  
+               if ( devices[device &quot;,isa&quot;] ~ /Hard drive/ ) {  
+                  printf(&quot;  %-10s %-7s %-13s %-7s %-12s %-11s %-7s\n&quot;,  
+                     devices[device &quot;,isa&quot;],  
+                     devices[device &quot;,state&quot;],  
+                     devices[device &quot;,speed&quot;],  
+                     devices[device &quot;,vendor&quot;],  
+                     devices[device &quot;,model&quot;],  
+                     devices[device &quot;,size&quot;],  
+                     devices[device &quot;,cache&quot;]);  
+               }  
+            }  
+         }'  
+
+}  
+
+# ##############################################################################  
+# Parse the output of &quot;lsiutil -i -s&quot; from /tmp/aspersa  
+# ##############################################################################  
+parse_fusionmpt_lsiutil () {  
+   echo  
+   awk '/LSI.*Firmware/ { print &quot; &quot;, $0 }' /tmp/aspersa  
+   grep . /tmp/aspersa | sed -n -e '/B___T___L/,$ {s/^/  /; p}'  
+}  
+
+# ##############################################################################  
+# Parse the output of MegaCli64 -AdpAllInfo -aALL from /tmp/aspersa.  
+# ##############################################################################  
+parse_lsi_megaraid_adapter_info () {  
+   name=$(awk -F: '/Product Name/{print substr($2, 2)}' /tmp/aspersa);  
+   int=$(awk '/Host Interface/{print $4}' /tmp/aspersa);  
+   prt=$(awk '/Number of Backend Port/{print $5}' /tmp/aspersa);  
+   bbu=$(awk '/^BBU             :/{print $3}' /tmp/aspersa);  
+   mem=$(awk '/Memory Size/{print $4}' /tmp/aspersa);  
+   vdr=$(awk '/Virtual Drives/{print $4}' /tmp/aspersa);  
+   dvd=$(awk '/Degraded/{print $3}' /tmp/aspersa);  
+   phy=$(awk '/^  Disks/{print $3}' /tmp/aspersa);  
+   crd=$(awk '/Critical Disks/{print $4}' /tmp/aspersa);  
+   fad=$(awk '/Failed Disks/{print $4}' /tmp/aspersa);  
+   name_val Model &quot;${name}, ${int} interface, ${prt} ports&quot;  
+   name_val Cache &quot;${mem} Memory, BBU ${bbu}&quot;  
+}  
+
+# ##############################################################################  
+# Parse the output (saved in /tmp/aspersa) of  
+# /opt/MegaRAID/MegaCli/MegaCli64 -AdpBbuCmd -GetBbuStatus -aALL  
+# ##############################################################################  
+parse_lsi_megaraid_bbu_status () {  
+   charge=$(awk '/Relative State/{print $5}' /tmp/aspersa);  
+   temp=$(awk '/^Temperature/{print $2}' /tmp/aspersa);  
+   soh=$(awk '/isSOHGood:/{print $2}' /tmp/aspersa);  
+   name_val BBU &quot;${charge}% Charged, Temperature ${temp}C, isSOHGood=${soh}&quot;  
+}  
+
+# ##############################################################################  
+# Parse physical devices from the output (saved in /tmp/aspersa) of  
+# /opt/MegaRAID/MegaCli/MegaCli64 -LdPdInfo -aALL  
+# OR, it will also work with the output of  
+# /opt/MegaRAID/MegaCli/MegaCli64 -PDList -aALL  
+# ##############################################################################  
+parse_lsi_megaraid_devices () {  
+   echo  
+   echo &quot;  PhysiclDev Type State   Errors Vendor  Model        Size&quot;  
+   echo &quot;  ========== ==== ======= ====== ======= ============ ===========&quot;  
+   for dev in $(awk '/Device Id/{print $3}' /tmp/aspersa); do  
+      sed -e '/./{H;$!d;}' -e &quot;x;/Device Id: ${dev}/!d;&quot; /tmp/aspersa \  
+      | awk '  
+         /Media Type/                        {d=substr($0, index($0, &quot;:&quot;) + 2)}  
+         /PD Type/                           {t=$3}  
+         /Firmware state/                    {s=$3}  
+         /Media Error Count/                 {me=$4}  
+         /Other Error Count/                 {oe=$4}  
+         /Predictive Failure Count/          {pe=$4}  
+         /Inquiry Data/                      {v=$3; m=$4;}  
+         /Raw Size/                          {z=$3}  
+         END {  
+            printf(&quot;  %-10s %-4s %-7s %6s %-7s %-12s %-7s\n&quot;,  
+               substr(d, 0, 10), t, s, me &quot;/&quot; oe &quot;/&quot; pe, v, m, z);  
+         }'  
+   done  
+}  
+
+# ##############################################################################  
+# Parse virtual devices from the output (saved in /tmp/aspersa) of  
+# /opt/MegaRAID/MegaCli/MegaCli64 -LdPdInfo -aALL  
+# OR, it will also work with the output of  
+# /opt/MegaRAID/MegaCli/MegaCli64 -LDInfo -Lall -aAll  
+# ##############################################################################  
+parse_lsi_megaraid_virtual_devices () {  
+   # Somewhere on the Internet, I found the following guide to understanding the  
+   # RAID level, but I don't know the source anymore.  
+   #    Primary-0, Secondary-0, RAID Level Qualifier-0 = 0  
+   #    Primary-1, Secondary-0, RAID Level Qualifier-0 = 1  
+   #    Primary-5, Secondary-0, RAID Level Qualifier-3 = 5  
+   #    Primary-1, Secondary-3, RAID Level Qualifier-0 = 10  
+   # I am not sure if this is always correct or not (it seems correct).  The  
+   # terminology MegaRAID uses is not clear to me, and isn't documented that I  
+   # am aware of.  Anyone who can clarify the above, please contact me.  
+   echo  
+   echo &quot;  VirtualDev Size      RAID Level Disks SpnDpth Stripe Status  Cache&quot;  
+   echo &quot;  ========== ========= ========== ===== ======= ====== ======= =========&quot;  
+   awk '  
+      /^Virtual Disk:/ {  
+         device              = $3;  
+         devicenames[device] = device;  
+      }  
+      /Number Of Drives/ {  
+         devices[device &quot;,numdisks&quot;] = substr($0, index($0, &quot;:&quot;) + 1);  
+      }  
+      /^Name:/ {  
+         devices[device &quot;,name&quot;] = $2 &gt; &quot;&quot; ? $2 : &quot;(no name)&quot;;  
+      }  
+      /RAID Level/ {  
+         devices[device &quot;,primary&quot;]   = substr($3, index($3, &quot;-&quot;) + 1, 1);  
+         devices[device &quot;,secondary&quot;] = substr($4, index($4, &quot;-&quot;) + 1, 1);  
+         devices[device &quot;,qualifier&quot;] = substr($NF, index($NF, &quot;-&quot;) + 1, 1);  
+      }  
+      /Span Depth/ {  
+         devices[device &quot;,spandepth&quot;] = substr($2, index($2, &quot;:&quot;) + 1);  
+      }  
+      /Number of Spans/ {  
+         devices[device &quot;,numspans&quot;] = $4;  
+      }  
+      /^Size:/ {  
+         devices[device &quot;,size&quot;] = substr($0, index($0, &quot;:&quot;) + 1);  
+      }  
+      /^State:/ {  
+         devices[device &quot;,state&quot;] = $2;  
+      }  
+      /^Stripe Size:/ {  
+         devices[device &quot;,stripe&quot;] = $3;  
+      }  
+      /^Current Cache Policy/ {  
+         devices[device &quot;,wpolicy&quot;] = $4 ~ /WriteBack/ ? &quot;WB&quot; : &quot;WT&quot;;  
+         devices[device &quot;,rpolicy&quot;] = $5 ~ /ReadAheadNone/ ? &quot;no RA&quot; : &quot;RA&quot;;  
+      }  
+      END {  
+         for ( device in devicenames ) {  
+            raid = 0;  
+            if ( devices[device &quot;,primary&quot;] == 1 ) {  
+               raid = 1;  
+               if ( devices[device &quot;,secondary&quot;] == 3 ) {  
+                  raid = 10;  
+               }  
+            }  
+            else {  
+               if ( devices[device &quot;,primary&quot;] == 5 ) {  
+                  raid = 5;  
+               }  
+            }  
+            printf(&quot;  %-10s %-9s %-10s %5d %7s %6s %-7s %s\n&quot;,  
+               device devices[device &quot;,name&quot;],  
+               devices[device &quot;,size&quot;],  
+               raid &quot; (&quot; devices[device &quot;,primary&quot;] &quot;-&quot; devices[device &quot;,secondary&quot;] &quot;-&quot; devices[device &quot;,qualifier&quot;] &quot;)&quot;,  
+               devices[device &quot;,numdisks&quot;],  
+               devices[device &quot;,spandepth&quot;] &quot;-&quot; devices[device &quot;,numspans&quot;],  
+               devices[device &quot;,stripe&quot;], devices[device &quot;,state&quot;],  
+               devices[device &quot;,wpolicy&quot;] &quot;, &quot; devices[device &quot;,rpolicy&quot;]);  
+         }  
+      }' /tmp/aspersa  
+}  
+
+# ##############################################################################  
+# Simplifies vmstat and aligns it nicely.  We don't need the memory stats, the  
+# system activity is enough.  
+# ##############################################################################  
+format_vmstat () {  
+   cat &gt; /tmp/aspersa.awk &lt;      BEGIN {  
+         format = &quot;  %2s %2s  %4s %4s %5s %5s %6s %6s %3s %3s %3s %3s %3s\n&quot;;  
+      }  
+      /procs/ {  
+         print  &quot;  procs  ---swap-- -----io---- ---system---- --------cpu--------&quot;;  
+      }  
+      /bo/ {  
+         printf format, &quot;r&quot;, &quot;b&quot;, &quot;si&quot;, &quot;so&quot;, &quot;bi&quot;, &quot;bo&quot;, &quot;ir&quot;, &quot;cs&quot;, &quot;us&quot;, &quot;sy&quot;, &quot;il&quot;, &quot;wa&quot;, &quot;st&quot;;  
+      }  
+      \$0 !~ /r/ {  
+            fuzzy_var = \$1;   ${fuzzy_formula}  r   = fuzzy_var;  
+            fuzzy_var = \$2;   ${fuzzy_formula}  b   = fuzzy_var;  
+            fuzzy_var = \$7;   ${fuzzy_formula}  si  = fuzzy_var;  
+            fuzzy_var = \$8;   ${fuzzy_formula}  so  = fuzzy_var;  
+            fuzzy_var = \$9;   ${fuzzy_formula}  bi  = fuzzy_var;  
+            fuzzy_var = \$10;  ${fuzzy_formula}  bo  = fuzzy_var;  
+            fuzzy_var = \$11;  ${fuzzy_formula}  ir  = fuzzy_var;  
+            fuzzy_var = \$12;  ${fuzzy_formula}  cs  = fuzzy_var;  
+            fuzzy_var = \$13;                    us  = fuzzy_var;  
+            fuzzy_var = \$14;                    sy  = fuzzy_var;  
+            fuzzy_var = \$15;                    il  = fuzzy_var;  
+            fuzzy_var = \$16;                    wa  = fuzzy_var;  
+            fuzzy_var = \$17;                    st  = fuzzy_var;  
+            printf format, r, b, si, so, bi, bo, ir, cs, us, sy, il, wa, st;  
+         }  
+    EOF  
+      awk -f /tmp/aspersa.awk /tmp/aspersa  
+   }  
+
+# ##############################################################################  
+# The main() function is called at the end of the script.  This makes it  
+# testable.  Major bits of parsing are separated into functions for testability.  
+# As a general rule, we cannot 'cp' files from /proc, because they might be  
+# empty afterwards.  (I've seen 'cp /proc/cpuinfo' create an empty file.)  But  
+# 'cat' works okay.  
+# ##############################################################################  
+main () {  
+
+   # Begin by setting the $PATH to include some common locations that are not  
+   # always in the $PATH, including the &quot;sbin&quot; locations, and some common  
+   # locations for proprietary management software, such as RAID controllers.  
+   export PATH=&quot;${PATH}:/usr/local/bin:/usr/bin:/bin:/usr/libexec&quot;  
+   export PATH=&quot;${PATH}:/usr/local/sbin:/usr/sbin:/sbin&quot;  
+   export PATH=&quot;${PATH}:/usr/StorMan/:/opt/MegaRAID/MegaCli/&quot;;  
+
+   # Set up temporary files.  
+   temp_files &quot;rm&quot;  
+   temp_files &quot;touch&quot;  
+   section Aspersa_System_Summary_Report  
+
+   # ########################################################################  
+   # Grab a bunch of stuff and put it into temp files for later.  
+   # ########################################################################  
+   sysctl -a &gt; /tmp/aspersa.sysctl 2&gt;/dev/null  
+
+   # ########################################################################  
+   # General date, time, load, etc  
+   # ########################################################################  
+   platform=&quot;$(uname -s)&quot;  
+   name_val &quot;Date&quot; &quot;`date -u +'%F %T UTC'` (local TZ: `date +'%Z %z'`)&quot;  
+   name_val &quot;Hostname&quot; &quot;$(uname -n)&quot;  
+   name_val &quot;Uptime&quot; &quot;$(uptime | awk '{print substr($0, index($0, &quot;up&quot;) + 3)}')&quot;  
+   if which dmidecode &gt; /dev/null 2&gt;&amp;1; then  
+      vendor=&quot;$(dmidecode -s system-manufacturer 2&gt;/dev/null | sed 's/ *$//g')&quot;  
+      if [ &quot;${vendor}&quot; ]; then  
+         product=&quot;$(dmidecode -s system-product-name 2&gt;/dev/null | sed 's/ *$//g')&quot;  
+         version=&quot;$(dmidecode -s system-version 2&gt;/dev/null | sed 's/ *$//g')&quot;  
+         chassis=&quot;$(dmidecode -s chassis-type 2&gt;/dev/null | sed 's/ *$//g')&quot;  
+         system=&quot;${vendor}; ${product}; v${version} (${chassis})&quot;  
+         name_val &quot;System&quot; &quot;${system}&quot;;  
+         servicetag=&quot;$(dmidecode -s system-serial-number 2&gt;/dev/null | sed 's/ *$//g')&quot;  
+         name_val &quot;Service Tag&quot; &quot;${servicetag:-Not found}&quot;;  
+      fi  
+   fi  
+   name_val &quot;Platform&quot; &quot;${platform}&quot;  
+   if [ &quot;${platform}&quot; = &quot;SunOS&quot; ]; then  
+      if which zonename &gt;/dev/null 2&gt;&amp;1 ; then  
+         name_val &quot;Zonename&quot; &quot;$(zonename)&quot;  
+      fi  
+   fi  
+
+   # Try to find all sorts of different files that say what the release is.  
+   if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+      kernel=&quot;$(uname -r)&quot;  
+      if [ -e /etc/fedora-release ]; then  
+         release=$(cat /etc/fedora-release);  
+      elif [ -e /etc/redhat-release ]; then  
+         release=$(cat /etc/redhat-release);  
+      elif [ -e /etc/system-release ]; then  
+         release=$(cat /etc/system-release);  
+      elif which lsb_release &gt;/dev/null 2&gt;&amp;1; then  
+         release=&quot;$(lsb_release -ds) ($(lsb_release -cs))&quot;  
+      elif [ -e /etc/lsb-release ]; then  
+         release=$(grep DISTRIB_DESCRIPTION /etc/lsb-release |awk -F'=' '{print $2}' |sed 's#&quot;##g');  
+      elif [ -e /etc/debian_version ]; then  
+         release=&quot;Debian-based version $(cat /etc/debian_version)&quot;;  
+         if [ -e /etc/apt/sources.list ]; then  
+             code=`cat /etc/apt/sources.list |awk  '/^deb/ {print $3}' |awk -F/ '{print $1}'| awk 'BEGIN {FS=&quot;|&quot;}{print $1}' | sort | uniq -c | sort -rn |head -n1 |awk '{print $2}'`  
+             release=&quot;${release} (${code})&quot;  
+      fi  
+      elif ls /etc/*release &gt;/dev/null 2&gt;&amp;1; then  
+         if grep -q DISTRIB_DESCRIPTION /etc/*release; then  
+            release=$(grep DISTRIB_DESCRIPTION /etc/*release | head -n1);  
+         else  
+            release=$(cat /etc/*release | head -n1);  
+         fi  
+      fi  
+   elif [ &quot;${platform}&quot; = &quot;FreeBSD&quot; ]; then  
+      release=&quot;$(uname -r)&quot;  
+      kernel=&quot;$(sysctl -n kern.osrevision)&quot;  
+   elif [ &quot;${platform}&quot; = &quot;SunOS&quot; ]; then  
+      release=&quot;$(head -n1 /etc/release)&quot;  
+      if [ -z &quot;${release}&quot; ]; then  
+         release=&quot;$(uname -r)&quot;  
+      fi  
+      kernel=&quot;$(uname -v)&quot;  
+   fi  
+   name_val Release &quot;${release}&quot;  
+   name_val Kernel &quot;${kernel}&quot;  
+
+   CPU_ARCH='32-bit'  
+   OS_ARCH='32-bit'  
+   if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+      if grep -q ' lm ' /proc/cpuinfo; then  
+         CPU_ARCH='64-bit'  
+      fi  
+   elif [ &quot;${platform}&quot; = &quot;FreeBSD&quot; ]; then  
+      if sysctl hw.machine_arch | grep -v 'i[36]86' &gt;/dev/null; then  
+         CPU_ARCH='64-bit'  
+      fi  
+   elif [ &quot;${platform}&quot; = &quot;SunOS&quot; ]; then  
+      if isainfo -b | grep 64 &gt;/dev/null ; then  
+         CPU_ARCH=&quot;64-bit&quot;  
+      fi  
+   fi  
+   if file /bin/sh | grep '64-bit' &gt;/dev/null; then  
+      OS_ARCH='64-bit'  
+   fi  
+   name_val &quot;Architecture&quot; &quot;CPU = $CPU_ARCH, OS = $OS_ARCH&quot;  
+
+   # Threading library  
+   if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+      name_val Threading &quot;$(getconf GNU_LIBPTHREAD_VERSION)&quot;  
+   fi  
+   if [ -x /lib/libc.so.6 ]; then  
+      name_val &quot;Compiler&quot; &quot;$(/lib/libc.so.6 | grep 'Compiled by' | cut -c13-)&quot;  
+   fi  
+
+   if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+      if getenforce &gt;/dev/null 2&gt;&amp;1; then  
+         getenforce=&quot;$(getenforce 2&gt;&amp;1)&quot;;  
+      fi  
+      name_val &quot;SELinux&quot; &quot;${getenforce:-No SELinux detected}&quot;;  
+   fi  
+
+   # We look in dmesg for virtualization information first, because it's often  
+   # available to non-root users and usually has telltale signs.  It's most  
+   # reliable to look at /var/log/dmesg if possible.  There are a number of  
+   # other ways to find out if a system is virtualized.  
+   cat /var/log/dmesg &gt; /tmp/aspersa 2&gt;/dev/null  
+   if [ ! -s /tmp/aspersa ]; then  
+      dmesg &gt; /tmp/aspersa 2&gt;/dev/null  
+   fi  
+   if [ -s /tmp/aspersa ]; then  
+      virt=&quot;$(parse_virtualization_dmesg)&quot;  
+   fi  
+   if [ -z &quot;${virt}&quot; ]; then  
+      if which lspci &gt;/dev/null 2&gt;&amp;1; then  
+         lspci &gt; /tmp/aspersa 2&gt;/dev/null  
+         if grep -qi virtualbox /tmp/aspersa; then  
+            virt=VirtualBox  
+         elif grep -qi vmware /tmp/aspersa; then  
+            virt=VMWare  
+         elif [ -e /proc/user_beancounters ]; then  
+            virt=&quot;OpenVZ/Virtuozzo&quot;  
+         fi  
+      fi  
+   elif [ &quot;${platform}&quot; = &quot;FreeBSD&quot; ]; then  
+      if ps -o stat | grep J ; then  
+         virt=&quot;FreeBSD Jail&quot;  
+      fi  
+   elif [ &quot;${platform}&quot; = &quot;SunOS&quot; ]; then  
+      if which prtdiag &gt;/dev/null 2&gt;&amp;1 &amp;&amp; prtdiag &gt; /tmp/aspersa.prtdiag 2&gt;/dev/null; then  
+         virt=&quot;$(parse_virtualization_generic /tmp/aspersa.prtdiag)&quot;  
+      elif which smbios &gt;/dev/null 2&gt;&amp;1 &amp;&amp; smbios &gt; /tmp/aspersa.smbios 2&gt;/dev/null; then  
+         virt=&quot;$(parse_virtualization_generic /tmp/aspersa.smbios)&quot;  
+      fi  
+   fi  
+   name_val Virtualized &quot;${virt:-No virtualization detected}&quot;  
+
+   # ########################################################################  
+   # Processor/CPU, Memory, Swappiness, dmidecode  
+   # ########################################################################  
+   section Processor  
+   if [ -f /proc/cpuinfo ]; then  
+      cat /proc/cpuinfo &gt; /tmp/aspersa 2&gt;/dev/null  
+      parse_proc_cpuinfo  
+   elif [ &quot;${platform}&quot; = &quot;FreeBSD&quot; ]; then  
+      parse_sysctl_cpu_freebsd /tmp/aspersa.sysctl  
+   elif [ &quot;${platform}&quot; = &quot;SunOS&quot; ]; then  
+      psrinfo -v &gt; /tmp/aspersa  
+      parse_psrinfo_cpus /tmp/aspersa  
+      # TODO: prtconf -v actually prints the CPU model name etc.  
+   fi  
+
+   section Memory  
+   if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+      free -b &gt; /tmp/aspersa  
+      cat /proc/meminfo &gt;&gt; /tmp/aspersa  
+      parse_free_minus_b /tmp/aspersa  
+   elif [ &quot;${platform}&quot; = &quot;FreeBSD&quot; ]; then  
+      parse_memory_sysctl_freebsd /tmp/aspersa.sysctl  
+   elif [ &quot;${platform}&quot; = &quot;SunOS&quot; ]; then  
+      name_val Memory &quot;$(prtconf | awk -F: '/Memory/{print $2}')&quot;  
+   fi  
+
+   rss=$(ps -eo rss 2&gt;/dev/null | awk '/[0-9]/{total += $1 * 1024} END {print total}')  
+   name_val UsedRSS &quot;$(shorten ${rss} 1)&quot;  
+
+   if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+      name_val Swappiness &quot;$(sysctl vm.swappiness 2&gt;&amp;1)&quot;  
+      name_val DirtyPolicy &quot;$(sysctl vm.dirty_ratio 2&gt;&amp;1), $(sysctl vm.dirty_background_ratio 2&gt;&amp;1)&quot;  
+      if sysctl vm.dirty_bytes &gt; /dev/null 2&gt;&amp;1; then  
+         name_val DirtyStatus &quot;$(sysctl vm.dirty_bytes 2&gt;&amp;1), $(sysctl vm.dirty_background_bytes 2&gt;&amp;1)&quot;  
+      fi  
+   fi  
+
+   if which dmidecode &gt;/dev/null 2&gt;&amp;1 &amp;&amp; dmidecode &gt; /tmp/aspersa 2&gt;/dev/null; then  
+      parse_dmidecode_mem_devices  
+   fi  
+
+   # ########################################################################  
+   # Disks, RAID, Filesystems  
+   # ########################################################################  
+   # TODO: Add info about software RAID  
+
+   if echo &quot;${ASPERSA_SKIP}&quot; | grep -v MOUNT &gt;/dev/null; then  
+      if [ &quot;${platform}&quot; != &quot;SunOS&quot; ]; then  
+         section &quot;Mounted_Filesystems&quot;  
+         cmd=&quot;df -h&quot;  
+         if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+            cmd=&quot;df -h -P&quot;  
+         fi  
+         $cmd | sort &gt; /tmp/aspersa2  
+         mount | sort | join /tmp/aspersa2 - &gt; /tmp/aspersa  
+         parse_filesystems /tmp/aspersa &quot;${platform}&quot;  
+      fi  
+   fi  
+
+   if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+      section &quot;Disk_Schedulers_And_Queue_Size&quot;  
+      echo &quot;&quot; &gt; /tmp/aspersa  
+      for disk in $(ls /sys/block/ | grep -v -e ram -e loop -e 'fd[0-9]'); do  
+         if [ -e &quot;/sys/block/${disk}/queue/scheduler&quot; ]; then  
+            name_val &quot;${disk}&quot; &quot;$(cat /sys/block/${disk}/queue/scheduler | grep -o '\[.*\]') $(cat /sys/block/${disk}/queue/nr_requests)&quot;  
+            fdisk -l &quot;/dev/${disk}&quot; &gt;&gt; /tmp/aspersa 2&gt;/dev/null  
+         fi  
+      done  
+
+      # Relies on /tmp/aspersa having data from the Disk Schedulers loop.  
+      section &quot;Disk_Partioning&quot;  
+      parse_fdisk  
+
+      section &quot;Kernel_Inode_State&quot;  
+      for file in dentry-state file-nr inode-nr; do  
+         name_val &quot;${file}&quot; &quot;$(cat /proc/sys/fs/${file} 2&gt;&amp;1)&quot;  
+      done  
+
+      section &quot;LVM_Volumes&quot;  
+
+      if which lvs &gt;/dev/null 2&gt;&amp;1 &amp;&amp; test -x &quot;$(which lvs)&quot;; then  
+         lvs 2&gt;&amp;1  
+      else  
+         echo &quot;Cannot execute 'lvs'&quot;;  
+      fi  
+   fi  
+
+   section &quot;RAID_Controller&quot;  
+
+   # ########################################################################  
+   # We look in lspci first because it's more reliable, then dmesg, because it's  
+   # often available to non-root users.  It's most reliable to look at  
+   # /var/log/dmesg if possible.  
+   # ########################################################################  
+   if which lspci &gt;/dev/null 2&gt;&amp;1 &amp;&amp; lspci &gt; /tmp/aspersa 2&gt;/dev/null; then  
+      controller=&quot;$(parse_raid_controller_lspci)&quot;  
+   fi  
+   if [ -z &quot;${controller}&quot; ]; then  
+      cat /var/log/dmesg &gt; /tmp/aspersa 2&gt;/dev/null  
+      if [ ! -s /tmp/aspersa ]; then  
+         dmesg &gt; /tmp/aspersa 2&gt;/dev/null  
+      fi  
+      controller=&quot;$(parse_raid_controller_dmesg)&quot;  
+   fi  
+
+   name_val Controller &quot;${controller:-No RAID controller detected}&quot;  
+
+   # ########################################################################  
+   # Attempt to get, parse, and print RAID controller status from possibly  
+   # proprietary management software.  Any executables that are normally stored  
+   # in a weird location, such as /usr/StorMan/arcconf, should have their  
+   # location added to $PATH at the beginning of main().  
+   # ########################################################################  
+   notfound=&quot;&quot;  
+   if [ &quot;${controller}&quot; = &quot;AACRAID&quot; ]; then  
+      if arcconf getconfig 1 &gt; /tmp/aspersa 2&gt;/dev/null; then  
+         parse_arcconf  
+      elif ! which arcconf &gt;/dev/null 2&gt;&amp;1; then  
+         notfound=&quot;e.g. http://www.adaptec.com/en-US/support/raid/scsi_raid/ASR-2120S/&quot;  
+      fi  
+   elif [ &quot;${controller}&quot; = &quot;HP Smart Array&quot; ]; then  
+      if hpacucli ctrl all show config &gt; /tmp/aspersa 2&gt;/dev/null; then  
+         parse_hpacucli  
+      elif ! which hpacucli &gt;/dev/null 2&gt;&amp;1; then  
+         notfound=&quot;your package repository or the manufacturer's website&quot;  
+      fi  
+   elif [ &quot;${controller}&quot; = &quot;LSI Logic MegaRAID SAS&quot; ]; then  
+      if MegaCli64 -AdpAllInfo -aALL -NoLog &gt; /tmp/aspersa 2&gt;/dev/null; then  
+         parse_lsi_megaraid_adapter_info  
+      elif ! which MegaCli64 &gt;/dev/null 2&gt;&amp;1; then  
+         notfound=&quot;your package repository or the manufacturer's website&quot;  
+      fi  
+      if MegaCli64 -AdpBbuCmd -GetBbuStatus -aALL -NoLog &gt; /tmp/aspersa 2&gt;/dev/null; then  
+         parse_lsi_megaraid_bbu_status  
+      fi  
+      if MegaCli64 -LdPdInfo -aALL -NoLog &gt; /tmp/aspersa 2&gt;/dev/null; then  
+         parse_lsi_megaraid_virtual_devices  
+         parse_lsi_megaraid_devices  
+      fi  
+   fi  
+
+   if [ &quot;${notfound}&quot; ]; then  
+      echo &quot;   RAID controller software not found; try getting it from&quot;  
+      echo &quot;   ${notfound}&quot;  
+   fi  
+
+   if echo &quot;${ASPERSA_SKIP}&quot; | grep -v NETWORK &gt;/dev/null; then  
+      # #####################################################################  
+      # Network stuff  
+      # #####################################################################  
+      if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+         section Network_Config  
+         if which lspci &gt; /dev/null 2&gt;&amp;1 &amp;&amp; lspci &gt; /tmp/aspersa 2&gt;/dev/null; then  
+            parse_ethernet_controller_lspci  
+         fi  
+         if sysctl net.ipv4.tcp_fin_timeout &gt; /dev/null 2&gt;&amp;1; then  
+            name_val &quot;FIN Timeout&quot; &quot;$(sysctl net.ipv4.tcp_fin_timeout)&quot;  
+            name_val &quot;Port Range&quot; &quot;$(sysctl net.ipv4.ip_local_port_range)&quot;  
+         fi  
+      fi  
+
+      # TODO cat /proc/sys/net/ipv4/ip_conntrack_max ; it might be  
+      # /proc/sys/net/netfilter/nf_conntrack_max or /proc/sys/net/nf_conntrack_max  
+      # in new kernels like Fedora 12?  
+
+      if which ip &gt;/dev/null 2&gt;&amp;1 &amp;&amp; ip -s link &gt; /tmp/aspersa 2&gt;/dev/null; then  
+         section Interface_Statistics  
+         parse_ip_s_link /tmp/aspersa  
+      fi  
+
+      if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+         section Network_Connections  
+         if netstat -antp &gt; /tmp/aspersa 2&gt;/dev/null; then  
+            parse_netstat  
+         fi  
+      fi  
+   fi  
+
+   # ########################################################################  
+   # Processes, load, etc  
+   # ########################################################################  
+   if echo &quot;${ASPERSA_SKIP}&quot; | grep -v PROCESS &gt;/dev/null; then  
+      section Top_Processes  
+      if which prstat &gt; /dev/null 2&gt;&amp;1; then  
+         prstat | head  
+      elif which top &gt; /dev/null 2&gt;&amp;1 ; then  
+         cmd=&quot;top -bn 1&quot;  
+         if [ &quot;${platform}&quot; = &quot;FreeBSD&quot; ]; then  
+            cmd=&quot;top -b -d 1&quot;  
+         fi  
+         $cmd | sed -e 's# *$##g' -e '/./{H;$!d;}' -e 'x;/PID/!d;' | grep . | head  
+      fi  
+      if which vmstat &gt; /dev/null 2&gt;&amp;1 ; then  
+         section &quot;Simplified_and_fuzzy_rounded_vmstat_(wait_please)&quot;  
+         vmstat 1 5 &gt; /tmp/aspersa  
+         if [ &quot;${platform}&quot; = &quot;Linux&quot; ]; then  
+            format_vmstat  
+         else  
+            # TODO: simplify/format for other platforms  
+            cat /tmp/aspersa  
+         fi  
+      fi  
+   fi  
+
+   # ########################################################################  
+   # All done.  Signal the end so it's explicit.  
+   # ########################################################################  
+   temp_files &quot;rm&quot;  
+   temp_files &quot;check&quot;  
+   section The_End  
+}  
+
+# Execute the program if it was not included from another file.  This makes it  
+# possible to include without executing, and thus test.  
+if [ &quot;$(basename &quot;$0&quot;)&quot; = &quot;summary&quot; ] || [ &quot;$(basename &quot;$0&quot;)&quot; = &quot;bash&quot; -a &quot;$_&quot; = &quot;$0&quot; ]; then  
+    main $@  
+fi  
+</code></pre>
+
+<p>这是我开发机器上的信息</p>
+
+<pre><code># Aspersa System Summary Report ##############################  
+        Date | 2011-06-12 08:56:30 UTC (local TZ: CST +0800)  
+    Hostname | ubuntu1104-dev01  
+      Uptime | 2 days, 6:37, 2 users, load average: 0.00, 0.01, 0.05  
+      System | Dell Inc.; OptiPlex 990; v01 (Mini Tower)  
+ Service Tag | XXXXXXX  
+    Platform | Linux  
+     Release | Ubuntu 11.04 (natty)  
+      Kernel | 2.6.38-8-generic  
+Architecture | CPU = 64-bit, OS = 64-bit  
+   Threading | NPTL 2.13  
+     SELinux | No SELinux detected  
+ Virtualized | No virtualization detected  
+# Processor ##################################################  
+  Processors | physical = 1, cores = 4, virtual = 8, hyperthreading = yes  
+      Speeds | 7x1600.000, 1x2600.000  
+      Models | 8xIntel(R) Core(TM) i7-2600 CPU @ 3.40GHz  
+      Caches | 8x8192 KB  
+# Memory #####################################################  
+       Total | 15.66G  
+        Free | 13.08G  
+        Used | physical = 2.59G, swap = 0.00k, virtual = 2.59G  
+     Buffers | 175.48M  
+      Caches | 1.55G  
+       Dirty | 40 kB  
+     UsedRSS | 746.0M  
+  Swappiness | vm.swappiness = 60  
+ DirtyPolicy | vm.dirty_ratio = 10, vm.dirty_background_ratio = 5  
+ DirtyStatus | vm.dirty_bytes = 0, vm.dirty_background_bytes = 0  
+  Locator   Size     Speed             Form Factor   Type          Type Detail  
+  ========= ======== ================= ============= ============= ===========  
+  ChannelA-DIMM0 4096 MB  1333 MHz (0.8 ns) DIMM          {OUT OF SPEC} Synchronous  
+  ChannelA-DIMM1 4096 MB  1333 MHz (0.8 ns) DIMM          {OUT OF SPEC} Synchronous  
+  ChannelB-DIMM0 4096 MB  1333 MHz (0.8 ns) DIMM          {OUT OF SPEC} Synchronous  
+  ChannelB-DIMM1 4096 MB  1333 MHz (0.8 ns) DIMM          {OUT OF SPEC} Synchronous  
+# Mounted Filesystems ########################################  
+  Filesystem  Size Used Type       Opts                             Mountpoint  
+  /dev/sda1   902G   2% ext4       rw,errors=remount-ro,commit=0    /  
+  none        7.9G   0% devpts     rw,noexec,nosuid,gid=5,mode=0620 /var/lock  
+  none        7.9G   0% tmpfs      rw,nosuid,nodev                  /var/lock  
+  none        7.9G   0% devtmpfs   rw,mode=0755                     /var/lock  
+  none        7.9G   0% debugfs    rw                               /var/lock  
+  none        7.9G   0% securityfs rw                               /var/lock  
+  none        7.9G   0% sysfs      rw,noexec,nosuid,nodev           /var/lock  
+  none        7.9G   0% tmpfs      rw,noexec,nosuid,nodev           /var/lock  
+  none        7.9G   0% tmpfs      rw,nosuid,mode=0755              /var/lock  
+  none        7.9G   1% devpts     rw,noexec,nosuid,gid=5,mode=0620 /dev/shm  
+  none        7.9G   1% tmpfs      rw,nosuid,nodev                  /dev/shm  
+  none        7.9G   1% devtmpfs   rw,mode=0755                     /dev/shm  
+  none        7.9G   1% debugfs    rw                               /dev/shm  
+  none        7.9G   1% securityfs rw                               /dev/shm  
+  none        7.9G   1% sysfs      rw,noexec,nosuid,nodev           /dev/shm  
+  none        7.9G   1% tmpfs      rw,noexec,nosuid,nodev           /dev/shm  
+  none        7.9G   1% tmpfs      rw,nosuid,mode=0755              /dev/shm  
+  none        7.9G   1% devpts     rw,noexec,nosuid,gid=5,mode=0620 /dev  
+  none        7.9G   1% tmpfs      rw,nosuid,nodev                  /dev  
+  none        7.9G   1% devtmpfs   rw,mode=0755                     /dev  
+  none        7.9G   1% debugfs    rw                               /dev  
+  none        7.9G   1% securityfs rw                               /dev  
+  none        7.9G   1% sysfs      rw,noexec,nosuid,nodev           /dev  
+  none        7.9G   1% tmpfs      rw,noexec,nosuid,nodev           /dev  
+  none        7.9G   1% tmpfs      rw,nosuid,mode=0755              /dev  
+  none        7.9G   1% devpts     rw,noexec,nosuid,gid=5,mode=0620 /var/run  
+  none        7.9G   1% tmpfs      rw,nosuid,nodev                  /var/run  
+  none        7.9G   1% devtmpfs   rw,mode=0755                     /var/run  
+  none        7.9G   1% debugfs    rw                               /var/run  
+  none        7.9G   1% securityfs rw                               /var/run  
+  none        7.9G   1% sysfs      rw,noexec,nosuid,nodev           /var/run  
+  none        7.9G   1% tmpfs      rw,noexec,nosuid,nodev           /var/run  
+  none        7.9G   1% tmpfs      rw,nosuid,mode=0755              /var/run  
+# Disk Schedulers And Queue Size #############################  
+         sda | [cfq] 128  
+         sr0 | [cfq] 128  
+# Disk Partioning ############################################  
+Device       Type      Start        End               Size  
+============ ==== ========== ========== ==================  
+/dev/sda     Disk                            1000204886016  
+/dev/sda1    Part          1     119519       983069015040  
+/dev/sda2    Part     119519     121602        17133258240  
+/dev/sda5    Part     119519     121602        17133258240  
+# Kernel Inode State #########################################  
+dentry-state | 153236 143621 45 0 0 0  
+     file-nr | 5664 0 1601386  
+    inode-nr | 76942 2365  
+# LVM Volumes ################################################  
+Cannot execute 'lvs'  
+# RAID Controller ############################################  
+  Controller | Intel Corporation 82801 SATA RAID Controller (rev 04)  
+# Network Config #############################################  
+  Controller | Intel Corporation 82579LM Gigabit Network Connection (rev 04)  
+ FIN Timeout | net.ipv4.tcp_fin_timeout = 60  
+  Port Range | net.ipv4.ip_local_port_range = 32768 61000  
+# Interface Statistics #######################################  
+  interface  rx_bytes rx_packets  rx_errors   tx_bytes tx_packets  tx_errors  
+  ========= ========= ========== ========== ========== ========== ==========  
+  l        2000000000   12500000          0 2000000000   12500000          0  
+  eth       100000000     350000          0   12500000      80000          0  
+  vboxnet           0          0          0          0          0          0  
+# Network Connections ########################################  
+  Connections from remote IP addresses  
+    127.0.0.            2  
+    192.168.0.23        1  
+  Connections to local IP addresses  
+    127.0.0.            2  
+    192.168.0.24        1  
+  Connections to top 10 local ports  
+    22                  1  
+    4369                1  
+    45022               1  
+  States of connections  
+    ESTABLISHED         3  
+    LISTEN              8  
+# Top Processes ##############################################  
+  PID USER      PR  NI  VIRT  RES  SHR S %CPU %MEM    TIME+  COMMAND  
+    1 root      20   0 24008 2212 1356 S    0  0.0   0:01.78 init  
+    2 root      20   0     0    0    0 S    0  0.0   0:00.00 kthreadd  
+    3 root      20   0     0    0    0 S    0  0.0   0:01.98 ksoftirqd/0  
+    5 root      20   0     0    0    0 S    0  0.0   0:00.25 kworker/u:0  
+    6 root      RT   0     0    0    0 S    0  0.0   0:00.00 migration/0  
+    7 root      RT   0     0    0    0 S    0  0.0   0:00.00 migration/1  
+    8 root      20   0     0    0    0 S    0  0.0   0:03.52 kworker/1:0  
+    9 root      20   0     0    0    0 S    0  0.0   0:00.77 ksoftirqd/1  
+   11 root      RT   0     0    0    0 S    0  0.0   0:00.00 migration/2  
+# Simplified and fuzzy rounded vmstat (wait please) ##########  
+  procs  ---swap-- -----io---- ---system---- --------cpu--------  
+   r  b    si   so    bi    bo     ir     cs  us  sy  il  wa  st  
+   0  0     0    0     1     1     25      1   0   0  99   0      
+   0  0     0    0     0     0    250    450   0   0 100   0      
+   0  0     0    0     0   125    150    250   0   0  99   1      
+   0  0     0    0     0     0    100    150   0   0 100   0      
+   0  0     0    0     0     0    100    225   0   0 100   0      
+# The End ####################################################  
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

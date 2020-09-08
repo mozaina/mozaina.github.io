@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell主要逻辑源码级分析1SHELL运行流程 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell主要逻辑源码级分析1SHELL运行流程 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell主要逻辑源码级分析1SHELL运行流程">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E4%B8%BB%E8%A6%81%E9%80%BB%E8%BE%91%E6%BA%90%E7%A0%81%E7%BA%A7%E5%88%86%E6%9E%901shell%E8%BF%90%E8%A1%8C%E6%B5%81%E7%A8%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell主要逻辑源码级分析1SHELL运行流程</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>2019独角兽企业重金招聘Python工程师标准&gt;&gt;&gt;
+<img src="https://img.it610.com/image/info8/35bf71b4b7ad4a72bcb9c6561b5679b1.jpg" alt="hot3.png" /></p>
+
+<p>版权声明：本文由李航原创文章，转载请注明出处:<br />
+文章原文链接：<a href="https://www.qcloud.com/community/article/109">https://www.qcloud.com/community/article/109</a></p>
+
+<p>来源：腾云阁 <a href="https://www.qcloud.com/community">https://www.qcloud.com/community</a></p>
+
+<p><strong>本文的目的</strong>
+：分享一下在学校的时候分析shell源码的一些收获，帮助大家了解shell的一个工作流程，从软件设计的角度，看看shell这样一个历史悠久的软件的一些设计优点和缺陷。本文重点不是讲SHELL语法，相信很多同事玩shell都很熟了。</p>
+
+<p><strong>本文的局限</strong>
+：限于本人技术水平和时间，肯定有不少错误和遗漏的地方，在当时的源码注释的过程中，也确实会有一直都不理解和存疑的地方，还请指正。但总的来说，主要逻辑和流程还是可以理清的。</p>
+
+<p><strong>分析的版本</strong> ：首先选用最常用的bash，然后版本是bash4.2-release</p>
+
+<p><strong>bash代码简介</strong>
+：之前做过一个统计，shell源码大概有10万行，其中核心逻辑在1万多行，这也是分析的目标代码。剩下的包括引入的readline库（也是个开源库，处理输入的），yacc语法分析器生成工具（开源库，相信很多学过编译原理的都知道这东西），以及很多为提高用户界面友好性做得优化和辅助代码（比如！的历史操作）。</p>
+
+<p>建议：在了解shell运行机制的同时，从软件设计的角度来看他，会发现有很多可以优化和改进的地方（当然，因为shell本身是从比较久远的年代发展而来，各种历史因素相关），特别是，读了下面内容的同学应该可以发现，命令解析那一块，用C++的OO思想可以合理的设计命令的类层次结构，大大简化代码量和逻辑，有兴趣的同学甚至可以自己动手写来试试替换掉这一部分。</p>
+
+<h2 id="一-启动过程">一.启动过程</h2>
+
+<p><code>shell.c</code>是shell主函数main所在文件。因此shell的启动可以认为从<code>shell.c</code>文件开始。main函数完成的主要工作流程是包括：检查启动的运行环境（是否通过sshd启动，是否运行于emacs环境下，是否运行于cgywin环境下，是否是交互式shell，是否是login
+shell等，对系统进行内存泄露检查，是否是受限shell），读取配置文件（顺序为<code>/etc/profile and</code>( <code>~/.bash_profile
+OR ~/.bash_login OR
+~/.profile</code>)前面的存在不会读后面的），设置运行需要的全局变量的值（当前环境变量、shell的名称、启动时间、输入输出文件描述符、语言本地化的相关设置），处理参数和选项（即带有<code>-c
+-s --debugger</code>等参数和选项），设置参数和选项的值（<code>run_shopt_alist
+()</code>函数调用<code>shopt_setopt</code>函数设置选项的值；绑定$位置参数的值）,然后根据不同的启动参数进入以下不同分支：</p>
+
+<ol>
+<li><p>如果是只进行参数扩展而不执行命令，调用<code>run_wordexp</code>函数扩展参数，然后调用<code>exit_shell</code> (<code>last_command_exit_value</code>)函数以上次命令执行的返回值为返回值退出。</p></li>
+
+<li><p>如果是以-c参数模式启动shell，分为两种情况：一：如果是附带了字符串参数作为要执行的命令，则调用<code>run_one_command (command_execution_string)</code>执行-c附带的命令，参数<code>command_execution_string</code>保存-c后面附带的字符串命令值。执行完毕后调用<code>exit_shell (last_command_exit_value)</code>退出。二：如果是期待用户输入要执行的命令，则跳转到分支3。</p></li>
+
+<li><p>将<code>shell_initialized</code>置为1表示shell初始化完成。调用<code>eval.c</code>中定义的函数<code>reader_loop()</code>不断的读取和解析用户输入，如果<code>reader_loop</code>函数返回，则调用<code>exit_shell</code>、<code>(last_command_exit_value)</code>退出shell。</p></li>
+</ol>
+
+<h2 id="二-命令解析和执行流程">二.命令解析和执行流程</h2>
+
+<h4 id="1-主要相关文件">1. 主要相关文件</h4>
+
+<pre><code>Eval.c
+
+Command.h
+
+Copy_cmd.c
+
+Execute_cmd.c
+
+Make_cmd.c
+</code></pre>
+
+<h4 id="2-shell命令结构">2. shell命令结构：</h4>
+
+<p>shell中用如下结构体来表示一个命令。</p>
+
+<pre><code>typedef struct command {
+
+  enum command_type type;   /* 命令的类型 */
+
+  int flags;                /* 标记位，将影响命令的执行环境 */
+
+  int line;                 /* 命令从哪一行开始 */
+
+  REDIRECT *redirects;      /*关联的重定向操作*/
+
+
+  union {/*以下是一个联合value，保存具体的“命令体”，可能是for循环，case条件，
+
+while循环等，union结构体的特征是只有一个值是有效的，因此以下命令种类是并列的，后
+
+面有每一种命令类型的注释*/
+
+    struct for_com *For;
+
+    struct case_com *Case;
+
+    struct while_com *While;
+
+    struct if_com *If;
+
+    struct connection *Connection;
+
+    struct simple_com *Simple;
+
+    struct function_def *Function_def;
+
+    struct group_com *Group;
+
+#if defined (SELECT_COMMAND)
+
+    struct select_com *Select;
+
+#endif
+
+#if defined (DPAREN_ARITHMETIC)
+
+    struct arith_com *Arith;
+
+#endif
+
+#if defined (COND_COMMAND)
+
+    struct cond_com *Cond;
+
+#endif
+
+#if defined (ARITH_FOR_COMMAND)
+
+    struct arith_for_com *ArithFor;
+
+#endif
+
+    struct subshell_com *Subshell;
+
+    struct coproc_com *Coproc;
+
+  } value;
+
+} COMMAND;
+</code></pre>
+
+<p>其中一个很关键的成员是联合union类型value，它指出了该命令的类型，也给出了保存命令具体内容的指针。从该结构的可选值来看，shell定义的命令共有for循环、case条件、while循环、函数定义、协同异步命令等14种。</p>
+
+<p>其中，经过对所有命令执行路径的分析，确定类型为simple的command是经过命令替换后的最原子的命令操作，其余类型的命令都是由若干simple
+command构成的。</p>
+
+<p>在shell启动之后，无论是进入上面的2和3两个分支中的哪一个，最后解析命令所用到的函数都是<code>execute_cmd.c</code>中定义的函数。分支1不涉及到命令的解析，所以不在这里分析。</p>
+
+<h4 id="3-分支2的第一种情况">3. 分支2的第一种情况：</h4>
+
+<p>run_one_command (command_execution_string) 执行的过程中调用<code>parse_and_execute</code>
+(在evalstring.c中定义）解析与执行命令，<code>parse_and_execute</code>中实际调用<code>execute_command_internal</code>函数进行命令的执行。</p>
+
+<h4 id="4-分支2的第二种情况和分支3">4. 分支2的第二种情况和分支3：</h4>
+
+<p><code>reader_loop</code>函数调用<code>read_command</code>函数解析命令，<code>read_command</code>函数调用<code>parse_command()</code>函数进行语法分析，<code>parse_command()</code>调用语法分析器y.tab.c中的yyparse()（该函数由yyac自动生成，因此不再往函数内部跟进），将解析结果的命令字符串保存在全局变量<code>GLOBAL_COMMAND</code>中，然后执行<code>execute_command</code>函数（定义在<code>execute_cmd.c</code>中），<code>execute_command</code>函数再调用<code>execute_command_internal</code>函数进行命令的执行。至此分支2和分支3的情况又合并到<code>execute_command_internal</code>的执行上。</p>
+
+<h4 id="5-execute-command-internal内部流程">5. execute_command_internal内部流程：</h4>
+
+<p>该函数是shell源码中执行命令的实际操作函数。他需要对作为操作参数传入的具体命令结构的value成员进行分析，并针对不同的value类型，再调用具体类型的命令执行函数进行具体命令的解释执行工作。</p>
+
+<p>具体来说：如果value是simple，则直接调用<code>execute_simple_command</code>函数进行执行，<code>execute_simple_command</code>再根据命令是内部命令或磁盘外部命令分别调用<code>execute_builtin</code>和<code>execute_disk_command</code>来执行,其中，<code>execute_disk_comman</code>d在执行外部命令的时候调用<code>make_child</code>函数fork子进程执行外部命令。</p>
+
+<p>如果value是其他类型，则调用对应类型的函数进行分支控制。举例来说，如果是value是<code>for_commmand</code>,即这是一个for循环控制结构命令，则调用<code>execute_for_command</code>函数。在该函数中，将枚举每一个操作域中的元素，对其再次调用<code>execute_command</code>函数进行分析。即<code>execute_for_command</code>这一类函数实现的是一个命令的展开以及流程控制以及递归调用<code>execute_command</code>的功能。</p>
+
+<p>因此，从main函数启动到命令执行的主要流程图可以表现为下图所示：</p>
+
+<h4 id="6-从启动到命令解释的函数级流程图">6. 从启动到命令解释的函数级流程图：</h4>
+
+<p>括号内为函数定义所在的文件。</p>
+
+<h2 id="三-变量控制">三. 变量控制</h2>
+
+<h4 id="1-主要相关文件-1">1. 主要相关文件</h4>
+
+<pre><code>variables.c
+
+variables.h
+</code></pre>
+
+<h4 id="2-重要数据结构">2. 重要数据结构</h4>
+
+<p>BASH中主要通过变量上下文和变量两个结构体来描述一个变量结构。以下分别介绍。</p>
+
+<p><strong>变量上下文</strong> ：上下文又可以理解为作用域，可以比照C语言中的函数作用域，全局作用域来理解。一个上下文中的变量都是在这个上下文中可见的。<br />
+变量上下文结构定义：</p>
+
+<pre><code>typedef struct var_context {
+
+  char *name;           /* name如果为空则表示它存储的是bash全局上下文，否则表示名为name的函数的局部上下文*/
+
+  int scope;         /*上下文在调用栈中的层数，0代表全局上下文 ，每深入一层函数调用scope递增1*/
+
+  int flags;  /*标志位集合flags记录该上下文是否为局部的、是否属于函数、是否属于内部命令，或者是不是临时建立的等信息*/
+
+  struct var_context *up; /* 指向函数调用栈中上一个上下文*/
+
+  struct var_context *down;   /*指向函数调用栈中下一个上下文*/
+
+  HASH_TABLE *table;    /* 同一上下文中的所有变量集合hash表，即名值对 */
+
+} VAR_CONTEXT;
+</code></pre>
+
+<p>描述一个变量的作用域的结构体。一个上下文中的所有变量，存放在var_context的table成员中。</p>
+
+<p><strong>变量</strong> ：bash中的变量不强调类型，可以认为都是字符串。其存储结构如下</p>
+
+<pre><code>typedef struct variable {
+
+  char *name;                  /*指向变量的名 */
+
+  char *value;                  /*指向变量的值*/
+
+  char *exportstr;            /*指向一个形如“名=值”的字符串*/
+
+  sh_var_value_func_t *dynamic_value;    /* 如果是要返回一个动态值的函数，比如$SECONDS       或者$RANDOM，则函数指针指向生成该值的函数。*/
+
+  sh_var_assign_func_t *assign_func; /* 如果是特殊变量被赋值时需要调用的回调函数，则其函数指针值保存在这里
+
+*/
+
+  int attributes;         /* 只读，可见等属性*/
+
+  int context;                    /*记录该上下文变量属于可访问的作用域内局部变量
+栈的哪一层*/
+
+} SHELL_VAR;
+</code></pre>
+
+<p>由于所有变量笼统的由字符串来表示，因此提供了attributes属性成员来修饰变量的特性，比如属性可以是<code>att_readonly</code>表示只读，<code>att_array</code>表示是数组变量，<code>att_function</code>表示是个函数，<code>att_integer</code>表示是整型类变量等等。</p>
+
+<h4 id="3-作用机理">3. 作用机理</h4>
+
+<p>shell程序的执行伴随着一个个上下文的切换，shell源码中的变量控制也是基于这一点。将变量绑定于一个一个的上下文中。</p>
+
+<p>举例来说，一开始默认存在的是全局上下文，这里称为global，其中包含有由main函数的参数或者配置文件传入的变量值。如果这时进入了一个函数foo的执行中，则foo先从全局上下文获取要导出的变量，加上自己新增的变量，构成foo的上下文局部变量，将foo的上下文压入调用栈。这时调用栈看起来如下所示。</p>
+
+<ul>
+<li><p>栈顶 ：foo上下文(包含foo上下文的所有局部变量)</p></li>
+
+<li><p>栈底：global全局上下文(包含所有全局变量)</p></li>
+</ul>
+
+<p>为了解释更详细的情况，假设在foo中又调用了fun函数，则fun先从foo中获取要导出的变量，加上自己新增的变量，构成fun的上下文局部变量，然后将fun的上下文压入调用栈的栈顶</p>
+
+<p>。这是调用栈看起来如下所示。</p>
+
+<ul>
+<li><p>栈顶 ：fun上下文(包含fun上下文的所有局部变量)</p></li>
+
+<li><p>栈中 ：foo上下文(包含foo上下文的所有局部变量)</p></li>
+
+<li><p>栈底：global全局上下文(包含所有全局变量)</p></li>
+</ul>
+
+<p>此时假设fun函数执行完毕，则将fun上下文从栈中pop出，局部变量全部失效。调用栈又变成如下所示。</p>
+
+<ul>
+<li><p>栈顶 ：foo上下文(包含foo上下文的所有局部变量)</p></li>
+
+<li><p>栈底：global全局上下文(包含所有全局变量)</p></li>
+</ul>
+
+<p><strong>变量的查找顺序</strong>
+：从栈顶往栈底，即如果栈顶上下文中没有要查找的变量，则查找其在栈中的下一个上下文，如果整个调用栈查找完毕也没有找到，则查找失败。举例来说，如果在栈顶上下文中有PWD变量（当前工作路径），就不会去查找全局的PWD变量，这保证了局部变量覆盖的正确语义。</p>
+
+<h4 id="4-特殊变量">4. 特殊变量：</h4>
+
+<p>bash中定义了若干特殊变量，特殊变量的意思是在该变量被修改后需要做一些额外的连贯工作。比如表示时区的变量TZ被修改了之后需要调用tzset函数修改系统中相应的时区设置。bash给这一类变量提供了一个回调函数接口，供其值发生改变的情况下来调用该回调函数。这可以类比数据库中的触发器机制。在bash中，特殊变量保存在一个全局数组<code>special_vars</code>中。其定义如下：</p>
+
+<pre><code>struct name_and_function {
+
+            char *name;/*变量名*/
+
+            sh_sv_func_t *function;/*变量值修改时要触发的回调函数的函数指针*/
+
+};
+</code></pre>
+
+<p>该结构表示一个特殊变量结构，用于生成special <em>vars数组。回调函数一般是sv</em> 变量名的命名方式。</p>
+
+<pre><code>static struct name_and_function special_vars[] = {
+
+  { &quot;BASH_XTRACEFD&quot;, sv_xtracefd },
+
+#if defined (READLINE)
+
+#  if defined (STRICT_POSIX)
+
+  { &quot;COLUMNS&quot;, sv_winsize },
+
+#  endif
+
+  { &quot;COMP_WORDBREAKS&quot;, sv_comp_wordbreaks },
+
+#endif
+
+  { &quot;FUNCNEST&quot;, sv_funcnest },
+
+  { &quot;GLOBIGNORE&quot;, sv_globignore },
+
+#if defined (HISTORY)
+
+  { &quot;HISTCONTROL&quot;, sv_history_control },
+
+  { &quot;HISTFILESIZE&quot;, sv_histsize },
+
+  { &quot;HISTIGNORE&quot;, sv_histignore },
+
+  { &quot;HISTSIZE&quot;, sv_histsize },
+
+  { &quot;HISTTIMEFORMAT&quot;, sv_histtimefmt },
+
+#endif
+
+#if defined (__CYGWIN__)
+
+  { &quot;HOME&quot;, sv_home },
+
+#endif
+
+#if defined (READLINE)
+
+  { &quot;HOSTFILE&quot;, sv_hostfile },
+
+#endif
+
+  { &quot;IFS&quot;, sv_ifs },
+
+  { &quot;IGNOREEOF&quot;, sv_ignoreeof },
+
+  { &quot;LANG&quot;, sv_locale },
+
+  { &quot;LC_ALL&quot;, sv_locale },
+
+  { &quot;LC_COLLATE&quot;, sv_locale },
+
+  { &quot;LC_CTYPE&quot;, sv_locale },
+
+  { &quot;LC_MESSAGES&quot;, sv_locale },
+
+  { &quot;LC_NUMERIC&quot;, sv_locale },
+
+  { &quot;LC_TIME&quot;, sv_locale },
+
+#if defined (READLINE) &amp;&amp; defined (STRICT_POSIX)
+
+  { &quot;LINES&quot;, sv_winsize },
+
+#endif
+
+  { &quot;MAIL&quot;, sv_mail },
+
+  { &quot;MAILCHECK&quot;, sv_mail },
+
+  { &quot;MAILPATH&quot;, sv_mail },
+
+  { &quot;OPTERR&quot;, sv_opterr },
+
+  { &quot;OPTIND&quot;, sv_optind },
+
+  { &quot;PATH&quot;, sv_path },
+
+  { &quot;POSIXLY_CORRECT&quot;, sv_strict_posix },
+
+#if defined (READLINE)
+
+  { &quot;TERM&quot;, sv_terminal },
+
+  { &quot;TERMCAP&quot;, sv_terminal },
+
+  { &quot;TERMINFO&quot;, sv_terminal },
+
+#endif /* READLINE */
+
+  { &quot;TEXTDOMAIN&quot;, sv_locale },
+
+  { &quot;TEXTDOMAINDIR&quot;, sv_locale },
+
+#if defined (HAVE_TZSET) &amp;&amp; defined (PROMPT_STRING_DECODE)
+
+  { &quot;TZ&quot;, sv_tz },
+
+#endif
+
+#if defined (HISTORY) &amp;&amp; defined (BANG_HISTORY)
+
+  { &quot;histchars&quot;, sv_histchars },
+
+#endif /* HISTORY &amp;&amp; BANG_HISTORY */
+
+  { &quot;ignoreeof&quot;, sv_ignoreeof },
+
+  { (char *)0, (sh_sv_func_t *)0 }
+
+};
+</code></pre>
+
+<p>转载于:<a href="https://my.oschina.net/u/2987407/blog/779329">https://my.oschina.net/u/2987407/blog/779329</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用Shell编写Android自动化测试脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用Shell编写Android自动化测试脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用Shell编写Android自动化测试脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8shell%E7%BC%96%E5%86%99android%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%8B%E8%AF%95%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用Shell编写Android自动化测试脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<blockquote>
+<p><strong>版权声明：本文章原创于 RamboPan ，未经允许，请勿转载。</strong></p>
+</blockquote>
+
+<h2 id="使用-shell-编写-android-自动化测试脚本">使用 Shell 编写 Android 自动化测试脚本</h2>
+
+<p>最近碰到一个需求：就是需要反复测试一个简单的应用，是否能稳定的长期运行。</p>
+
+<p>这个应用是类似一个答题过程，选择一个难度，然后选择正确的答案，然后接下来回答下一轮，答题完成会弹出结果页面，最后再自动或手动退回主界面。</p>
+
+<p>因为需要点击固定的位置，反复的进行点击。刚开始测试这个应用就类似自己玩一下，感觉还有点意思。后面发现老改动，老自己点，这 ……
+一点都不符合程序员的准则是吧：能自动化的就不要自己动手。</p>
+
+<p>想到命令行中也能通过输入命令模拟对屏幕触控 … 那第一反应就是能不能编一个脚本，把要执行的命令与逻辑做好，脚本不断使用命令来达到模拟触屏的实现。</p>
+
+<p>查阅了 <strong>Mac</strong> 平台使用批处理的大概思路。参考了一些 <strong>Shell</strong>
+文档（文末附上链接），经过几天调试优化，感觉效果还算可以，拿出来分享下，也算是一个自动化测试思路吧。</p>
+
+<p>先放个效果图。</p>
+
+<hr />
+
+<p>首先分析这个应用的流程：</p>
+
+<p><strong>主界面：</strong><br />
+<a href="https://img.it610.com/image/info8/1bd23dae71d64bcb9f2659e8fb7141f9.jpg"><img src="https://img.it610.com/image/info8/1bd23dae71d64bcb9f2659e8fb7141f9.jpg" alt="使用 Shell 编写 Android
+自动化测试脚本_第1张图片" /></a></p>
+
+<p>有四个选项框，选择不同的难度。</p>
+
+<p><strong>答题界面：</strong></p>
+
+<p>虽然中间的图像部分会因为难度变化而变化，但下面四个选项位置不会改变，所以每次点击都是4个位置中的固定位置。</p>
+
+<p><strong>结果界面：</strong><br />
+<a href="https://img.it610.com/image/info8/82af0c9546504bd4b6d18b0b4bfdc409.jpg"><img src="https://img.it610.com/image/info8/82af0c9546504bd4b6d18b0b4bfdc409.jpg" alt="使用 Shell 编写 Android
+自动化测试脚本_第2张图片" /></a></p>
+
+<p>中间有可以滑动的列表，显示着每次答题的正确答案。如果点击右上角可以手动返回主菜单，如果不点击，则自动返回主菜单。</p>
+
+<p>这里我们先按照简单的实现，就是一直答题，答题结束后，再返回主菜单继续。</p>
+
+<p>说完了流程，我们来熟悉接下来需要使用到 <strong>Shell</strong> 中的操作。</p>
+
+<hr />
+
+<blockquote>
+<p><strong>(使用的是 Mac 系统，如果使用 Windows 系统，略有差别。)</strong></p>
+</blockquote>
+
+<p>我们新建一个文本文件，第一行输入</p>
+
+<pre><code>    #!/bin/bash
+</code></pre>
+
+<p>指定解释的路径，然后将后缀改为 <strong>.sh</strong> 。</p>
+
+<p>按着新语言的学习过程，肯定是要来一个 <strong>HelloWorld</strong> 的，那我们再下一行输入</p>
+
+<pre><code>    echo Hello,World ~
+</code></pre>
+
+<p>如果命令行当前位置与文件位于同一个目录，则可以直接</p>
+
+<pre><code>    ./test1.sh（此处 test 是我的文件名）执行当前目录下 test.sh 脚本。
+</code></pre>
+
+<p>如果不在同一个目录，将文件拖入命令行中就可以了。</p>
+
+<p>是不是满怀期待，发现居然是 Permission denied ，惊不惊喜 ~</p>
+
+<p>我们输入 chmod 777 加上刚刚的脚本名，给指定脚本权限，例如：</p>
+
+<pre><code>    chmod 777 /Users/RamboPan/Desktop/test1.sh 
+
+    #输出：
+    Hello,World
+</code></pre>
+
+<p>这次 Hello,World 如期出现。</p>
+
+<p><strong>echo</strong>
+作用，有许多，这就说两个作用：作为一个输出指令对字符串进行输出，或者函数的返回值。返回值一会看到。剩下依次将使用到的部分做个简单示例，需要深入了解的可以查看对应
+<strong>Shell</strong> 文档。</p>
+
+<p><strong>四则运算（除法和 int 除法类似）：</strong></p>
+
+<pre><code>    #代码：
+    a=40;
+    b=30;
+    result=`expr $a + $b`
+    echo &quot;a + b : $result&quot;
+
+    result=`expr $a - $b`
+    echo &quot;a - b : $result&quot;
+
+    result=`expr $a \* $b`
+    echo &quot;a * b : $result&quot;
+
+    result=`expr $a / $b`
+    echo &quot;a / b : $result&quot;
+
+    result=`expr $a % $b`
+    echo &quot;a % b : $result&quot;
+
+    输出：
+    a + b : 70
+    a - b : 10
+    a * b : 1200
+    a / b : 1
+    a % b : 10
+</code></pre>
+
+<p><strong>流程控制：If</strong></p>
+
+<pre><code>    #if 使用
+    if (( 3 &lt; 2 ))
+    then
+        echo &quot;3 &lt; 2&quot;
+    else
+        echo &quot;3 &gt; 2&quot;
+    #需要使用 fi 进行结束说明
+    fi
+
+    输出：
+    3 &gt; 2
+</code></pre>
+
+<p><strong>while</strong></p>
+
+<pre><code>    #while 使用
+    index=1;
+    while (( $index &lt; 5))
+    do 
+        echo &quot;It's $index&quot;
+        index=`expr $index + 1`
+    done
+
+    输出
+    It's 1
+    It's 2
+    It's 3
+    It's 4
+</code></pre>
+
+<p><strong>case (switch)</strong></p>
+
+<pre><code>    #case 使用 (switch)
+    case 1 in
+    1) echo &quot;It's 1&quot; ;;
+    2) echo &quot;It's 2&quot; ;;
+    esac
+
+    输出
+    It's 1
+</code></pre>
+
+<p><strong>方法定义与调用</strong></p>
+
+<pre><code>    #方法定义
+    function sayHello(){
+        echo &quot;sayHello&quot;
+    }
+    $(sayHello)
+
+    #输出
+    sayHello
+
+    function tap(){
+        adb shell input tap $1 $2
+    }
+    $(tap 100 100 )
+
+    #输出 (这里我没插设备，所以没检测到)
+    no devices/emulators found
+</code></pre>
+
+<hr />
+
+<p>大概熟悉了下 <strong>Shell</strong> 之后，就开始组建测试的语句。</p>
+
+<p>我们先来模拟下点击和滑动的指令。</p>
+
+<pre><code>    //滑动 (点 0,0 滑动到 点100,100 ) 处。
+    adb shell input swipe 0 0 100 100
+    //点击（点 0，0） 
+    adb shell input tap 0 0
+</code></pre>
+
+<p>我们连上 <strong>Android</strong> 设备之后，在命令行（终端）中输入滑动那句命令，因为先测试点击屏幕不容易看出效果，我们先测试滑动，从顶端划出菜单栏。</p>
+
+<p><a href="https://img.it610.com/image/info8/fedcf09f84c047f79d1d379dfe63ca6f.gif"><img src="https://img.it610.com/image/info8/fedcf09f84c047f79d1d379dfe63ca6f.gif" alt="使用 Shell 编写 Android
+自动化测试脚本_第3张图片" /></a></p>
+
+<p>这效果很明显。此时我们在命令行中输入点击的命令，如果执行没有问题的话，刚刚弹出的菜单栏会收回，(这里点到了广告 -_-
+#)，因为我们点在菜单栏的外面了。（部分手机的菜单栏长度各有不同，根据自己设备调整）</p>
+
+<p><a href="https://img.it610.com/image/info8/f3c66654ddf94f81b2ad97385891c88e.gif"><img src="https://img.it610.com/image/info8/f3c66654ddf94f81b2ad97385891c88e.gif" alt="使用 Shell 编写 Android
+自动化测试脚本_第4张图片" /></a></p>
+
+<p>这样两个命令执行就没什么问题了。</p>
+
+<p>因为会执行各种点位的点击与滑动，那么我们需要把点击命令的前半段，就是 英文部分 和 位置部分 拆开处理。</p>
+
+<p>点击点的位置基本不动，所以此处也需要做一些变量来存储这些固定的位置。</p>
+
+<p>既然都已经拆开了，那我们肯定第一想到就是做两个方法：点击某个位置，从哪滑动到哪。</p>
+
+<p>先放下代码。</p>
+
+<pre><code>    #点击前半段
+    baseTap=&quot;adb shell input tap&quot;;
+    #滑动前半段
+    baseSwipe=&quot;adb shell input swipe&quot;;
+
+    #点击的实现
+    function tapPoint(){
+        $baseTap $1 $2
+    }
+
+    #滑动的实现
+    function tapAnyWhere(){
+        $swipe $1 $2 $3 $4
+    }
+</code></pre>
+
+<p>因为 shell 中引用变量需要加 $ 符号，使用 <em><strong>bastTap</strong></em> 变量就是 <em><strong>$baseTap</strong></em> ； <strong>$1</strong> <strong>$2</strong>
+对应为函数第几个参数，此处 <strong>index</strong> 从 <strong>1</strong> 开始，和一般语言中容器序号需要从 <strong>0</strong> 开始不一样。</p>
+
+<p>然后我们再添加一些固定的点。</p>
+
+<pre><code>    #界面1 左边点的x
+    xl=xxx;
+    #界面1 右边点的x
+    xr=xxx;
+    #界面1 上边点的y
+    yu=xxx;
+    #界面1 下边点的y
+    yd=xxx;
+
+    #如果要点击第一个界面，左上方的 简单模式 按钮，那么我们就使用函数传入对应参数来调用。
+    #因为左上角就是左x，上y的点。
+    $(baseTap $xl $yu)
+    #从左上到右下的滑动
+    $(baseSwipe $xl $yu $xr $yd)
+</code></pre>
+
+<p>看着好像还可以，不过现在有一些问题。参数多了倒是还能执行，如果少些参数就没办法正确执行。</p>
+
+<p>而且如果整个文件都是使用这个函数，那么如果中途要改点什么需要改动就太大了，维护成本极高，所以我们还要继续进行封装：</p>
+
+<p>我们点击的过程中，需要模拟随机点击哪个按钮：比如主界面，需要 4 选 1 ，答题界面需要 4 选 1 ，结束界面返回只需要点一个。</p>
+
+<p>可以把每个界面的随机点击事件，都做成一个方法，根据传入数值，执行不同的点击按钮操作。而每个对应的命令使用点的位置也只在这里出现，后期维护也很容易。</p>
+
+<p>说的有点绕，还是一步一步上代码。这里需要加入 <strong>shell</strong> 的 <strong>case</strong> 使用 与 <strong>随机生成函数</strong> ：</p>
+
+<pre><code>    #定义一个随机函数
+    #用法 $(rand 0 100) 生成 0 到 100 之间的数值（包括 0 与 100）。
+    function rand(){
+        min=$1
+        max=$(($2-$min+1))
+        num=$(($RANDOM))
+        #此处的 echo 就负责返回结果
+        echo $(($num%$max+$min))
+    }
+
+    #定义屏幕一的随机点击方法，
+    function randomTapS1(){
+        #因为四选一，所以此处直接使用 $(rand 0 3)
+        index = $(random 0 3);
+        #根据 index 的值，走不同的选项。
+        case $index in
+        #点击屏幕1左上方按钮
+        0) $(tapPoint $xl $yu) ;;
+        #点击屏幕1右上方按钮
+        1) $(tapPoint $xr $yu) ;;
+        #点击屏幕1左下方按钮
+        2) $(tapPoint $xl $yd) ;;
+        #点击屏幕1右下方按钮
+        3) $(tapPoint $xr $yd) ;;
+        #使用了 case 需要使用 case 的反向（esac）结束选择。
+        esac
+        #此处加入 echo 对 index 返回，调用方法可以获取结果进行输出。
+        echo $index;
+    }
+</code></pre>
+
+<p>既然能模拟出第一个界面的点击事件，那么第二个、第三个界面的点击事件，也可以依次做出来。这里就直接跳过了。</p>
+
+<p>接下来就是整个应用的模拟点击流程编写了。</p>
+
+<pre><code>    #先来定义个当前测试轮数与总测试轮数.
+    startCount=0;
+    totalCount=100;
+
+    #当不满足总轮数时一直循环
+    while((startCount&lt;totalCount))
+    do
+        #输出日志，当前是第几轮开始。
+        echo &quot;Now start play round : $startCount&quot;
+
+        #choose mode main menu
+        cIndex=$(randomTapS1);
+        #输出日志，第一个界面选择的是什么模式（哪个按钮）
+        echo &quot;Choose Mode : $cIndex&quot;;
+        #等待一秒钟
+        sleep 1
+
+        #因为有4个问题，所以需要做一个小循环。
+        #start inner loop
+        i=0;
+        j=5;
+        while((i&lt;j))
+        do
+
+            cIndex=$(randomTapS2);
+            #输出日志 当前点击的是第几个选项
+            echo &quot;Choosing: Round: $i ,choose index : $cIndex&quot;;
+            #i++;
+            i=`expr $i + 1`;
+            sleep 1
+
+        #退出小循环
+        done
+
+        #点击返回按钮
+        $(randomTapS3);
+        #输出日志 返回主菜单
+        echo &quot;Click back to main menu&quot;;
+        sleep 1
+
+        #测试轮数+1
+        startCount=`expr $startCount + 1`;
+
+    done
+</code></pre>
+
+<p>因为流程比较简单，加上有注释说明，应该不难看懂。</p>
+
+<p>既然现在测试可以运行了，那么就有一个所有 App 都需要考虑的问题，适配。这些对应的按钮在不同的设备上，肯定因为分辨率不同，坐标也不同。</p>
+
+<p>当然可以只在一台固定的设备上测试，比如 1920 x 1080，不过如果要在其他设备上测试的话，肯定是要用个比例与基准尺寸进行运算的。</p>
+
+<p>浮点运算在 <strong>shell</strong> 中稍微有点麻烦，我搜了一个实现，然后也简单封成方法。</p>
+
+<pre><code>    #计算两个数相乘
+    function multiDouble(){
+        #保留两位小数精度。
+        echo &quot;scale=2;$1 * $2&quot; | bc;
+    }
+</code></pre>
+
+<p>把用到的对应坐标都换成 <strong>比例</strong> 与对应 <strong>基准尺寸</strong> 就行。</p>
+
+<pre><code>    #base screen size
+    baseWidth=1920;
+    baseHeight=1080;
+
+    #之前用的 屏幕1 对应4个点的 x y 坐标，后面统一换成比例乘以基准尺寸。
+    #当然基准尺寸可以考虑做成运行脚本时的参数，有兴趣的可以试下。
+    #screen 1 
+    # xl=780;
+    # xr=1150;
+    # yu=640;
+    # yd=800;
+
+    xl=$(multi 0.4 $baseWidth);
+    xr=$(multi 0.6 $baseWidth);
+    yu=$(multi 0.6 $baseHeight);
+    yd=$(multi 0.74 $baseHeight);
+</code></pre>
+
+<p>现在又想到一个问题，如果 …… 有多比例需要考虑（相乘）怎么办（真的是过场有点多哈 ~ (→_→) ），那么我们可以考虑 <strong>for</strong> 循环来实现。</p>
+
+<pre><code>    #计算两个数相乘
+    function multiDouble(){
+        #保留两位小数精度。
+        echo &quot;scale=2;$1 * $2&quot; | bc;
+    }
+
+    #计算多个数相乘，判断传入参数个数多少计算不同计算
+    function multi(){
+
+        #没有参数时返回0
+        if [ $# = 0 ]
+        then 
+            echo 0
+
+        #一个参数时返回该参数
+        elif [ $# = 1 ]
+        then 
+            echo $1
+
+        #两个参数时返回乘积
+        elif [ $# = 2 ]
+        then 
+            echo $(multiDouble $1 $2)
+
+        #多个参数时使用循环，声明一个结果，循环轮乘
+        else
+            result=1.0;
+            for var in $@
+            do
+                #echo &quot;It's $(($index))&quot;
+                result=$(multiDouble $result $var)
+            done
+            echo $result
+        fi
+    }
+
+    ######################
+
+    #调用示范：
+    echo $(multi)
+    echo $(multi 1.1)
+    echo $(multi 1.1 2.2)
+    echo $(multi 1.1 2.2 3.3 )
+    echo $(multi 1.1 2.2 3.3 4.4 )
+
+    输出结果：
+    0
+    1.1
+    2.42
+    7.98
+    35.11
+</code></pre>
+
+<p>这样使用 multi 函数，不管多少参数都可以正确使用，真是机智 : ) 。</p>
+
+<p>最后放一个完整版的代码，程序不一样，也只是仅供参考。</p>
+
+<pre><code>    #!/bin/bash
+
+    #define a ramdom funtion
+    function rand(){
+        min=$1
+        max=$(($2-$min+1))
+        num=$(($RANDOM))
+        echo $(($num%$max+$min))
+    }
+
+    #define a tap anywhere function
+    function tapAnyWhere(){
+        $baseTap $(rand 0 $baseWidth) $(rand 0 $baseHeight);
+    }
+
+    #define a function to tap specify point
+    function tapPoint(){
+        $baseTap $1 $2
+    }
+
+    #define a random tap button function in screen1
+    function randomTapS1(){
+        index=$(rand 0 3);
+        case $index in
+            0) $(tapPoint $xl $yu) ;;
+            1) $(tapPoint $xr $yu) ;;
+            2) $(tapPoint $xl $yd) ;;
+            3) $(tapPoint $xr $yd) ;;
+        esac
+        echo $index;
+    }
+
+    #define a random tap button function in screen2
+    function randomTapS2(){
+        index=$(rand 0 3);
+        case $index in
+            0) $(tapPoint $x1 $y1) ;;
+            1) $(tapPoint $x2 $y1) ;;
+            2) $(tapPoint $x3 $y1) ;;
+            3) $(tapPoint $x4 $y1) ;;
+        esac
+        echo $index;
+    }
+
+    #define a random tap button function in screen2
+    function randomTapS3(){
+        $(tapPoint $xb $yb);
+    }
+
+    #define a swipe anywhere function
+    function swipeAnyWhere(){
+        $baseSwipe $(rand 0 $baseWidth) $(rand 0 $baseHeight) $(rand 0 $baseWidth) $(rand 0 $baseHeight);
+    }
+
+    #define a center swipe in result page
+    function swipteCenter(){
+        $baseSwipe $(rand $xStart $xEnd) $(rand yStart $yEnd) $(rand $xStart xEnd) $(rand yStart $yEnd);
+    }
+
+    #define two float multi
+    function multiDouble(){
+        echo &quot;scale=2;$1 * $2&quot; | bc;
+    }
+
+    #define several float multi
+    function multi(){
+        if [ $# = 0 ]
+        then 
+            echo 0
+        elif [ $# = 1 ]
+        then 
+            echo $1
+        elif [ $# = 2 ]
+        then 
+            echo $(multiDouble $1 $2)
+        else
+            echo $(multi $1 $(multiDouble $2 $3)) 
+        fi
+    }
+
+    function addDouble(){
+        echo &quot;scale=2;$1 + $2&quot;|bc;
+    }
+
+    function add(){
+        if [ $# = 0 ]
+        then 
+            echo 0
+        elif [ $# = 1 ]
+        then 
+            echo $1
+        elif [ $# = 2 ]
+        then 
+            echo $(addDouble $1 $2)
+        else
+            echo $(add $1 $(addDouble $2 $3)) 
+        fi
+    }
+
+    startCount=0;
+    totalCount=100;
+
+
+    #screen 1:fou button:
+    #leftTop 780 640
+    #rightTop 1150 640
+    #leftBottom 780 800
+    #rightBottom 1150 800
+
+    #screen 2:four button:
+    #key1:475 1024 
+    #key2:730 1025
+    #key3:1010 1024
+    #key4:1277 1024
+
+    #sreen 3:back button
+    # 1815 110
+
+    #base screen size
+    baseWidth=1920;
+    baseHeight=1080;
+
+    #screen 1 
+    # xl=780;
+    # xr=1150;
+    # yu=640;
+    # yd=800;
+
+    xl=$(multi 0.4 $baseWidth);
+    xr=$(multi 0.6 $baseWidth);
+    yu=$(multi 0.6 $baseHeight);
+    yd=$(multi 0.74 $baseHeight);
+
+    #screen 2
+    # x1=475;
+    # x2=730;
+    # x3=1010;
+    # x4=1277;
+    # y1=1024;
+
+    x1=$(multi 0.25 $baseWidth);
+    x2=$(multi 0.38 $baseWidth);
+    x3=$(multi 0.52 $baseWidth);
+    x4=$(multi 0.25 $baseWidth);
+    y1=$(multi 0.95 $baseHeight);
+
+    #screen 3
+    # xb=1815;
+    # yb=110;
+    xb=$(multi 0.945 $baseWidth);
+    yb=$(multi 0.1 $baseHeight);
+
+
+
+    #center rect
+    xStart=$(multi 0.156 $baseWidth);
+    xWidth=$(multi 0.71 $baseWidth);
+    xEnd=$(add $xStart $xWidth);
+
+
+    yStart=$(multi 0.28 $baseHeight);
+    yHeight=$(multi 0.49 $baseHeight);
+    yEnd=$(add $yStart $yHeight);
+
+    #base input cmd
+    baseTap=&quot;adb shell input tap&quot;;
+    baseSwipe=&quot;adb shell input swipe&quot;;
+
+    #start out loop 
+    while((startCount&lt;totalCount))
+    do
+        echo &quot;Now start play round : $startCount&quot;
+
+        #choose mode main menu
+        cIndex=$(randomTapS1);
+        echo &quot;Choose Mode : $cIndex&quot;;
+        sleep 1
+
+        #start inner loop
+        i=0;
+        j=5;
+        while((i&lt;j))
+        do
+
+            cIndex=$(randomTapS2);
+            echo &quot;Choosing: Round: $i ,choose index : $cIndex&quot;;
+            i=`expr $i + 1`;
+            sleep 1
+
+        done
+
+        $(randomTapS3);
+        echo &quot;Click back to main menu&quot;;
+        sleep 1
+
+        startCount=`expr $startCount + 1`;
+
+    done
+</code></pre>
+
+<p>如果有疑问或者意见，欢迎指出，共同讨论。</p>
+
+<hr />
+
+<p><strong>参考文章：</strong></p>
+
+<p><strong>Shell:</strong><br />
+<a href="https://blog.csdn.net/taiyang1987912/article/details/39551385">https://blog.csdn.net/taiyang1987912/article/details/39551385</a><br />
+<a href="https://www.runoob.com/linux/linux-shell-func.html">https://www.runoob.com/linux/linux-shell-func.html</a></p>
+
+<p><strong>Android:</strong><br />
+<a href="https://blog.bihe0832.com/adb-shell-input.html">https://blog.bihe0832.com/adb-shell-input.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

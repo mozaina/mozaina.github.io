@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>nginx502错误处理phpfpm假死检测并重启phpfpm的shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="nginx502错误处理phpfpm假死检测并重启phpfpm的shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="nginx502错误处理phpfpm假死检测并重启phpfpm的shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/nginx502%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86phpfpm%E5%81%87%E6%AD%BB%E6%A3%80%E6%B5%8B%E5%B9%B6%E9%87%8D%E5%90%AFphpfpm%E7%9A%84shell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">nginx502错误处理phpfpm假死检测并重启phpfpm的shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>一、服务器配置</p>
+
+<p>nginx出现502有很多原因，但大部分原因可以归结为资源数量不够用,也就是说后端PHP-fpm处理有问题，nginx将正确的客户端请求发给了后端的php-
+fpm进程，但是因为php-fpm进程的问题导致不能正确解析php代码，最终返回给了客户端502错误。</p>
+
+<p>nginx+php出现502 bad gateway，一般这都不是nginx的问题，而是由于
+fastcgi或者php的问题导致的，常见的有以下几种(其实解决问题的最好的方式还是自己去看nginx和fastcgi的errorlog):</p>
+
+<p>1、我本地的配置地址和日志：</p>
+
+<p>本机AWS服务器，1G内存 单核CPU</p>
+
+<p>/usr/local/php/etc/php-fpm.conf</p>
+
+<p>/usr/local/php/var/log/php-fpm.log</p>
+
+<p>/usr/local/nginx/conf/nginx.conf</p>
+
+<p>2、修改 php-fpm.conf的配置：<br />
+配置方式两种 static（静态）或者dynamic（动态）</p>
+
+<p><a href="https://img.it610.com/image/info8/779e30de091c405da0d5c172aecf55df.png"><img src="https://img.it610.com/image/info8/779e30de091c405da0d5c172aecf55df.png" alt="nginx 502错误 处理php-fpm假死 检测并重启php-
+fpm的shell脚本_第1张图片" /></a></p>
+
+<p>要求pm.start_servers的值在pm.min_spare_servers和pm.max_spare_servers之间</p>
+
+<p>pm.max_children：静态方式下开启的php-fpm进程数量，在动态方式下他限定php-
+fpm的最大进程数（这里要注意pm.max_spare_servers的值只能小于等于pm.max_children）<br />
+pm.start_servers：动态方式下的起始php-fpm进程数量。[min_spare_servers + (max_spare_servers -
+min_spare_servers) / 2；]<br />
+pm.min_spare_servers：动态方式空闲状态下的最小php-fpm进程数量。<br />
+pm.max_spare_servers：动态方式空闲状态下的最大php-fpm进程数量。</p>
+
+<p>重启php-fpm服务</p>
+
+<p>查看当前php-fpm进程数：ps -ef |grep php</p>
+
+<p><a href="https://img.it610.com/image/info8/549bd44e369f4156a19d9b505ccdbe99.jpg"><img src="https://img.it610.com/image/info8/549bd44e369f4156a19d9b505ccdbe99.jpg" alt="nginx 502错误 处理php-fpm假死 检测并重启php-
+fpm的shell脚本_第2张图片" /></a></p>
+
+<p>二、定时检测php-fpm的状态，假死状态下重启服务</p>
+
+<p>监控php-fpm并自动重启服务的shell脚本,脚本的主要功能：不断检查网站的状态,如果异常就重启php-fpm服务</p>
+
+<pre><code>#!/bin/bash
+
+#变量初始化
+process=&quot;php-fpm&quot; #进程名
+startCmd=&quot;/etc/init.d/php-fpm start&quot; #启动命令
+down=0
+
+while true
+do
+    #取得http状态码
+    code=$(curl -H &quot;Host:www.jb51.net&quot; -m 5 -L -s -w %{http_code} http://127.0.0.1 -o /dev/null)
+    #当状态码返回000或者大于等于500时,计数故障到down变量
+    if [ $code -eq 000 -o $code -ge 500 ];then
+        ((down++))
+    else
+break
+    fi
+    #稍等5s
+    sleep 5
+    #判断是否连续检测三次都为故障.
+    if [ $down -ge 3 ];then
+if [ &quot;$(find /tmp/${process}_restart -mmin -3)&quot; == &quot;&quot; ];then
+                #取得进程名对应的所有pid
+pids=$(ps aux | grep ${process} | grep -v &quot;grep&quot; | awk '{print $2}')
+                #依次对所有pid执行kill命令
+for i in $pids;do
+kill -9 $i
+kill -9 $i
+done
+                #kill完pid后,启动服务
+$startCmd
+echo &quot;$(date) Return code $code,${process} had been restarted&quot; &gt;&gt; /tmp/${process}_restart
+else
+echo &quot;$(date) ${process} not yet recovery.As it had been restarted in 2 minutes.so this time ignore.&quot; &gt;&gt; /tmp/${process}_not_restart
+fi
+
+break
+    fi
+done
+</code></pre>
+
+<p>修改cron每2分钟执行一次：</p>
+
+<p>*/2 * * * * sh /home/sh/restart_php.sh</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

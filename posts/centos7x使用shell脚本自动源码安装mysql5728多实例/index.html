@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>CentOS7X使用shell脚本自动源码安装MySQL5728多实例 | 开发者问答集锦</title>
+    <meta property="og:title" content="CentOS7X使用shell脚本自动源码安装MySQL5728多实例 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="CentOS7X使用shell脚本自动源码安装MySQL5728多实例">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/centos7x%E4%BD%BF%E7%94%A8shell%E8%84%9A%E6%9C%AC%E8%87%AA%E5%8A%A8%E6%BA%90%E7%A0%81%E5%AE%89%E8%A3%85mysql5728%E5%A4%9A%E5%AE%9E%E4%BE%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">CentOS7X使用shell脚本自动源码安装MySQL5728多实例</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>在文章上一篇文章中<br />
+源码方法安装MySQL5.7.28多实例<br />
+我使用的是手动源码安装mysql5.7.28，安装过程还是比较耗时，所以这编文章，我把手动安装的过程编写成shell来自动安装脚本，请大家参考，脚本我测试没有出现问题，脚本中有什么可以优化的还请多多指点，谢谢！！</p>
+
+<p>以下是脚本中的几点说明：</p>
+
+<p>1、mysql5.7.28软件包(脚本中配置wget下载，如果下载比较慢，可以事先下载好，上传到 /opt
+路径下，并注释对应行的wget下载代码，另外源码安装过程比较耗时，安装请耐心等待)</p>
+
+<p>软件包名称如下：</p>
+
+<p>#boost_1_59_0.tar.gz</p>
+
+<p>#mysql-boost-5.7.28.tar.gz</p>
+
+<p>2、两个mysql数据库脚本上传路径： /opt 包含如下文件(注意sql脚本中的实例名)</p>
+
+<p>sql测试脚本名称如下：</p>
+
+<p>#testone.sql</p>
+
+<p>#testtwo.sql</p>
+
+<p>实例dbtwo有添加lower_case_table_names = 1参数实例dbone没有添加</p>
+
+<p>3、根据服务器磁盘分配情况，创建对应软链接，脚本我配置的路径是/data，根据需要修改，例如：</p>
+
+<p>#mkdir /home/data<br />
+#ln -s /home/data/ /data<br />
+4、修改(确保局域网内值唯一)</p>
+
+<p>#mysql3306.cnf 的 server_id = 3306</p>
+
+<p>#mysql3307.cnf 的 server_id = 3307</p>
+
+<p>5、注意修改预设的root密码与apps应用连接密码，根据需要修改使用</p>
+
+<p>#dbone_rootpwd=“Dbone.3306”</p>
+
+<p>#dbtwo_rootpwd=“Dbtwo.3307”</p>
+
+<p>#dbone_appspwd=“dbone3306”</p>
+
+<p>#dbtwo_appspwd=“dbtwo3307”</p>
+
+<p>6、修改dbone数据库实例 dbone 用户名 dbone 及对应的密码 dbone3306</p>
+
+<p>7、修改dbone导入数据库时的数据库实例名 dbone</p>
+
+<p>8、修改dbtwo数据库实例 dbtwo 用户名 dbtwo 及对应的密码 dbtwo3307</p>
+
+<p>9、修改dbtwo导入数据库时的数据库实例名 dbtwo</p>
+
+<pre><code>#!/bin/bash
+################################################################################################
+# Install software -- Install Mysql 5.7.28 on CentOS 7
+#Author:Danrtsey
+#mail:mydefiniteaim@126.com
+# History: 2020/01/09 Asa release
+################################################################################################
+[ -f /etc/init.d/functions ]&amp;&amp; . /etc/init.d/functions
+
+###Check if user is root
+if [ $UID -ne 0 ]; then
+    echo &quot;Error: This script must be executed as root.&quot;
+    exit 1
+fi
+
+echo &quot;################################################################################################&quot;
+echo &quot;                      源码自动安装   MySQL 5.7.28      on CentOS7 Linux                           &quot;
+echo &quot;################################################################################################&quot;
+
+#set mysql root password
+echo &quot;#########################       预设 Mysql root用户密码           ###############################&quot;
+dbone_rootpwd=&quot;dbone.3306&quot;
+dbtwo_rootpwd=&quot;dbtwo.3307&quot;
+
+#set mysql apps password
+echo &quot;#########################       预设 Mysql apps用户密码           ###############################&quot;
+dbone_appspwd=&quot;Dbone3306&quot;
+dbtwo_appspwd=&quot;Dbtwo3307&quot;
+
+echo &quot;################################       定义目录路径      #######################################&quot;
+
+##define mysql directory configuration variable
+dboneDatadir=/data/mysql/dbone3306/data
+dboneBinlogdir=/data/mysql/dbone3306/binlog
+dboneLogdir=/data/mysql/dbone3306/logs
+dboneSockfile=/data/mysql/dbone3306/mysql3306.sock
+dbonepidfile=/data/mysql/dbone3306/mysqld3306.pid
+dboneDefaultfile=/data/mysql/dbone3306/my3306.cnf
+
+dbtwoDatadir=/data/mysql/dbtwo3307/data
+dbtwoBinlogdir=/data/mysql/dbtwo3307/binlog
+dbtwoLogdir=/data/mysql/dbtwo3307/logs
+dbtwoSockfile=/data/mysql/dbtwo3307/dbtwo3307.sock
+dbtwopidfile=/data/mysql/dbtwo3307/mysqld3307.pid
+dbtwoDefaultfile=/data/mysql/dbtwo3307/my3307.cnf
+
+BaseDir=/usr/local/mysql
+MYSQL_DATADIR=/usr/local/mysql/data
+UNIX_ADDR=/usr/local/mysql/tmp/mysql.sock
+BOOSTDIR=/usr/local/boost
+Dbdir=/data
+Softwaredir=/opt
+
+mkdir -pv /data/mysql/{dbone3306,dbtwo3307}
+mkdir -v /data/mysql/dbone3306/{logs,data,binlog}
+mkdir -v /data/mysql/dbtwo3307/{logs,data,binlog}
+
+echo &quot;################################################################################################&quot;
+echo &quot;                                        修改系统参数                                             &quot;
+echo &quot;################################################################################################&quot;
+
+###set the ip in hosts
+hostsset() {
+echo &quot;############################   Ip&amp;Hosts Configuration  #######################################&quot;
+hostname=`hostname`
+ip=`ip a|grep 'inet '|grep -v '127.0.0.1'|awk '{print $2}'|awk -F '/' '{print $1}'`
+for i in ${ip}
+do
+    a=`grep &quot;${i}&quot; /etc/hosts`
+    if [ ! -n &quot;${a}&quot; ];then
+        echo &quot;${i} ${hostname}&quot; &gt;&gt; /etc/hosts 
+    else
+        break
+    fi
+done
+}
+
+ntp() {
+yum -y install ntp
+systemctl enable ntpd
+echo 'server ntp1.aliyun.com' &gt;&gt; /etc/ntp.conf
+echo 'server ntp2.aliyun.com' &gt;&gt; /etc/ntp.conf
+systemctl start ntpd
+if [ $? != 0 ]; then
+   errorExit 'ntp 启动未成功'
+   exit 2
+fi
+  return 0
+}
+
+syspro() {
+sed -i 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
+setenforce 0
+ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+echo 'LANG=&quot;en_US.UTF-8&quot;' &gt;&gt; /etc/profile &amp;&amp; source /etc/profile
+
+cat &gt;&gt;/etc/security/limits.conf&lt;&lt;EOF
+* soft nproc 65535
+* hard nproc 65535
+* soft nofile 65535
+* hard nofile 65535
+EOF
+
+cat &gt;&gt; /etc/sysctl.conf&lt;&lt;EOF
+net.core.somaxconn = 65535
+net.core.netdev_max_backlog = 65535
+net.ipv4.tcp_max_syn_backlog = 65535
+net.ipv4.tcp_fin_timeout = 10
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_tw_recycle = 1
+net.ipv4.tcp_keepalive_time = 120
+net.ipv4.tcp_keepalive_intvl = 30
+net.ipv4.tcp_keepalive_probes = 3
+vm.swappiness = 0
+net.ipv4.ip_forward=1
+net.bridge.bridge-nf-call-iptables=1
+net.ipv4.neigh.default.gc_thresh1=4096
+net.ipv4.neigh.default.gc_thresh2=6144
+net.ipv4.neigh.default.gc_thresh3=8192
+kernel.shmmax = 25769803774
+kernel.shmmni = 4096
+kernel.shmall = 16777216
+kernel.sem = 1010 129280 1010 128
+net.ipv4.ip_local_port_range = 9000 65500
+net.core.rmem_default = 4194304
+net.core.rmem_max = 4194304
+net.core.wmem_default = 262144
+net.core.wmem_max = 1048576
+fs.aio-max-nr = 1048576
+fs.file-max = 6815744
+EOF
+modprobe br_netfilter
+sysctl -p
+}
+
+fwport() {
+firewall-cmd --permanent --zone=public --add-port=3306/tcp
+firewall-cmd --permanent --zone=public --add-port=3307/tcp
+firewall-cmd --reload
+}
+
+clean() {
+echo &quot;################################    删除旧Mysql、Maria    #######################################&quot;
+    rpm -qa|grep mysql
+    MariaDB=`rpm -qa|grep mariadb`
+    yum -y remove mysql* --nodeps
+    yum -y remove $MariaDB --nodeps
+
+#Backup old my.cnf
+if [ -s /etc/my.cnf ]; then
+    mv /etc/my.cnf /etc/my.cnf.`date +%Y%m%d%H%M%S`.bak
+fi
+}
+
+# 添加用户和组
+addusers() {
+grep mysql /etc/passwd
+RETVAL=$?
+if [ $RETVAL -ne 0 ];then
+   groupadd mysql
+   useradd mysql -g mysql -s /sbin/nologin -M
+
+     action &quot;mysql user added successfully&quot; /bin/true
+  else
+      action &quot; $(echo -e &quot; mysql user already exists &quot;)&quot; /bin/true
+      exit 3
+fi
+
+chown -R mysql:mysql $Dbdir
+
+cat &gt;&gt; /etc/profile&lt;&lt;EOF
+if [ $USER = &quot;mysql&quot; ]; then
+if [ $SHELL = &quot;/bin/ksh&quot; ]; then
+ulimit -p 16384
+ulimit -n 65536
+else
+ulimit -u 16384 -n 65536
+fi
+fi
+EOF
+source /etc/profile
+}
+
+#install mysql-5.7.28
+dbinstall() {
+echo &quot;################################       开始下载安装      #######################################&quot;
+yum -y install bzr zlib-devel gcc-c++ ncurses ncurses-devel libev make cmake gcc autoconf automake zlib libxml \
+libgcrypt libtool bison perl perl-devel libaio libaio-devel perl-Time-HiRes perl-DBD-MySQL perl-Digest-MD5 \
+rsync perl-Data-Dumper net-tools wget vim openssl openssl-devel
+cd $Softwaredir
+wget -c http://www.sourceforge.net/projects/boost/files/boost/1.59.0/boost_1_59_0.tar.gz
+tar xf boost_1_59_0.tar.gz
+mv boost_1_59_0 $BOOSTDIR
+
+wget -c https://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-boost-5.7.28.tar.gz
+tar xf mysql-boost-5.7.28.tar.gz
+cd mysql-5.7.28
+cmake . -DCMAKE_INSTALL_PREFIX=$BaseDir \
+-DMYSQL_DATADIR=$MYSQL_DATADIR \
+-DMYSQL_UNIX_ADDR=$UNIX_ADDR \
+-DDEFAULT_CHARSET=utf8 \
+-DDEFAULT_COLLATION=utf8_bin \
+-DEXTRA_CHARSETS=all \
+-DENABLED_LOCAL_INFILE=ON \
+-DWITH_INNOBASE_STORAGE_ENGINE=1 \
+-DWITH_FEDERATED_STORAGE_ENGINE=1 \
+-DWITH_BLACKHOLE_STORAGE_ENGINE=1 \
+-DWITHOUT_EXAMPLE_STORAGE_ENGINE=1 \
+-DWITHOUT_PARTITION_STORAGE_ENGINE=1 \
+-DWITH_FAST_MUTEXES=1 \
+-DWITH_SSL=system \
+-DWITH_ZLIB=bundled \
+-DWITH_EDITLINE=bundled \
+-DWITH_BOOST=$BOOSTDIR \
+-DENABLED_LOCAL_INFILE=1 \
+-DWITH_READLINE=1 \
+-DWITH_EMBEDDED_SERVER=1 \
+-DWITH_DEBUG=0
+if [ $? -eq 0 ];then
+   make
+   if [ $? -eq 0 ];then
+      make install
+      if [ $? -eq 0 ];then
+        echo -e &quot; \033[32m mysql install success \033[0m&quot;
+      else
+        echo -e &quot;\e[31;47;5m make install failed!! please check the result!! \e[0m&quot;
+        exit 6
+      fi
+   else
+     echo -e &quot;\e[31;47;5m make failed!! please check the result!! \e[0m&quot;
+     exit 5
+   fi
+else
+  echo -e &quot;\e[31;47;5m cmake failed!! please check the result!! \e[0m&quot;
+  exit 4  
+fi
+
+cat &lt;&lt; EOF &gt;&gt; /etc/profile
+export PATH=\$PATH:${BaseDir}/bin
+EOF
+source /etc/profile
+
+chown -R mysql:mysql $BaseDir
+}
+
+#edit my.cnf
+setmycnf() {
+cat &gt;&gt;$dboneDefaultfile&lt;&lt;EOF
+[client]
+port = 3306
+socket = ${dboneSockfile}
+
+[mysql]
+prompt=&quot;\u@jsshapp \R:\m:\s [\d]&gt; &quot;
+no-auto-rehash
+
+[mysqld]
+user                                = mysql
+port                                = 3306
+symbolic-links                      = 0
+basedir                             = ${BaseDir}
+datadir                             = ${dboneDatadir}
+socket                              = ${dboneSockfile}
+pid-file                            = ${dbonepidfile}
+server_id                           = 3306
+character_set_server                = utf8
+max_connections                     = 1000
+skip_name_resolve                   = 1
+open_files_limit                    = 65536
+thread_cache_size                   = 64
+table_open_cache                    = 4096
+table_definition_cache              = 1024
+table_open_cache_instances          = 64
+max_prepared_stmt_count             = 1048576
+explicit_defaults_for_timestamp     = true
+log_timestamps                      = system
+
+binlog_format                       = row
+log_bin                           = ${dboneBinlogdir}/mysql-bin
+binlog_rows_query_log_events        = on
+expire_logs_days                    = 7
+binlog_cache_size                   = 4M
+max_binlog_cache_size               = 2G
+max_binlog_size                     = 1G
+sync_binlog                         = 1
+log_bin_trust_function_creators     = 1
+
+slow_query_log                      = on
+slow_query_log_file                 = ${dboneDatadir}/slow.log
+log-error                           = ${dboneLogdir}/error.log
+log_queries_not_using_indexes      = on
+long_query_time                     = 1.000000
+
+gtid_mode                           = on
+enforce_gtid_consistency            = on
+
+default_storage_engine              = innodb                    
+default_tmp_storage_engine          = innodb                    
+innodb_data_file_path               = ibdata1:1024M:autoextend
+innodb_temp_data_file_path          = ibtmp1:12M:autoextend
+innodb_buffer_pool_filename         = ib_buffer_pool
+innodb_log_files_in_group           = 3
+innodb_log_file_size                = 512M
+innodb_online_alter_log_max_size    = 1024M
+innodb_open_files                   = 4096
+innodb_page_size                    = 32k
+innodb_thread_concurrency           = 0
+innodb_read_io_threads              = 4
+innodb_write_io_threads             = 4
+innodb_purge_threads                = 4
+innodb_page_cleaners                = 4
+innodb_print_all_deadlocks          = on
+innodb_lock_wait_timeout            = 20
+innodb_spin_wait_delay              = 128
+innodb_autoinc_lock_mode            = 2
+innodb_io_capacity                  = 200
+innodb_io_capacity_max              = 2000
+#innodb_flush_neighbors             = 
+innodb_log_buffer_size              = 8M
+innodb_flush_log_at_timeout         = 1
+innodb_flush_log_at_trx_commit      = 2
+innodb_buffer_pool_size             = 1024M
+innodb_buffer_pool_instances        = 4
+autocommit                          = 1
+innodb_buffer_pool_dump_pct         = 25
+innodb_buffer_pool_dump_at_shutdown = ON
+innodb_buffer_pool_load_at_startup  = ON
+
+[mysqldump]
+quick
+max_allowed_packet = 32M
+EOF
+
+cat &gt;&gt;$dbtwoDefaultfile&lt;&lt;EOF
+[client]
+port = 3307
+socket = ${dbtwoSockfile}
+
+[mysql]
+prompt=&quot;\u@jsshapp \R:\m:\s [\d]&gt; &quot;
+no-auto-rehash
+
+[mysqld]
+user                                = mysql
+port                                = 3307
+symbolic-links                      = 0
+lower_case_table_names              = 1
+basedir                             = ${BaseDir}
+datadir                             = ${dbtwoDatadir}
+socket                              = ${dbtwoSockfile}
+pid-file                            = ${dbtwopidfile}
+server_id                           = 3307
+character_set_server                = utf8
+max_connections                     = 1000
+skip_name_resolve                   = 1
+open_files_limit                    = 65536
+thread_cache_size                   = 64
+table_open_cache                    = 4096
+table_definition_cache              = 1024
+table_open_cache_instances          = 64
+max_prepared_stmt_count             = 1048576
+explicit_defaults_for_timestamp     = true
+log_timestamps                      = system
+
+binlog_format                       = row
+log_bin                            = ${dbtwoBinlogdir}/mysql-bin
+binlog_rows_query_log_events        = on
+expire_logs_days                    = 7
+binlog_cache_size                   = 4M
+max_binlog_cache_size               = 2G
+max_binlog_size                     = 1G
+sync_binlog                         = 1
+
+slow_query_log                      = on
+slow_query_log_file                 = ${dbtwoDatadir}/slow.log
+log-error                           = ${dbtwoLogdir}/error.log
+log_queries_not_using_indexes      = on
+long_query_time                     = 1.000000
+
+gtid_mode                           = on
+enforce_gtid_consistency            = on
+
+default_storage_engine              = innodb
+default_tmp_storage_engine          = innodb
+innodb_data_file_path               = ibdata1:1024M:autoextend
+innodb_temp_data_file_path          = ibtmp1:12M:autoextend
+innodb_buffer_pool_filename         = ib_buffer_pool
+innodb_log_files_in_group           = 3
+innodb_log_file_size                = 512M
+innodb_online_alter_log_max_size    = 1024M
+innodb_open_files                   = 4096
+innodb_page_size                    = 32k
+innodb_thread_concurrency           = 0
+innodb_read_io_threads              = 4
+innodb_write_io_threads             = 4
+innodb_purge_threads                = 4
+innodb_page_cleaners                = 4
+innodb_print_all_deadlocks          = on
+innodb_lock_wait_timeout            = 20
+innodb_spin_wait_delay              = 128
+innodb_autoinc_lock_mode            = 2
+innodb_io_capacity                  = 200
+innodb_io_capacity_max              = 2000
+#innodb_flush_neighbors             = 
+innodb_log_buffer_size              = 8M
+innodb_flush_log_at_timeout         = 1
+innodb_flush_log_at_trx_commit      = 2
+innodb_buffer_pool_size             = 1024M
+innodb_buffer_pool_instances        = 4
+autocommit                          = 1
+innodb_buffer_pool_dump_pct         = 25
+innodb_buffer_pool_dump_at_shutdown = ON
+innodb_buffer_pool_load_at_startup  = ON
+
+[mysqldump]
+quick
+max_allowed_packet = 32M
+EOF
+}
+
+#dbone initialize
+dboneinitialize() {
+echo &quot;################################      dbone 初始化     #######################################&quot;
+$BaseDir/bin/mysqld --defaults-file=$dboneDefaultfile --initialize --user=mysql --basedir=$BaseDir --datadir=$dboneDatadir
+sleep 120
+less $dboneLogdir/error.log|grep 'A temporary password is generated for root@localhost:'
+A=$?
+count=0
+while [ $count -lt 10 ]
+do
+    if [ $A -eq 0 ];then
+        echo -e &quot; \033[32m mysql initialize success!! \033[0m&quot;
+        break
+    else
+        echo -e &quot;\e[31;47;5m the result is null,check again!! \e[0m&quot;
+        count=$[${count}+1]
+    fi
+done
+
+#create ssl_rsa
+echo &quot;################################      dbone 生成ssl授权     #######################################&quot;
+$BaseDir/bin/mysql_ssl_rsa_setup --user=mysql --basedir=$BaseDir --datadir=$dboneDatadir
+if [ $? -eq 0 ];then
+   echo -e &quot; \033[32m create ssl_rsa success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m create ssl_rsa failed!! \e[0m&quot;
+  exit 7  
+fi
+
+echo &quot;################################      dbone 服务启动     #######################################&quot;
+$BaseDir/bin/mysqld_safe --defaults-file=$dboneDefaultfile --user=mysql 2&gt;&amp;1 &gt; /dev/null &amp;
+sleep 10
+netstat -tnlp|grep 3306
+if [ $? -eq 0 ];then
+   echo -e &quot; \033[32m dbone start success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbone start failed!! \e[0m&quot;
+  exit 8  
+fi
+
+echo &quot;################################      dbone root用户临时密码     #######################################&quot;
+dboneTempPass=$(less $dboneLogdir/error.log|grep 'A temporary password is generated for root@localhost:' |awk  '{print $NF}')
+echo $dboneTempPass
+
+echo &quot;################################     自动修改 dbone root用户初始密码       ###############################&quot;
+$BaseDir/bin/mysqladmin -uroot -p&quot;$dboneTempPass&quot; -S $dboneSockfile password $dbone_rootpwd
+if [ $? -eq 0 ];then
+   echo -e &quot; \033[32m dbone rootpwd changed success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbone rootpwd changed failed!! \e[0m&quot;
+  exit 9  
+fi
+
+echo &quot;################################      dbone 服务关闭     #######################################&quot;
+$BaseDir/bin/mysqladmin -uroot -p$dbone_rootpwd -S $dboneSockfile shutdown
+netstat -tnlp|grep 3306
+if [ $? -ne 0 ];then
+   echo -e &quot; \033[32m dbone stop success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbone stop failed!! \e[0m&quot;
+  exit 10
+fi
+}
+
+#dbtwo initialize
+dbtwoinitialize() {
+echo &quot;################################      dbtwo 初始化     #######################################&quot;
+$BaseDir/bin/mysqld --defaults-file=$dbtwoDefaultfile --initialize --user=mysql --basedir=$BaseDir --datadir=$dbtwoDatadir
+sleep 120
+less $dbtwoLogdir/error.log|grep 'A temporary password is generated for root@localhost:'
+B=$?
+count=0
+while [ $count -lt 10 ]
+do
+    if [ $B -eq 0 ];then
+        echo -e &quot; \033[32m mysql initialize success!! \033[0m&quot;
+        break
+    else
+        echo -e &quot;\e[31;47;5m the result is null,check again!! \e[0m&quot;
+        count=$[${count}+1]
+    fi
+done
+
+#create ssl_rsa
+echo &quot;################################      dbtwo 生成ssl授权     #######################################&quot;
+$BaseDir/bin/mysql_ssl_rsa_setup --user=mysql --basedir=$BaseDir --datadir=$dbtwoDatadir
+if [ $? -eq 0 ];then
+   echo -e &quot; \033[32m create ssl_rsa success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m create ssl_rsa failed!! \e[0m&quot;
+  exit 11
+fi
+
+echo &quot;################################      dbtwo 服务启动     #######################################&quot;
+$BaseDir/bin/mysqld_safe --defaults-file=$dbtwoDefaultfile --user=mysql 2&gt;&amp;1 &gt; /dev/null &amp;
+sleep 10
+netstat -tnlp|grep 3307
+if [ $? -eq 0 ];then
+   echo -e &quot; \033[32m dbtwo start success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbtwo start failed!! \e[0m&quot;
+  exit 12  
+fi
+
+echo &quot;################################      dbtwo root用户临时密码     #######################################&quot;
+dbtwoTempPass=$(less $dbtwoLogdir/error.log|grep 'A temporary password is generated for root@localhost:' |awk  '{print $NF}')
+echo $dbtwoTempPass
+
+echo &quot;################################     自动修改 dbtwo root用户初始密码       ###############################&quot;
+$BaseDir/bin/mysqladmin -uroot -p&quot;$dbtwoTempPass&quot; -S $dbtwoSockfile password $dbtwo_rootpwd
+if [ $? -eq 0 ];then
+   echo -e &quot; \033[32m dbtwo rootpwd changed success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbtwo rootpwd changed failed!! \e[0m&quot;
+  exit 13
+fi
+
+echo &quot;################################      dbtwo 服务关闭     #######################################&quot;
+$BaseDir/bin/mysqladmin -uroot -p$dbtwo_rootpwd -S $dbtwoSockfile shutdown
+netstat -tnlp|grep 3307
+if [ $? -ne 0 ];then
+   echo -e &quot; \033[32m dbtwo stop success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbtwo stop failed!! \e[0m&quot;
+  exit 14  
+fi
+}
+
+#set dbonestart script
+dbonestart() {
+SOCK=&quot;${dboneSockfile}&quot;
+CNF=&quot;${dboneDefaultfile}&quot;
+MYSQL_USER=&quot;root&quot;
+MYSQL_PWD=&quot;${dbone_rootpwd}&quot;
+CmdPath=&quot;${BaseDir}/bin&quot;
+cat &gt; /etc/init.d/dbone&lt;&lt;EOF
+#!/bin/sh
+# chkconfig: 2345 80 90 
+# Simple dbone mysql init.d script conceived to work on Linux systems
+
+SOCK=&quot;${SOCK}&quot;
+CNF=&quot;${CNF}&quot;
+MYSQL_USER=&quot;${MYSQL_USER}&quot;
+MYSQL_PWD=&quot;${MYSQL_PWD}&quot;
+CmdPath=&quot;${CmdPath}&quot;
+
+#startup function
+function_start_mysql()
+{
+    printf &quot;Starting MySQL...\n&quot;
+    /bin/sh ${CmdPath}/mysqld_safe --defaults-file=${CNF} --user=mysql  2&gt;&amp;1 &gt; /dev/null &amp;
+}
+
+#stop function
+function_stop_mysql()
+{
+    printf &quot;Stoping MySQL...\n&quot;
+    ${CmdPath}/mysqladmin -u ${MYSQL_USER} -p${MYSQL_PWD} -S ${SOCK} shutdown
+}
+
+#restart function
+function_restart_mysql()
+{
+    printf &quot;Restarting MySQL...\n&quot;
+    function_stop_mysql
+    sleep 2
+    function_start_mysql
+}
+
+case \$1 in
+start)
+    function_start_mysql
+;;
+stop)
+    function_stop_mysql
+;;
+restart)
+    function_restart_mysql
+;;
+*)
+    printf &quot;Usage: dbone {start|stop|restart}\n&quot;
+esac
+EOF
+
+chmod +x /etc/init.d/dbone
+chkconfig --add dbone
+chkconfig --list dbone
+service dbone start
+netstat -tnlp|grep 3306
+if [ $? -ne 0 ];then
+   echo -e &quot; \033[32m dbone start success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbone start failed!! \e[0m&quot;
+  exit 15  
+fi
+}
+
+#set dbtwostart script
+dbtwostart() {
+SOCK=&quot;${dbtwoSockfile}&quot;
+CNF=&quot;${dbtwoDefaultfile}&quot;
+MYSQL_USER=&quot;root&quot;
+MYSQL_PWD=&quot;${dbtwo_rootpwd}&quot;
+CmdPath=&quot;${BaseDir}/bin&quot;
+cat &gt; /etc/init.d/dbtwo&lt;&lt;EOF
+#!/bin/sh
+# chkconfig: 2345 81 92 
+# Simple dbtwo mysql init.d script conceived to work on Linux systems
+
+SOCK=&quot;${SOCK}&quot;
+CNF=&quot;${CNF}&quot;
+MYSQL_USER=&quot;${MYSQL_USER}&quot;
+MYSQL_PWD=&quot;${MYSQL_PWD}&quot;
+CmdPath=&quot;${CmdPath}&quot;
+
+#startup function
+function_start_mysql()
+{
+    printf &quot;Starting MySQL...\n&quot;
+    /bin/sh ${CmdPath}/mysqld_safe --defaults-file=${CNF} --user=mysql 2&gt;&amp;1 &gt; /dev/null &amp;
+}
+
+#stop function
+function_stop_mysql()
+{
+    printf &quot;Stoping MySQL...\n&quot;
+    ${CmdPath}/mysqladmin -u ${MYSQL_USER} -p${MYSQL_PWD} -S ${SOCK} shutdown
+}
+
+#restart function
+function_restart_mysql()
+{
+    printf &quot;Restarting MySQL...\n&quot;
+    function_stop_mysql
+    sleep 2
+    function_start_mysql
+}
+
+case \$1 in
+start)
+    function_start_mysql
+;;
+stop)
+    function_stop_mysql
+;;
+restart)
+    function_restart_mysql
+;;
+*)
+    printf &quot;Usage: dbtwo {start|stop|restart}\n&quot;
+esac
+
+EOF
+
+chmod +x /etc/init.d/dbtwo
+chkconfig --add dbtwo
+chkconfig --list dbtwo
+service dbtwo start
+netstat -tnlp|grep 3307
+if [ $? -ne 0 ];then
+   echo -e &quot; \033[32m dbtwo start success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbtwo start failed!! \e[0m&quot;
+  exit 16  
+fi
+}
+
+dboneimp() {
+echo &quot;###############################  再次重启 dbone 数据库确认系统服务正常  ##################################&quot;
+service dbone stop
+service dbone start
+sleep 10
+netstat -tnlp|grep 3306
+if [ $? -ne 0 ];then
+   echo -e &quot; \033[32m dbone start success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbone start failed!! \e[0m&quot;
+  exit 17  
+fi
+echo &quot;###############################        创建 dbone 库           ##################################&quot;
+MYSQL_CMD=&quot;$BaseDir/bin/mysql -uroot -p&quot;${dbone_rootpwd}&quot; -S ${dboneSockfile}&quot;
+$MYSQL_CMD -e &quot;create database dbone default character set utf8 collate utf8_bin;grant select,insert,update,delete,create,execute on dbone.* to 'dbone'@'%' identified by 'dbone3306';flush privileges;&quot;
+$MYSQL_CMD -e &quot;show databases;&quot; | grep dbone
+if [ $? -ne 0 ]
+ then
+   echo -e &quot;\e[31;47;5m 创建 dbone 数据库失败！\e[0m&quot;
+   exit 18
+fi
+echo &quot;###############################           dbone 导入数据            ##################################&quot;
+cd $Softwaredir
+$BaseDir/bin/mysql -uroot -p&quot;${dbone_rootpwd}&quot; -S ${dboneSockfile} --comments dbone &lt; testone.sql
+if [ $? -ne 0 ]
+ then
+   echo -e &quot;\e[31;47;5m 导入数据失败！\e[0m&quot;
+   exit 19
+fi
+}
+
+dbtwoimp() {
+echo &quot;###############################   再次重启 dbtwo 数据库确认系统服务正常   ##################################&quot;
+service dbtwo stop
+service dbtwo start
+sleep 10
+netstat -tnlp|grep 3307
+if [ $? -ne 0 ];then
+   echo -e &quot; \033[32m dbtwo start success!! \033[0m&quot;
+else
+  echo -e &quot;\e[31;47;5m dbtwo start failed!! \e[0m&quot;
+  exit 20  
+fi
+echo &quot;###############################        创建 dbtwo  库           ##################################&quot;
+MYSQL_CMD=&quot;$BaseDir/bin/mysql -uroot -p&quot;${dbtwo_rootpwd}&quot; -S ${dbtwoSockfile}&quot;
+$MYSQL_CMD -e &quot;create database dbtwo  default character set utf8 collate utf8_bin;grant select,insert,update,delete,create,execute on dbtwo.* to 'dbtwo'@'%' identified by 'dbtwo3307';flush privileges;&quot;
+$MYSQL_CMD -e &quot;show databases;&quot; | grep dbtwo 
+if [ $? -ne 0 ]
+ then
+   echo -e &quot;\e[31;47;5m 创建 dbtwo  数据库失败！\e[0m&quot;
+   exit 21
+fi
+echo &quot;###############################           dbtwo  导入数据            ##################################&quot;
+cd $Softwaredir
+$BaseDir/bin/mysql -uroot -p&quot;${dbtwo_rootpwd}&quot; -S ${dbtwoSockfile} --comments dbtwo  &lt; testtwo.sql
+if [ $? -ne 0 ]
+ then
+   echo -e &quot;\e[31;47;5m 导入数据失败！\e[0m&quot;
+   exit 22
+fi
+}
+
+main() {
+
+hostsset
+
+ntp
+
+syspro
+
+fwport
+
+clean
+
+addusers
+
+dbinstall
+
+setmycnf
+
+dboneinitialize
+
+dbtwoinitialize
+
+dbonestart
+
+dbtwostart
+
+dboneimp
+
+dbtwoimp
+}
+
+main
+
+echo &quot;#######################        安装完成 （请记录dbone数据库dbone信息）          ##############################&quot;
+echo &quot;root密码：&quot;
+echo $dbone_rootpwd
+echo &quot;数据库实例连接密码：&quot;
+echo $dbone_appspwd
+
+echo &quot;#######################        安装完成 （请记录dbtwo数据库dbtwo信息）          ##############################&quot;
+echo &quot;root密码：&quot;
+echo $dbtwo_rootpwd
+echo &quot;数据库实例连接密码：&quot;
+echo $dbtwo_appspwd
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

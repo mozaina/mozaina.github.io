@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linux服务器巡检脚本shell | 开发者问答集锦</title>
+    <meta property="og:title" content="linux服务器巡检脚本shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linux服务器巡检脚本shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%B7%A1%E6%A3%80%E8%84%9A%E6%9C%ACshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linux服务器巡检脚本shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <pre><code>#!/bin/bash
+#主机信息每日巡检
+
+IPADDR=$(ifconfig eth0|grep 'inet addr'|awk -F '[ :]' '{print $13}')
+#环境变量PATH没设好，在cron里执行时有很多命令会找不到
+export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
+source /etc/profile
+
+[ $(id -u) -gt 0 ] &amp;&amp; echo &quot;请用root用户执行此脚本！&quot; &amp;&amp; exit 1
+centosVersion=$(awk '{print $(NF-1)}' /etc/redhat-release)
+VERSION=&quot;2017.08.22&quot;
+
+#日志相关
+PROGPATH=`echo $0 | sed -e 's,[\\/][^\\/][^\\/]*$,,'`
+[ -f $PROGPATH ] &amp;&amp; PROGPATH=&quot;.&quot;
+LOGPATH=&quot;$PROGPATH/log&quot;
+[ -e $LOGPATH ] || mkdir $LOGPATH
+RESULTFILE=&quot;$LOGPATH/HostDailyCheck-$IPADDR-`date +%Y%m%d`.txt&quot;
+
+
+#定义报表的全局变量
+report_DateTime=&quot;&quot; #日期 ok
+report_Hostname=&quot;&quot; #主机名 ok
+report_OSRelease=&quot;&quot; #发行版本 ok
+report_Kernel=&quot;&quot; #内核 ok
+report_Language=&quot;&quot; #语言/编码 ok
+report_LastReboot=&quot;&quot; #最近启动时间 ok
+report_Uptime=&quot;&quot; #运行时间（天） ok
+report_CPUs=&quot;&quot; #CPU数量 ok
+report_CPUType=&quot;&quot; #CPU类型 ok
+report_Arch=&quot;&quot; #CPU架构 ok
+report_MemTotal=&quot;&quot; #内存总容量(MB) ok
+report_MemFree=&quot;&quot; #内存剩余(MB) ok
+report_MemUsedPercent=&quot;&quot; #内存使用率% ok
+report_DiskTotal=&quot;&quot; #硬盘总容量(GB) ok
+report_DiskFree=&quot;&quot; #硬盘剩余(GB) ok
+report_DiskUsedPercent=&quot;&quot; #硬盘使用率% ok
+report_InodeTotal=&quot;&quot; #Inode总量 ok
+report_InodeFree=&quot;&quot; #Inode剩余 ok
+report_InodeUsedPercent=&quot;&quot; #Inode使用率 ok
+report_IP=&quot;&quot; #IP地址 ok
+report_MAC=&quot;&quot; #MAC地址 ok
+report_Gateway=&quot;&quot; #默认网关 ok
+report_DNS=&quot;&quot; #DNS ok
+report_Listen=&quot;&quot; #监听 ok
+report_Selinux=&quot;&quot; #Selinux ok
+report_Firewall=&quot;&quot; #防火墙 ok
+report_USERs=&quot;&quot; #用户 ok
+report_USEREmptyPassword=&quot;&quot; #空密码用户 ok
+report_USERTheSameUID=&quot;&quot; #相同ID的用户 ok
+report_PasswordExpiry=&quot;&quot; #密码过期（天） ok
+report_RootUser=&quot;&quot; #root用户 ok
+report_Sudoers=&quot;&quot; #sudo授权 ok
+report_SSHAuthorized=&quot;&quot; #SSH信任主机 ok
+report_SSHDProtocolVersion=&quot;&quot; #SSH协议版本 ok
+report_SSHDPermitRootLogin=&quot;&quot; #允许root远程登录 ok
+report_DefunctProsess=&quot;&quot; #僵尸进程数量 ok
+report_SelfInitiatedService=&quot;&quot; #自启动服务数量 ok
+report_SelfInitiatedProgram=&quot;&quot; #自启动程序数量 ok
+report_RuningService=&quot;&quot; #运行中服务数 ok
+report_Crontab=&quot;&quot; #计划任务数 ok
+report_Syslog=&quot;&quot; #日志服务 ok
+report_SNMP=&quot;&quot; #SNMP OK
+report_NTP=&quot;&quot; #NTP ok
+report_JDK=&quot;&quot; #JDK版本 ok
+function version(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;系统巡检脚本：Version $VERSION&quot;
+}
+
+function getCpuStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ CPU检查 #############################&quot;
+Physical_CPUs=$(grep &quot;physical id&quot; /proc/cpuinfo| sort | uniq | wc -l)
+Virt_CPUs=$(grep &quot;processor&quot; /proc/cpuinfo | wc -l)
+CPU_Kernels=$(grep &quot;cores&quot; /proc/cpuinfo|uniq| awk -F ': ' '{print $2}')
+CPU_Type=$(grep &quot;model name&quot; /proc/cpuinfo | awk -F ': ' '{print $2}' | sort | uniq)
+CPU_Arch=$(uname -m)
+echo &quot;物理CPU个数:$Physical_CPUs&quot;
+echo &quot;逻辑CPU个数:$Virt_CPUs&quot;
+echo &quot;每CPU核心数:$CPU_Kernels&quot;
+echo &quot; CPU型号:$CPU_Type&quot;
+echo &quot; CPU架构:$CPU_Arch&quot;
+#报表信息
+report_CPUs=$Virt_CPUs #CPU数量
+report_CPUType=$CPU_Type #CPU类型
+report_Arch=$CPU_Arch #CPU架构
+}
+
+function getMemStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 内存检查 ############################&quot;
+if [[ $centosVersion &lt; 7 ]];then
+free -mo
+else
+free -h
+fi
+#报表信息
+MemTotal=$(grep MemTotal /proc/meminfo| awk '{print $2}') #KB
+MemFree=$(grep MemFree /proc/meminfo| awk '{print $2}') #KB
+let MemUsed=MemTotal-MemFree
+MemPercent=$(awk &quot;BEGIN {if($MemTotal==0){printf 100}else{printf \&quot;%.2f\&quot;,$MemUsed*100/$MemTotal}}&quot;)
+report_MemTotal=&quot;$((MemTotal/1024))&quot;&quot;MB&quot; #内存总容量(MB)
+report_MemFree=&quot;$((MemFree/1024))&quot;&quot;MB&quot; #内存剩余(MB)
+report_MemUsedPercent=&quot;$(awk &quot;BEGIN {if($MemTotal==0){printf 100}else{printf \&quot;%.2f\&quot;,$MemUsed*100/$MemTotal}}&quot;)&quot;&quot;%&quot; #内存使用率%
+}
+function getDiskStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 磁盘检查 ############################&quot;
+df -hiP | sed 's/Mounted on/Mounted/'&gt; /tmp/inode
+df -hTP | sed 's/Mounted on/Mounted/'&gt; /tmp/disk
+join /tmp/disk /tmp/inode | awk '{print $1,$2,&quot;|&quot;,$3,$4,$5,$6,&quot;|&quot;,$8,$9,$10,$11,&quot;|&quot;,$12}'| column -t
+#报表信息
+diskdata=$(df -TP | sed '1d' | awk '$2!=&quot;tmpfs&quot;{print}') #KB
+disktotal=$(echo &quot;$diskdata&quot; | awk '{total+=$3}END{print total}') #KB
+diskused=$(echo &quot;$diskdata&quot; | awk '{total+=$4}END{print total}') #KB
+diskfree=$((disktotal-diskused)) #KB
+diskusedpercent=$(echo $disktotal $diskused | awk '{if($1==0){printf 100}else{printf &quot;%.2f&quot;,$2*100/$1}}')
+inodedata=$(df -iTP | sed '1d' | awk '$2!=&quot;tmpfs&quot;{print}')
+inodetotal=$(echo &quot;$inodedata&quot; | awk '{total+=$3}END{print total}')
+inodeused=$(echo &quot;$inodedata&quot; | awk '{total+=$4}END{print total}')
+inodefree=$((inodetotal-inodeused))
+inodeusedpercent=$(echo $inodetotal $inodeused | awk '{if($1==0){printf 100}else{printf &quot;%.2f&quot;,$2*100/$1}}')
+report_DiskTotal=$((disktotal/1024/1024))&quot;GB&quot; #硬盘总容量(GB)
+report_DiskFree=$((diskfree/1024/1024))&quot;GB&quot; #硬盘剩余(GB)
+report_DiskUsedPercent=&quot;$diskusedpercent&quot;&quot;%&quot; #硬盘使用率%
+report_InodeTotal=$((inodetotal/1000))&quot;K&quot; #Inode总量
+report_InodeFree=$((inodefree/1000))&quot;K&quot; #Inode剩余
+report_InodeUsedPercent=&quot;$inodeusedpercent&quot;&quot;%&quot; #Inode使用率%
+
+}
+
+function getSystemStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 系统检查 ############################&quot;
+if [ -e /etc/sysconfig/i18n ];then
+default_LANG=&quot;$(grep &quot;LANG=&quot; /etc/sysconfig/i18n | grep -v &quot;^#&quot; | awk -F '&quot;' '{print $2}')&quot;
+else
+default_LANG=$LANG
+fi
+export LANG=&quot;en_US.UTF-8&quot;
+Release=$(cat /etc/redhat-release 2&gt;/dev/null)
+Kernel=$(uname -r)
+OS=$(uname -o)
+Hostname=$(uname -n)
+SELinux=$(/usr/sbin/sestatus | grep &quot;SELinux status: &quot; | awk '{print $3}')
+LastReboot=$(who -b | awk '{print $3,$4}')
+uptime=$(uptime | sed 's/.*up \([^,]*\), .*/\1/')
+echo &quot; 系统：$OS&quot;
+echo &quot; 发行版本：$Release&quot;
+echo &quot; 内核：$Kernel&quot;
+echo &quot; 主机名：$Hostname&quot;
+echo &quot; SELinux：$SELinux&quot;
+echo &quot;语言/编码：$default_LANG&quot;
+echo &quot; 当前时间：$(date +'%F %T')&quot;
+echo &quot; 最后启动：$LastReboot&quot;
+echo &quot; 运行时间：$uptime&quot;
+#报表信息
+report_DateTime=$(date +&quot;%F %T&quot;) #日期
+report_Hostname=&quot;$Hostname&quot; #主机名
+report_OSRelease=&quot;$Release&quot; #发行版本
+report_Kernel=&quot;$Kernel&quot; #内核
+report_Language=&quot;$default_LANG&quot; #语言/编码
+report_LastReboot=&quot;$LastReboot&quot; #最近启动时间
+report_Uptime=&quot;$uptime&quot; #运行时间（天）
+report_Selinux=&quot;$SELinux&quot;
+export LANG=&quot;$default_LANG&quot;
+
+}
+
+function getServiceStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 服务检查 ############################&quot;
+echo &quot;&quot;
+if [[ $centosVersion &gt; 7 ]];then
+conf=$(systemctl list-unit-files --type=service --state=enabled --no-pager | grep &quot;enabled&quot;)
+process=$(systemctl list-units --type=service --state=running --no-pager | grep &quot;.service&quot;)
+#报表信息
+report_SelfInitiatedService=&quot;$(echo &quot;$conf&quot; | wc -l)&quot; #自启动服务数量
+report_RuningService=&quot;$(echo &quot;$process&quot; | wc -l)&quot; #运行中服务数量
+else
+conf=$(/sbin/chkconfig | grep -E &quot;:on|:启用&quot;)
+process=$(/sbin/service --status-all 2&gt;/dev/null | grep -E &quot;is running|正在运行&quot;)
+#报表信息
+report_SelfInitiatedService=&quot;$(echo &quot;$conf&quot; | wc -l)&quot; #自启动服务数量
+report_RuningService=&quot;$(echo &quot;$process&quot; | wc -l)&quot; #运行中服务数量
+fi
+echo &quot;服务配置&quot;
+echo &quot;--------&quot;
+echo &quot;$conf&quot; | column -t
+echo &quot;&quot;
+echo &quot;正在运行的服务&quot;
+echo &quot;--------------&quot;
+echo &quot;$process&quot;
+
+}
+
+
+function getAutoStartStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 自启动检查 ##########################&quot;
+conf=$(grep -v &quot;^#&quot; /etc/rc.d/rc.local| sed '/^$/d')
+echo &quot;$conf&quot;
+#报表信息
+report_SelfInitiatedProgram=&quot;$(echo $conf | wc -l)&quot; #自启动程序数量
+}
+
+function getLoginStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 登录检查 ############################&quot;
+last | head
+}
+
+function getNetworkStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 网络检查 ############################&quot;
+if [[ $centosVersion &lt; 7 ]];then
+/sbin/ifconfig -a | grep -v packets | grep -v collisions | grep -v inet6
+else
+#ip a
+for i in $(ip link | grep BROADCAST | awk -F: '{print $2}');do ip add show $i | grep -E &quot;BROADCAST|global&quot;| awk '{print $2}' | tr '\n' ' ' ;echo &quot;&quot; ;done
+fi
+GATEWAY=$(ip route | grep default | awk '{print $3}')
+DNS=$(grep nameserver /etc/resolv.conf| grep -v &quot;#&quot; | awk '{print $2}' | tr '\n' ',' | sed 's/,$//')
+echo &quot;&quot;
+echo &quot;网关：$GATEWAY &quot;
+echo &quot; DNS：$DNS&quot;
+#报表信息
+IP=$(ip -f inet addr | grep -v 127.0.0.1 | grep inet | awk '{print $NF,$2}' | tr '\n' ',' | sed 's/,$//')
+MAC=$(ip link | grep -v &quot;LOOPBACK\|loopback&quot; | awk '{print $2}' | sed 'N;s/\n//' | tr '\n' ',' | sed 's/,$//')
+report_IP=&quot;$IP&quot; #IP地址
+report_MAC=$MAC #MAC地址
+report_Gateway=&quot;$GATEWAY&quot; #默认网关
+report_DNS=&quot;$DNS&quot; #DNS
+}
+
+function getListenStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 监听检查 ############################&quot;
+TCPListen=$(ss -ntul | column -t)
+echo &quot;$TCPListen&quot;
+#报表信息
+report_Listen=&quot;$(echo &quot;$TCPListen&quot;| sed '1d' | awk '/tcp/ {print $5}' | awk -F: '{print $NF}' | sort | uniq | wc -l)&quot;
+}
+
+function getCronStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 计划任务检查 ########################&quot;
+Crontab=0
+for shell in $(grep -v &quot;/sbin/nologin&quot; /etc/shells);do
+for user in $(grep &quot;$shell&quot; /etc/passwd| awk -F: '{print $1}');do
+crontab -l -u $user &gt;/dev/null 2&gt;&amp;1
+status=$?
+if [ $status -eq 0 ];then
+echo &quot;$user&quot;
+echo &quot;--------&quot;
+crontab -l -u $user
+let Crontab=Crontab+$(crontab -l -u $user | wc -l)
+echo &quot;&quot;
+fi
+done
+done
+#计划任务
+find /etc/cron* -type f | xargs -i ls -l {} | column -t
+let Crontab=Crontab+$(find /etc/cron* -type f | wc -l)
+#报表信息
+report_Crontab=&quot;$Crontab&quot; #计划任务数
+}
+function getHowLongAgo(){
+# 计算一个时间戳离现在有多久了
+datetime=&quot;$*&quot;
+[ -z &quot;$datetime&quot; ] &amp;&amp; echo &quot;错误的参数：getHowLongAgo() $*&quot;
+Timestamp=$(date +%s -d &quot;$datetime&quot;) #转化为时间戳
+Now_Timestamp=$(date +%s)
+Difference_Timestamp=$(($Now_Timestamp-$Timestamp))
+days=0;hours=0;minutes=0;
+sec_in_day=$((60*60*24));
+sec_in_hour=$((60*60));
+sec_in_minute=60
+while (( $(($Difference_Timestamp-$sec_in_day)) &gt; 1 ))
+do
+let Difference_Timestamp=Difference_Timestamp-sec_in_day
+let days++
+done
+while (( $(($Difference_Timestamp-$sec_in_hour)) &gt; 1 ))
+do
+let Difference_Timestamp=Difference_Timestamp-sec_in_hour
+let hours++
+done
+echo &quot;$days 天 $hours 小时前&quot;
+}
+
+function getUserLastLogin(){
+# 获取用户最近一次登录的时间，含年份
+# 很遗憾last命令不支持显示年份，只有&quot;last -t YYYYMMDDHHMMSS&quot;表示某个时间之间的登录，我
+# 们只能用最笨的方法了，对比今天之前和今年元旦之前（或者去年之前和前年之前……）某个用户
+# 登录次数，如果登录统计次数有变化，则说明最近一次登录是今年。
+username=$1
+: ${username:=&quot;`whoami`&quot;}
+thisYear=$(date +%Y)
+oldesYear=$(last | tail -n1 | awk '{print $NF}')
+while(( $thisYear &gt;= $oldesYear));do
+loginBeforeToday=$(last $username | grep $username | wc -l)
+loginBeforeNewYearsDayOfThisYear=$(last $username -t $thisYear&quot;0101000000&quot; | grep $username | wc -l)
+if [ $loginBeforeToday -eq 0 ];then
+echo &quot;从未登录过&quot;
+break
+elif [ $loginBeforeToday -gt $loginBeforeNewYearsDayOfThisYear ];then
+lastDateTime=$(last -i $username | head -n1 | awk '{for(i=4;i&lt;(NF-2);i++)printf&quot;%s &quot;,$i}')&quot; $thisYear&quot; #格式如: Sat Nov 2 20:33 2015
+lastDateTime=$(date &quot;+%Y-%m-%d %H:%M:%S&quot; -d &quot;$lastDateTime&quot;)
+echo &quot;$lastDateTime&quot;
+break
+else
+thisYear=$((thisYear-1))
+fi
+done
+
+}
+
+function getUserStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 用户检查 ############################&quot;
+#/etc/passwd 最后修改时间
+pwdfile=&quot;$(cat /etc/passwd)&quot;
+Modify=$(stat /etc/passwd | grep Modify | tr '.' ' ' | awk '{print $2,$3}')
+
+echo &quot;/etc/passwd 最后修改时间：$Modify ($(getHowLongAgo $Modify))&quot;
+echo &quot;&quot;
+echo &quot;特权用户&quot;
+echo &quot;--------&quot;
+RootUser=&quot;&quot;
+for user in $(echo &quot;$pwdfile&quot; | awk -F: '{print $1}');do
+if [ $(id -u $user) -eq 0 ];then
+echo &quot;$user&quot;
+RootUser=&quot;$RootUser,$user&quot;
+fi
+done
+echo &quot;&quot;
+echo &quot;用户列表&quot;
+echo &quot;--------&quot;
+USERs=0
+echo &quot;$(
+echo &quot;用户名 UID GID HOME SHELL 最后一次登录&quot;
+for shell in $(grep -v &quot;/sbin/nologin&quot; /etc/shells);do
+for username in $(grep &quot;$shell&quot; /etc/passwd| awk -F: '{print $1}');do
+userLastLogin=&quot;$(getUserLastLogin $username)&quot;
+echo &quot;$pwdfile&quot; | grep -w &quot;$username&quot; |grep -w &quot;$shell&quot;| awk -F: -v lastlogin=&quot;$(echo &quot;$userLastLogin&quot; | tr ' ' '_')&quot; '{print $1,$3,$4,$6,$7,lastlogin}'
+done
+let USERs=USERs+$(echo &quot;$pwdfile&quot; | grep &quot;$shell&quot;| wc -l)
+done
+)&quot; | column -t
+echo &quot;&quot;
+echo &quot;空密码用户&quot;
+echo &quot;----------&quot;
+USEREmptyPassword=&quot;&quot;
+for shell in $(grep -v &quot;/sbin/nologin&quot; /etc/shells);do
+for user in $(echo &quot;$pwdfile&quot; | grep &quot;$shell&quot; | cut -d: -f1);do
+r=$(awk -F: '$2==&quot;!!&quot;{print $1}' /etc/shadow | grep -w $user)
+if [ ! -z $r ];then
+echo $r
+USEREmptyPassword=&quot;$USEREmptyPassword,&quot;$r
+fi
+done
+done
+echo &quot;&quot;
+echo &quot;相同ID的用户&quot;
+echo &quot;------------&quot;
+USERTheSameUID=&quot;&quot;
+UIDs=$(cut -d: -f3 /etc/passwd | sort | uniq -c | awk '$1&gt;1{print $2}')
+for uid in $UIDs;do
+echo -n &quot;$uid&quot;;
+USERTheSameUID=&quot;$uid&quot;
+r=$(awk -F: 'ORS=&quot;&quot;;$3=='&quot;$uid&quot;'{print &quot;:&quot;,$1}' /etc/passwd)
+echo &quot;$r&quot;
+echo &quot;&quot;
+USERTheSameUID=&quot;$USERTheSameUID $r,&quot;
+done
+#报表信息
+report_USERs=&quot;$USERs&quot; #用户
+report_USEREmptyPassword=$(echo $USEREmptyPassword | sed 's/^,//')
+report_USERTheSameUID=$(echo $USERTheSameUID | sed 's/,$//')
+report_RootUser=$(echo $RootUser | sed 's/^,//') #特权用户
+}
+
+
+function getPasswordStatus {
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 密码检查 ############################&quot;
+pwdfile=&quot;$(cat /etc/passwd)&quot;
+echo &quot;&quot;
+echo &quot;密码过期检查&quot;
+echo &quot;------------&quot;
+result=&quot;&quot;
+for shell in $(grep -v &quot;/sbin/nologin&quot; /etc/shells);do
+for user in $(echo &quot;$pwdfile&quot; | grep &quot;$shell&quot; | cut -d: -f1);do
+get_expiry_date=$(/usr/bin/chage -l $user | grep 'Password expires' | cut -d: -f2)
+if [[ $get_expiry_date = ' never' || $get_expiry_date = 'never' ]];then
+printf &quot;%-15s 永不过期\n&quot; $user
+result=&quot;$result,$user:never&quot;
+else
+password_expiry_date=$(date -d &quot;$get_expiry_date&quot; &quot;+%s&quot;)
+current_date=$(date &quot;+%s&quot;)
+diff=$(($password_expiry_date-$current_date))
+let DAYS=$(($diff/(60*60*24)))
+printf &quot;%-15s %s天后过期\n&quot; $user $DAYS
+result=&quot;$result,$user:$DAYS days&quot;
+fi
+done
+done
+report_PasswordExpiry=$(echo $result | sed 's/^,//')
+
+echo &quot;&quot;
+echo &quot;密码策略检查&quot;
+echo &quot;------------&quot;
+grep -v &quot;#&quot; /etc/login.defs | grep -E &quot;PASS_MAX_DAYS|PASS_MIN_DAYS|PASS_MIN_LEN|PASS_WARN_AGE&quot;
+
+
+}
+
+function getSudoersStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ Sudoers检查 #########################&quot;
+conf=$(grep -v &quot;^#&quot; /etc/sudoers| grep -v &quot;^Defaults&quot; | sed '/^$/d')
+echo &quot;$conf&quot;
+echo &quot;&quot;
+#报表信息
+report_Sudoers=&quot;$(echo $conf | wc -l)&quot;
+}
+
+function getInstalledStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 软件检查 ############################&quot;
+rpm -qa --last | head | column -t
+}
+
+function getProcessStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 进程检查 ############################&quot;
+if [ $(ps -ef | grep defunct | grep -v grep | wc -l) -ge 1 ];then
+echo &quot;&quot;
+echo &quot;僵尸进程&quot;;
+echo &quot;--------&quot;
+ps -ef | head -n1
+ps -ef | grep defunct | grep -v grep
+fi
+echo &quot;&quot;
+echo &quot;内存占用TOP10&quot;
+echo &quot;-------------&quot;
+echo -e &quot;PID %MEM RSS COMMAND
+$(ps aux | awk '{print $2, $4, $6, $11}' | sort -k3rn | head -n 10 )&quot;| column -t
+echo &quot;&quot;
+echo &quot;CPU占用TOP10&quot;
+echo &quot;------------&quot;
+top b -n1 | head -17 | tail -11
+#报表信息
+report_DefunctProsess=&quot;$(ps -ef | grep defunct | grep -v grep|wc -l)&quot;
+}
+
+function getJDKStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ JDK检查 #############################&quot;
+java -version 2&gt;/dev/null
+if [ $? -eq 0 ];then
+java -version 2&gt;&amp;1
+fi
+echo &quot;JAVA_HOME=\&quot;$JAVA_HOME\&quot;&quot;
+#报表信息
+report_JDK=&quot;$(java -version 2&gt;&amp;1 | grep version | awk '{print $1,$3}' | tr -d '&quot;')&quot;
+}
+function getSyslogStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ syslog检查 ##########################&quot;
+echo &quot;服务状态：$(getState rsyslog)&quot;
+echo &quot;&quot;
+echo &quot;/etc/rsyslog.conf&quot;
+echo &quot;-----------------&quot;
+cat /etc/rsyslog.conf 2&gt;/dev/null | grep -v &quot;^#&quot; | grep -v &quot;^\\$&quot; | sed '/^$/d' | column -t
+#报表信息
+report_Syslog=&quot;$(getState rsyslog)&quot;
+}
+function getFirewallStatus(){
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ 防火墙检查 ##########################&quot;
+#防火墙状态，策略等
+if [[ $centosVersion &lt; 7 ]];then
+/etc/init.d/iptables status &gt;/dev/null 2&gt;&amp;1
+status=$?
+if [ $status -eq 0 ];then
+s=&quot;active&quot;
+elif [ $status -eq 3 ];then
+s=&quot;inactive&quot;
+elif [ $status -eq 4 ];then
+s=&quot;permission denied&quot;
+else
+s=&quot;unknown&quot;
+fi
+else
+s=&quot;$(getState iptables)&quot;
+fi
+echo &quot;iptables: $s&quot;
+echo &quot;&quot;
+echo &quot;/etc/sysconfig/iptables&quot;
+echo &quot;-----------------------&quot;
+cat /etc/sysconfig/iptables 2&gt;/dev/null
+#报表信息
+report_Firewall=&quot;$s&quot;
+}
+
+function getSNMPStatus(){
+#SNMP服务状态，配置等
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ SNMP检查 ############################&quot;
+status=&quot;$(getState snmpd)&quot;
+echo &quot;服务状态：$status&quot;
+echo &quot;&quot;
+if [ -e /etc/snmp/snmpd.conf ];then
+echo &quot;/etc/snmp/snmpd.conf&quot;
+echo &quot;--------------------&quot;
+cat /etc/snmp/snmpd.conf 2&gt;/dev/null | grep -v &quot;^#&quot; | sed '/^$/d'
+fi
+#报表信息
+report_SNMP=&quot;$(getState snmpd)&quot;
+}
+
+
+
+function getState(){
+if [[ $centosVersion &lt; 7 ]];then
+if [ -e &quot;/etc/init.d/$1&quot; ];then
+if [ `/etc/init.d/$1 status 2&gt;/dev/null | grep -E &quot;is running|正在运行&quot; | wc -l` -ge 1 ];then
+r=&quot;active&quot;
+else
+r=&quot;inactive&quot;
+fi
+else
+r=&quot;unknown&quot;
+fi
+else
+#CentOS 7+
+r=&quot;$(systemctl is-active $1 2&gt;&amp;1)&quot;
+fi
+echo &quot;$r&quot;
+}
+
+function getSSHStatus(){
+#SSHD服务状态，配置,受信任主机等
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ SSH检查 #############################&quot;
+#检查受信任主机
+pwdfile=&quot;$(cat /etc/passwd)&quot;
+echo &quot;服务状态：$(getState sshd)&quot;
+Protocol_Version=$(cat /etc/ssh/sshd_config | grep Protocol | awk '{print $2}')
+echo &quot;SSH协议版本：$Protocol_Version&quot;
+echo &quot;&quot;
+echo &quot;信任主机&quot;
+echo &quot;--------&quot;
+authorized=0
+for user in $(echo &quot;$pwdfile&quot; | grep /bin/bash | awk -F: '{print $1}');do
+authorize_file=$(echo &quot;$pwdfile&quot; | grep -w $user | awk -F: '{printf $6&quot;/.ssh/authorized_keys&quot;}')
+authorized_host=$(cat $authorize_file 2&gt;/dev/null | awk '{print $3}' | tr '\n' ',' | sed 's/,$//')
+if [ ! -z $authorized_host ];then
+echo &quot;$user 授权 \&quot;$authorized_host\&quot; 无密码访问&quot;
+fi
+let authorized=authorized+$(cat $authorize_file 2&gt;/dev/null | awk '{print $3}'|wc -l)
+done
+
+echo &quot;&quot;
+echo &quot;是否允许ROOT远程登录&quot;
+echo &quot;--------------------&quot;
+config=$(cat /etc/ssh/sshd_config | grep PermitRootLogin)
+firstChar=${config:0:1}
+if [ $firstChar == &quot;#&quot; ];then
+PermitRootLogin=&quot;yes&quot; #默认是允许ROOT远程登录的
+else
+PermitRootLogin=$(echo $config | awk '{print $2}')
+fi
+echo &quot;PermitRootLogin $PermitRootLogin&quot;
+
+echo &quot;&quot;
+echo &quot;/etc/ssh/sshd_config&quot;
+echo &quot;--------------------&quot;
+cat /etc/ssh/sshd_config | grep -v &quot;^#&quot; | sed '/^$/d'
+
+#报表信息
+report_SSHAuthorized=&quot;$authorized&quot; #SSH信任主机
+report_SSHDProtocolVersion=&quot;$Protocol_Version&quot; #SSH协议版本
+report_SSHDPermitRootLogin=&quot;$PermitRootLogin&quot; #允许root远程登录
+}
+function getNTPStatus(){
+#NTP服务状态，当前时间，配置等
+echo &quot;&quot;
+echo &quot;&quot;
+echo &quot;############################ NTP检查 #############################&quot;
+if [ -e /etc/ntp.conf ];then
+echo &quot;服务状态：$(getState ntpd)&quot;
+echo &quot;&quot;
+echo &quot;/etc/ntp.conf&quot;
+echo &quot;-------------&quot;
+cat /etc/ntp.conf 2&gt;/dev/null | grep -v &quot;^#&quot; | sed '/^$/d'
+fi
+#报表信息
+report_NTP=&quot;$(getState ntpd)&quot;
+}
+
+
+function uploadHostDailyCheckReport(){
+json=&quot;{
+\&quot;DateTime\&quot;:\&quot;$report_DateTime\&quot;,
+\&quot;Hostname\&quot;:\&quot;$report_Hostname\&quot;,
+\&quot;OSRelease\&quot;:\&quot;$report_OSRelease\&quot;,
+\&quot;Kernel\&quot;:\&quot;$report_Kernel\&quot;,
+\&quot;Language\&quot;:\&quot;$report_Language\&quot;,
+\&quot;LastReboot\&quot;:\&quot;$report_LastReboot\&quot;,
+\&quot;Uptime\&quot;:\&quot;$report_Uptime\&quot;,
+\&quot;CPUs\&quot;:\&quot;$report_CPUs\&quot;,
+\&quot;CPUType\&quot;:\&quot;$report_CPUType\&quot;,
+\&quot;Arch\&quot;:\&quot;$report_Arch\&quot;,
+\&quot;MemTotal\&quot;:\&quot;$report_MemTotal\&quot;,
+\&quot;MemFree\&quot;:\&quot;$report_MemFree\&quot;,
+\&quot;MemUsedPercent\&quot;:\&quot;$report_MemUsedPercent\&quot;,
+\&quot;DiskTotal\&quot;:\&quot;$report_DiskTotal\&quot;,
+\&quot;DiskFree\&quot;:\&quot;$report_DiskFree\&quot;,
+\&quot;DiskUsedPercent\&quot;:\&quot;$report_DiskUsedPercent\&quot;,
+\&quot;InodeTotal\&quot;:\&quot;$report_InodeTotal\&quot;,
+\&quot;InodeFree\&quot;:\&quot;$report_InodeFree\&quot;,
+\&quot;InodeUsedPercent\&quot;:\&quot;$report_InodeUsedPercent\&quot;,
+\&quot;IP\&quot;:\&quot;$report_IP\&quot;,
+\&quot;MAC\&quot;:\&quot;$report_MAC\&quot;,
+\&quot;Gateway\&quot;:\&quot;$report_Gateway\&quot;,
+\&quot;DNS\&quot;:\&quot;$report_DNS\&quot;,
+\&quot;Listen\&quot;:\&quot;$report_Listen\&quot;,
+\&quot;Selinux\&quot;:\&quot;$report_Selinux\&quot;,
+\&quot;Firewall\&quot;:\&quot;$report_Firewall\&quot;,
+\&quot;USERs\&quot;:\&quot;$report_USERs\&quot;,
+\&quot;USEREmptyPassword\&quot;:\&quot;$report_USEREmptyPassword\&quot;,
+\&quot;USERTheSameUID\&quot;:\&quot;$report_USERTheSameUID\&quot;,
+\&quot;PasswordExpiry\&quot;:\&quot;$report_PasswordExpiry\&quot;,
+\&quot;RootUser\&quot;:\&quot;$report_RootUser\&quot;,
+\&quot;Sudoers\&quot;:\&quot;$report_Sudoers\&quot;,
+\&quot;SSHAuthorized\&quot;:\&quot;$report_SSHAuthorized\&quot;,
+\&quot;SSHDProtocolVersion\&quot;:\&quot;$report_SSHDProtocolVersion\&quot;,
+\&quot;SSHDPermitRootLogin\&quot;:\&quot;$report_SSHDPermitRootLogin\&quot;,
+\&quot;DefunctProsess\&quot;:\&quot;$report_DefunctProsess\&quot;,
+\&quot;SelfInitiatedService\&quot;:\&quot;$report_SelfInitiatedService\&quot;,
+\&quot;SelfInitiatedProgram\&quot;:\&quot;$report_SelfInitiatedProgram\&quot;,
+\&quot;RuningService\&quot;:\&quot;$report_RuningService\&quot;,
+\&quot;Crontab\&quot;:\&quot;$report_Crontab\&quot;,
+\&quot;Syslog\&quot;:\&quot;$report_Syslog\&quot;,
+\&quot;SNMP\&quot;:\&quot;$report_SNMP\&quot;,
+\&quot;NTP\&quot;:\&quot;$report_NTP\&quot;,
+\&quot;JDK\&quot;:\&quot;$report_JDK\&quot;
+}&quot;
+#echo &quot;$json&quot;
+curl -l -H &quot;Content-type: application/json&quot; -X POST -d &quot;$json&quot; &quot;$uploadHostDailyCheckReportApi&quot; 2&gt;/dev/null
+}
+
+function check(){
+version
+getSystemStatus
+getCpuStatus
+getMemStatus
+getDiskStatus
+getNetworkStatus
+getListenStatus
+getProcessStatus
+getServiceStatus
+getAutoStartStatus
+getLoginStatus
+getCronStatus
+getUserStatus
+getPasswordStatus
+getSudoersStatus
+getJDKStatus
+getFirewallStatus
+getSSHStatus
+getSyslogStatus
+getSNMPStatus
+getNTPStatus
+getInstalledStatus
+}
+
+
+#执行检查并保存检查结果
+check &gt; $RESULTFILE
+
+echo &quot;检查结果：$RESULTFILE&quot;
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

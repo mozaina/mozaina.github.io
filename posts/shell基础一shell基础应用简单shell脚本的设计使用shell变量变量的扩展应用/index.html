@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell基础一Shell基础应用简单Shell脚本的设计使用Shell变量变量的扩展应用 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell基础一Shell基础应用简单Shell脚本的设计使用Shell变量变量的扩展应用 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell基础一Shell基础应用简单Shell脚本的设计使用Shell变量变量的扩展应用">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%9F%BA%E7%A1%80%E4%B8%80shell%E5%9F%BA%E7%A1%80%E5%BA%94%E7%94%A8%E7%AE%80%E5%8D%95shell%E8%84%9A%E6%9C%AC%E7%9A%84%E8%AE%BE%E8%AE%A1%E4%BD%BF%E7%94%A8shell%E5%8F%98%E9%87%8F%E5%8F%98%E9%87%8F%E7%9A%84%E6%89%A9%E5%B1%95%E5%BA%94%E7%94%A8/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell基础一Shell基础应用简单Shell脚本的设计使用Shell变量变量的扩展应用</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><strong>一、Shell基础应用</strong></p>
+
+<h3 id="目标">目标：</h3>
+
+<p>本案例要求熟悉Linux Shell环境的特点，主要练习以下操作：</p>
+
+<p>1&gt; 切换用户的Shell环境<br />
+2&gt; 练习命令历史、命令别名<br />
+3&gt; 重定向标准输入/输出/错误输出<br />
+4&gt; 管道操作实践</p>
+
+<h3 id="步骤">步骤：</h3>
+
+<p>步骤一：切换用户的Shell环境</p>
+
+<p>若需要临时使用另一种Shell环境，可以直接执行对应的Shell解释器程序，比如只要执行ksh可以切换到ksh命令行环境。</p>
+
+<p>[root@svr5 ~]# yum -y install ksh  //若缺少ksh请先安装ksh包<br />
+.. ..<br />
+[root@svr5 ~]# cat /etc/shells<br />
+/bin/sh<br />
+/bin/bash<br />
+/sbin/nologin<br />
+/bin/tcsh<br />
+/bin/csh<br />
+/bin/ksh  //确认当前系统已识别ksh<br />
+[root@svr5 ~]# ksh //进入ksh环境，不支持tab键(不好用)<br />
+[root@svr5]~# exit  //返回到切换前的bash环境</p>
+
+<p>若希望修改用户的登录Shell，管理员可以直接通过usermod命令设置。比如，以下操作可将用户zhangsan的登录Shell改为/bin/tcsh：</p>
+
+<p>[root@svr5 ~]# grep &lsquo;zhangsan&rsquo; /etc/passwd<br />
+zhangsan:x:516:516::/home/zhangsan:/bin/bash //修改前<br />
+[root@svr5 ~]# usermod -s /bin/tcsh zhangsan  //执行修改操作<br />
+[root@svr5 ~]# grep &lsquo;zhangsan&rsquo; /etc/passwd<br />
+zhangsan:x:516:516::/home/zhangsan:/bin/tcsh //修改后</p>
+
+<p>步骤二：练习命令历史</p>
+
+<p>1）检查历史命令的容量。</p>
+
+<p>默认记录1000条，通过全局变量HISTSIZE设置，对所有用户有效：</p>
+
+<p>[root@svr5 ~]# grep HISTSIZE /etc/profile<br />
+HISTSIZE=1000<br />
+export PATH USER LOGNAME MAIL HOSTNAME HISTSIZE INPUTRC</p>
+
+<p>查看已为当前用户记录的历史命令条数：</p>
+
+<p>[root@svr5 ~]# history | wc -l<br />
+1000</p>
+
+<p>2）查看历史命令列表。</p>
+
+<p>列出最近执行的10条历史命令：</p>
+
+<p>[root@svr5 ~]# history | tail //tail后面不加-n(n是一个数值)，则默认的显示后10行<br />
+1028 grep &lsquo;zhangsan&rsquo; /etc/passwd<br />
+1029 cat /etc/redhat-release<br />
+1030 usermod -s /bin/tcsh zhangsan<br />
+1031 grep &lsquo;zhangsan&rsquo; /etc/passwd<br />
+1032 su - zhangsan<br />
+1033 echo 1234567 | passwd &ndash;stdin zhangsan<br />
+1034 su - zhangsan<br />
+1035 grep HISTSIZE /etc/profile<br />
+1036 history | wc -l<br />
+1037 history | tail</p>
+
+<p>3）调用指定的历史命令。</p>
+
+<p>重新执行历史命令列表中的第1028条操作：</p>
+
+<p>[root@svr5 ~]# !1028<br />
+grep &lsquo;zhangsan&rsquo; /etc/passwd<br />
+zhangsan:x:516:516::/home/zhangsan:/bin/bash</p>
+
+<p>重新执行最近一次以cat开头（根据实际情况变更）的历史命令操作：</p>
+
+<p>[root@svr5 ~]# !cat<br />
+cat /etc/redhat-release<br />
+Red Hat Enterprise Linux Server release 5.9 (Tikanga)</p>
+
+<p>4）清空已记录的历史命令。</p>
+
+<p>[root@svr5 ~]# history -c //清空自己的历史命令<br />
+[root@svr5 ~]# &gt; ~/.bash_history //清空记录文件<br />
+[root@svr5 ~]# history //再次检查历史命令列表<br />
+42 &gt; ~/.bash_history<br />
+43 history</p>
+
+<p>步骤三：练习命令别名</p>
+
+<p>1）查看已经定义的命令别名列表。</p>
+
+<p>当前的别名列表：</p>
+
+<p>[root@svr5 ~]# alias<br />
+alias cp=&lsquo;cp -i&rsquo;<br />
+alias l.=&lsquo;ls -d .* &ndash;color=tty&rsquo;<br />
+alias ll=&lsquo;ls -l &ndash;color=tty&rsquo;<br />
+alias ls=&lsquo;ls &ndash;color=tty&rsquo;<br />
+alias mv=&lsquo;mv -i&rsquo;<br />
+alias rm=&lsquo;rm -i&rsquo;<br />
+alias which=&lsquo;alias | /usr/bin/which &ndash;tty-only &ndash;read-alias &ndash;show-dot &ndash;show-
+tilde&rsquo;</p>
+
+<p>别名设置一般存放在用户的.bashrc文件内：</p>
+
+<p>[root@svr5 ~]# grep &lsquo;^alias&rsquo; ~/.bashrc<br />
+alias rm=&lsquo;rm -i&rsquo;<br />
+alias cp=&lsquo;cp -i&rsquo;<br />
+alias mv=&lsquo;mv -i&rsquo;</p>
+
+<p>2）自定义新的命令别名<br />
+添加一个名为lh的命令别名，实际执行的是“ls –lh –color=tty”：</p>
+
+<p>[root@svr5 ~]# alias lh=&lsquo;ls -lh&rsquo; //定义别名命令lh<br />
+[root@svr5 ~]# alias lh //确认定义结果<br />
+alias lh=&lsquo;ls -lh&rsquo;</p>
+
+<p>验证别名命令的效果：</p>
+
+<p>[root@svr5 ~]# lh /etc/fstab //使用别名<br />
+-rw-r&ndash;r&ndash; 1 root root 733 10-09 15:34 /etc/fstab<br />
+[root@svr5 ~]# ls -lh /etc/fstab //使用完整的命令<br />
+-rw-r&ndash;r&ndash; 1 root root 733 10-09 15:34 /etc/fstab</p>
+
+<p>3）取消别名</p>
+
+<p>取消单个别名：</p>
+
+<p>[root@svr5 ~]# unalias lh //取消名为lh的命令别名<br />
+[root@svr5 ~]# alias lh //查询时已没有lh<br />
+-bash: alias: lh: not found</p>
+
+<p>取消所有别名：</p>
+
+<p>[root@svr5 ~]# unalias -a //取消所有别名<br />
+[root@svr5 ~]# alias //查询时已无任何别名<br />
+[root@svr5 ~]#</p>
+
+<p>步骤四：重定向标准输入/输出/错误输出</p>
+
+<p>标准输入（stdin），描述号为0；标准输出（stdout），描述号为1；标准错误（stderr），描述号为2。</p>
+
+<p>1）重定向标准输出。</p>
+
+<p>使用 &gt; 将命令执行的正常输出重定向到文件：</p>
+
+<p>[root@svr5 ~]# ls -ld /etc/ //正常应输出到屏幕<br />
+drwxr-xr-x. 140 root root 8192 8月 2 04:45 /etc/<br />
+[root@svr5 ~]# ls -ld /etc/ &gt; stdout.txt //重定向到文件<br />
+[root@svr5 ~]# cat stdout.txt //确认重定向输出的结果<br />
+drwxr-xr-x. 140 root root 8192 8月 2 04:45 /etc/</p>
+
+<blockquote>
+<p>操作会覆盖目标文件（先清空、再写入）：</p>
+</blockquote>
+
+<p>[root@svr5 ~]# echo &ldquo;I am the king.&rdquo; &gt; stdout.txt //覆盖目标文件<br />
+[root@svr5 ~]# cat stdout.txt //确认结果<br />
+I am the king.</p>
+
+<p>改用 &gt;&gt; 可实现追加重定向输出：</p>
+
+<p>[root@svr5 ~]# ls -ld /etc/ &gt;&gt; stdout.txt //追加输出<br />
+[root@svr5 ~]# cat stdout.txt<br />
+I am the king. //原有内容还保留<br />
+drwxr-xr-x. 140 root root 8192 8月 2 04:45 /etc/</p>
+
+<p>2）重定向标准错误。</p>
+
+<p>对于命令执行出错的信息，使用 &gt; 无法保存，仍然会输出到屏幕。比如，可使用ls命令同时查看两个对象（其中nofile并不存在），重定向输出：</p>
+
+<p>[root@svr5 ~]# ls -l nofile.txt /etc/fstab &gt; stderr.txt<br />
+ls: nofile.txt: 没有那个文件或目录 //出错信息仍显示到屏幕<br />
+[root@svr5 ~]# cat stderr.txt //正常信息成功重定向到目标文件<br />
+-rw-r&ndash;r&ndash;. 1 root root 541 1月 5 2017 /etc/fstab</p>
+
+<p>使用 2&gt; 可重定向错误信息，比如，可执行一个错误的命令：</p>
+
+<p>[root@svr5 ~]# ipconfig /all<br />
+-bash: ipconfig: command not found //正常情况下，错误显示到屏幕<br />
+[root@svr5 ~]# ipconfig /all 2&gt; stderr.txt //将错误信息重定向到目标文件<br />
+[root@svr5 ~]# cat stderr.txt //确认重定向结果<br />
+-bash: ipconfig: command not found</p>
+
+<p>类似的，2&gt;&gt; 可实现追加输出：</p>
+
+<p>[root@svr5 ~]# ls nofile 2&gt;&gt; stderr.txt<br />
+[root@svr5 ~]# cat stderr.txt<br />
+-bash: ipconfig: command not found<br />
+ls: nofile: 没有那个文件或目录</p>
+
+<p>若希望将正常输出、错误输出重定向同一个文件，可使用 &amp;&gt; :</p>
+
+<p>[root@svr5 ~]# ls -l nofile.txt /etc/fstab &amp;&gt; stderr.txt<br />
+[root@svr5 ~]# cat stderr.txt<br />
+ls: nofile.txt: 没有那个文件或目录<br />
+-rw-r&ndash;r&ndash;. 1 root root 541 1月 5 2017 /etc/fstab</p>
+
+<p>3）重定向标准输入。</p>
+
+<p>[root@svr5 ~]# mail –s Error root &lt; /etc/passwd</p>
+
+<p>4）案例</p>
+
+<p>[root@svr5 ~]# cat /root/test.sh<br />
+#!/bin/bash<br />
+for i in {1..10}<br />
+do<br />
+useradd user$i 2&gt;&gt;/root/user.log<br />
+echo &lsquo;123456&rsquo; | passwd &ndash;stdin user$i &gt;/dev/null 2&gt;/pass.log<br />
+done</p>
+
+<p>步骤五：管道操作实践</p>
+
+<p>借助于管道符“|”，可以将一条命令的标准输出交给另一条命令处理，在一条命令行内可依次使用多个管道。</p>
+
+<p>1）统计/etc/目录下资料的数量。</p>
+
+<p>[root@svr5 ~]# ls -l /etc | wc -l<br />
+254</p>
+
+<p>2）列出Yum库里名称中含cluster的软件包。</p>
+
+<p>[root@svr5 ~]# yum list | grep cluster<br />
+cluster-cim.x86_64 0.12.1-7.el5 RHEL5-Cluster<br />
+cluster-snmp.x86_64 0.12.1-7.el5 RHEL5-Cluster<br />
+… …</p>
+
+<p><strong>二、简单Shell脚本的设计</strong></p>
+
+<h3 id="目标-1">目标：</h3>
+
+<p>本案例要求编写三个脚本程序，分别实现以下目标：</p>
+
+<p>1&gt; 在屏幕上输出一段文字“Hello World”<br />
+2&gt; 能够为本机快速配好Yum仓库<br />
+3&gt; 能够为本机快速装配好vsftpd服务</p>
+
+<h3 id="方案">方案：</h3>
+
+<p>一个规范的Shell脚本构成包括：</p>
+
+<p>1&gt; 脚本声明（需要的解释器、作者信息等）<br />
+2&gt; 注释信息（步骤、思路、用途、变量含义等）<br />
+3&gt; 可执行语句（操作代码）</p>
+
+<h3 id="步骤-1">步骤：</h3>
+
+<p>步骤一：编写第一个Shell脚本，输出“Hello World”</p>
+
+<p>1）根据手动任务操作编写脚本文件</p>
+
+<p>[root@svr5 ~]# vim /root/first.sh<br />
+#!/bin/bash<br />
+echo &lsquo;Hello World&rsquo;<br />
+[root@svr5 ~]# chmod +x /root/first.sh //添加可执行权限<br />
+2）执行脚本，测试效果</p>
+
+<p>[root@svr5 ~]# /root/first.sh<br />
+Hello World</p>
+
+<p>3）Shell脚本的执行方式：</p>
+
+<p>方法一，作为“命令字”：指定脚本文件的路径，前提是有 x 权限</p>
+
+<p>[root@svr5 ~]# ./first.sh //指定相对路径<br />
+[root@svr5 ~]# /root/first.sh //指定绝对路径</p>
+
+<p>方法二，作为“参数”：使用bash、sh、source来加载脚本文件</p>
+
+<p>[root@svr5 ~]# bash first.sh //开启子进程<br />
+[root@svr5 ~]# sh first.sh //开启子进程<br />
+[root@svr5 ~]# source first.sh //不开启子进程</p>
+
+<p>步骤二：编写为本机快速配Yum仓库的Shell脚本</p>
+
+<p>1）Yum仓库配置文件的参考内容如下：</p>
+
+<p>[root@svr5 ~]# cat /etc/yum.repos.d/rhel6.repo<br />
+[rhel6]<br />
+name=Red Hat Enterprise Linux 6<br />
+baseurl=file:///misc/cd<br />
+enabled=1<br />
+gpgcheck=1<br />
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release</p>
+
+<p>2）根据参考文件的内容，编写脚本内容如下：</p>
+
+<p>[root@svr5 ~]# vim /root/el6repo.sh<br />
+#!/bin/bash<br />
+rm -rf /etc/yum.repos.d/*.repo<br />
+echo &lsquo;[rhel-packages]<br />
+name=Red Hat Enterprise Linux 6<br />
+baseurl=file:///misc/cd<br />
+gpgcheck=1<br />
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release<br />
+&rsquo; &gt; /etc/yum.repos.d/rhel6.repo<br />
+[root@svr5 ~]# chmod +x /root/el6repo.sh //添加可执行权限</p>
+
+<p>3）执行脚本，测试效果</p>
+
+<p>执行配置Yum仓库的脚本：</p>
+
+<p>[root@svr5 ~]# /root/el6repo.sh</p>
+
+<p>检查配置结果：</p>
+
+<p>[root@svr5 ~]# ls /etc/yum.repos.d/* //仓库配置已建立<br />
+/etc/yum.repos.d/rhel6.repo<br />
+[root@svr5 ~]# yum repolist //Yum仓库已可用<br />
+rhel-packages | 3.9 kB 00:00 &hellip;<br />
+rhel-packages/primary_db | 3.1 MB 00:00 &hellip;<br />
+repo id repo name status<br />
+rhel-packages Red Hat Enterprise Linux 6 3,690<br />
+repolist: 3,690</p>
+
+<p>步骤三：编写快速装配vsftpd服务的Shell脚本</p>
+
+<p>1）编写参考脚本文件如下：</p>
+
+<p>[root@svr5 ~]# vim /root/ftpon.sh<br />
+#!/bin/bash<br />
+yum -y install vsftpd &amp;&gt; /dev/null<br />
+systemctl start vsftpd<br />
+systemctl enable vsftpd<br />
+[root@svr5 ~]# chmod +x /root/ftpon.sh //添加可执行权限</p>
+
+<p>2）执行脚本，测试效果</p>
+
+<p>执行快速装配vsftpd服务的脚本：</p>
+
+<p>[root@svr5 ~]# /root/ftpon.sh</p>
+
+<p>确认脚本执行结果：</p>
+
+<p>[root@svr5 ~]# rpm -q vsftpd<br />
+vsftpd-3.0.2-10.el7.x86_64<br />
+[root@svr5 ~]# systemctl status vsftpd</p>
+
+<p><strong>三、使用Shell变量</strong></p>
+
+<h3 id="目标-2">目标：</h3>
+
+<p>本案例要求熟悉Shell变量的使用，主要练习或验证下列内容：</p>
+
+<p>1&gt; 定义/赋值/查看变量<br />
+2&gt; 环境/预定义/位置变量的应用</p>
+
+<p>除了学会建立和引用变量以外，还要认识环境变量PWD、USER、HOME、SHELL，还有预定义变量$0、$$、$?、$#、$*，以及位置变量$1、$2、$10、……的作用。</p>
+
+<h3 id="步骤-2">步骤：</h3>
+
+<p>步骤一：变量的定义/赋值/查看</p>
+
+<p>1）新建/赋值变量</p>
+
+<p>新建变量SCHOOL，赋值“Tarena IT GROUP”，通过set命令可以检查变量设置：</p>
+
+<p>[root@svr5 ~]# SCHOOL=&ldquo;Tarena IT&rdquo;<br />
+[root@svr5 ~]# set | grep SCHOOL<br />
+SCHOOL=&lsquo;Tarena IT&rsquo;</p>
+
+<p>2）查看变量</p>
+
+<p>通过echo $变量名 可输出变量值：</p>
+
+<p>[root@svr5 ~]# echo $SCHOOL<br />
+Tarena IT<br />
+查看变量时，若变量名称与后面要输出的字符串连在一起，则应该以{}将变量名括起来以便区分：</p>
+
+<p>[root@svr5 ~]# echo $SCHOOLGroup //无法识别变量名SCHOOL<br />
+[root@svr5 ~]# echo ${SCHOOL}Group //区分后可以识别<br />
+Tarena ITGroup</p>
+
+<p>3）撤销自定义变量</p>
+
+<p>若要撤销已有的变量，可使用unset命令：</p>
+
+<p>[root@svr5 ~]# unset SCHOOL //撤销变量SCHOOL<br />
+[root@svr5 ~]# echo $SCHOOL //查看时已无结果</p>
+
+<p>步骤二：使用环境变量</p>
+
+<p>1）查看环境变量相关文件</p>
+
+<p>全局文件为/etc/profile，对所有用户有效；用户文件为~/.bash_profile，仅对指定的用户有效。</p>
+
+<p>查看/etc/profile文件内容：</p>
+
+<p>[root@svr5 ~]# cat /etc/profile<br />
+.. ..<br />
+if [ -x /usr/bin/id ]; then<br />
+USER=&rdquo;<code>id -un</code>&rdquo;<br />
+LOGNAME=$USER<br />
+MAIL=&ldquo;/var/spool/mail/$USER&rdquo;<br />
+fi<br />
+HOSTNAME=<code>/bin/hostname</code><br />
+HISTSIZE=1000<br />
+.. ..<br />
+export PATH USER LOGNAME MAIL HOSTNAME HISTSIZE INPUTRC<br />
+.. ..</p>
+
+<ol>
+<li></li>
+</ol>
+
+<p>2）使用环境变量</p>
+
+<p>当前用户的环境变量USER记录了用户名、LOGNAME记录了登录名、HOME记录了宿主目录、SHELL记录了登录Shell、HOSTNAME记录主机名、TERM记录终端类型：</p>
+
+<p>[root@svr5 ~]# echo $USER $LOGNAME $HOME $SHELL<br />
+root root /root /bin/bash<br />
+[root@svr5 ~]# echo $HOSTNAME<br />
+svr5.tarena.com</p>
+
+<p>环境变量PS1表示Shell环境的一级提示符，即命令行提示符（\u 用户名、\h 主机名、\W 工作目录、\$ 权限标识）：</p>
+
+<p>[root@svr5 src]# echo $PS1 //查看默认的一级提示<br />
+[\u@\h \W]\$<br />
+[root@svr5 src]#PS1=&lsquo;bash-3.2\$&rsquo; //修改一级提示<br />
+bash-3.2# //更改结果<br />
+bash-3.2#PS1=&rsquo;[\u@\h \W]\$ &lsquo;  //恢复原有设置<br />
+[root@svr5 src]#</p>
+
+<p>环境变量PS2表示二级提示符，出现在强制换行、at任务编辑等场合：</p>
+
+<p>[root@svr5 ~]# echo $PS2 //查看默认的二级提示<br />
+&gt;<br />
+[root@svr5 src]# cd \ //强制换行，观察提示符效果<br />
+&gt; /root/<br />
+[root@svr5 ~]# PS2=&lsquo;=&gt; &rsquo; //手动修改二级提示<br />
+[root@svr5 ~]# cd \ //再次验证提示符效果<br />
+=&gt; ~<br />
+[root@svr5 ~]# PS2=&lsquo;&gt; &rsquo; //恢复原有设置</p>
+
+<p>3）查看系统变量</p>
+
+<p>使用env可查看所有环境变量：</p>
+
+<p>[root@svr5 src]# env<br />
+HOSTNAME=svr5.tarena.com<br />
+SHELL=/bin/bash<br />
+HISTSIZE=1000<br />
+SSH_CLIENT=192.168.4.110 59026 22<br />
+OLDPWD=/root<br />
+SSH_TTY=/dev/pts/0<br />
+USER=root<br />
+.. ..</p>
+
+<p>使用set可查看所有变量（包括env能看到的环境变量）：</p>
+
+<p>[root@svr5 src]# set<br />
+BASH=/bin/bash<br />
+BASH_ARGC=()<br />
+BASH_ARGV=()<br />
+BASH_LINENO=()<br />
+.. ..<br />
+步骤三：使用位置变量与预定义变量<br />
+1）创建一个测试脚本，用来展示。</p>
+
+<p>[root@svr5 ~]# vim location.sh<br />
+#!/bin/bash<br />
+echo $0 //脚本的名称<br />
+echo $1 //第一个参数<br />
+echo $2 //第二个参数<br />
+echo $* //所有参数<br />
+echo $# //所有参数的总和<br />
+echo $$ //当前进程的进程号<br />
+echo $? //上一个程序的返回状态码<br />
+[root@svr5 ~]# chmod +x location.sh //添加可执行权限</p>
+
+<p>2）执行脚本location.sh，细心观察结果（高明的武功需要用心参悟）。</p>
+
+<p>[root@svr5 ~]# ./location.sh one 1 2 abc qq 8 7</p>
+
+<p>步骤四：创建账户与修改密码的脚本</p>
+
+<p>1）编写脚本。</p>
+
+<p>[root@svr5 ~]# vim /root/user.sh<br />
+#!/bin/bash<br />
+useradd $1<br />
+echo &ldquo;$2&rdquo; |passwd &ndash;stdin $1</p>
+
+<p>执行脚本测试：</p>
+
+<p>[root@svr5 ~]# ./user.sh jerry 123456<br />
+更改用户 jerry 的密码 。<br />
+passwd： 所有的身份验证令牌已经成功更新。</p>
+
+<p><strong>四、变量的扩展应用</strong></p>
+
+<h3 id="目标-3">目标：</h3>
+
+<p>本案例要求进一步熟悉Shell变量的赋值控制，主要练习或验证下列内容：</p>
+
+<p>1&gt; 三种引号对赋值的影响<br />
+2&gt; 使用read命令从键盘读取变量值<br />
+3&gt; 使用export发布全局变量</p>
+
+<h3 id="步骤-3">步骤：</h3>
+
+<p>步骤一：三种引号对变量赋值的影响</p>
+
+<p>1）双引号的应用</p>
+
+<p>使用双引号可以界定一个完整字符串。</p>
+
+<p>[root@svr5 ~]# SCHOOL=Tarena IT Group<br />
+-bash: IT: command not found //未界定时赋值失败<br />
+[root@svr5 ~]# SCHOOL=&ldquo;Tarena IT Group&rdquo; //界定后成功<br />
+[root@svr5 ~]# touch aa bb //创建了两个文件<br />
+[root@svr5 ~]# touch &ldquo;aa bb&rdquo; //创建了一个文件<br />
+[root@svr5 ~]# ll //查看结果</p>
+
+<p>2）单引号的应用</p>
+
+<p>界定一个完整的字符串，并且可以实现屏蔽特殊符号的功能。</p>
+
+<p>[root@svr5 ~]# NOTE=&lsquo;当前的用户是:$USER&rsquo;<br />
+[root@svr5 ~]# echo $NOTE<br />
+当前的用户是:$USER //单引号内的 $ 被视为普通字符</p>
+
+<p>3）反撇号或$()的应用</p>
+
+<p>使用反撇号或$()时，可以将命令执行的标准输出作为字符串存储，因此称为命令替换。</p>
+
+<p>[root@svr5 ~]# tar -czf log-<code>date +%Y%m%d</code>.tar.gz /var/log</p>
+
+<p>步骤二：使用read命令从键盘读取变量值</p>
+
+<p>1）read基本用法</p>
+
+<p>执行后从会等待并接受用户输入（无任何提示的情况），并赋值给变量str：</p>
+
+<p>[root@svr5 ~]# read str<br />
+What&rsquo;s happen ? //随便输入一些文字，按Enter键提交<br />
+[root@svr5 ~]# echo $str  //查看赋值结果<br />
+What&rsquo;s happen ?</p>
+
+<p>为了不至于使用户不知所措、莫名其妙，推荐的做法是结合-p选项给出友好提示：</p>
+
+<p>[root@svr5 ~]# read -p &ldquo;请输入一个整数：&rdquo; i<br />
+请输入一个整数：240<br />
+[root@svr5 ~]# echo $i<br />
+240</p>
+
+<ol>
+<li>240</li>
+</ol>
+
+<p>2）stty终端显示控制</p>
+
+<p>将回显功能关闭（stty -echo），</p>
+
+<p>将回显功能恢复（stty echo）。</p>
+
+<p>可参考下列操作创建一个测试脚本：</p>
+
+<p>[root@svr5 ~]# vim sttyecho.sh //创建一个测试脚本<br />
+#!/bin/bash<br />
+read -p &ldquo;请输入用户名: &ldquo; USERNAME //读取用户名<br />
+stty -echo //关闭回显<br />
+read -p &ldquo;请输入密码: &ldquo; PASSWORD //读取密码<br />
+stty echo //恢复回显<br />
+echo &ldquo;&rdquo;  //恢复回显后补一个空行<br />
+echo &ldquo;您的用户名是: $USERNAME&rdquo; //确认赋值结果<br />
+[root@svr5 ~]# chmod +x sttyecho.sh //添加执行权限</p>
+
+<p>执行测试脚本sttyecho.sh，验证效果：</p>
+
+<p>[root@svr5 ~]# ./sttyecho.sh<br />
+请输入用户名: root //输入root，回车<br />
+请输入密码: //输入1234567（不会显示），回车<br />
+您的用户名是: root //脚本反馈结果</p>
+
+<p>步骤三：使用export发布全局变量</p>
+
+<p>默认情况下，自定义的变量为局部变量，只在当前Shell环境中有效，而在子Shell环境中无法直接使用。比如已定义的SCHOOL变量，当进入到sh或bash子Shell后，变量SCHOOL将处于未定义的状态：</p>
+
+<p>[root@svr5 ~]# echo $SCHOOL<br />
+Tarena IT Group<br />
+[root@svr5 ~]# sh //开启一个sh子进程<br />
+sh-3.2# echo $SCHOOL //查看SCHOOL变量值无结果<br />
+sh-3.2# exit //返回原有Shell环境<br />
+exit<br />
+[root@svr5 ~]# bash //开启bash子进程<br />
+[root@svr5 ~]# echo $SCHOOL //查看SCHOOL变量值无结果<br />
+[root@svr5 ~]# exit //返回原有Shell环境<br />
+exit<br />
+[root@svr5 ~]#<br />
+若希望定义的变量能被子进程使用，可以使用export命令将其发布为全局变量。使用export发布时，只需指定变量名（可以有多个）即可，也可以通过export命令直接设置新的全局变量：</p>
+
+<p>[root@svr5 ~]# export SCHOOL //发布已定义的变量<br />
+[root@svr5 ~]# export XX=&ldquo;1234&rdquo;  //发布新变量<br />
+[root@svr5 ~]# NSD=&ldquo;Network&amp;System Direction&rdquo;<br />
+[root@svr5 ~]# export NSD YY=&ldquo;5678&rdquo; //混合式发布</p>
+
+<p>验证刚刚发布的全局变量：</p>
+
+<p>[root@svr5 ~]# sh //进入sh子Shell环境<br />
+sh-3.2# echo $SCHOOL //查看全局变量的值 .. ..<br />
+Tarena IT Group<br />
+sh-3.2# echo $NSD<br />
+Network&amp;System Direction<br />
+sh-3.2# echo $XX $YY<br />
+1234 5678<br />
+sh-3.2# exit //返回原有Shell环境<br />
+exit<br />
+[root@svr5 ~]#</p>
+
+<p>若要取消全局变量的全局属性，可结合export命令的 -n
+选项；若要取消变量，则应使用unset命令。比如，以下操作可将前面发布的SCHOOL、XX恢复成局部变量：</p>
+
+<p>[root@svr5 ~]# export -n SCHOOL XX //取消全局变量属性<br />
+[root@svr5 ~]# echo $SCHOOL $XX //局部变量SCHOOL、XX仍可用<br />
+Tarena IT Group 1234<br />
+[root@svr5 ~]# sh<br />
+sh-3.2# echo $SCHOOL $XX //全局变量SCHOOL、XX已不可用<br />
+sh-3.2# exit //返回原有Shell环境<br />
+exit<br />
+[root@svr5 ~]#</p>
+
+<p>转载于:<a href="https://www.cnblogs.com/baichuanhuihai/p/8241363.html">https://www.cnblogs.com/baichuanhuihai/p/8241363.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

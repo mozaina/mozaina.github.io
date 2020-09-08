@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本向磁盘中批量写入数据 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本向磁盘中批量写入数据 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本向磁盘中批量写入数据">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%90%91%E7%A3%81%E7%9B%98%E4%B8%AD%E6%89%B9%E9%87%8F%E5%86%99%E5%85%A5%E6%95%B0%E6%8D%AE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本向磁盘中批量写入数据</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>一、关于本文</strong></p>
+
+<p>工作要做的监控系统需要监控磁盘空间的使用率并报警。在测试这个功能的时候需要模拟两个场景：一是磁盘空间不断增长超过设定的阈值时，需要触发报警机制；二是磁盘空间降落到低于报警阈值的时候，不再进行报警。为了测试这两个场景，我写了下面三个脚本：</p>
+
+<p>1）initializer.sh：创建目录TestDir，并创建一个大文件template</p>
+
+<p>2）duplicator.sh：不断复制文件template，直到磁盘空间使用率超过输入的参数为止</p>
+
+<p>3）cleaner.sh：清除前面两个脚本留下的痕迹，即删除目录TestDir</p>
+
+<p><strong>二、initializer.sh</strong></p>
+
+<p>最开始创建一个大文件的方式是通过Shell向文件中写入字符并复制的方式，代码如下（initializer.sh.old）：</p>
+
+<pre><code>#!/bin/sh
+
+#本脚本用于初始化工作，创建文件夹TestDir并写入一个大小为100M的目录
+
+#创建文件TestDir
+if [ -x &quot;./TestDir&quot; ]; then
+    rm -rf TestDir
+fi
+mkdir TestDir
+cd TestDir
+mkdir Template
+cd Template
+
+touch template.txt
+
+#制作大小为100K的文件template.txt
+string=&quot;&quot;
+repetend=&quot;012345678901234|&quot;
+for((i=1;i&lt;6400;i++))
+do
+    string=$string$repetend
+done
+echo $string &gt;&gt; template.txt
+
+#复制1000个该文件
+i=0
+while [ true ]; do
+    if [ &quot;$i&quot; -gt 1020 ]; then
+        break
+    fi
+    cp template.txt $i
+    ((i++))
+done
+
+echo &quot;文件制造完毕，空间占用信息如下&quot;
+pwd .
+du -sh .
+
+cd ../..
+
+exit 0
+</code></pre>
+
+<p>这种方式效率比较低，并且代码比较长，后来改用dd命令实现功能（initializer.sh）：</p>
+
+<pre><code>#!/bin/sh
+
+#本脚本用于初始化工作，创建文件夹TestDir并写入一个大小为100M的目录
+
+#创建文件TestDir
+if [ -x &quot;./TestDir&quot; ]; then
+    rm -rf TestDir
+fi
+mkdir TestDir
+cd TestDir
+
+dd if=/dev/zero of=template bs=1M count=1024
+
+pwd .
+du -sh .
+
+cd ..
+
+exit 0
+</code></pre>
+
+<p>这个脚本创建了TestDir目录，并在里面写入了一个1.1GB的文件template</p>
+
+<p><strong>三、duplicator.sh</strong></p>
+
+<p>脚本duplicator.sh接受一个5-95的数字，作为阈值。这个脚本不断复制initializer.sh创建的template文件，直到里面指定的磁盘空间使用率超过输入的阈值时，才停止运行。</p>
+
+<pre><code>#!/bin/sh
+
+#运行本脚本前请先运行脚本 initializer.sh
+#本脚本用于不断复制文件，直到给出的参数阈值超过当前磁盘空间利用率
+#输入参数：磁盘空间使用率阈值
+
+#函数：打印脚本使用说明
+function usage()
+{
+    echo &quot;Usage: ./duplicator [threshold]&quot;
+    echo &quot;threshold is an integer in the range of [1,99]&quot;
+    echo &quot;*Run initializer.sh before run this script&quot;
+    exit 0
+}
+
+#脚本有且只有一个输入
+if [ &quot;$#&quot; -ne 1 ]; then
+    echo &quot;脚本应有且只有一个输入&quot;
+    usage
+fi
+
+#脚本的输入必须为5-95之间的正整数
+threshold=`echo $1 | bc`
+if [ &quot;$threshold&quot; -lt 5 -o &quot;$threshold&quot; -gt 95 ]; then
+    echo &quot;脚本的输入必须为5-95之间的正整数&quot;
+    usage
+fi
+
+#目录TestDir必须存在
+if [ ! -d ./TestDir ]; then
+    echo &quot;缺少目录 TestDir&quot;
+    usage
+fi
+
+#文件TestDir/template必须存在
+if [ ! -f ./TestDir/template ]; then
+    echo &quot;缺少文件 TestDir/template&quot;
+    usage
+fi
+
+cd TestDir
+
+#复制文件，超过输入的阈值为止
+i=0
+while [ true ]; do
+    cur=`df -h | grep /dev/sda3 | awk '{printf substr($5,1,length($5)-1)}'`
+    echo &quot;Current usage: $cur | Object usage: $threshold&quot;
+    if [ &quot;$cur&quot; -gt &quot;$threshold&quot; ]; then
+        break;
+    fi
+    cp template $i
+    echo &quot; $i Duplication complete!&quot;
+    ((i++))
+done
+
+cd .. #TestDir
+
+echo &quot;Script finished!&quot;
+
+exit 0
+</code></pre>
+
+<p><strong>四、cleaner.sh</strong></p>
+
+<p>这个脚本用于清除前两个脚本在系统中留下的痕迹</p>
+
+<pre><code>#!/bin/sh
+
+#本脚本用于清空脚本initializer.sh和duplicator.sh留下的痕迹
+
+#检查文件是否存在
+if [ ! -x &quot;./TestDir&quot; ]; then
+    echo &quot;文件 ./TestDir 不存在，无需清除&quot;
+    exit 0
+fi
+
+#用户确认后清除文件
+echo &quot;真的要清除全部数据吗？ (y/n)&quot;
+read input
+case &quot;$input&quot; in
+    y* | Y* )
+        rm -rf ./TestDir
+        echo &quot;数据删除完毕&quot;;;
+    n* | N* )
+        echo &quot;放弃删除数据&quot;;;
+    * )
+        echo &quot;输入未识别&quot;;;
+esac
+
+exit 0
+</code></pre>
+
+<p><strong>五、调用效果截图</strong></p>
+
+<p><strong><a href="https://img.it610.com/image/info8/d7d5cae6d6cb4ada833bdc4d6ef6cb3e.png"><img src="https://img.it610.com/image/info8/d7d5cae6d6cb4ada833bdc4d6ef6cb3e.png" alt="Shell脚本:向磁盘中批量写入数据_第1张图片" /></a></strong></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

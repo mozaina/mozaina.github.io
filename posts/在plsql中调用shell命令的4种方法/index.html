@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>在plsql中调用shell命令的4种方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="在plsql中调用shell命令的4种方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="在plsql中调用shell命令的4种方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%9C%A8plsql%E4%B8%AD%E8%B0%83%E7%94%A8shell%E5%91%BD%E4%BB%A4%E7%9A%844%E7%A7%8D%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">在plsql中调用shell命令的4种方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>本来想是一个很简单的操作，可惜Oracle没有提供简单的一个命令（也许我不知道吧），只好进行一些复杂点的操作了。一般有三种方式实现：</p>
+
+<p>1. 利用DBMS_PIPE包并创建OS上运行的守护进程；</p>
+
+<p>2. 调用c程序来实现</p>
+
+<p>3. 利用java的getRuntime().exec；</p>
+
+<p>4. 使用oracle的EXECUTABLE jobs功能。</p>
+
+<p><strong>利用DBMS_PIPE包并创建OS上运行的守护进程</strong></p>
+
+<p>觉得这种方式复杂，还要用到pro*c，没试。(</p>
+
+<p><strong>利用java的getRuntime().exec</strong></p>
+
+<p>这种好点，java用的还是蛮多的。</p>
+
+<p>1）写个简单的java程序 ExecuteCmd.java</p>
+
+<p>import java.lang.Runtime; import java.lang.Process; import
+java.io.IOException; import java.lang.InterruptedException; class ExecuteCmd {
+public static void main(String args[]) { System.out.println(&ldquo;Start
+executing&rdquo;); try { /* Execute the command using the Runtime object and get the
+Process which controls this command <em>/ Process p =
+Runtime.getRuntime().exec(args[0]); /</em> Use the following code to wait for the
+process to finish and check the return code from the process <em>/ try {
+p.waitFor(); /</em> Handle exceptions for waitFor() <em>/ } catch
+(InterruptedException intexc) { System.out.println(&ldquo;Interrupted Exception on
+waitFor: &ldquo; + intexc.getMessage()); } System.out.println(&ldquo;Return code from
+process: &ldquo;+ p.exitValue()); System.out.println(&ldquo;Done executing&rdquo;); /</em> Handle
+the exceptions for exec() */ } catch (IOException e) { System.out.println(&ldquo;IO
+Exception from exec: &ldquo; + e.getMessage()); e.printStackTrace(); } } }</p>
+
+<p>2）编译生成 ExecuteCmd.class</p>
+
+<p>javac ExecuteCmd.java</p>
+
+<p>3）加载到oracle中</p>
+
+<p>$ loadjava -user system/manager ExecuteCmd.class</p>
+
+<p>4）生成java存储过程</p>
+
+<p>CREATE OR REPLACE PROCEDURE executecmd (S1 VARCHAR2) AS LANGUAGE JAVA name
+&lsquo;ExecuteCmd.main(java.lang.String[])&lsquo;; /</p>
+
+<p>测试：</p>
+
+<p>SQL&gt; set serveroutput on SQL&gt; call dbms_java.set_output(2000); SQL&gt; EXEC
+executecmd(&lsquo;/bin/touch /home/oracle/a.txt&rsquo;); Start executing Return code from
+process: 0 Done executing PL/SQL procedure successfully completed. SQL&gt; host $
+ls /home/oracle a.txt</p>
+
+<p>执行成功了，但还是有些问题，比如参数中不能使用环境变量 EXEC executecmd(&lsquo;/bin/touch <strong>$HOME</strong>
+/a.txt&rsquo;)执行不行，绝对路径和相对路径的问题，还要给执行用户（这里是system用户）授予相应的权限等等。所以我觉得还是应该先把要做的事写一个shell可执行脚本，然后再如上调用，这样会省去一些麻烦。</p>
+
+<p><strong>使用C程序调用</strong></p>
+
+<p>有时，我们会发现有些功能通过PL/SQL完成会很麻烦，而通过C/C++语言编程则会容易很多。因此， <strong>oracle</strong>
+提供了在PL/SQL程序里直接调用外部函数（包括C函数或Java方法）的功能，从而扩展了PL/SQL的程序功能。调用外部函数的过程如下图所示。</p>
+
+<p><a href="https://img.it610.com/image/info8/4ddbe8816e544e2b96b61882794167dd.jpg"><img src="https://img.it610.com/image/info8/4ddbe8816e544e2b96b61882794167dd.jpg" alt="在pl/sql中调用shell命令的4种方法_第1张图片" /></a></p>
+
+<p>调用外部函数的过程</p>
+
+<p>从上图可以看出，调用外部函数的过程包括：</p>
+
+<p>1) 用户进程执行PL/SQL程序。</p>
+
+<p>2) 在执行的PL/SQL程序过程中，调用了一个C/C++语言写的函数：c_func。这里需要借助别名库（Alias Library）。别名库是
+<strong>数据库</strong> 里的一个对象，用来描述一个外部函数所在的动态链接库的路径和名称。通过别名库，从而可以知道被调用的外部函数在哪个文件里。</p>
+
+<p>3) PL/SQL将对外部函数的调用请求发送给监听器。</p>
+
+<p>4)
+监听器生成一个extproc进程，该进程专门用来处理对外部函数的调用。每个session都会生成一个属于该session的extproc进程，并且在整个session生命周期里，extproc进程会一直存在。</p>
+
+<p>5) Extproc进程负责将别名库所指定的动态链接库文件加载到内存。</p>
+
+<p>6) Extproc进程执行指定的外部函数，并将结果返回给服务器进程，进而返回给用户进程。</p>
+
+<p>需要对监听器进行配置，从而启动extproc进程，配置方式如前面的图11-3所示。其中(ADDRESS = (PROTOCOL = IPC)(KEY =
+EXTPROC0))说明监听extproc进程请求的地址；而SID_DESC部分则说明extproc进程的连接信息。</p>
+
+<p>然后我们还要配置tnsnames.ora文件，注意，该文件也必须位于数据库服务器端。我们需要添加如下图的内容。</p>
+
+<p><a href="https://img.it610.com/image/info8/24067820fa6e4a2bbfc3d3b96903671b.jpg"><img src="https://img.it610.com/image/info8/24067820fa6e4a2bbfc3d3b96903671b.jpg" alt="在pl/sql中调用shell命令的4种方法_第2张图片" /></a></p>
+
+<p>配置tnsnames.ora</p>
+
+<p>配置完毕以后，可以尝试tnsping连接字符串名称，如果成功，则说明监听没有问题。</p>
+
+<p>[oracle@book admin]$ tnsping EXTPROC_CONNECTION_DATA</p>
+
+<p>接下来，我们创建一个C语言编写的函数，如下所示。该函数完成的功能非常简单，计算传入参数的15％，并作为税额返回给调用者。</p>
+
+<p>[oracle@book ~]$ vi calc_tax.c</p>
+
+<p>calc_tax(n)</p>
+
+<p>int n;</p>
+
+<p>{</p>
+
+<p>int tax;</p>
+
+<p>tax=(n*15)/100;</p>
+
+<p>return (tax);</p>
+
+<p>}</p>
+
+<p>将calc_tax.c文件编译成动态链接库，并将生成的库文件拷贝到$ORACLE_HOME/bin目录下：</p>
+
+<p>[oracle@book ~]$ cc -shared -o calc_tax.so calc_tax.c</p>
+
+<p>[oracle@book ~]$ cp calc_tax.so $ORACLE_HOME/bin</p>
+
+<p>然后，我们创建一个别名库，用来说明将要调用的C函数所在的库文件，并将使用c_code别名库的权限赋给HR用户：</p>
+
+<p>SQL&gt; connect / as sysdba</p>
+
+<p>SQL&gt; create or replace library c_code as &lsquo;$ORACLE_HOME/bin/calc_tax.so&rsquo;;</p>
+
+<p>2 /</p>
+
+<p>SQL&gt; grant execute on c_code to hr;</p>
+
+<p>要使用这个calc_tax函数，还必须在数据库里创建一个调用声明。如下所示：</p>
+
+<p>SQL&gt; connect hr/hr</p>
+
+<p>SQL&gt; create or replace function call_c</p>
+
+<p>2 (x binary_integer)</p>
+
+<p>3 return binary_integer</p>
+
+<p>4 as language C</p>
+
+<p>5 library sys.c_code</p>
+
+<p>6 name &ldquo;calc_tax&rdquo;;</p>
+
+<p>7 /</p>
+
+<p>在调用声明里定义了calc_tax函数的传入传出参数、所在的别名库名称（library sys.c_code部分）、以及在动态链接库中的函数名（name
+&ldquo;calc_tax&rdquo;）等。</p>
+
+<p>现在，我们就可以通过调用call_c，进而调用calc_tax函数了。如下所示：</p>
+
+<p>SQL&gt; set serveroutput on</p>
+
+<p>SQL&gt; var v_salary number;</p>
+
+<p>SQL&gt; var v_tax number;</p>
+
+<p>SQL&gt; exec :v_salary := 10000;</p>
+
+<p>SQL&gt; exec :v_tax := call_c(:v_salary);</p>
+
+<p>SQL&gt; print v_tax;</p>
+
+<p>V_TAX</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<p>1500</p>
+
+<p>从返回结果可以看到，我们成功调用了C函数：calc_tax。</p>
+
+<p>注：以上内容摘自《Oracle数据库核心技术与实务详解－教你如何成为10g OCP》一书</p>
+
+<p><strong>使用oracle的EXECUTABLE jobs功能</strong></p>
+
+<p>对DBMS_SCHEDULER没什么研究，论坛上有个例子，但我没试通，有时间再研究一下，应该也可以。</p>
+
+<p>exec DBMS_SCHEDULER.CREATE_JOB
+(job_name=&gt;&lsquo;test13&rsquo;,job_type=&gt;&lsquo;EXECUTABLE&rsquo;,job_action=&gt;&lsquo;/tmp/test1.sh&rsquo;); exec
+DBMS_SCHEDULER.RUN_JOB(job_name=&gt;&lsquo;test13&rsquo;);</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

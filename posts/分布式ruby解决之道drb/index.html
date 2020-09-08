@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>分布式Ruby解决之道DRb | 开发者问答集锦</title>
+    <meta property="og:title" content="分布式Ruby解决之道DRb - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="分布式Ruby解决之道DRb">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%88%86%E5%B8%83%E5%BC%8Fruby%E8%A7%A3%E5%86%B3%E4%B9%8B%E9%81%93drb/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">分布式Ruby解决之道DRb</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h4 id="分布式ruby解决之道">分布式Ruby解决之道</h4>
+
+<blockquote>
+<p>其实用Druby很久了，今天需要完成一个进程数据同步的机制，我需要的不是运行速度快，不是用 linux / mac
+下的扩展，而是独立，快速开发效率，方便最简单的Ruby环境可运行，可以吗？
+DRb(即分布式Ruby，下面都这样说它)是内置于Ruby标准库中的对象代理的实现。什么是对象代理，现在不明白不要紧，一会就知道了。</p>
+</blockquote>
+
+<h4 id="解决什么样的问题">解决什么样的问题？</h4>
+
+<p>有的时候，我们需要提供远程的服务，比如提供远程API调用（如果你听过RPC，或WDSL），这样，我们可以很大程度上解耦各大模块，对外提供服务。</p>
+
+<p>还有的时候，我们需要在两个进程中通信，以获得互相的同步或资源。</p>
+
+<p>更有，我想实现实现某种透明的对象，让对象可以在不同的进程或主机上传递。</p>
+
+<p>这些，都可以通过 DRb 来实现。DRb
+的相关文档非常少，但在想快速实现一个轻量级分布应用，依赖最少化时，使用它是非常方便的。我对分布式的研究不多，欢迎各位看了本文后能提出更多解决方案。</p>
+
+<h4 id="使用方法">使用方法</h4>
+
+<p>依官方的例子为主，各位看官建议看的时候复制下试试。因为是分布式解决方案，肯定是 服务端 与 客户端 双方的代码。</p>
+
+<ol>
+<li><p>简单的例子</p>
+
+<ul>
+<li><p>服务端</p>
+
+<pre><code># ==== 服务端代码，保存为 timer_server.rb
+#
+require 'drb/drb'
+
+# 监听的地址，你可以改为 0.0.0.0 来支持远程连接
+URI=&quot;druby://localhost:8787&quot;
+
+class TimeServer
+
+  def get_current_time
+    return Time.now
+  end
+
+end
+
+# 被代理的对象，客户端获取的到的对象就是它
+FRONT_OBJECT=TimeServer.new
+
+DRb.start_service(URI, FRONT_OBJECT)
+# 
+DRb.thread.join
+</code></pre></li>
+
+<li><p>客户端</p>
+
+<pre><code># ==== timer_client.rb
+
+require 'drb/drb'
+
+SERVER_URI=&quot;druby://localhost:8787&quot;
+
+# 这句是必要的，因为我们很快会用到回调与引用，一会说。
+# 所以纯粹的客户端是不存在的。
+DRb.start_service
+
+timeserver = DRbObject.new_with_uri(SERVER_URI)
+puts timeserver.get_current_time
+</code></pre></li>
+</ul>
+
+<p>我必须要说的是，很符合我们的 C/S 模型，但是你有没有想过如果 <code>get_current_time</code> 返回一个远程对象，会发     生什么呢？ 接下来，就是我要讲的。</p></li>
+
+<li><p>远程对象代理</p>
+
+<ul>
+<li><p>服务端</p>
+
+<pre><code>require 'drb/drb'
+
+URI=&quot;druby://localhost:8787&quot;
+
+class Logger
+
+  # Logger 是被远程代理，客户端不会存在，所以用这句
+  include DRb::DRbUndumped
+
+  def initialize(n, fname)
+    @name = n
+    @filename = fname
+  end
+
+  def log(message)
+    File.open(@filename, &quot;a&quot;) do |f|
+      f.puts(&quot;#{Time.now}: #{@name}: #{message}&quot;)
+    end
+  end
+
+end
+
+class LoggerFactory
+
+  def initialize(bdir)
+    @basedir = bdir
+    @loggers = {}
+  end
+
+  def get_logger(name)
+    if !@loggers.has_key? name
+      # 保证文件名是合法的
+      fname = name.gsub(/[.\/]/, &quot;_&quot;).untaint
+      @loggers[name] = Logger.new(name, @basedir + &quot;/&quot; + fname)
+    end
+    return @loggers[name]
+  end
+
+end
+# 在执行之前你要手动创建一下dlog
+FRONT_OBJECT=LoggerFactory.new(&quot;dlog&quot;)
+
+DRb.start_service(URI, FRONT_OBJECT)
+DRb.thread.join
+</code></pre></li>
+</ul></li>
+</ol>
+
+<ul>
+<li><p>客户端</p>
+
+<pre><code>    require 'drb/drb'
+
+SERVER_URI=&quot;druby://localhost:8787&quot;
+
+DRb.start_service
+
+log_service=DRbObject.new_with_uri(SERVER_URI)
+
+[&quot;loga&quot;, &quot;logb&quot;, &quot;logc&quot;].each do |logname|
+
+  logger=log_service.get_logger(logname)
+
+  logger.log(&quot;Hello, world!&quot;)
+  logger.log(&quot;Goodbye, world!&quot;)
+  logger.log(&quot;=== EOT ===&quot;)
+
+end
+</code></pre></li>
+</ul>
+
+<p>吐嘈，执行完，你会发现日志被写在了服务端的 <code>dlog/</code> 目录里，注意 <code>DRb::DRbUndumped</code> 在<code>Logger</code>
+对象的加载，这样的对象是无须传递给客户端的，这样，客户端代码里拿到的 <code>loggger</code>
+对象是远程代理对象，所有该对象调用的方法实际上是在远程服务端执行的。我们称这种方法是按引用传递。</p>
+
+<p>那当然有一种传递叫，按值传递，什么情况是呢？显然，上面第一种方法即是，我们调用<code>get_current_time</code>
+是本地对象，再调用该对象的方法时，方法在本地执行。</p>
+
+<p>如此，便是 DRb
+的基本使用方法了，应该说不难理解。你可以这样理解，都是对象，只不是有些对象是远程的，有些是本地的，远程的对象方法的执行是在远端，本地的方法是在本地。远程的对象是包含了
+<code>DRb::DRbUpdumped</code> 的对象。不包含的都会转换为本地对象。</p>
+
+<p>那么，何为分布式的 Ruby，这明显是忽悠我们群众嘛？别急，我正要说，还记得一开始代码里注释的<code>start_service</code> 了吧。所谓 <code>服务端</code>
+可以随时获取 <code>客户端</code> 的远程对象，对吧？所以用 DRb 实现一个通信是非常简单的。为了有深入理解，我想需要将它的实现原理分析一下。</p>
+
+<h4 id="如何实现的呢">如何实现的呢</h4>
+
+<p>DRb 的本质是，一个通信底层，一个序列化方式，一个代理器，OK？你不用看都能知道是吧？因为我也会这样实现的。</p>
+
+<ol>
+<li>代理器</li>
+</ol>
+
+<p><code>method_missing</code> 将一个对象的方法传递给另一个对象的神器，谓之代理，多像有关部门，不做事情，只是将事情移交给另一个有关部门。看看核心代码：</p>
+
+<pre><code>    # drb/drb.rb: 1078 （ruby-1.9.3）
+def method_missing(msg_id, *a, &amp;b)
+  if DRb.here?(@uri)
+    obj = DRb.to_obj(@ref)
+    DRb.current_server.check_insecure_method(obj, msg_id)
+    return obj.__send__(msg_id, *a, &amp;b)
+  end
+
+  succ, result = self.class.with_friend(@uri) do
+  DRbConn.open(@uri) do |conn|
+    conn.send_message(self, msg_id, a, b)
+  end
+  #。。。处理异常
+end
+</code></pre>
+
+<p>obj显然是被代理的对象，上面除了缓存机制外，<code>send_message</code> 是 <code>method_missing</code>做的最重要的事，它引出来了下面的事情。</p>
+
+<ol>
+<li>通信底层</li>
+</ol>
+
+<p>DRb 的底层是一层透明的传输协议，通过它的接口，可以将数据（或命令）无压力收取，且看它的关键接口：</p>
+
+<pre><code>    # drb/drb.rb:728 打开一个连接
+def open(uri, config, first=true)
+  @protocol.each do |prot|
+    begin
+      return prot.open(uri, config)
+    rescue DRbBadScheme
+    rescue DRbConnError
+      raise($!)
+    rescue
+      raise(DRbConnError, &quot;#{uri} - #{$!.inspect}&quot;)
+    end
+  end
+  if first &amp;&amp; (config[:auto_load] != false)
+    auto_load(uri, config)
+    return open(uri, config, false)
+  end
+  raise DRbBadURI, 'can\'t parse uri:' + uri
+end
+
+# drb/drb.rb:901 发送一个请求，通俗的说，调用一个方法
+def send_request(ref, msg_id, arg, b)
+  @msg.send_request(stream, ref, msg_id, arg, b)
+end
+
+# 在服务端，接受一个方法
+def recv_request
+  @msg.recv_request(stream)
+end
+
+# 服务端，发送一个结果
+def send_reply(succ, result)
+  @msg.send_reply(stream, succ, result)
+end
+
+# 客户端，接受一个结果
+def recv_reply
+ @msg.recv_reply(stream)
+end
+</code></pre>
+
+<p>继续吐嘈，默认 DRb 使用 DRbTCPSocket 来通信，你可以随时调整为 UnixSocket 或者 Http ，甚至
+SSL。这个视你的需求而定，比如你要从公司用基于 Ruby 的方法，遥控你的家用电脑，建议你使用 SSL。</p>
+
+<p>抽象你的接口，是实现易于维护系统的关键，是吧。如何序列化是整个 DRb 的关键，而在 Ruby 中，这一切显得如此简单。</p>
+
+<ol>
+<li>序列化方法（与对象引用转换）</li>
+</ol>
+
+<p>Marshal 神器用来序列化对象，默认直接使用即可。例如：</p>
+
+<pre><code>    class A
+  def initialize(a)
+    @a = a
+  end
+end
+a = A.new(1)
+b = Marshal.dump(a)
+c = Marshal.load(b)
+puts c.a  # ok, 输出 1
+</code></pre>
+
+<p>它被引用在 DRb 中，做为 DRbMessage 的关键，传递对象使用。</p>
+
+<p>于是，组合以上思路，DRb 就产生了，不过，我们还缺点什么没讲，作为安全的程序员，一定要看看。</p>
+
+<p>代理对象如果被发送了 <code>instance_eval(&quot;rm -rf /&quot;)</code> Ok，我们系统没了。。。</p>
+
+<p>所以，<code>$SAFE = 1</code> 是可以保障基本安全的， 然而，这还不够，更细的控制，应该由 Ruby 1.9.1
+以后（应该是说我没深入研究过）开始的，我就不细说了，你如果有需求可以仔细看看。</p>
+
+<p>另一个问题是，分布式要求远程对象长期生效，那么你可以去研究下 <code>DRb::TimerIdConv</code> 进行生存期保存。</p>
+
+<p>最后一个问题，远程对象支持 block 调用吗？答案是，YES。 如何实现的呢？</p>
+
+<pre><code>   # drb/invokemethod.rb 
+   def perform_with_block
+     @obj.__send__(@msg_id, *@argv) do |*x|
+       jump_error = nil
+       begin
+         block_value = block_yield(x) #本质是 block.call(*x)，只是特殊处理了 Array
+       rescue LocalJumpError
+         jump_error = $!
+       end
+       if jump_error
+        case jump_error.reason
+        when :break
+          break(jump_error.exit_value)
+        else
+          raise jump_error
+        end
+     end
+     block_value
+   end
+</code></pre>
+
+<p>看的出来（再吐嘈），block是通过本地的调用后，将结果再传递给远程对象。详细可以继续看 <code>drb/drb</code> 里的<code>perform</code> 实现。</p>
+
+<p>值得注意的是，如果一个对象没有 <code>include DRb::DRbUndumped</code> 被返回到客户端，则会抛出<code>DRbUnknownError</code>
+异常。这个很容易理解。另一个注意点是，一个类无法使用 <code>Marshal.dump</code>
+时（例如打开了一个文件句柄），则需要想办法自己实现它，或者。。。或者你应该实现为远程代理类，对吧。</p>
+
+<p>好了，基本上都讲完了。代码里还有许多精华，例如 <code>self.allcate</code> 可以跳过 initialize 来创建一个类。</p>
+
+<p>看完后，你再想想开篇的需求是否可以轻松解决掉？实际上只需要几步：</p>
+
+<ul>
+<li><p>创建一个类，按一般方法编写它的方法。如果方法有返回自定义对象，根据是否远程代理加载<code>DRbUpdumped</code>。</p></li>
+
+<li><p>加载 DRb ， 启动服务。</p></li>
+
+<li><p>客户端连接，获取代理对象，调用方法。</p></li>
+</ul>
+
+<h4 id="与其他语言的解决方案的对比与区别">与其他语言的解决方案的对比与区别</h4>
+
+<ul>
+<li>JAVA的 RMI</li>
+</ul>
+
+<p>RMI 是JAVA的远程调用实现方法，这里有一篇不错的介绍：<a href="http://damies.iteye.com/blog/51778">http://damies.iteye.com/blog/51778</a> 。</p>
+
+<p>DRb 是分布式的，RMI是单向的 C/S。 DRb 不需要声明接口，直接使用。熟练后，可以极快速度完成一个通信和同步的应用。</p>
+
+<ul>
+<li>CORBA</li>
+</ul>
+
+<p>看这个：<a href="http://zh.wikipedia.org/wiki/CORBA">http://zh.wikipedia.org/wiki/CORBA</a> ， 基本原理相同，不过 DRb 足够轻，足够快。</p>
+
+<ul>
+<li>WDSL</li>
+</ul>
+
+<p>利用xml的标准RPC调用。适合于静态语言。</p>
+
+<p>由于对其他的了解不深入，欢迎熟悉的看客们提出你的看法。</p>
+
+<h4 id="其他需求">其他需求</h4>
+
+<ul>
+<li><p>在公司之前的工作时，需要将 JRuby 的对象代理到 Ruby 中，这样可以复用 gems 。</p></li>
+
+<li><p>需要远程API的方法调用另一个进程的所有方法。</p></li>
+</ul>
+
+<p>因为要代理所有本地不存在的对象，只使用 DRb 还不够。但基本思路很简单，利用一个模块的<code>const_missing</code>
+动态加载远程的对象，而远程对象在创建时均自动加载 <code>DRbUpdumped</code> 被远程代理。根据以上，我们可以写一个看似本地代码却可以轻易转到远程执行。</p>
+
+<p>例如：</p>
+
+<pre><code>    # 本地代码
+    require 'watir'
+    ie = Watir::IE.new
+    ie.goto(&quot;www.baidu.com&quot;) # 本地打开一个浏览器
+
+    # 加载为远程进程执行
+    ATU.require 'watir'
+    ie = ATU::Watir::IE.new
+    ie.goto(&quot;www.baidu.com&quot;) # 远程的进程打开一个浏览器
+</code></pre>
+
+<p>有了它，几乎同一份代码可以同用两个用途。可以非常方便的以代码级的控制远程主机和对象，并且重用性很高。</p>
+
+<p>如何实现，可以自己想想，同时可以查看这里：ruby_proxy的实现</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

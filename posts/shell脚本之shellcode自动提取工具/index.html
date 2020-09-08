@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本之shellcode自动提取工具 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本之shellcode自动提取工具 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本之shellcode自动提取工具">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E4%B9%8Bshellcode%E8%87%AA%E5%8A%A8%E6%8F%90%E5%8F%96%E5%B7%A5%E5%85%B7/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本之shellcode自动提取工具</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>最近一直在忙着写论文。突然领导又分配任务，帮写个自动提取shellcode的脚本工具。因为之前，我们都是用objdump查看后，把shellcode一个个添加进去，很麻烦，害怕写错。所以说我们写这个工具还是挺有必要的。首先我们要先了解几个用到的命令。objdump,od,dd.这几个对于提取shellcode很有用。</p>
+
+<p>objdump 有点象那个快速查看之类的工具，就是以一种可阅读的格式让你更多地了解二进制文件可能带有的附加信息。这里我们讲用到-d -F 选项。-d
+disassemble. 反汇编 那些应该还有指令机器码的section。-F
+fileoffset.显示文件偏移量。是为了我们能够定位到出我们想要的shellcode。</p>
+
+<p>od 命令。dump files in octal and other formats. 就是可以以各种格式输出文件。 -t
+输入格式，我选x1，表示十六进制一个字节为一个单位。</p>
+
+<p>dd命令。Copy a file converting and formatting according the
+operands.我用这个命令来提取shellcode。-bs选项，是每次读取的字节数。-if，输入文件。-of，输出文件。-skip，跳过的字节数，就是从objdump活得的偏移量。-count
+复制的数量，这个我们通过计算获得。</p>
+
+<p>首先我们看下用来测试的execve2.asm:</p>
+
+<pre><code>Section .text
+    global _start
+_start:
+    jmp short GotoCall
+shellcode:
+
+    pop esi
+    xor eax,eax
+    mov byte [esi + 7], al
+    lea ebx,[esi]
+    mov long [esi + 8],ebx
+    mov long [esi + 12],eax
+    mov byte al,0x0b
+    mov ebx,esi
+    lea ecx,[esi + 8]
+    lea edx,[esi + 12]
+    int 0x80
+GotoCall:
+    call shellcode
+    db '/bin/shJAAAAKKKK'
+</code></pre>
+
+<p>用nasm -f elf execve2.asm 会把文件&rsquo;execve2.asm&rsquo;汇编成&rsquo;ELF&rsquo;格式 的文件&rsquo;execve2.o</p>
+
+<p>然后我们用 objdump -d -F execve2.o 来查看。</p>
+
+<p><a href="https://img.it610.com/image/info8/2850ab17044e40fc863be8829682a8be.jpg"><img src="https://img.it610.com/image/info8/2850ab17044e40fc863be8829682a8be.jpg" alt="shell脚本之shellcode自动提取工具_第1张图片" /></a></p>
+
+<p>与之间的就是我们要提取的shellcode。首先我们看到和的偏移量：0x112,0x12c。那么这个值就可以作为我们dd命令的skip值。我们要怎么提取这个偏移量呢。。。首先想到了awk工具，那么我们可以看看，这个偏移地址总是在最后一行，那么我们就可以先用grep命令把这行提取出来，然后再用awk把最后一个字段提取出来，得到0x112):
+。然后我们在用字符串处理把）和：去掉就得到0x112。这是得到的是字符串，然后我们再用(())这个运算符来进行数值运算。就可以把0x112转换成十进制数字了。这样就可以得到我们想要的skip值。对于的偏移量我们同理可得，然后用0x12c-0x112就可以得到我们要提取的字节数，也就是dd命令的count值。具体的我们来看我写的脚本吧。</p>
+
+<p>extract_shellcode.sh</p>
+
+<p>总共有5个输入参数，第一个是输入的文件,execve2.o，
+第二个是输出文件的格式execv2.raw，第三个是shellcode开始的标识，我们这里的开始标示是，第四个是结束标识。第五个是选择我们要输出的格式，r表示只输出shellcode本身，c表示输出带有C语言的。即unsigned
+int shellcode[] =&ldquo;&ldquo;；格式的。</p>
+
+<pre><code>#!/bin/bash
+
+BEGIN=$(objdump -d -F $1 | grep “3&gt;” | awk 'NR==1 {print $NF ;}')
+BEGIN=${BEGIN%)*}
+((BEGIN=BEGIN+0x0))
+echo $BEGIN
+
+END=$(objdump -d -F $1 | grep &quot;4&gt;&quot; | awk 'NR==1 {print $NF ;}')
+END=${END%)*}
+((END=END+0x0))
+echo $END
+
+((VAR=END-BEGIN))
+echo $VAR 
+
+dd bs=1 if=$1 of=$2 skip=$BEGIN count=$VAR
+
+if [ &quot;$5&quot; = &quot;c&quot; ]; then
+    TMP=tmp;
+    touch $TMP;
+    echo &quot;unsigned int shellcode[] =&quot; &gt; $TMP;
+    od -t x1 $2 | awk '{$1=&quot;&quot;;print;}' | sed 's/\ /\\x/g' | sed '/^$/d;s/^/\&quot;/g;s/$/\&quot;/g' &gt;&gt; $TMP;
+    cat $TMP | awk '{print;} END{print &quot;;&quot;;}' &gt; $2;
+    rm $TMP;
+fi
+</code></pre>
+
+<p>下面是我获得的execve2.raw格式的。</p>
+
+<p><a href="https://img.it610.com/image/info8/fcfbd385f7f54ac88c484469313a48c6.jpg"><img src="https://img.it610.com/image/info8/fcfbd385f7f54ac88c484469313a48c6.jpg" alt="shell脚本之shellcode自动提取工具_第2张图片" /></a></p>
+
+<p>下面是生成C语言格式的：</p>
+
+<p><a href="https://img.it610.com/image/info8/c9e8e318c08e4812852f6ab15f4f1ac4.jpg"><img src="https://img.it610.com/image/info8/c9e8e318c08e4812852f6ab15f4f1ac4.jpg" alt="shell脚本之shellcode自动提取工具_第3张图片" /></a></p>
+
+<p>下面是生成的execve2.c:</p>
+
+<p><a href="https://img.it610.com/image/info8/e41e21cd28324bf2b3ca00bbcb552f0a.jpg"><img src="https://img.it610.com/image/info8/e41e21cd28324bf2b3ca00bbcb552f0a.jpg" alt="shell脚本之shellcode自动提取工具_第4张图片" /></a></p>
+
+<p>提取的结果和我们前面用objdump 看的execve2.o里面的是完全一样的。大功告成！</p>
+
+<p>2013/4/29 13:58</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

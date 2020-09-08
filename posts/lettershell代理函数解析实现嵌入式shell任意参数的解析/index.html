@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>lettershell代理函数解析实现嵌入式shell任意参数的解析 | 开发者问答集锦</title>
+    <meta property="og:title" content="lettershell代理函数解析实现嵌入式shell任意参数的解析 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="lettershell代理函数解析实现嵌入式shell任意参数的解析">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/lettershell%E4%BB%A3%E7%90%86%E5%87%BD%E6%95%B0%E8%A7%A3%E6%9E%90%E5%AE%9E%E7%8E%B0%E5%B5%8C%E5%85%A5%E5%BC%8Fshell%E4%BB%BB%E6%84%8F%E5%8F%82%E6%95%B0%E7%9A%84%E8%A7%A3%E6%9E%90/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">lettershell代理函数解析实现嵌入式shell任意参数的解析</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="前言">前言</h2>
+
+<p>letter
+shell默认支持整形，字符，字符串参数的自动解析，我一直以为，浮点型的参数也是可以支持的，结果前几天发现，浮点型参数只在某些特定情况下可以使用(仅当浮点型参数为函数的最后一个参数时)，为此，我尝试了一种新的方式，从而引出了代理函数和代理参数解析的概念，可以实现任意类型参数的解析</p>
+
+<h2 id="原理">原理</h2>
+
+<p>如果你需要导出一个命令到shell，但是函数又有shell原生不支持的数据类型，比如说<code>void test(int a, float b, int c,
+float d)</code>，那么要怎么办呢</p>
+
+<p>最简单的，你可能会重新定义一个函数<code>void testWarpper(int a, int b, int c, int
+d)</code>，在这个函数里面对参数进行转换，调用<code>test</code>，然后导出<code>testWarpper</code>作为命令</p>
+
+<p>这就是所谓代理函数的概念，letter shell的代理函数就是基于此，只不过通过宏，简化了代理函数的定义，代理函数宏定义如下:</p>
+
+<pre><code>/**
+ * @brief shell 代理函数名
+ */
+#define     SHELL_AGENCY_FUNC_NAME(_func)   agency##_func
+
+/**
+ * @brief shell代理函数定义
+ *
+ * @param _func 被代理的函数
+ * @param ... 代理参数
+ */
+#define     SHELL_AGENCY_FUNC(_func, ...) \
+            void SHELL_AGENCY_FUNC_NAME(_func)(int p1, int p2, int p3, int p4, int p5, int p6, int p7) \
+            { _func(__VA_ARGS__); }
+</code></pre>
+
+<p>定义了代理函数，我们需要在代理函数里对参数进行处理，我称之为代理参数解析，参考letter
+shell的代理函数宏定义，shell会将终端输入的参数，解析成shell支持的基本参数数据，按顺序以<code>p1~p7</code>的参数传递进来，使用者需要定义代理参数解析器，可以为一个函数，或者宏，或者只是简单的数据处理，通过代理参数解析器，将<code>p1~p7</code>中对应的参数，转换成原函数需要的数据类型</p>
+
+<p>letter shell默认实现了浮点参数的代理参数解析器，如下：</p>
+
+<pre><code>/**
+ * @brief shell float型参数转换
+ */
+#define     SHELL_PARAM_FLOAT(x)            (*(float *)(&amp;x))
+</code></pre>
+
+<p>有了代理函数和对应的代理参数解析器，就可以将代理函数导出到命令，从而可以实现任意参数类型的解析，letter
+shell提供了一个宏，可以一步定义代理函数和导出命令，定义如下：</p>
+
+<pre><code>/**
+ * @brief shell 代理命令定义
+ *
+ * @param _attr 命令属性
+ * @param _name 命令名
+ * @param _func 命令函数
+ * @param _desc 命令描述
+ * @param ... 代理参数
+ */
+#define SHELL_EXPORT_CMD_AGENCY(_attr, _name, _func, _desc, ...) \
+        SHELL_AGENCY_FUNC(_func, ##__VA_ARGS__) \
+        SHELL_EXPORT_CMD(_attr, _name, SHELL_AGENCY_FUNC_NAME(_func), _desc)
+</code></pre>
+
+<p>代理函数命令导出宏前4个参数和常规形式的命令导出一致，之后的参数即传递至目标函数的参数，对于shell直接支持的参数类型，直接写对应的<code>px(x为1~7)</code>即可，代理参数类型则需要使用代理参数解析器，如<code>SHELL_PARAM_FLOAT(p2)</code></p>
+
+<h2 id="使用实例">使用实例</h2>
+
+<p>下面通过几个例子详细说明letter shell中代理函数的使用</p>
+
+<h3 id="浮点参数">浮点参数</h3>
+
+<p>一个包含多个浮点参数的函数定义如下：</p>
+
+<pre><code>void test(int a, float b, int c, float d)
+{
+    printf(&quot;a = %d, b = %f, c = %d, d = %f \r\n&quot;, a, b, c, d);
+}
+</code></pre>
+
+<p>使用letter shell默认实现的浮点参数解析器定义代理函数以及导出命令：</p>
+
+<pre><code>SHELL_EXPORT_CMD_AGENCY(SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+test, test, test float param,
+p1, SHELL_PARAM_FLOAT(p2), p3, SHELL_PARAM_FLOAT(p4));
+</code></pre>
+
+<p>参数中，第一个参数和第三个参数时letter
+shell原生支持的参数类型，不需要代理解析，所以直接写<code>p1</code>和<code>p3</code>即可，而第二个和第四个参数是浮点型的数据，这里使用letter
+shell默认实现的浮点参数代理解析器对参数进行代理解析，写入<code>SHELL_PARAM_FLOAT(p2)</code>和<code>SHELL_PARAM_FLOAT(p4))</code></p>
+
+<p>在命令行调用结果如下：</p>
+
+<pre><code>letter:/$ test 12 12.5 854 7895.4
+a = 12, b = 12.500000, c = 854, d = 7895.399902
+Return: 34, 0x00000022
+</code></pre>
+
+<h3 id="结构体参数">结构体参数</h3>
+
+<p>一个包含结构体参数的函数定义如下：</p>
+
+<pre><code>typedef struct {
+    int a;
+    char *b;
+} Test;
+
+void test(char *name, Test *test)
+{
+    printf(&quot;name: %s, a: %d, b: %s\r\n&quot;, name, test-&gt;a, test-&gt;b);
+}
+</code></pre>
+
+<p>这里我们直接使用C99复合文字的特性，作为代理参数解析器，可以导出命令如下：</p>
+
+<pre><code>SHELL_EXPORT_CMD_AGENCY(SHELL_CMD_TYPE(SHELL_TYPE_CMD_FUNC),
+test, test, test struct,
+(char *)p1, &amp;(Test){p2, (char *)p3});
+</code></pre>
+
+<p>导出的命令需要三个参数，第一个参数传递给<code>test</code>函数的形参<code>name</code>，第二个参数和第三个参数作为结构体<code>Test</code>的成员，通过复合文字特性的代理参数解析，生成结构体传递给<code>test</code>函数的形参<code>test</code></p>
+
+<p>在命令行调用结果如下：</p>
+
+<pre><code>letter:/$ test hello 123 test
+name: hello, a: 123, b: test
+Return: 30, 0x0000001e
+</code></pre>
+
+<p>对于稍微复杂的结构体参数，还可以结合cson，以字符串的形式将json数据传入，然后使用cson将字符串代理解析成结构体参数</p>
+
+<h2 id="结语">结语</h2>
+
+<p>原理上来说，letter shell的代理函数并不复杂，本质上，就只是重新定义了一个函数，实现参数的转化，letter
+shell结合宏定义，简化了真个代理函数的定义流程，将函数定义和命令导出结合到一条宏，并和原先的宏定义保持类似的结构</p>
+
+<p>总而言之，借助代理函数和代理参数解析，你可以使用letter shell实现任意参数的传递，将任意形式的函数作为shell命令导出</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

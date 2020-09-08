@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Ruby的self | 开发者问答集锦</title>
+    <meta property="og:title" content="Ruby的self - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Ruby的self">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/ruby%E7%9A%84self/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Ruby的self</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>self上下文</strong></p>
+
+<p>Ruby的self有和Java的this相似之处，但又大不相同。Java的方法都是在实例方法中引用，所以this一般都是指向当前对象的。而Ruby的代码逐行执行，所以在不同的上下文(context)self就有了不同的含义，先来看看常见的context
+self都代表哪些</p>
+
+<pre><code>1
+2
+3
+4
+5
+6
+7
+8
+9
+**10**
+11
+12
+13
+14
+15
+16
+17
+18
+19
+**20**
+21
+22
+23
+24
+25
+26
+27
+28
+29
+**30**
+31
+32
+33
+34
+35
+36
+</code></pre>
+
+<p>|</p>
+
+<pre><code># 这个位置位于top level context，代表Object的默认对象main
+p self # =&gt; main
+p self.class # =&gt; Object
+@self1 = self
+
+# 因为所有自定义类都位于main context之中，所以这是Object的实例方法
+# 同时也可以说是一个全局方法
+def a_method
+  @self2 = self
+  p self 
+  # =&gt; main，因为有了实例变量@self1和@self2，所以打印出来的不是main这个字符
+  # =&gt; 但仍然是main对象，注释掉4，8行即可看到效果
+  p @self1 == @self2 # =&gt; true
+end
+
+
+# 下面是一个关于类中不同上下文的self
+class Person
+  p self # =&gt; Person，代表当前类
+
+  def instance_method
+    p self # =&gt; #&lt;0xb7818fdc&gt;，代表当前类的实例
+  end
+
+  def self.class_method
+    p self # =&gt; Person，和第16行一样代表当前类（这是类方法的context），它们是相等的
+  end
+end
+
+m = Person.new
+def m.hello
+  p self # =&gt; 代表m这个单例对象
+end
+
+m.hello
+</code></pre>
+
+<p>&mdash;|&mdash;</p>
+
+<p>上面只写了在类中的self，其实在module也是一样的。通过上面代码你可以发现，self一直引用着它所在位置上下文的实例/类。</p>
+
+<p><strong>self显式/隐式</strong></p>
+
+<p>你可以先试着运行下面代码，看看有什么意外发生没有</p>
+
+<pre><code>1
+2
+3
+4
+5
+6
+7
+8
+9
+**10**
+11
+12
+13
+</code></pre>
+
+<p>|</p>
+
+<pre><code>class Person
+  attr_accessor :name
+
+  def set_name(your_name)
+    name = your_name 
+  end
+end
+
+m = Person.new
+p m.name
+m.set_name('today')
+p m.name # =&gt; 猜是什么
+</code></pre>
+
+<p>&mdash;|&mdash;</p>
+
+<p>如果你猜是today就大错特错了，答案是nil，为什么是nil呢，在第5行，我明明调用的是attr_accessor生成的name=方法赋值的啊，你可以在前面加上self试试，代码如你预期的一样执行了。在这种情况下name
+= your_name并没有去调用attr_accessor生成的xx=方法，而是将name当作了一个局部变量，如果显式的指定self，就没有问题了。</p>
+
+<p>读到这，你是不是认为以后这种情况就一直用显式self去调用就好了，其实不然，下面的代码仍会说明一些问题</p>
+
+<pre><code>1
+2
+3
+4
+5
+6
+7
+8
+9
+**10**
+11
+12
+13
+14
+15
+16
+17
+18
+19
+**20**
+21
+22
+23
+24
+25
+26
+</code></pre>
+
+<p>|</p>
+
+<pre><code>class Person
+
+  public
+  def get_my_secret1
+    my_secret # =&gt; 隐式
+  end
+
+  def get_my_secret2
+    self.my_secret # =&gt; 显式
+  end
+
+  private
+  def my_secret
+    p 'something...'
+  end
+
+  def self.secret
+    p 'nothing'
+  end
+end
+
+m = Person.new
+#m.my_secret # =&gt; private method error 
+Person.secret # =&gt; nothing
+m.get_my_secret1 # =&gt; something
+m.get_my_secret2 # =&gt; private method error
+</code></pre>
+
+<p>&mdash;|&mdash;</p>
+
+<p>上面代码说明：</p>
+
+<p>第一个问题，显式self不可以调用private(protected的也一样)方法，而隐式的可以，这说明隐式更具有灵活性，但由于上面隐式调用也同时存在一定的“误解”，所以读者应该明白他们之间的区别，以便更好的使用。</p>
+
+<p>第二个问题，self的方法不受private限制，其实我在这故意误导了读者，因为self的方法是类方法，而权限修饰符只对实例方法生效，所以private的类方法也可以直接访问。</p>
+
+<p><strong>self“怪异”写法</strong></p>
+
+<p>下面代码被我个人称为怪异写法，因为平时用不到，但偶尔会看到，但看起来又不太直观，这里列举一下</p>
+
+<pre><code>1
+2
+3
+4
+5
+6
+7
+8
+9
+**10**
+11
+12
+13
+14
+15
+16
+17
+18
+19
+**20**
+21
+22
+23
+24
+25
+26
+27
+28
+29
+**30**
+31
+32
+33
+34
+35
+36
+37
+38
+39
+**40**
+41
+</code></pre>
+
+<p>|</p>
+
+<pre><code>class Person
+  def metaclass
+    class &lt;&lt; self
+      self
+    end
+  end
+
+  def metaclass2
+    self
+  end
+end
+
+a = Person.new
+
+b = a.metaclass
+c = a.metaclass2
+
+# 首先要明白，类Person是Class的一个“实例”，a是Person的一个实例
+# 这里b也是一个Person类，但它是独一无二的，即你修改Person不会影响到b，反之亦然
+p b # =&gt; #&gt;
+p b.class # =&gt; Class
+
+class Person
+  def hello
+    p 'hello Person'
+  end
+end
+
+class &lt;&lt; b
+  def hello
+    p 'hello b'
+  end
+end
+
+b.hello # =&gt; hello b
+
+
+p c # =&gt; #&lt;0xb76f3800/&gt;
+p c.class # =&gt; Person
+
+c.hello # =&gt; hello Person
+</code></pre>
+
+<p>&mdash;|&mdash;</p>
+
+<p>还有一个</p>
+
+<pre><code>1
+2
+3
+4
+5
+6
+7
+8
+9
+**10**
+11
+12
+13
+14
+15
+</code></pre>
+
+<p>|</p>
+
+<pre><code>class Person
+  def self.hello
+    p 'hello'
+  end
+
+  class &lt;&lt; self
+    # 看了最上面self和context的关系，你应该知道这个self代表是Person类
+    # 在这里为Person添加方法，其实也就是为Person添加类方法，和上面的self.hello异曲同工
+    def work
+      p 'hard work'
+    end
+  end
+end
+
+Person.work
+</code></pre>
+
+<p>&mdash;|&mdash;</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

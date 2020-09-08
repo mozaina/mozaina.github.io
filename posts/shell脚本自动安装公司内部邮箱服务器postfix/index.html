@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本自动安装公司内部邮箱服务器Postfix | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本自动安装公司内部邮箱服务器Postfix - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本自动安装公司内部邮箱服务器Postfix">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E8%87%AA%E5%8A%A8%E5%AE%89%E8%A3%85%E5%85%AC%E5%8F%B8%E5%86%85%E9%83%A8%E9%82%AE%E7%AE%B1%E6%9C%8D%E5%8A%A1%E5%99%A8postfix/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本自动安装公司内部邮箱服务器Postfix</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="简介">简介：</h1>
+
+<blockquote>
+<p>Postfix是Wietse Venema在IBM的GPL协议之下开发的MTA（邮件传输代理）软件。postfix是Wietse
+Venema想要为使用最广泛的sendmail提供替代品的一个尝试。在Internet世界中，大部分的电子邮件都是通过sendmail来投递的，大约有100万用户使用sendmail，每天投递上亿封邮件。这真是一个让人吃惊的数字。Postfix试图更快、更容易管理、更安全，同时还与sendmail保持足够的兼容性。</p>
+</blockquote>
+
+<h1 id="搭建企业邮箱的好处">搭建企业邮箱的好处：</h1>
+
+<blockquote>
+<p>1.全面统一企业形象，方便企业形象的推广，同时可以方便产品的推广。<br />
+2.对于员工流动，造成信息外泄和资源无法保留提供保证；如果员工使用个人邮箱，离职时必然带走邮箱；<br />
+3.便于企业统一管理，设置权限和分文别类，方便企业内部信息交流，沟通和协助；<br />
+4.优于个人邮箱的稳定性，安全性及其服务性；<br />
+5.有海外转发服务器，这样对于国外邮件的往来不容易丢失和退回邮件。<br />
+6.还有一些其它功能，比如防止病毒、手机短信提醒、邮件传真、备份、监控</p>
+</blockquote>
+
+<h1 id="脚本环境">脚本环境</h1>
+
+<blockquote>
+<p>1.linux centos 7 系统<br />
+2.系统可连接外网<br />
+3.网络模式：自动桥接模式</p>
+</blockquote>
+
+<h1 id="实验步骤">实验步骤</h1>
+
+<h2 id="1-上传postfix脚本到linux系统-root目录下">1.上传postfix脚本到Linux系统/root目录下</h2>
+
+<blockquote>
+<p>chmod +x *.sh 添加执行权限</p>
+</blockquote>
+
+<h2 id="2-脚本postfix-sh详解">2.脚本postfix.sh详解</h2>
+
+<blockquote>
+<p>#!/bin/bash</p>
+
+<p>#自动本机获取网段<br />
+net=<code>ifconfig ens33 | grep &quot;netmask&quot; | awk '{print $2}' | cut -c 1-9</code><br />
+#自动获取本机ip<br />
+ip=<code>ifconfig ens33 | grep &quot;netmask&quot; | awk '{print $2}'</code></p>
+
+<p>#下载postfix相关软件包<br />
+down_postfix()<br />
+{<br />
+#关闭防火墙，安全性<br />
+systemctl stop firewalld<br />
+setenforce 0<br />
+echo -e &ldquo;\033\t[34m 正在下载postfix相关软件包 &hellip; \033[0m&rdquo; &amp;&amp; sleep 1<br />
+yum install -y bind postfix dovecot<br />
+}</p>
+
+<p>#修改相关配置文件<br />
+setup_file()<br />
+{<br />
+echo -e &ldquo;\033\t[34m 正在修改DNS相关配置文件 &hellip; \033[0m&rdquo; &amp;&amp; sleep 1<br />
+#编辑DNS主配置文件<br />
+#允许监听所有端口<br />
+sed -i &ldquo;13s/127.0.0.1/any/&rdquo; /etc/named.conf<br />
+#允许接收所有网段<br />
+sed -i &ldquo;21s/localhost/any/&rdquo; /etc/named.conf</p>
+
+<p>#修改编辑区域配置文件<br />
+#定义域名及区域数据配置文件名<br />
+sed -i &ldquo;24i zone \&rdquo;\benet.com\&rdquo;\ IN {\n\<br />
+type master;\n\<br />
+file \&rdquo;\benet.com.zone\&rdquo;\;\n\<br />
+allow-update { none; };\n\<br />
+};&rdquo; /etc/named.rfc1912.zones</p>
+
+<p>#新建正向解析文件<br />
+cp -p /var/named/named.localhost /var/named/benet.com.zone<br />
+#添加管理员邮箱<br />
+sed -i &ldquo;2s/rname.invalid./admin/&rdquo; /var/named/benet.com.zone<br />
+#添加本机ip地址<br />
+sed -i &ldquo;9s/127.0.0.1/$ip/&rdquo; /var/named/benet.com.zone<br />
+#指定邮件交换记录<br />
+sed -i &ldquo;10c IN MX 5 mail.benet.com.&rdquo; /var/named/benet.com.zone<br />
+#解析主机地址<br />
+echo &ldquo;mail IN A $ip&rdquo; &gt;&gt;/var/named/benet.com.zone<br />
+#添加本机解析hosts文件<br />
+echo &ldquo;$ip mail.benet.com&rdquo; &gt;&gt;/etc/hosts</p>
+
+<p>#修改postfix相关配置文件<br />
+echo -e &ldquo;\033\t[34m 正在修改postfix相关配置文件 &hellip; \033[0m&rdquo; &amp;&amp; sleep 1<br />
+#修改发信服务器主机名<br />
+sed -i &ldquo;75c myhostname = mail.benet.com&rdquo; /etc/postfix/main.cf<br />
+#修改发信服务器域名<br />
+sed -i &ldquo;83c mydomain = benet.com&rdquo; /etc/postfix/main.cf<br />
+#修改发信人地址邮件域名<br />
+sed -i &ldquo;99s/#//&rdquo; /etc/postfix/main.cf<br />
+#开启监听ip地址为all<br />
+sed -i &ldquo;113s/#//&rdquo; /etc/postfix/main.cf<br />
+#关闭只监听本地ip<br />
+sed -i &ldquo;116s/^/#/&rdquo; /etc/postfix/main.cf<br />
+#设置邮件存放位置<br />
+sed -i &ldquo;419s/#//&rdquo; /etc/postfix/main.cf<br />
+#修改收件人地址和邮件域名<br />
+sed -i &lsquo;164c mydestination = $mydomain, $myhostname&rsquo; /etc/postfix/main.cf</p>
+
+<p>#修改devocot相关配置文件<br />
+echo -e &ldquo;\033\t[34m 正在修改devocot相关配置文件 &hellip; \033[0m&rdquo; &amp;&amp; sleep 1<br />
+#开启收件服务<br />
+sed -i &ldquo;24s/#/ /&rdquo; /etc/dovecot/dovecot.conf<br />
+#设置允许收件的网段<br />
+sed -i &ldquo;48c login_trusted_networks = $net.0/24&rdquo; /etc/dovecot/dovecot.conf<br />
+#开启邮箱的位置及格式<br />
+sed -i &ldquo;24s/#/ /&rdquo; /etc/dovecot/conf.d/10-mail.conf<br />
+}</p>
+
+<p>#重启所有服务<br />
+restart_service()<br />
+{<br />
+#重启dns服务<br />
+systemctl restart named<br />
+#重启发件postfix服务<br />
+systemctl restart postfix<br />
+#重启收件dovecot服务<br />
+systemctl restart dovecot<br />
+}</p>
+
+<p>#函数汇总<br />
+main()<br />
+{<br />
+down_postfix &amp;&amp; setup_file &amp;&amp; restart_service<br />
+}</p>
+
+<p>#执行所有函数<br />
+main</p>
+</blockquote>
+
+<h2 id="3-验证脚本">3.验证脚本</h2>
+
+<h3 id="1-执行脚本">1.执行脚本</h3>
+
+<blockquote>
+<p>./postfix.sh #运行脚本</p>
+</blockquote>
+
+<h3 id="2-查看服务端口">2.查看服务端口</h3>
+
+<h3 id="3-创建测试用户zhangsan-lisi">3.创建测试用户zhangsan,lisi</h3>
+
+<blockquote>
+<p>groupadd mailusers #添加用户邮箱测试<br />
+useradd -g mailusers -s /sbin/nologin zhangsan #添加zhangsan 用户<br />
+useradd -g mailusers -s /sbin/nologin lisi #添加lisi用户<br />
+passwd zhangsan #设置zhangsan密码<br />
+passwd lisi #设置lisi密码</p>
+</blockquote>
+
+<h2 id="知识点讲解">知识点讲解：</h2>
+
+<blockquote>
+<p>useradd -g mailusers -s /sbin/nologin zhangsan 是添加zhangsan用户加入组里，不登录linux系统<br />
+而useradd zhangsan 是可以登录linux系统的<br />
+2者创建的用户都可以登录邮箱，不同创建方式的，也可以相互发送邮件，邮箱方面不受影响！</p>
+</blockquote>
+
+<h2 id="3-安装foxmail">3.安装Foxmail</h2>
+
+<blockquote>
+<p>1.官网下载地址：<a href="https://www.foxmail.com/">https://www.foxmail.com/</a> ，选择windows版本或mac版本。</p>
+</blockquote>
+
+<p>2.先设置本地电脑dns服务器地址</p>
+
+<blockquote>
+<p>备注：192.168.0.1 是电脑是本地路由网关地址，为了连接外网<br />
+192.168.0.200 是dns服务器地址，为了解析mail.benet.com 域名</p>
+
+<p>3.安装好Foxmail后运行，设置账号，点击手动设置</p>
+
+<p>4.设置邮箱账号，密码，pop服务器，SMTP服务器，其他默认即可，点击创建，完成</p>
+
+<p>5.在zhangsan账户下右击设置，创建lisi用户，设置同zhangsan用户</p>
+
+<p>6.zhangsan用户发信给lisi用户</p>
+
+<p>7.lisi收信查看</p>
+
+<p>8.lisi回复测试</p>
+
+<p>9.zhangsan收信测试</p>
+</blockquote>
+
+<h1 id="坑点讲解">坑点讲解</h1>
+
+<blockquote>
+<p>以上操作教程只用于虚拟机演示，做实验部分。若是真实公司搭建内网邮箱，是不会这么顺利的，会出现很多问题</p>
+</blockquote>
+
+<h2 id="问题一-有的电脑邮箱顺利登陆-但有的电脑邮箱登陆失败">问题一：有的电脑邮箱顺利登陆，但有的电脑邮箱登陆失败</h2>
+
+<h2 id="问题二-一开始邮件收发都正常-过一段时间后-发现邮件发送失败或收件失败">问题二：一开始邮件收发都正常，过一段时间后，发现邮件发送失败或收件失败。</h2>
+
+<h2 id="原因分析-出现这样问题的原因可能是因为域名解析故障或自己搭建的dns服务器解析不稳定">原因分析：出现这样问题的原因可能是因为域名解析故障或自己搭建的dns服务器解析不稳定</h2>
+
+<h1 id="解决方法">解决方法：</h1>
+
+<h2 id="方法1-添加本地hosts文件解析">方法1.添加本地hosts文件解析</h2>
+
+<h2 id="方法2-设置服务器时填写ip地址代替域名">方法2.设置服务器时填写IP地址代替域名</h2>
+
+<h2 id="经过多次测试-我发现了最方便-最稳定的方案就是以下4步">经过多次测试，我发现了最方便，最稳定的方案就是以下4步：</h2>
+
+<h3 id="1-搭建postfix服务时直接不用dns服务">1.搭建postfix服务时直接不用dns服务</h3>
+
+<h3 id="2-在本地也不填写dns服务器地址-自动获取即可">2.在本地也不填写dns服务器地址，自动获取即可</h3>
+
+<h3 id="3-添加本地hosts文件解析-见方法1图">3.添加本地hosts文件解析（见方法1图）</h3>
+
+<h3 id="4-设置服务器时填写ip地址代替域名-所有用户必做步骤">4.设置服务器时填写IP地址代替域名（所有用户必做步骤）</h3>
+
+<h3 id="备注-1-2-3步是选做步骤-4是必做步骤-为了保险-4步都操作一下最好">备注：1,2,3步是选做步骤，4是必做步骤，为了保险，4步都操作一下最好!</h3>
+
+<h2 id="其他坑点">其他坑点：</h2>
+
+<blockquote>
+<p>Mac系统登录失败，这是由于mac版本foxmail和Windows版本账户设置不一样</p>
+</blockquote>
+
+<p><strong>解决方法：填写如下图账户信息</strong></p>
+
+<h1 id="总结">总结：</h1>
+
+<blockquote>
+<p>1.公司局域网搭建邮箱服务器推荐使用postfix.<br />
+2.脚本文件不建议直接复制，可下载我的资料 <a href="https://down.51cto.com/data/2464053">https://down.51cto.com/data/2464053</a><br />
+3.文中搭建的邮箱服务器即为公司内部服务器，只能在内网中使用，若要外网使用，需要申请外网域名。</p>
+</blockquote>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

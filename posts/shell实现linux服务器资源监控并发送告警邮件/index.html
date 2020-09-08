@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell实现linux服务器资源监控并发送告警邮件 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell实现linux服务器资源监控并发送告警邮件 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell实现linux服务器资源监控并发送告警邮件">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%AE%9E%E7%8E%B0linux%E6%9C%8D%E5%8A%A1%E5%99%A8%E8%B5%84%E6%BA%90%E7%9B%91%E6%8E%A7%E5%B9%B6%E5%8F%91%E9%80%81%E5%91%8A%E8%AD%A6%E9%82%AE%E4%BB%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell实现linux服务器资源监控并发送告警邮件</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>shell：实现linux服务器资源监控并发送告警邮件</p>
+
+<p>1、安装方式</p>
+
+<p>wget <a href="http://10.8.225.126/wsmonitor/install.sh;sh">http://10.8.225.126/wsmonitor/install.sh;sh</a> install.sh test@test.com</p>
+
+<p>2、install.sh</p>
+
+<pre><code>#!/bin/sh
+if [ $# -ne 1 ]; then
+    echo &quot;########################################################&quot;
+    echo &quot;# 用法：sh install_monitor.sh 邮箱地址;                #&quot;
+    echo &quot;# 如：sh install_monitor.sh chenjy@wangsu.com          #&quot;
+    echo &quot;# 若邮箱地址多个用英文逗号分隔                         #&quot;
+    echo &quot;########################################################&quot;
+    exit 1
+fi
+#对应目录放开权限，安装sendmail
+/usr/bin/chattr -i /etc/shadow /etc/passwd /etc/gshadow /etc/group /etc/group-
+mkdir /var/spool/clientmqueue;chmod 777 /var/spool/clientmqueue
+
+for i in `seq 1 3`
+do
+    echo $i
+    rpm -q --quiet sendmail
+    if [ $? == 1 ]; then
+        yum install -y sendmail
+        if [ $? == 1 ]; then
+            echo &quot;######ERROR!sendmail install fail!######&quot;
+            echo &quot;######Please try [yum install -y sendmail]######&quot;
+            exit
+        fi
+    fi
+    rpm -q --quiet sendmail
+    if [ $? == 0 ]; then
+        service sendmail restart
+        if [ $? == 1 ]; then
+            echo &quot;######ERROR!sendmail start fail!######&quot;
+            echo &quot;######Please try [service sendmail restart]######&quot;
+            exit
+        fi
+        chkconfig --add sendmail
+        break
+    fi
+    done
+#下载监控脚本及启动后台执行
+current=`date &quot;+%Y-%m-%d %H:%M:%S&quot;`
+timestamp=`date -d &quot;$current&quot; +%s`
+mkdir -p /usr/local/wsmonitor
+mkdir -p /usr/local/wsmonitor/bak
+for i in `seq 1 3`
+do
+    echo $i
+#    if [ -f wsmonitor.sh ];then
+#        mv /usr/local/wsmonitor/wsmonitor.sh /usr/local/wsmonitor/bak/wsmonitor.sh.$timestamp
+#    fi
+
+    wget http://10.8.225.126/wsmonitor/wsmonitor.sh -O /usr/local/wsmonitor/wsmonitor.sh
+    wget http://10.8.225.126/wsmonitor/wsmonitor -O /etc/init.d/wsmonitor
+    wget http://10.8.225.126/wsmonitor/ReadMe_wsmonitor.txt -O /usr/local/wsmonitor/ReadMe_wsmonitor.txt
+    #替换监控脚本中的邮箱地址
+    sed -i 's/MAILTO=chenjy@wangsu.com/MAILTO='$1'/g' /usr/local/wsmonitor/wsmonitor.sh
+    #启动服务
+    chmod +x /etc/init.d/wsmonitor
+    service wsmonitor restart
+    echo &quot;#################################################################&quot;
+    echo &quot;#####Install wsmonitor success! #####&quot;
+    echo &quot;#################################################################&quot;
+    echo &quot;#####If you want to change mailaddress,edit [/usr/local/wsmonitor/wsmonitor.sh]! #####&quot;
+    echo &quot;#####Please use [service wsmonitor start/stop/restart] #####&quot;
+    echo &quot;使用说明见：/usr/local/wsmonitor/ReadMe_wsmonitor.txt&quot;
+    exit
+done
+</code></pre>
+
+<p>3、wsmontor.sh</p>
+
+<pre><code>#!/bin/bash
+ntpdate cn.pool.ntp.org
+#配置多个收件人用英文逗号隔开
+#MAILTO=cc@wangsu.com,qinjy@wangsu.com
+#MAILTO=cc@wangsu.com
+MAILTO=chenjy@wangsu.com,yuzt@wangsu.com
+#1、监控间隔时间，单位（秒）
+TIME_INTERVAL=5
+#2、内存使用率，单位 （%）
+MEM_RATE=1
+#3、流量监控设置
+#要监控的网卡
+ETH_NAME=eth0
+#上行下行流量,单位（MB)
+FLOWIN_MB=10240
+FLOWOUT_MB=10240
+#4、TCP连接状态数量,连接的最大个数
+TIME_WAIT=1000
+ESTABLISHED=1000
+#5、CPU使用率,大于该值发送告警，单位（%）
+CPU_RATE=80
+#6、硬盘占用率，单位（%）
+DISK_RATE=80
+
+############################################################
+################！以下脚本内容不需要修改！！################
+############################################################
+
+
+
+#检测是否加入crontab
+#username=`users|awk '{print $1}'`
+#crontab_path=/var/spool/cron/$username
+#script_path=`pwd`
+#ifexist=`crontab -l|grep wsmonitor_keepalive.sh|wc -l`
+#ifexist_mail=`crontab -l|grep wsmonitor_keepalive.sh|grep $MAILTO|wc -l`
+#if [ $ifexist -eq 0 ];then
+#        echo &quot;1 * * * * sh $script_path/wsmonitor_keepalive.sh $MAILTO  &gt; /dev/null 2&gt;&amp;1&quot; &gt;&gt;$crontab_path
+#elif [[ $ifexist -eq 1  &amp;&amp;  $ifexist_mail -eq 0 ]];then
+#        sed -i '/wsmonitor_keepalive.sh/d' $crontab_path
+#        echo &quot;1 * * * * sh $script_path/wsmonitor_keepalive.sh $MAILTO  &gt; /dev/null 2&gt;&amp;1&quot; &gt;&gt;$crontab_path
+#fi
+
+while [ 1 ]
+do
+#获取本机IP
+SERVER_IP=`ifconfig -a|grep inet|grep -v 127.0.0.1|grep -v inet6|awk '{print $2}'|tr -d &quot;addr:&quot;`
+#定义发送邮件的内容
+MAILSUBJECT=&quot;WARNING_[$SERVER_IP]&quot;
+MAILFROM=&quot;wsmonitor_test@wangsu.com&quot;
+function do_sendmail()
+{
+sendmail -t &lt;&lt;EOF
+from:wsmonitor 
+to:$MAILTO
+subject:[$1]_$MAILSUBJECT
+Content-Type: text/html;charset=utf-8
+
+
+$time  $1当前监控记录值为：$2，大于设置的阈值：$3，详情登陆系统查看[$SERVER_IP]。当天同一资源超过阈值只告警一次。  
+
+备注：请勿回复此邮件！
+
+EOF
+}
+
+# 监 控 脚 本 执 行 内 容
+################################################################################
+mkdir -p /usr/local/wsmonitor/log
+date=`date +&quot;%Y%m%d&quot;`
+time=`date +&quot;%Y-%m-%d %H:%M:%S&quot;`
+LOG_PATH=/usr/local/wsmonitor/log/monitor_$date.log
+##################################################################
+####1、为CPU使用率计算先记录日志1#################################
+####2、为FLOW计算先获取flowin和flowout############################
+##################################################################
+cpulog_1=$(cat /proc/stat | grep 'cpu ' | awk '{print $2&quot; &quot;$3&quot; &quot;$4&quot; &quot;$5&quot; &quot;$6&quot; &quot;$7&quot; &quot;$8}')    
+flowin_old=$(cat /proc/net/dev|grep -w $ETH_NAME|sed -e &quot;s/\(.*\)\:\(.*\)/\2/g&quot; |awk '{ print $1 }')
+flowout_old=$(cat /proc/net/dev|grep -w $ETH_NAME|sed -e &quot;s/\(.*\)\:\(.*\)/\2/g&quot; |awk '{ print $9 }')
+
+#监控周期
+sleep $TIME_INTERVAL
+
+##################################################################
+###########################内存监控部分###########################
+##################################################################
+#对于应用程序来说，buffers/caches是未被使用的，对应-/+ buffers/cache那一行
+memuse=`free -m|grep &quot;buffers/cache&quot;|awk '{print $3}'`
+memtotal=`free -m|grep &quot;Mem&quot;|awk '{print $2}'`
+MEM_NOW=`echo &quot;$memuse/$memtotal*100&quot;|bc -l|cut -d. -f1`
+MEM_TAG=`echo &quot;$MEM_NOW $MEM_RATE&quot;|awk '{tag=0;if($1&gt;$2){tag=1} print tag}'`
+echo &quot;$time MEM $MEM_NOW $MEM_RATE $MEM_TAG&quot;&gt;&gt;$LOG_PATH
+
+#DISK:df -lh查看磁盘使用率，获取最大值
+disk_log=/tmp/disk_tmp.log
+df -lh|grep -v Filesystem|awk '{print $5}' &gt; $disk_log
+DISK_NOW=`cat $disk_log |awk 'BEGIN{max=0}{if($1+0&gt;max+0) max=$1 fi} END {print max}'|cut -d% -f1`
+DISK_TAG=`echo &quot;$DISK_NOW $DISK_RATE&quot;|awk '{tag=0;if($1&gt;$2){tag=1} print tag}'`
+echo &quot;$time DISK $DISK_NOW $DISK_RATE $DISK_TAG&quot;&gt;&gt;$LOG_PATH
+###################################################################
+#####连接数:只获取ESTABLISHED和TIME_WAIT状态的tcp连接数############
+###################################################################
+tcpconn_log=/tmp/tcpconn.log
+netstat -n | awk '/^tcp/ {++S[$NF]} END {for(a in S) print a, S[a]}' &gt;$tcpconn_log
+
+#注意连接数为0的情况
+grep ESTABLISHED $tcpconn_log &gt; /dev/null
+if [ $? -eq 1 ] ; then
+                echo &quot;ESTABLISHED 0 &quot; &gt;&gt;$tcpconn_log
+fi
+ESTABLISHED_NOW=`grep ESTABLISHED $tcpconn_log|awk '{print $2}'`
+ESTABLISHED_TAG=`echo &quot;$ESTABLISHED_NOW $ESTABLISHED&quot;|awk '{tag=0;if($1&gt;$2){tag=1} print tag}'`
+echo &quot;$time ESTABLISHED $ESTABLISHED_NOW $ESTABLISHED $ESTABLISHED_TAG&quot;&gt;&gt;$LOG_PATH
+
+grep TIME_WAIT $tcpconn_log &gt; /dev/null
+if [ $? -eq 1 ] ; then
+                echo &quot;TIME_WAIT 0 &quot; &gt;&gt;$tcpconn_log
+fi
+TIME_WAIT_NOW=`grep TIME_WAIT $tcpconn_log|awk '{print $2}'`
+TIME_WAIT_TAG=`echo &quot;$TIME_WAIT_NOW $TIME_WAIT&quot;|awk '{tag=0;if($1&gt;$2){tag=1} print tag}'`
+echo &quot;$time TIME_WAIT $TIME_WAIT_NOW $TIME_WAIT $TIME_WAIT_TAG&quot;&gt;&gt;$LOG_PATH
+
+
+##################################################################
+######################### 流量 ###################################
+##################################################################
+flowin=$(cat /proc/net/dev|grep -w $ETH_NAME|sed -e &quot;s/\(.*\)\:\(.*\)/\2/g&quot;|awk '{ print $1 }')
+flowout=$(cat /proc/net/dev|grep -w $ETH_NAME|sed -e &quot;s/\(.*\)\:\(.*\)/\2/g&quot;|awk '{ print $9 }')
+FLOWIN=$((($flowin-$flowin_old)/$TIME_INTERVAL))
+FLOWOUT=$((($flowout-$flowout_old)/$TIME_INTERVAL))
+#echo &quot;Recv rate: $((${FLOWIN}/1024)) KB/s   Sent rate:  $((${FLOWOUT}/1024)) KB/s &quot;
+flowin_old=${flowin}
+flowout_old=${flowout}
+#转换单位为MB
+FLOWIN_MB_NOW=$(((${FLOWIN}/1024)/1024))
+FLOWOUT_MB_NOW=$(((${FLOWOUT}/1024)/1024))
+FLOWIN_MB_TAG=`echo &quot;$FLOWIN_MB_NOW $FLOWIN_MB&quot;|awk '{tag=0;if($1&gt;$2){tag=1} print tag}'`
+FLOWOUT_MB_TAG=`echo &quot;$FLOWOUT_MB_NOW $FLOWOUT_MB&quot;|awk '{tag=0;if($1&gt;$2){tag=1} print tag}'`
+echo &quot;$time FLOWIN_MB $FLOWIN_MB_NOW $FLOWIN_MB $FLOWIN_MB_TAG&quot;&gt;&gt;$LOG_PATH
+echo &quot;$time FLOWOUT_MB $FLOWOUT_MB_NOW $FLOWOUT_MB $FLOWOUT_MB_TAG&quot;&gt;&gt;$LOG_PATH
+#转换单位为KB
+FLOWIN_KB_NOW=$((${FLOWIN}/1024))
+FLOWOUT_KB_NOW=$((${FLOWOUT}/1024))
+FLOWIN_KB_TAG=`echo &quot;$FLOWIN_KB_NOW $((${FLOWIN_MB}*1024))&quot;|awk '{tag=0;if($1&gt;$2){tag=1} print tag}'`
+FLOWOUT_KB_TAG=`echo &quot;$FLOWOUT_KB_NOW $((${FLOWOUT_MB}*1024))&quot;|awk '{tag=0;if($1&gt;$2){tag=1} print tag}'`
+echo &quot;$time FLOWIN_KB $FLOWIN_KB_NOW $((${FLOWIN_MB}*1024)) $FLOWIN_KB_TAG&quot;&gt;&gt;$LOG_PATH
+echo &quot;$time FLOWOUT_KB $FLOWOUT_KB_NOW $((${FLOWOUT_MB}*1024)) $FLOWOUT_KB_TAG&quot;&gt;&gt;$LOG_PATH
+
+
+##################################################################
+######################CPU 通过/proc/stat计算######################
+##################################################################
+sys_idle_1=$(echo $cpulog_1 | awk '{print $4}')
+total_1=$(echo $cpulog_1 | awk '{print $1+$2+$3+$4+$5+$6+$7}')
+
+cpulog_2=$(cat /proc/stat | grep 'cpu ' | awk '{print $2&quot; &quot;$3&quot; &quot;$4&quot; &quot;$5&quot; &quot;$6&quot; &quot;$7&quot; &quot;$8}')
+sys_idle_2=$(echo $cpulog_2 | awk '{print $4}')
+total_2=$(echo $cpulog_2 | awk '{print $1+$2+$3+$4+$5+$6+$7}')
+
+sys_idle=`expr $sys_idle_2 - $sys_idle_1`
+total=`expr $total_2 - $total_1`
+CPU_NOW=`echo &quot;100-$sys_idle/$total*100&quot;|bc -l|cut -d. -f1`
+if [ $total -eq 0 ] ;then
+        CPU_NOW=0
+elif [ ! -n &quot;$CPU_NOW&quot; ];then
+    CPU_NOW=0
+fi
+CPU_TAG=`echo &quot;$CPU_NOW $CPU_RATE&quot;|awk '{tag=0;if($1&gt;$2){tag=1} print tag}'`
+echo &quot;$time CPU $CPU_NOW $CPU_RATE $CPU_TAG&quot;&gt;&gt;$LOG_PATH
+
+
+########################################################################################
+
+#检查日志中是否有超过阈值的记录
+function check_ifoverload()
+{
+all_count=`grep $1 $LOG_PATH|awk '{if($6==1) print $0}'|wc -l`
+latest_count=`tail -n $2 $LOG_PATH|grep $1|awk '{if($6==1) print $0}'|wc -l`
+if [[ $all_count -eq 1 &amp;&amp; $latest_count -eq 1 ]];then
+        do_sendmail $1 $3 $4
+fi
+}
+check_item=9
+check_ifoverload MEM $check_item $MEM_NOW'%' $MEM_RATE'%'
+check_ifoverload CPU $check_item $CPU_NOW'%' $CPU_RATE'%'
+check_ifoverload DISK $check_item $DISK_NOW'%' $DISK_RATE'%'
+check_ifoverload ESTABLISHED $check_item $ESTABLISHED_NOW $ESTABLISHED
+check_ifoverload TIME_WAIT $check_item $TIME_WAIT_NOW $TIME_WAIT
+check_ifoverload FLOWIN_MB $check_item $FLOWIN_MB_NOW $FLOWIN_MB
+check_ifoverload FLOWOUT_MB $check_item $FLOWOUT_MB_NOW $FLOWOUT_MB
+
+done
+</code></pre>
+
+<p>posted on 2018-09-20 10:59 channy14 阅读( &hellip;) 评论( &hellip;) 编辑 收藏</p>
+
+<p>转载于:<a href="https://www.cnblogs.com/channy14/p/9679558.html">https://www.cnblogs.com/channy14/p/9679558.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

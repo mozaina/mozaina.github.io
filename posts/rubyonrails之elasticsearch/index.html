@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>RubyOnRails之ElasticSearch | 开发者问答集锦</title>
+    <meta property="og:title" content="RubyOnRails之ElasticSearch - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="RubyOnRails之ElasticSearch">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/rubyonrails%E4%B9%8Belasticsearch/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">RubyOnRails之ElasticSearch</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>ElasticSearch中内置了许多分词器, standard, english, chinese等, 中文分词效果不佳, 所以使用ik,
+以及pinyin</p>
+
+<h3 id="elasticsearch-install">elasticsearch install</h3>
+
+<pre><code>brew install elasticsearch
+
+ cd /usr/local/Cellar/elasticsearch/6.4.2/bin
+ ➜  bin ./elasticsearch-plugin install https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v6.4.2/elasticsearch-analysis-ik-6.4.2.zip
+
+ ➜  bin ./elasticsearch-plugin install https://github.com/medcl/elasticsearch-analysis-pinyin/releases/download/v6.4.2/elasticsearch-analysis-pinyin-6.4.2.zip
+</code></pre>
+
+<p>elasticsearch 配置文件</p>
+
+<pre><code> /usr/local/etc/elasticsearch/elasticsearch.yml
+cluster.name: 集群名字
+node.name: 节点名
+path.data: 数据存储目录
+path.logs: 日志存储目录
+action.auto_create_index: false
+# /usr/local/etc/elasticsearch/jvm.options
+# 指定使用内存
+-Xms128m
+-Xmx128m
+</code></pre>
+
+<h3 id="elasticsearch-启动">elasticsearch 启动</h3>
+
+<pre><code>brew services list
+brew services stop elasticsearch
+brew services start elasticsearch
+
+
+
+http://localhost:9200/products/product/1382
+{
+    error: {
+        root_cause: [
+            {
+                type: &quot;index_closed_exception&quot;,
+                reason: &quot;closed&quot;,
+                index_uuid: &quot;opkeQfWbTKSrJzx4BxwoXA&quot;,
+                index: &quot;products&quot;
+            }
+        ],
+        type: &quot;index_closed_exception&quot;,
+        reason: &quot;closed&quot;,
+        index_uuid: &quot;opkeQfWbTKSrJzx4BxwoXA&quot;,
+        index: &quot;products&quot;
+    },
+    status: 400
+}
+</code></pre>
+
+<h3 id="启用或关闭-open-close">启用或关闭(_open/_close)</h3>
+
+<pre><code>➜  work-api git:(release) ✗ curl -XPOST 'localhost:9200/products/_open?pretty'
+{
+  &quot;acknowledged&quot; : true,
+  &quot;shards_acknowledged&quot; : true
+}
+➜
+
+irb(main):02:0&gt; Product.import
+</code></pre>
+
+<h3 id="elasticsearch-gem">elasticsearch gem</h3>
+
+<pre><code>gem 'elasticsearch-model', '~&gt; 5.0', '&gt;= 5.0.1'
+gem 'elasticsearch-rails', '~&gt; 5.0', '&gt;= 5.0.1'
+</code></pre>
+
+<h3 id="config-setting-yml">config/setting.yml</h3>
+
+<pre><code>development:
+  elasticsearch:
+    host: &quot;http://127.0.0.1:9200&quot;
+</code></pre>
+
+<h3 id="config-initializers-setting-rb">config/initializers/setting.rb</h3>
+
+<pre><code>require 'yaml'
+setting_path = Rails.root.join('config', 'setting.yml')
+$setting = YAML.load_file(setting_path)[Rails.env]
+</code></pre>
+
+<h3 id="config-initializers-elasticsearch-rb">config/initializers/elasticsearch.rb</h3>
+
+<pre><code>require Rails.root.join('config', 'initializers', 'setting')
+config = {
+  host: $setting['elasticsearch']['host'],
+  transport_options: {
+    request: { open_timeout: 5, timeout: 5 }
+  },
+}
+
+$elasticsearch = config
+Elasticsearch::Model.client = Elasticsearch::Client.new(config)
+</code></pre>
+
+<h3 id="model-import">model import</h3>
+
+<pre><code>class Order
+  SyncModerElasticsearch
+end
+</code></pre>
+
+<h3 id="app-models-concerns-sync-moder-elasticsearch-rb">app/models/concerns/sync_moder_elasticsearch.rb</h3>
+
+<pre><code>require &quot;elasticsearch/model&quot;
+module SyncModerElasticsearch
+  extend ActiveSupport::Concern
+
+  included do
+    include Elasticsearch::Model
+    extend ElasticsearchCallback
+    # include Elasticsearch::Model::Callbacks
+    synchronization
+    mapping{
+      indexes :suggested_price, type: :float
+      indexes :lowest_price, type: :float
+      indexes :sales_volume, type: :integer
+    }
+    after_commit :sync_elasticsearch, on: [:create, :update]
+  end
+
+  def as_indexed_json(options = {})
+    {
+        id: id,
+        name: name,
+        name_cn: name_cn,
+        order_item: {
+          id: _id,
+          name: _name
+        }
+    }
+  end
+
+  private
+
+  def sync_elasticsearch
+    self.import
+    _table_name, _id = self.class.table_name, self.id
+    EsSyncJob.set(table_name: _table_name, id: _id)
+  end
+
+end
+
+
+
+module ElasticsearchCallback
+  extend ActiveSupport::Concern
+
+  def synchronization
+    after_commit on: [:create] do
+      begin
+        $logger.info('同步创建', self)
+        self.__elasticsearch__.index_document
+      rescue =&gt; e
+        $logger.info(self, e)
+        begin
+          self.__elasticsearch__.index_document
+        rescue =&gt; e
+          $logger.info(self, e)
+        end
+      end
+    end
+
+    after_commit on: [:update] do
+      begin
+        $logger.info('同步更新', self)
+        self.__elasticsearch__.update_document
+      rescue =&gt; e
+        $logger.info(self, e)
+        begin
+          self.__elasticsearch__.update_document
+        rescue =&gt; e
+          $logger.info(self, e)
+        end
+      end
+    end
+
+    after_commit on: [:destroy] do
+      begin
+        $logger.info('同步删除', self)
+        self.__elasticsearch__.delete_document
+      rescue =&gt; e
+        $logger.info(self, e)
+        begin
+          self.__elasticsearch__.delete_document
+        rescue =&gt; e
+          $logger.info(self, e)
+        end
+      end
+    end
+    end
+
+end
+</code></pre>
+
+<h3 id="model-import-worker">model import worker</h3>
+
+<pre><code>class EsSyncJob &lt; ApplicationJob
+  queue_as :default
+
+  def perform table_name,id
+    $logger.info('begin sync_elasticsearch queue')
+    begin
+      table_name.classify.safe_constantize.where(id: id).import
+    rescue =&gt; e
+      $logger.info(&quot;sync_elasticsearch error: #{e.message}&quot;)
+    end
+  end
+end
+</code></pre>
+
+<h3 id="elasticsearch-service">Elasticsearch Service</h3>
+
+<pre><code>class ElasticsearchService
+
+  def initialize model
+    @model = model
+  end
+
+  def search_without_paginate query, sort=nil, page = 1, per_page = 10, is_highlight = false
+    _query = query.is_a?(Hash) ? hash_query(query) : multi_match_query(query)
+    _highlight = is_highlight ? fetch_highlight_hash : {}
+    _sort = sort.nil? ? {id: :desc} : sort
+    begin
+      response = @model.search query: _query,
+                               highlight: { fields: _highlight },
+                               sort: _sort,
+                               from: per_page * (page - 1),
+                               size: 1000 #TODO
+
+      return response.results
+    rescue =&gt; e
+      $logger.info(&quot;es search_without_paginate error&quot;, e)
+      return []
+    end
+  end
+
+  def search query, sort=nil, page = 1, per_page = 10, is_highlight = false
+    _query = query.is_a?(Hash) ? hash_query(query) : multi_match_query(query)
+    _highlight = is_highlight ? fetch_highlight_hash : {}
+    _sort = sort.nil? ? {id: :desc} : sort
+    begin
+      response = @model.search query: _query,
+                               highlight: { fields: _highlight },
+                               sort: _sort,
+                               from: per_page * (page - 1),
+                               size: per_page
+      return [response.response['hits']['total'], response.results]
+    rescue =&gt; e
+      $logger.info(&quot;es search error&quot;, e)
+      struct = Struct.new :results
+      return [0, struct.new([])]
+    end
+  end
+
+  private
+
+  def hash_query query
+    filtered = {
+      bool: {
+        must: query[:filter].select{|key, value| !value.include?(' OR ')}.keys.map do |key|
+          { match: query[:filter].slice(key) }
+        end
+      }
+    }
+    if query[:filter].select{|key, value| value.include?(' OR ')}.present?
+      should = query[:filter].select{|key, value| value.include?(' OR ')}.map do |key, values|
+        values.split(&quot; OR &quot;).map do |value|
+          {match: {key.to_sym =&gt; value} }
+        end
+      end.flatten
+      filtered[:bool][:must] &lt;&lt; { bool: { should: [should] } }
+    end
+    filtered[:bool].merge!({filter: { range: query[:range] }}) if query[:range].present?
+    filtered[:bool].merge!({must_not: { term: {status: 'preparing'} }}) if query[:only_show]
+    return filtered
+  end
+
+  def multi_match_query query
+    fileds = fetch_multi_match_fields
+    {
+      bool: {
+        must: {
+          multi_match:{
+            query: query,
+            type: &quot;best_fields&quot;,
+            fields: fileds,
+            operator: &quot;and&quot;
+          }
+        },
+        # filter: filter_term,
+        must_not: must_not_term
+      }
+    }
+  end
+
+  def filter_term
+    case @model.to_s
+    when 'Product'
+      {
+        not:{
+          filter:{
+            term: {status: 'selling'}
+          }
+        }
+      }
+    end
+  end
+
+  def must_not_term
+    case @model.to_s
+    when 'Product'
+      {
+        term: {status: 'preparing'}
+      }
+    end
+  end
+
+
+  def fetch_multi_match_fields
+    case @model.to_s
+    when 'Model'
+      return [
+        'name_cn^7', &quot;name_cn.ik^6&quot;, &quot;name_cn.pinyin^5&quot;, &quot;name_cn.standard^4&quot;, &quot;name_cn.english^3&quot;
+      ]
+    end
+  end
+
+  def fetch_highlight_hash
+    case @model.to_s
+    when 'Model'
+      return {
+        name_cn: {}, &quot;name_cn.ik&quot;=&gt;{}, &quot;name_cn.pinyin&quot;=&gt;{}, &quot;name_cn.standard&quot;=&gt;{}, &quot;name_cn.english&quot;=&gt;{}
+      }
+    end
+  end
+
+end
+
+
+
+filter_hash = {&quot;order_no&quot;: order_no, &quot;category.id&quot;: category_id }
+range_hash = {&quot;order_amount&quot;: {&quot;lte&quot;: params[:order_amount]}}
+sort = {id: :desc}
+page = 1
+per_page = 30
+total, products = ElasticsearchService.new(Model).search({filter: filter_hash, range: range_hash, only_show: true}, sort, page.to_i, per_page.to_i)
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

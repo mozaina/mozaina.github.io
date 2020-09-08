@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本编程进阶 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本编程进阶 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本编程进阶">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E7%BC%96%E7%A8%8B%E8%BF%9B%E9%98%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本编程进阶</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>以三台机器搭建的集群为例</p>
+
+<h1 id="1-查看三台机器的进程">1.查看三台机器的进程</h1>
+
+<pre><code>[hadoop@hadoop001 hadoop]$ vi jps.sh
+#!/bin/bash
+
+echo &quot;-----------------hadoop001 process---------------&quot;
+ssh hadoop001 &quot;$JAVA_HOME/bin/jps&quot;
+echo &quot;                                                    &quot;
+
+
+echo &quot;-----------------hadoop002 process---------------&quot;
+ssh hadoop002 &quot;$JAVA_HOME/bin/jps&quot;
+echo &quot;                                                    &quot;
+
+
+echo &quot;-----------------hadoop003 process---------------&quot;
+ssh  hadoop003 &quot;$JAVA_HOME/bin/jps&quot;
+echo &quot;                                                    &quot;
+[hadoop@hadoop001 hadoop]$ ./jps.sh
+----------hadoop001 process------------
+3385 Jps
+
+----------hadoop002 process------------
+2903 Jps
+
+----------hadoop003 process------------
+2611 Jps
+</code></pre>
+
+<h1 id="2-拷贝文件脚本">2.拷贝文件脚本</h1>
+
+<pre><code>[hadoop@hadoop001 hadoop]$ vi sync_hadoop.sh 
+#!/bin/bash -x
+
+HADOOP_CONF=/home/hadoop/app/hadoop/etc/hadoop/
+
+cd $HADOOP_CONF
+
+# 此处由于机器少 可以直接一个一个写  如果机器多的话  可以使用for循环
+scp hadoop-env.sh core-site.xml hdfs-site.xml mapred-site.xml yarn-site.xml  hadoop002:$HADOOP_CONF
+scp hadoop-env.sh core-site.xml hdfs-site.xml mapred-site.xml yarn-site.xml  hadoop003:$HADOOP_CONF
+
+exit 0
+</code></pre>
+
+<h1 id="3-启动集群shell脚本">3.启动集群shell脚本</h1>
+
+<h2 id="3-1-编写启动脚本">3.1 编写启动脚本</h2>
+
+<pre><code>[hadoop@hadoop001 hadoop]$ vi start_cluster.sh
+#!/bin/bash -x
+
+# 启动zk
+ssh hadoop001 &quot;$ZOOKEEPER_HOME/bin/zkServer.sh start&quot;
+ssh hadoop002 &quot;$ZOOKEEPER_HOME/bin/zkServer.sh start&quot;
+ssh hadoop003 &quot;$ZOOKEEPER_HOME/bin/zkServer.sh start&quot;
+
+# 睡眠5s  zk启动之后不能立马就启动hadoop
+sleep 5
+
+#start hdfs+yarn+jobhistory
+/home/hadoop/app/hadoop/sbin/start-all.sh
+
+sleep 5s
+
+# 启动hadoop002机器上的resourcemanager historyserver
+ssh hadoop002 &quot;/home/hadoop/app/hadoop/sbin/yarn-daemon.sh start resourcemanager&quot;
+/home/hadoop/app/hadoop/sbin/mr-jobhistory-daemon.sh start historyserver
+
+# 退出
+exit 0
+</code></pre>
+
+<h2 id="3-2-执行脚本并查看进程">3.2 执行脚本并查看进程</h2>
+
+<pre><code># 执行脚本
+[hadoop@hadoop001 hadoop]$ ./start_cluster.sh
+# 启动日志如下
++ ssh hadoop001 '/home/hadoop/app/zookeeper/bin/zkServer.sh start'
+JMX enabled by default
+Using config: /home/hadoop/app/zookeeper/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
++ ssh hadoop002 '/home/hadoop/app/zookeeper/bin/zkServer.sh start'
+JMX enabled by default
+Using config: /home/hadoop/app/zookeeper/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
++ ssh hadoop003 '/home/hadoop/app/zookeeper/bin/zkServer.sh start'
+JMX enabled by default
+Using config: /home/hadoop/app/zookeeper/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
++ sleep 5
++ /home/hadoop/app/hadoop/sbin/start-all.sh
+This script is Deprecated. Instead use start-dfs.sh and start-yarn.sh
+Starting namenodes on [hadoop001 hadoop002]
+hadoop001: starting namenode, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-namenode-hadoop001.out
+hadoop002: starting namenode, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-namenode-hadoop002.out
+hadoop001: starting datanode, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-datanode-hadoop001.out
+hadoop002: starting datanode, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-datanode-hadoop002.out
+hadoop003: starting datanode, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-datanode-hadoop003.out
+Starting journal nodes [hadoop001 hadoop002 hadoop003]
+hadoop001: starting journalnode, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-journalnode-hadoop001.out
+hadoop003: starting journalnode, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-journalnode-hadoop003.out
+hadoop002: starting journalnode, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-journalnode-hadoop002.out
+Starting ZK Failover Controllers on NN hosts [hadoop001 hadoop002]
+hadoop001: starting zkfc, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-zkfc-hadoop001.out
+hadoop002: starting zkfc, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/hadoop-hadoop-zkfc-hadoop002.out
+starting yarn daemons
+starting resourcemanager, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/yarn-hadoop-resourcemanager-hadoop001.out
+hadoop003: starting nodemanager, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/yarn-hadoop-nodemanager-hadoop003.out
+hadoop002: starting nodemanager, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/yarn-hadoop-nodemanager-hadoop002.out
+hadoop001: starting nodemanager, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/yarn-hadoop-nodemanager-hadoop001.out
++ sleep 5s
++ ssh hadoop002 '/home/hadoop/app/hadoop/sbin/yarn-daemon.sh start resourcemanager'
+starting resourcemanager, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/yarn-hadoop-resourcemanager-hadoop002.out
++ /home/hadoop/app/hadoop/sbin/mr-jobhistory-daemon.sh start historyserver
+starting historyserver, logging to /home/hadoop/app/hadoop-2.6.0-cdh5.15.1/logs/mapred-hadoop-historyserver-hadoop001.out
++ exit 0
+
+# 执行jps.sh 查看下各机器进程情况
+[hadoop@hadoop001 hadoop]$ ./jps.sh
+----------hadoop001 process------------
+3265 Jps
+2401 NameNode
+3219 JobHistoryServer
+2694 JournalNode
+2504 DataNode
+3066 NodeManager
+
+----------hadoop002 process------------
+2787 ResourceManager
+2628 NodeManager
+2260 NameNode
+2324 DataNode
+2427 JournalNode
+2829 Jps
+
+----------hadoop003 process------------
+2357 JournalNode
+2455 NodeManager
+2263 DataNode
+2585 Jps
+# 查看进程会发现启动有问题 缺少zookeeper  zkfc
+</code></pre>
+
+<h3 id="3-2-1-排查集群未启动成功问题">3.2.1 排查集群未启动成功问题</h3>
+
+<h4 id="3-2-1-1-查看zookeeper进程">3.2.1.1 查看zookeeper进程</h4>
+
+<pre><code># 通过ps -ef | grep zookeeper 查看进程
+[hadoop@hadoop001 hadoop]$ ps -ef | grep zookeeper
+hadoop    3527  2111  0 15:08 pts/0    00:00:00 grep --color=auto zookeeper
+# 未发现zookeeper进程
+</code></pre>
+
+<p>由于zk没有启动成功，导致zkfc也启动失败</p>
+
+<h4 id="3-2-1-2-查看zk启动日志">3.2.1.2 查看zk启动日志</h4>
+
+<pre><code># ① 查找zk配置文件 发现没有配置日志目录
+[hadoop@hadoop001 conf]$ cat zoo.cfg
+
+# ② 查找conf目录下的log4j.properties文件
+[hadoop@hadoop001 conf]$ cat log4j.properties
+......
+zookeeper.log.dir=.
+zookeeper.log.file=zookeeper.log
+......
+# 但通过给定的路径未找到日志文件 zookeeper.log 
+
+# ③ find /home/hadoop -name 'zookeeper.log'
+[hadoop@hadoop001 conf]$ find /home/hadoop -name 'zookeeper.log'
+# 没有任何信息打印 说明hadoop用户下不存在
+# 用root在根目录下搜索
+[root@hadoop001 ~]# find / -name 'zookeeper.log'
+
+# ④ 查看zk启动脚本  zkServer.sh
+[hadoop@hadoop001 bin]$ vi zkServer.sh
+# 由于是启动  所以只需要看start那一块脚本即可
+......
+_ZOO_DAEMON_OUT=&quot;$ZOO_LOG_DIR/zookeeper.out&quot;
+
+case $1 in
+start)
+    echo  -n &quot;Starting zookeeper ... &quot;
+    if [ -f &quot;$ZOOPIDFILE&quot; ]; then
+      if kill -0 `cat &quot;$ZOOPIDFILE&quot;` &gt; /dev/null 2&gt;&amp;1; then
+         echo $command already running as process `cat &quot;$ZOOPIDFILE&quot;`.
+         exit 0
+      fi
+    fi
+    nohup &quot;$JAVA&quot; &quot;-Dzookeeper.log.dir=${ZOO_LOG_DIR}&quot; &quot;-Dzookeeper.root.logger=${ZOO_LOG4J_PROP}&quot; \
+    -cp &quot;$CLASSPATH&quot; $JVMFLAGS $ZOOMAIN &quot;$ZOOCFG&quot; &gt; &quot;$_ZOO_DAEMON_OUT&quot; 2&gt;&amp;1 &lt; /dev/null &amp;
+......
+# 经查找启动脚本会发现 日志文件的后缀被更改成了zookeeper.out
+
+# ⑤ 全局搜索下 zookeeper.out
+[root@hadoop001 ~]# find / -name 'zookeeper.out'
+/home/hadoop/app/hadoop-2.6.0-cdh5.15.1/etc/hadoop/zookeeper.out
+/home/hadoop/app/zookeeper-3.4.6/conf/zookeeper.out
+/home/hadoop/zookeeper.out # 该文件为日志文件
+[root@hadoop001 ~]# cat /home/hadoop/zookeeper.out
+nohup: failed to run command ‘java’: No such file or directory
+# 此时问题找到
+
+# ⑥ 分析错误 直接执行ssh查找java   发现找不到java  但是却可以找到环境变量  且 单独执行which java也是存在的
+[hadoop@hadoop001 ~]$ ssh hadoop001 &quot;which java&quot;
+which: no java in (/usr/local/bin:/usr/bin)
+[hadoop@hadoop001 ~]$ ssh hadoop001 &quot;echo $JAVA_HOME&quot;
+/usr/java/jdk1.8.0_40
+[hadoop@hadoop001 ~]$ which java
+/usr/java/jdk1.8.0_40/bin/java
+
+# ⑦ 继续查看zkServer.sh启动脚本 从头开始看 主要为了找到zkServer.sh脚本中$JAVA在哪里赋值的
+# 会发现如下部分
+[hadoop@hadoop001 bin]$ vi zkServer.sh
+......
+if [ -e &quot;$ZOOBIN/../libexec/zkEnv.sh&quot; ]; then
+  . &quot;$ZOOBINDIR/../libexec/zkEnv.sh&quot;
+else
+  . &quot;$ZOOBINDIR/zkEnv.sh&quot;
+fi
+......
+# 查看zkEnv.sh   找到如下赋值
+[hadoop@hadoop001 bin]$ vi zkEnv.sh
+......
+#手动加一句打印  为了查看环境变量是否存在
+echo &quot;---------------java: $JAVA_HOME-------------&quot;
+
+if [ &quot;$JAVA_HOME&quot; != &quot;&quot; ]; then
+  JAVA=&quot;$JAVA_HOME/bin/java&quot;
+else
+  JAVA=java
+fi
+......
+# 尝试ssh启动zk
+[hadoop@hadoop001 bin]$ ssh hadoop001 &quot;$ZOOKEEPER_HOME/bin/zkServer.sh start&quot;
+JMX enabled by default
+---------------java: -------------
+Using config: /home/hadoop/app/zookeeper/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+# 上面结果显示未读取到环境变量JAVA_HOME  且下面结果中没有zk进程
+[hadoop@hadoop001 bin]$ ps -ef | grep zookeeper
+hadoop    4284  3989  0 15:58 pts/2    00:00:00 grep --color=auto zookeeper
+
+# ⑧ 解决方案：
+# 1.在zkEnv.sh中写死java路径
+[hadoop@hadoop001 bin]$ vi zkEnv.sh
+if [ &quot;$JAVA_HOME&quot; != &quot;&quot; ]; then
+  JAVA=&quot;$JAVA_HOME/bin/java&quot;
+else
+  JAVA=/usr/java/jdk1.8.0_40/bin/java
+fi
+# 2.将java环境变量配置到hadoop用户的 ~/.bashrc中
+[hadoop@hadoop001 bin]$ vi ~/.bashrc
+export JAVA_HOME=/usr/java/jdk1.8.0_40
+export PATH=$JAVA_HOME/bin:$PATH
+# 验证下是可以读取到的
+[hadoop@hadoop001 bin]$ ssh hadoop001 &quot;which java&quot;
+/usr/java/jdk1.8.0_40/bin/java
+[hadoop@hadoop001 bin]$ ssh hadoop001 &quot;$ZOOKEEPER_HOME/bin/zkServer.sh start&quot;
+JMX enabled by default
+---------------java: /usr/java/jdk1.8.0_40------------- # 可以读取到
+Using config: /home/hadoop/app/zookeeper/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+[hadoop@hadoop001 bin]$ jps
+4507 Jps
+4478 QuorumPeerMain # zk进程存在
+
+# 对应的将~/.bashrc同步到另两台机器上面
+[hadoop@hadoop001 bin]$ scp ~/.bashrc hadoop002:/home/hadoop/
+.bashrc                                                 100%  306     0.3KB/s   00:00    
+[hadoop@hadoop001 bin]$ scp ~/.bashrc hadoop003:/home/hadoop/
+.bashrc                                                 100%  306     0.3KB/s   00:00 
+</code></pre>
+
+<h3 id="3-2-2-补充ssh知识点">3.2.2 补充ssh知识点</h3>
+
+<h4 id="3-2-2-1-ssh执行远程命令和脚本">3.2.2.1 ssh执行远程命令和脚本</h4>
+
+<p>三种环境变量配置</p>
+
+<blockquote>
+<p>全局： /etc/profile</p>
+
+<p>个人： ~/.bash_profile 或者 ~/.bashrc</p>
+</blockquote>
+
+<p>⚠️⚠️⚠️ <strong>bash模式：加载环境变量配置文件：个人~/.bashrc</strong></p>
+
+<h2 id="3-3-再次通过shell脚本启动集群">3.3. 再次通过shell脚本启动集群</h2>
+
+<pre><code># 启动前先关闭
+[hadoop@hadoop001 hadoop]$ ./stop_cluster.sh 
+
+# 执行启动脚本
+[hadoop@hadoop001 hadoop]$ ./start_cluster.sh 
+
+# 执行jps.sh验证下  zk zkfc都已启动成功
+[hadoop@hadoop001 hadoop]$ ./jps.sh 
+----------hadoop001 process------------
+5186 QuorumPeerMain
+5330 NameNode
+6373 JobHistoryServer
+5625 JournalNode
+6025 NodeManager
+5434 DataNode
+5916 ResourceManager
+6445 Jps
+5805 DFSZKFailoverController
+
+----------hadoop002 process------------
+4496 NodeManager
+4659 ResourceManager
+4292 JournalNode
+4197 DataNode
+4123 NameNode
+4060 QuorumPeerMain
+4413 DFSZKFailoverController
+4717 Jps
+
+----------hadoop003 process------------
+3090 JournalNode
+3186 NodeManager
+2995 DataNode
+3319 Jps
+2938 QuorumPeerMain
+</code></pre>
+
+<h1 id="4-关闭集群">4.关闭集群</h1>
+
+<pre><code>[hadoop@hadoop001 hadoop]$ vi stop_cluster.sh 
+#!/bin/bash -x
+
+#stop history+yarn+hdfs
+/home/hadoop/app/hadoop/sbin/mr-jobhistory-daemon.sh stop historyserver
+ssh hadoop002 &quot;/home/hadoop/app/hadoop/sbin/yarn-daemon.sh stop resourcemanager&quot;
+
+/home/hadoop/app/hadoop/sbin/stop-all.sh
+
+#stop zk
+ssh hadoop001 &quot;$ZOOKEEPER_HOME/bin/zkServer.sh stop&quot;
+ssh hadoop002 &quot;$ZOOKEEPER_HOME/bin/zkServer.sh stop&quot;
+ssh hadoop003 &quot;$ZOOKEEPER_HOME/bin/zkServer.sh stop&quot;
+
+# 调用jps.sh脚本 查看进程
+./jps.sh
+
+exit 0
+
+# 执行脚本
+[hadoop@hadoop001 hadoop]$ ./stop_cluster.sh 
++ /home/hadoop/app/hadoop/sbin/mr-jobhistory-daemon.sh stop historyserver
+stopping historyserver
++ ssh hadoop002 '/home/hadoop/app/hadoop/sbin/yarn-daemon.sh stop resourcemanager'
+stopping resourcemanager
++ /home/hadoop/app/hadoop/sbin/stop-all.sh
+This script is Deprecated. Instead use stop-dfs.sh and stop-yarn.sh
+Stopping namenodes on [hadoop001 hadoop002]
+hadoop001: stopping namenode
+hadoop002: stopping namenode
+hadoop001: stopping datanode
+hadoop003: stopping datanode
+hadoop002: stopping datanode
+Stopping journal nodes [hadoop001 hadoop002 hadoop003]
+hadoop001: stopping journalnode
+hadoop002: stopping journalnode
+hadoop003: stopping journalnode
+Stopping ZK Failover Controllers on NN hosts [hadoop001 hadoop002]
+hadoop002: stopping zkfc
+hadoop001: stopping zkfc
+stopping yarn daemons
+stopping resourcemanager
+hadoop002: stopping nodemanager
+hadoop003: stopping nodemanager
+hadoop001: stopping nodemanager
+no proxyserver to stop
++ ssh hadoop001 '/home/hadoop/app/zookeeper/bin/zkServer.sh stop'
+JMX enabled by default
+---------------java: /usr/java/jdk1.8.0_40-------------
+Using config: /home/hadoop/app/zookeeper/bin/../conf/zoo.cfg
+Stopping zookeeper ... STOPPED
++ ssh hadoop002 '/home/hadoop/app/zookeeper/bin/zkServer.sh stop'
+JMX enabled by default
+Using config: /home/hadoop/app/zookeeper/bin/../conf/zoo.cfg
+Stopping zookeeper ... STOPPED
++ ssh hadoop003 '/home/hadoop/app/zookeeper/bin/zkServer.sh stop'
+JMX enabled by default
+Using config: /home/hadoop/app/zookeeper/bin/../conf/zoo.cfg
+Stopping zookeeper ... STOPPED
++ ./jps.sh
+----------hadoop001 process------------
+7132 Jps
+
+----------hadoop002 process------------
+5142 Jps
+
+----------hadoop003 process------------
+3483 Jps
+
++ exit 0
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

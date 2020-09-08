@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本实现zabbix监控信息收集 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本实现zabbix监控信息收集 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本实现zabbix监控信息收集">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0zabbix%E7%9B%91%E6%8E%A7%E4%BF%A1%E6%81%AF%E6%94%B6%E9%9B%86/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本实现zabbix监控信息收集</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="zabbix信息收集">zabbix信息收集</h1>
+
+<p>一般zabbix信息收集都是写成脚本</p>
+
+<p>思路：将监控的信息写成函数，使用位置参数$1来调用函数即可，一般都是zabbix来传参</p>
+
+<h2 id="1-tcp信息收集">1.tcp信息收集</h2>
+
+<p>tcp三次握手</p>
+
+<p>​ 一般由客户端发起请求</p>
+
+<p>​ 1.首先客户端向服务器发起请求，给服务器发送一个SYN的请求包</p>
+
+<p>​ 2.服务器接收确认后给客户端回复一个ACK的确认包，在向客户端发起一个SYN的包，表示请求和客户端建立连接</p>
+
+<p>​ 3.客户端收到sync的包后会回复一个ACK的确认包，表示与服务器建立连接，三次握手结束</p>
+
+<p>tcp四次挥手</p>
+
+<p>​ 通常由服务器发起，例如把用户请求的数据都给用户后就断开了连接</p>
+
+<p>​ 不同的应用会有不同的关闭，例如ssh就是客户端发起</p>
+
+<p>​ 1.服务器端向客户端发送一个FIN的包，表示要断开连接</p>
+
+<p>​ 2.客户端收到FIN包后，确认无误就会回复一个ACK的包</p>
+
+<p>​ 3.既然服务器端以及断开了连接，那么客户端也要断开连接，客户端向服务器发送FIN的包</p>
+
+<p>​ 4.服务器收到FIN包后回复一个ACK的包，四次握手完成</p>
+
+<p>[外链图片转存失败,源站可能有防盗链机制,建议将图片保存下来直接上传(img-4rkD7001-1592060494794)(C:\Users\Administrator\AppData\Roaming\Typora\typora-
+user-images\image-20200329154648099.png)]</p>
+
+<p>SYN、FIN、ACk这些我们都是看不到，我们能看到的只有Listen、ESTABLSHED、CLOSE WAIT
+、TIME_WAIT、CLOSED，如果看到了SYN、FIN、ACK这些状态，那么就说明问题来了</p>
+
+<p>下面开始编写脚本</p>
+
+<pre><code>这种方式一般是给人看的，所有状态的信息
+[root@localhost d18_ph_zabbix_sjxx]# netstat -an | grep 'tcp' | awk '{status[$NF]++} END{for (i in status){print i,status[i]}}'
+LISTEN 13
+ESTABLISHED 2
+
+[root@localhost d18_ph_zabbix_sjxx]# ss -an | grep 'tcp'  | awk '{status[$2]++} END{for (i in status){print i,status[i]}}'
+LISTEN 13
+ESTAB 2
+
+我们是要给zabbix看的，所以我们要把每一个状态的统计命令写出来
+#!/bin/bash
+#zabbix收集tcp连接状态,ss版
+LISTEN() {
+        #ss 版本
+        #ss -an | grep 'tcp' | grep 'LISTEN' | wc -l
+        #netstat 版本
+        netstat -an | grep 'tcp' | grep 'LISTEN' | wc -l
+}
+
+SYN_RECV() {
+        #ss 版本
+        #ss -an | grep 'tcp' | grep 'SYN[-_]RECV' | wc -l
+        #netstat 版本
+        netstat -an | grep 'tcp' | grep 'SYN[-_]RECV' | wc -l
+}
+
+ESTABLISHED() {
+        #ss 版本
+        #ss -an | grep 'tcp' | grep 'ESTAB' | wc -l
+        #netstat 版本
+        netstat -an | grep 'tcp' | grep 'ESTABLISHED' | wc -l
+}
+
+TIME_WAIT() {
+        #ss 版本
+        #ss -an | grep 'tcp' | grep 'TIME[-_]WAIT' | wc -l
+        #netstat 版本
+        netstat -an | grep 'tcp' | grep 'TIME[-_]WAIT' | wc -l
+}
+
+$1                      
+
+这里使用$1其实类似于传参，例如$1输入的是LISTEN那么就会调用对应的LISTEN函数
+
+执行：
+    [root@localhost d18_ph_zabbix_sjxx]# ./zabbix_tcp_connect_status.sh LISTEN
+    13
+    [root@localhost d18_ph_zabbix_sjxx]# ./zabbix_tcp_connect_status.sh ESTABLISHED
+    2
+</code></pre>
+
+<h2 id="2-mysql信息收集">2.mysql信息收集</h2>
+
+<p>mysqladmin命令除了可以改密码，还有很多扩展的功能</p>
+
+<pre><code>看一些mysql的基本信息
+[root@localhost d18_ph_zabbix_sjxx]# mysqladmin status
+Uptime: 263313  Threads: 1  Questions: 3  Slow queries: 0  Opens: 0  Flush tables: 2  Open tables: 26  Queries per second avg: 0.000
+
+如果数据库设置了密码则这样使用
+[root@localhost ~]# mysqladmin -uroot -p123 status
+Uptime: 39713  Threads: 1  Questions: 2  Slow queries: 0  Opens: 0  Flush tables: 2  Open tables: 26  Queries per second avg: 0.000
+
+看mysql扩展信息，例如增删改查的数量,由于输出过多，因此我们只保留几个比较重要的
+[root@localhost d18_ph_zabbix_sjxx]# mysqladmin extended-status
++------------------------------------------+-------------+
+| Variable_name                            | Value       |
++------------------------------------------+-------------+
+| Com_commit                               | 0           |
+| Com_insert                               | 0           |
+| Com_delete                               | 0           |
+| Com_update                               | 0           |
+| Com_select                               | 0           |
+| Com_rollback                             | 0           |
++------------------------------------------+-------------+
+</code></pre>
+
+<p>脚本内容</p>
+
+<pre><code>#!/bin/bash
+#监控mysql的状态信息
+#当前的uptime时间
+Uptime() {
+        mysqladmin status | awk '{print $2}'
+}
+
+#慢查询的数量
+Slow_queries() {
+        mysqladmin status | awk '{print $9}'
+}
+
+#insert的数量
+Com_insert() {
+        mysqladmin extended-status | awk '/\/{print $4}'
+}
+
+#delete的数量
+Com_delete() {
+        mysqladmin extended-status | awk '/\/{print $4}'
+}
+
+#update的数量
+Com_update() {
+        mysqladmin extended-status | awk '/\/{print $4}'
+}
+
+#select的数量
+Com_select() {
+        mysqladmin extended-status | awk '/\/{print $4}'
+}
+
+#commit(提交)的数量
+Com_commit() {
+        mysqladmin extended-status | awk '/\/{print $4}'
+}
+
+#rollback(回滚)的数量
+Com_rollback() {
+        mysqladmin extended-status | awk '/\/{print $4}'
+}
+
+$1
+
+执行
+[root@localhost d18_ph_zabbix_sjxx]# ./zabbix_mysql_status.sh Uptime
+264790
+[root@localhost d18_ph_zabbix_sjxx]# ./zabbix_mysql_status.sh Slow_queries
+0
+[root@localhost d18_ph_zabbix_sjxx]# ./zabbix_mysql_status.sh Com_insert
+0
+[root@localhost d18_ph_zabbix_sjxx]# ./zabbix_mysql_status.sh Com_delete
+0
+[root@localhost d18_ph_zabbix_sjxx]# ./zabbix_mysql_status.sh Com_update
+0
+[root@localhost d18_ph_zabbix_sjxx]# ./zabbix_mysql_status.sh Com_select
+1
+[root@localhost d18_ph_zabbix_sjxx]# ./zabbix_mysql_status.sh Com_commit
+0
+[root@localhost d18_ph_zabbix_sjxx]# ./zabbix_mysql_status.sh Com_rollback
+0
+</code></pre>
+
+<h2 id="3-内存信息收集">3.内存信息收集</h2>
+
+<p>每当vim一个文件，都会从硬盘把数据读取到内存页page，如果要写一个文件，可能一个page页不够，要分好几个，这就形成了脏页，如果不保存，就会形成丢失文件，因为只是在内存中修改了，我们需要持久化到硬盘才可以</p>
+
+<p>cp一个文件的时候首先拷到内存页，在拷贝到另一个内存页，最后再将这些内存页保存到硬盘中，同样会产生脏页</p>
+
+<p>命令结束了不代表数据一定到了硬盘，只能说到内存上去了，因为磁盘写入默认使用异步方式，可以使用sync命令，把脏页写入到硬盘，常用于u盘，硬盘的话可以慢慢写</p>
+
+<p>脚本内容</p>
+
+<pre><code>#!/bin/bash
+#内存信息收集
+#内存总量
+MemTotal() {
+        awk '/^MemTotal/{print $2}' /proc/meminfo
+}
+
+#空闲的内存量
+MemFree() {
+        awk '/^MemFree/{print $2}' /proc/meminfo
+}
+
+#缓冲区的大小
+Buffers() {
+        awk '/^Buffers/{print $2}' /proc/meminfo
+}
+
+#缓存区大小
+Cached(){
+        awk '/^Cached/{print $2}' /proc/meminfo
+}
+
+#脏页的大小
+Dirty() {
+        awk '/^Dirty/{print $2}' /proc/meminfo
+}
+$1
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

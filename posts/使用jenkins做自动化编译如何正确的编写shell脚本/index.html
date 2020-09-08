@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用Jenkins做自动化编译如何正确的编写shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用Jenkins做自动化编译如何正确的编写shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用Jenkins做自动化编译如何正确的编写shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8jenkins%E5%81%9A%E8%87%AA%E5%8A%A8%E5%8C%96%E7%BC%96%E8%AF%91%E5%A6%82%E4%BD%95%E6%AD%A3%E7%A1%AE%E7%9A%84%E7%BC%96%E5%86%99shell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用Jenkins做自动化编译如何正确的编写shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="前言">前言</h1>
+
+<p>最近在公司使用Jenkins自动化编译前端、Android、iOS时遇到了挺多的shell脚本的坑，以前都是从网上找一些脚本改改测试可用就直接用了，但是最近项目变化大，导致自动化编译总是出错，于是决定好好学习下shell脚本如何正确的编写！以下是我个人的实际项目所用的一些总结，我大致会围绕三个问题来聊聊我遇到的坑和解决方法：</p>
+
+<ul>
+<li>如何根据git的提交记录，判断代码的变化，决定是否需要编译！</li>
+<li>检测命令是否存在，命令不存在时如何捕获错误？</li>
+<li>判断一条命令的执行结果，根据结果判断是否需要特殊处理</li>
+</ul>
+
+<blockquote>
+<p>由于本人只是一个前端开发者，对于Linux的shell脚本还处于一脸懵逼状态，可能我的方法和您的不一致，如果您感觉我的方法和思路有什么不对的地方还请大神给予指正～</p>
+</blockquote>
+
+<h2 id="1-如何根据git的提交记录-判断代码的变化-决定是否需要编译">1. 如何根据git的提交记录，判断代码的变化，决定是否需要编译！</h2>
+
+<blockquote>
+<p>首先将可用代码贴出来：</p>
+</blockquote>
+
+<pre><code>#获取上次提交和本次提交的差异
+git diff --name-only $GIT_PREVIOUS_SUCCESSFUL_COMMIT $GIT_COMMIT &gt; ${WORKSPACE}/${APP_ID}commint.log
+rowNum=$(awk 'END{print NR}' &quot;${WORKSPACE}/${APP_ID}commint.log&quot;)
+# 文件更新数 小于等于 0 无需构建
+if [ $rowNum -le 0 ];then
+    echo &quot;代码没有任何修改，项目无需构建&quot;
+    exit 0
+fi
+</code></pre>
+
+<h3 id="1-1-从第一句话开始">1.1 从第一句话开始</h3>
+
+<hr />
+
+<p><code>git diff --name-only $GIT_PREVIOUS_SUCCESSFUL_COMMIT $GIT_COMMIT &gt;
+${WORKSPACE}/${APP_ID}commint.log</code> 这句话实现了两个功能：</p>
+
+<ul>
+<li>得到上次git提交和本次提交的差异文件<code>git diff --name-only $GIT_PREVIOUS_SUCCESSFUL_COMMIT $GIT_COMMIT</code></li>
+<li>将得到的差异输出到一个文件中<code>&gt; ${WORKSPACE}/${APP_ID}commint.log</code></li>
+</ul>
+
+<p>查看git两次提交的差异</p>
+
+<p>我们知道git diff 可以得到文件的差异，但是这里我们只需要得到差异的文件名称就可以，根据git官网文档得到 <code>--name-only</code>
+参数可得到文件名称，那么 <code>$GIT_PREVIOUS_SUCCESSFUL_COMMIT 和 $GIT_COMMIT</code> 是什么呢？</p>
+
+<p>根据Jenkins官方文档中的可用的shell变量一文得知</p>
+
+<ul>
+<li>$GIT_PREVIOUS_SUCCESSFUL_COMMIT ：代表上次git提交的commit ID</li>
+<li>$GIT_COMMIT ：代表本次git提交的 commit ID</li>
+<li>${WORKSPACE} ： Jenkins的工作空间绝对地址</li>
+<li>${APP_ID} ： 当前Jenkins的任务名称</li>
+</ul>
+
+<p>OK，得到两次提交的差异文件列表之后为方便后续使用，我们可以利用shell 中的 <code>&gt;</code> 重定向功能把结果输出到一个文件中！<br />
+参考shell脚本编程文档得知：</p>
+
+<ul>
+<li><code>&gt;</code> 将前一个命令的标准输出结果 以文本替换的方式 <code>重写</code> 进一个文件中，当文件不存在时自动创建该文件</li>
+<li><code>&gt;&gt;</code> 将前一个命令的标准输出以 <code>追加</code> 的形式，追加进一个文件的末尾行，当文件不存在时自动创建该文件</li>
+</ul>
+
+<p>最终利用 <code>git diff --name-only $GIT_PREVIOUS_SUCCESSFUL_COMMIT $GIT_COMMIT &gt;
+${WORKSPACE}/${APP_ID}commint.log</code>
+句话我们得到了git上次提交跟本次提交的差异文件，并将结果输出到了当前Jenkins任务的工作空间根目录，文件名为commit.log里！</p>
+
+<h3 id="1-2-第二句-rownum-awk-end-print-nr">1.2 第二句 `rowNum=$(awk &lsquo;END{print NR}&rsquo;</h3>
+
+<p>&rdquo;${WORKSPACE}/${APP_ID}commint.log&rdquo;)`</p>
+
+<hr />
+
+<p>我们已经得到了差异的文件信息并写入到了commit.log文件里，那么只需要读取这个文件，统计下这个文件里有多少行，是不是就可以得到本次修改了多少个文件？</p>
+
+<p>根据《Linux+shell脚本攻略（第二版）》一书第四章 让文本飞 一文中得知 使用awk 可以统计文件的行数！</p>
+
+<p>awk简介</p>
+
+<p>awk特殊变量</p>
+
+<p>使用awk统计文件中的行数</p>
+
+<p>所以我们得到了这条统计文件内容行数的命令，并将改命令的结果赋予<code>rowNum</code>变量</p>
+
+<pre><code>$ rowNum=$(awk 'END{print NR}' &quot;${WORKSPACE}/${APP_ID}commint.log&quot;)
+</code></pre>
+
+<h3 id="1-3-接下来的文件内容数量的判断">1.3 接下来的文件内容数量的判断</h3>
+
+<hr />
+
+<p>根据《Linux命令行于shell编程大全（第三版）》中 第12章 使用结构化命令 一文中得知:</p>
+
+<p>使用结构化语句</p>
+
+<p>数值比较</p>
+
+<pre><code>if [ $rowNum -le 0 ];then
+    echo &quot;代码没有任何修改，项目无需构建&quot;
+    exit 0
+fi
+</code></pre>
+
+<hr />
+
+<h2 id="2-检测命令是否存在-命令不存在时如何捕获错误">2. 检测命令是否存在，命令不存在时如何捕获错误？</h2>
+
+<p>在使用shell脚本自动化编译的时候经常会遇到当某个命令不存在或者没有安装的时候直接报错，终止了编译！现在解决的就是当遇到命令找不到的时候直接安装该命令</p>
+
+<blockquote>
+<p>先把最终实现代码贴出来然后一点点去分析(拿移动端代码热更新举个例子)：</p>
+</blockquote>
+
+<pre><code>#检测有没有code-push-cli，没有直接全局安装
+if hash code-push 2&gt;/dev/null; then
+    echo &quot;有code-push-cli&quot;
+else
+    npm install code-push-cli@latest -g
+fi
+</code></pre>
+
+<p>参考自stackoverflow 方法大致有三种：</p>
+
+<pre><code>command -v 
+hash  # For regular commands. Or...
+type  # To check built-ins and keywords
+</code></pre>
+
+<ul>
+<li>command ：shell内建函数，-v 参数主要用于检测命令是否存在，命令构建的退出状态是命令的退出状态</li>
+<li>type : shell内建函数，该命令用来显示指定命令的类型，判断给出的指令为“外部指令”、“命令别名”或者“内部指令”</li>
+<li>hash : shell内建函数，hash命令的作用是在环境变量PATH中搜索命令name的完整路径并记住它，这样以后再次执行相同的命令时，就不必搜索其完整路径了,成功执行时，hash命令的退出状态为0</li>
+</ul>
+
+<p>以上三种方式随意一个就可以了，看个人爱好了！现在来看下 <code>2&gt;/dev/null</code>的作用，在开始之前首先需要简单说下什么是<code>文件操作符</code></p>
+
+<h4 id="2-1-文件描述符">2.1 文件描述符</h4>
+
+<hr />
+
+<p>当执行shell命令时，每个 Unix/Linux 命令运行时会默认打开3个文件，每个文件有对应的文件描述符来方便我们使用：</p>
+
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>文件描述符</th>
+<th>默认情况</th>
+<th>对应文件句柄位置</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>标准输入（standard input）</td>
+<td>0</td>
+<td>从键盘获得输入</td>
+<td>/proc/self/fd/0</td>
+</tr>
+
+<tr>
+<td>标准输出（standard output</td>
+<td>1</td>
+<td>输出到屏幕（即控制台）</td>
+<td>/proc/self/fd/1</td>
+</tr>
+
+<tr>
+<td>错误输出（error output）</td>
+<td>2</td>
+<td>输出到屏幕（即控制台）</td>
+<td>/proc/self/fd/2</td>
+</tr>
+</tbody>
+</table>
+
+<p>所以我们平时在执行shell命令中，都默认是从键盘获得输入，并且将结果输出到控制台上。但是我们可以通过更改文件描述符默认的指向，从而实现输入输出的重定向。比如我们将1指向文件，那么标准的输出就会输出到文件中。</p>
+
+<h4 id="2-2-输出重定向">2.2 输出重定向</h4>
+
+<hr />
+
+<p>输出重定向的使用方式很简单，基本的一些命令如下：</p>
+
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>介绍</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>command &gt;filename</td>
+<td>把标准输出重定向到新文件中</td>
+</tr>
+
+<tr>
+<td>command 1&gt;filename</td>
+<td>同上</td>
+</tr>
+
+<tr>
+<td>command &gt;&gt;filename</td>
+<td>把标准输出追加到文件中</td>
+</tr>
+
+<tr>
+<td>command 1&gt;&gt;filename</td>
+<td>同上</td>
+</tr>
+
+<tr>
+<td>command 2&gt;filename</td>
+<td>把标准错误重定向到新文件中</td>
+</tr>
+
+<tr>
+<td>command 2&gt;&gt;filename</td>
+<td>把标准错误追加到新文件中</td>
+</tr>
+</tbody>
+</table>
+
+<h4 id="2-3-dev-null">2.3 &gt;/dev/null</h4>
+
+<p>/dev/null代表linux的空设备文件，所有往这个文件里面写入的内容都会丢失，俗称“黑洞”。那么执行了&gt;/dev/null之后，标准输出就会不再存在，没有任何地方能够找到输出的内容。</p>
+
+<h4 id="2-4-2-1">2.4 2&gt;&amp;1</h4>
+
+<p>这条命令用到了重定向绑定，采用&amp;可以将两个输出绑定在一起。这条命令的作用是错误输出将和标准输出同用一个文件描述符，说人话就是错误输出将会和标准输出输出到同一个地方。</p>
+
+<h4 id="2-5-dev-null-2-1">2.5 &gt;/dev/null 2&gt;&amp;1</h4>
+
+<p>linux在执行shell命令之前，就会确定好所有的输入输出位置，并且从左到右依次执行重定向的命令，所以&gt;/dev/null
+2&gt;&amp;1的作用就是让标准输出重定向到/dev/null中（丢弃标准输出），然后错误输出由于重用了标准输出的描述符，所以错误输出也被定向到了/dev/null中，错误输出同样也被丢弃了。</p>
+
+<p>参考自详解shell中&gt;/dev/null 2&gt;&amp;1到底是什么</p>
+
+<h5 id="小结">小结</h5>
+
+<p><code>hash code-push 2&gt;/dev/null</code> 用<code>hash</code>来判断<code>code-
+push</code>命令是否存在，并且把标准错误重定向到Linux黑洞中，以保证脚本的完整运行</p>
+
+<hr />
+
+<h2 id="3-判断一条命令的执行结果-根据结果判断是否需要特殊处理">3. 判断一条命令的执行结果，根据结果判断是否需要特殊处理</h2>
+
+<p>拿移动端代码热更新 <code>code-push</code> 举个例子，根据<code>code-push whoami</code>的执行结果判断当前code-
+push是否登录，未登录执行登录操作</p>
+
+<blockquote>
+<p>先贴下代码：</p>
+</blockquote>
+
+<pre><code>#登录code-push私服 
+WHOAMI=`code-push whoami 2&gt;&amp;1`
+if echo &quot;$WHOAMI&quot; | grep &quot;userName&quot; &gt;/dev/null; then
+    echo &quot;code-push login Successfully&quot;
+else
+    code-push login 
+fi
+</code></pre>
+
+<p>经过上面对文件操作符和重定向的学习，在看如上这段代码是不是好理解多了？</p>
+
+<h3 id="3-1-第一句-whoami-code-push-whoami-2-1">3.1 第一句 <code>WHOAMI=</code>code-push whoami 2&gt;&amp;1``</h3>
+
+<hr />
+
+<p>正常来说 <code>code-push whoami</code> 输出的是您当前登录的用户名，如果当前处于未登录状态，那么该命令会使用文件操作符2
+输出标准的错误信息，那么我们用到 2&gt;&amp;1 重定向绑定语句将标准错误输出和标准输出信息保存在WHOAMI变量中</p>
+
+<h3 id="3-2-第二句关键代码-echo-whoami-grep-username-dev-null">3.2 第二句关键代码 <code>echo &quot;$WHOAMI&quot; | grep &quot;userName&quot; &gt;/dev/null</code></h3>
+
+<hr />
+
+<p>该语句的关键在于 Linux 的管道操作符 和 grep 过滤器</p>
+
+<ul>
+<li>| ： Linux 中的管道操作符，用于将操作符左侧的标准输出信息，以标准输入的形式交给操作符右侧的命令！（自己的理解，无参考）</li>
+<li>grep ： Linux 中用于找到模式匹配的行，找到了返回状态码为0，未找到返回状态码未2</li>
+</ul>
+
+<p><code>&gt;/dev/null</code> 将左侧所有的输出重定向到Linux黑洞</p>
+
+<h1 id="总结">总结</h1>
+
+<p>我个人的思路就是捕获一切可能返回状态码为2的错误输出！保证程序能够按照预想的正常运行！欢迎拍砖～</p>
+
+<p>转载于:<a href="https://www.cnblogs.com/shuoer/p/9627072.html">https://www.cnblogs.com/shuoer/p/9627072.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

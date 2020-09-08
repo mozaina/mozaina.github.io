@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>基于AccessibilityService和ADBshell实现自动操作 | 开发者问答集锦</title>
+    <meta property="og:title" content="基于AccessibilityService和ADBshell实现自动操作 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="基于AccessibilityService和ADBshell实现自动操作">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%9F%BA%E4%BA%8Eaccessibilityservice%E5%92%8Cadbshell%E5%AE%9E%E7%8E%B0%E8%87%AA%E5%8A%A8%E6%93%8D%E4%BD%9C/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">基于AccessibilityService和ADBshell实现自动操作</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>实现自动操作，就是利用代码脚本，模拟人的操作，包括点击，滑动，输入文字，物理按键等，实现一系列操作。</p>
+
+<p>为什么要实现自动操作?</p>
+
+<p>为了自动化测试？android app的功能越来越多，测试们的事情都忙不过来，这时，有些大量的工作就可以交给脚本来完成。</p>
+
+<p>比如，测试抢微信红包的工作，测试游戏打怪升级，测试自动聊天，测试考勤打卡等等等等。。。。</p>
+
+<p>android中多种模拟操作的方法：</p>
+
+<h2 id="第一种-模拟motionevent">第一种：模拟MotionEvent</h2>
+
+<pre><code>这根本没用，因为只能给自己本身的app发送Event，需要发Event的话，我不如直接调用View的onClick，onTouch等方法，或方法内部的代码直接复制走一遍。
+</code></pre>
+
+<h2 id="第二种-instrumentation">第二种：Instrumentation</h2>
+
+<pre><code>google测试用的，在操作第三方app的时候，听说要装成系统App，对不起我不是手机厂商，也不刷机。
+</code></pre>
+
+<h2 id="第三种-adb命令">第三种：ADB命令</h2>
+
+<p>用adb shell命令<br />
+input tap x y<br />
+表示在屏幕（x,y）坐标上点击.<br />
+还有 swipe 滑动,keyevent按键事件..亲测有效<br />
+网上有说 还有 sendevent方法,试过,觉得即不好用,又容易出错..</p>
+
+<p>adb命令需要连接到电脑，在电脑上用命令行，，所以脚本也可以写在电脑上。。</p>
+
+<p>对于root的手机来说，可以往系统写入这些命令，模拟操作。</p>
+
+<p>缺点：<br />
+1.模拟点击需要从写入到反映，模拟的速度会很慢，点一下等一秒，所以要是用来秀操作，基本不可能。<br />
+2.必须root</p>
+
+<h2 id="第四种-accessibilityservice">第四种：AccessibilityService</h2>
+
+<p>这是google支持的，出发点是用来辅助有障碍人士使用手机的，可以模拟一些点击操作等。</p>
+
+<p>AccessibilityService可以监听的事件，包括页面切换，页面滚动，监听通知等。</p>
+
+<p>在AccessibilityService可以获取当前界面的AccessibilityNodeInfo。</p>
+
+<p>获取当前界面的跟节点信息</p>
+
+<pre><code>AccessibilityNodeInfo root = getRootInActiveWindow();
+</code></pre>
+
+<p>AccessibilityNodeInfo是什么，可以说就是View的代理对象，一个AccessibilityNodeInfo对应了一个View，AccessibilityNodeInfo树对应了当前界面的View树。</p>
+
+<blockquote>
+<p>AccessibilityService是需要用户授权的，授权了不明辅助服务，或者root的手机，风险是很大的，很容易被盗取账号密码。<br />
+怎么写一个AccessibilityService，怎么授权，百度可以找到大把的资源，这里就不赘述了。</p>
+</blockquote>
+
+<h2 id="定位到需要的accessibilitynodeinfo">定位到需要的AccessibilityNodeInfo</h2>
+
+<p>可以通过文字，资源id等直接定位到你需要的view上</p>
+
+<pre><code>AccessibilityNodeInfo info = root.findAccessibilityNodeInfosByText(&quot;确定&quot;);
+AccessibilityNodeInfo info = root.findAccessibilityNodeInfosByViewId();
+</code></pre>
+
+<p>没有提供直接通过View类型定位View的,但我们可以自己写一个，这样可以直接找“Button”</p>
+
+<pre><code>//查找节点
+    public static AccessibilityNodeInfo findNodeByViewName(AccessibilityNodeInfo info, String viewName) {
+        String name = info.getClassName().toString();
+        String[] split = name.split(&quot;\\.&quot;);
+        name = split[split.length - 1];
+        if (name.equals(viewName)) {
+            return info;
+        } else {
+
+            int count = info.getChildCount();
+            if (count &gt; 0) {
+                for (int i = 0; i &lt; count; i++) {
+                    AccessibilityNodeInfo inf = findNodeByViewName(info.getChild(i), viewName);
+                    if (inf != null) {
+                        return inf;
+                    }
+                }
+            } else {
+                return null;
+            }
+        }
+        return null;
+    }
+</code></pre>
+
+<ul>
+<li></li>
+</ul>
+
+<p>有的view结构很难定位，text找不到，类型也没区别，没有id。这时我们可以使用查看view树的工具，或者使用下面的方法打印整个view树结构</p>
+
+<pre><code>    private static int tabcount = -1;
+    private static StringBuilder sb;
+
+    public static void printPacketInfo(AccessibilityNodeInfo root) {
+        sb = new StringBuilder();
+        tabcount = 0;
+        int[] is = {};
+        analysisPacketInfo(root, is);
+        JLog.d(sb.toString());
+    }
+
+    //打印此时的界面状况,便于分析
+    private static void analysisPacketInfo(AccessibilityNodeInfo info, int... ints) {
+        if (info == null) {
+            return;
+        }
+        if (tabcount &gt; 0) {
+            for (int i = 0; i &lt; tabcount; i++) {
+                sb.append(&quot;\t\t&quot;);
+            }
+        }
+        if (ints != null &amp;&amp; ints.length &gt; 0) {
+            StringBuilder s = new StringBuilder();
+            for (int j = 0; j &lt; ints.length; j++) {
+                s.append(ints[j]).append(&quot;.&quot;);
+            }
+            sb.append(s).append(&quot; &quot;);
+        }
+        String name = info.getClassName().toString();
+        String[] split = name.split(&quot;\\.&quot;);
+        name = split[split.length - 1];
+        if (&quot;TextView&quot;.equals(name)) {
+            CharSequence text = info.getText();
+            sb.append(&quot;text:&quot;).append(text);
+        } else if (&quot;Button&quot;.equals(name)) {
+            CharSequence text = info.getText();
+            sb.append(&quot;Button:&quot;).append(text);
+        } else {
+            sb.append(name);
+        }
+        sb.append(&quot;\n&quot;);
+
+        int count = info.getChildCount();
+        if (count &gt; 0) {
+            tabcount++;
+            int len = ints.length + 1;
+            int[] newInts = Arrays.copyOf(ints, len);
+
+            for (int i = 0; i &lt; count; i++) {
+                newInts[len - 1] = i;
+                analysisPacketInfo(info.getChild(i), newInts);
+            }
+            tabcount--;
+        }
+
+    }
+</code></pre>
+
+<p>该方法打印的节点树如下:<br />
+<img src="https://img.it610.com/image/info8/bd7994cf089142848ac4d123d7c6826a.jpg" alt="这里写图片描述" /></p>
+
+<p>这样我们可以通过前面的0.0.0.1.1直接定位到View</p>
+
+<pre><code>        AccessibilityNodeInfo info = root;
+
+        int[] path = {0, 0, 0, 1, 1};
+        for (int i = 0; i &lt; path.length; i++) {
+            info = info.getChild(path[i]);
+            if (info == null || info.getChildCount() &lt;= 0) {
+                return null;
+            }
+        }
+        return info;
+</code></pre>
+
+<p>当然你有可能不知道0.0.0.1.1对应哪一个视图,可以通过</p>
+
+<pre><code>        Rect rect = new Rect();
+        info.getBoundsInScreen(rect);
+        //状态栏的高度
+        int h = GUtil.getStatusBarHeight(context.getApplicationContext());
+        rect.top -= h;
+        rect.bottom -= h;
+</code></pre>
+
+<p>打印rect，或者直接在全局窗口创建window，显示rect为有色区域..</p>
+
+<h2 id="accessibilitynodeinfo支持的操作">AccessibilityNodeInfo支持的操作</h2>
+
+<p>AccessibilityService本身有方法，模拟返回键，home键等</p>
+
+<pre><code> performGlobalAction(GLOBAL_ACTION_BACK)
+</code></pre>
+
+<ul>
+<li>1</li>
+</ul>
+
+<p>AccessibilityNodeInfo还可以直接模拟点击，长按等事件。</p>
+
+<pre><code> info.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+</code></pre>
+
+<p>但是，performAction有时候根本没用！！！</p>
+
+<p>因为现在很多应用都是混合应用，内容页可能是Html5写的，看起来是按钮，其实就是普通View..他的点击事件不是通过OnClick产生，而是直接判断TouchEvent。AccessibilityNodeInfo没有提供发送down，move，up事件的api。我不能通过这系列模拟所有操作了，替代方案使用root
+后的手机，向系统发送全局点击命令。</p>
+
+<pre><code>    /**点击某个视图*/
+     public static void perforGlobalClick(AccessibilityNodeInfo info) {
+        Rect rect = new Rect();
+        info.getBoundsInScreen(rect);
+        perforGlobalClick(rect.centerX(), rect.centerY());
+    }
+
+    public static void perforGlobalClick(int x, int y) {
+        execShellCmd(&quot;input tap &quot; + x + &quot; &quot; + y);
+    }
+    /**
+     * 执行shell命令
+     *
+     * @param cmd
+     */
+    public static void execShellCmd(String cmd) {
+
+        try {
+            // 申请获取root权限，这一步很重要，不然会没有作用
+            Process process = Runtime.getRuntime().exec(&quot;su&quot;);
+            // 获取输出流
+            OutputStream outputStream = process.getOutputStream();
+            DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+            dataOutputStream.writeBytes(cmd);
+            dataOutputStream.flush();
+            dataOutputStream.close();
+            outputStream.close();
+//            process.waitFor();
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+    }
+</code></pre>
+
+<p>还有一些封装模拟操作</p>
+
+<pre><code>    private static android.os.Handler handler = new android.os.Handler(Looper.getMainLooper());
+
+    /**
+     * 全局滑动操作
+     * @param x0
+     * @param y0
+     * @param x1
+     * @param y1
+     */
+    public static void perforGlobalSwipe(int x0, int y0, int x1, int y1) {
+        execShellCmd(&quot;input swipe &quot; + x0 + &quot; &quot; + y0 + &quot; &quot; + x1 + &quot; &quot; + y1);
+    }
+
+
+    /**
+     * 当要点击的View可能在屏幕外时
+     *
+     * @param info
+     * @param context
+     */  
+    public static void tryGlobalClickMaybeViewOutsideScreen(final AccessibilityNodeInfo info, final Context context, final Runnable afterScroll, final Runnable sucess) {
+        Rect rect = new Rect();
+        info.getBoundsInScreen(rect);
+
+        WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        DisplayMetrics dm = new DisplayMetrics();
+        wm.getDefaultDisplay().getMetrics(dm);
+
+        JLog.d(&quot;info rect==&gt;&quot; + rect);
+        JLog.d(&quot;window dm --&gt;&quot; + dm);
+        long delay = 3000;
+        if (rect.top &lt; 0) {
+            JLog.d(&quot;scroll down ↓↓↓↓&quot;);
+            //下滑半屏
+            perforGlobalSwipe(dm.widthPixels / 2, dm.heightPixels / 4, dm.widthPixels / 2, (int) (dm.heightPixels * 0.75));
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    afterScroll.run();
+                }
+            }, delay);
+        } else if (rect.bottom &gt; dm.heightPixels) {
+            JLog.d(&quot;scroll up ↑↑↑↑&quot;);
+            //上滑半屏
+            perforGlobalSwipe(dm.widthPixels / 2, (int) (dm.heightPixels * 0.75), dm.widthPixels / 2, dm.heightPixels / 4);
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    afterScroll.run();
+                }
+            }, delay);
+        } else {
+            //
+            JLog.d(&quot;scroll and find the clickable view in screen&quot;);
+
+            execShellCmd(&quot;input tap &quot; + rect.centerX() + &quot; &quot; + rect.centerY());
+            handler.postDelayed(sucess, 2000);
+        }
+
+    }
+
+    /**
+     * 发送全局 Home键 事件
+     * @param delay 延迟时间
+     */
+    public static void perforGlobalHome(long delay) {
+        if (delay &lt;= 0) {
+            execShellCmd(&quot;input keyevent &quot; + KeyEvent.KEYCODE_HOME);
+        } else
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    execShellCmd(&quot;input keyevent &quot; + KeyEvent.KEYCODE_HOME);
+                }
+            }, delay);
+    }
+
+
+    /**
+     * 发送全局 返回键 事件
+     * @param delay 延迟时间
+     */
+    public static void perforGlobalBack(long delay) {
+        if (delay &lt;= 0) {
+            execShellCmd(&quot;input keyevent &quot; + KeyEvent.KEYCODE_BACK);
+        } else
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    execShellCmd(&quot;input keyevent &quot; + KeyEvent.KEYCODE_BACK);
+                }
+            }, delay);
+    }
+    /**发送一段文字，该功能经实验，不好用*/
+    public static void sendString(String text) {
+        StringBuilder sb = new StringBuilder();
+        String[] split = text.split(&quot; &quot;);
+        for (int i = 0; i &lt; split.length; i++) {
+            sb.append(&quot;input text &quot; + split[i]).append(&quot;\n&quot;);
+            sb.append(&quot;input keyevent &quot; + KeyEvent.KEYCODE_SPACE).append(&quot;\n&quot;);
+        }
+        execShellCmd(sb.toString());
+    }
+
+    //自动为edittext粘贴上文字内容
+    public static void sendTextForEditText(Context context, AccessibilityNodeInfo edittext, String text) {
+        if (edittext != null) {
+            ClipboardManager clipboard = (ClipboardManager)context.getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData clip = ClipData.newPlainText(&quot;text&quot;, text);
+            clipboard.setPrimaryClip(clip);
+            //焦点（n是AccessibilityNodeInfo对象）
+            edittext.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+            ////粘贴进入内容
+            edittext.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+            //发送
+            //...
+        }
+    }
+/**
+ * 点亮亮屏,点亮屏幕要求很高,不能有手势锁,密码锁,指纹锁,还不能有屏保
+ */
+public static void unlock(Context context) {
+      PowerManager mPowerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        // 点亮亮屏
+      PowerManager.WakeLock mWakeLock = mPowerManager.newWakeLock
+                (PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.SCREEN_DIM_WAKE_LOCK, &quot;Tag&quot;);
+      Log.w(&quot;px&quot;, &quot;mWakeLock is lock:&quot; + mWakeLock.isHeld());
+      mWakeLock.acquire();
+
+}
+</code></pre>
+
+<p>有了这些功能，自己处理在哪个页面就点击什么按钮的逻辑，就可以组织一套自动脚本了。</p>
+
+<p>如果需要AccessibilityService长期生存，还得允许自动运行，有的手机比如小米要放弃省电模式，神隐模式等，安全中心不能随便杀死服务。</p>
+
+<p>有没有既不用root，不用系统app，不用USB调试连接电脑，而且点击，滑动精准快速，直接模拟touchEvent的方法？我没找到，我如果找到了，那也说明android实在是安全性太差了。</p>
+
+<p>如果app可以在模拟器支持一切功能，那脚本的问题就好办多了。毕竟windows的脚本工具已经很成熟了。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

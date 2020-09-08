@@ -1,0 +1,1049 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本linux安全加固 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本linux安全加固 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本linux安全加固">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AClinux%E5%AE%89%E5%85%A8%E5%8A%A0%E5%9B%BA/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本linux安全加固</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>关于Linux系统安全加固的具体实现脚本及基线检查规范，以供主机维护人员参考学习。</p>
+
+<p>其中以下脚本主要实现的功能包括：</p>
+
+<p>*<strong>加固项包括</strong> ：密码长度、session超时时间、删除不用的帐号和组、限制root用户直接telnet或rlogin、ssh</p>
+
+<p>*<strong>检查是否存在除</strong> root之外UID为0的用户、确保root用户的系统路径中不包含父目录，在非必要的情况下，不应包含组权限为777的目录</p>
+
+<p>*<strong>检查操作系统Linux用户umask设置</strong> 、检查重要目录和文件的权限、禁止除root之外的用户su操作、查找系统中任何人都有写权限的目录</p>
+
+<p>*<strong>查找系统中没有属主的文件</strong> 、查找系统中的隐藏文件、判断日志与审计是否合规、登录超时设置、禁用不必要的服务</p>
+
+<p>*linux 安全加固适用于redhat、centos5.8至6.2</p>
+
+<p>具体内容如下，请结合自身业务需求进行系统级加固：</p>
+
+<h1 id="1">#1、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>echo &ldquo;删除不用的帐号和组&rdquo;</p>
+
+<p>echo &ldquo;delete unused users and grups&rdquo;</p>
+
+<p>for i in lp sync shutdown halt news uucp operator games gopher</p>
+
+<p>do</p>
+
+<p>echo &ldquo;will delete user $i&rdquo;</p>
+
+<p>userdel $i</p>
+
+<p>echo &ldquo;user $i have delete&rdquo;</p>
+
+<p>done</p>
+
+<p>for i in lp sync shutdown halt news uucp operator games gopher</p>
+
+<p>do</p>
+
+<p>echo &ldquo;will delete group $i&rdquo;</p>
+
+<p>groupdel $i</p>
+
+<p>echo &ldquo;group $i have delete&rdquo;</p>
+
+<p>done</p>
+
+<p>date=<code>date +%F</code></p>
+
+<h1 id="2">#2、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</h1>
+
+<p>#section1 密码要求密码长度大于8,口令90天过期/etc/login.defs</p>
+
+<p>#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</p>
+
+<p>#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p>
+
+<p>echo &ldquo;cp /etc/login.defs to /etc/login.defs.bak_%date&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>cp /etc/login.defs /etc/login.defs.bak_$date</p>
+
+<p>#echo &ldquo;检查密码的配置&rdquo;</p>
+
+<p>echo &ldquo;Check the configure for user&rsquo;s password.&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>for i in PASS_MAX_DAYS PASS_MIN_LEN PASS_MIN_DAYS PASS_WARN_AGE</p>
+
+<p>do</p>
+
+<p>cat /etc/login.defs |grep $i|grep -v \#</p>
+
+<p>done</p>
+
+<p><strong>#set password min length 8</strong></p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>echo &ldquo;Set user&rsquo;s password min length is 8&rdquo;</p>
+
+<p>sed -i &lsquo;/PASS_MIN_LEN/s/5/8/g&rsquo; /etc/login.defs</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p><strong>#set password max day 90</strong></p>
+
+<p><strong>#echo &ldquo;set password expired 90 day&rdquo;</strong></p>
+
+<p><strong>#sed -i &lsquo;/PASS_MAX_DAYS/s/99999/90/g&rsquo; /etc/login.defs</strong></p>
+
+<h1 id="3">#3、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>echo &ldquo;#检查是否存在空口令&rdquo;</p>
+
+<p>echo &ldquo;Check if there have user without password!&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>awk -F: &lsquo;($2 == &ldquo;&rdquo;) { print $1 }&rsquo; /etc/shadow</p>
+
+<h1 id="4">#4、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</h1>
+
+<p>#section2 限制root用户直接telnet或rlogin，ssh无效</p>
+
+<p>######建议在/etc/securetty文件中配置：CONSOLE = /dev/tty01</p>
+
+<p>#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p>
+
+<p>#帐号与口令-检查是否存在除root之外UID为0的用户</p>
+
+<p>#echo &ldquo;#检查系统中是否存在其它id为0的用户&rdquo;</p>
+
+<p>echo &ldquo;Check if the system have other user&rsquo;s id is 0&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>mesg=<code>awk -F: '($3 == 0) { print $1 }' /etc/passwd|grep -v root</code></p>
+
+<p>if [ -z $mesg ]</p>
+
+<p>then</p>
+
+<p>echo &ldquo;There don&rsquo;t have other user uid=0&rdquo;</p>
+
+<p>else</p>
+
+<p>echo</p>
+
+<p>echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</p>
+
+<p>echo &ldquo;$mesg uid=0&rdquo;</p>
+
+<p>echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</p>
+
+<p>fi</p>
+
+<h1 id="5">#5、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</h1>
+
+<p>echo &ldquo;#确保root用户的系统路径中不包含父目录，在非必要的情况下，不应包含组权限为777的目录&rdquo;</p>
+
+<p>echo &ldquo;check the Path set for root,make sure the path for root dont have father
+directory and 777 rights&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>echo $PATH | egrep &lsquo;(^|:)(\.|:|$)&rsquo;</p>
+
+<p>find <code>echo $PATH | tr ':' ' '</code> -type d \( -perm -002 -o -perm -020 \) -ls</p>
+
+<h1 id="6">#6、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>echo &ldquo;#检查操作系统Linux远程连接&rdquo;</p>
+
+<p>echo &ldquo;Check if system have remote connection seting&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>find / -name .netrc</p>
+
+<p>find / -name .rhosts</p>
+
+<p>echo &ldquo;检查操作系统Linux用户umask设置&rdquo;</p>
+
+<p>echo &ldquo;Check the system users umask setting&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>for i in /etc/profile /etc/csh.login /etc/csh.cshrc /etc/bashrc</p>
+
+<p>do</p>
+
+<p>grep -H umask $i|grep -v &ldquo;#&rdquo;</p>
+
+<p>done</p>
+
+<p>###################设置umask为027</p>
+
+<h1 id="7">#7、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>#echo &ldquo;#检查重要目录和文件的权限&rdquo;</p>
+
+<p>##echo &ldquo;Check the important files and directory rights&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>for i in /etc /etc/rc.d/init.d /tmp /etc/inetd.conf /etc/passwd /etc/shadow
+/etc/group /etc/security /etc/services /etc/rc*.d</p>
+
+<p>do</p>
+
+<p>ls -ld $i</p>
+
+<p>done</p>
+
+<p>echo -n &ldquo;Please check if the output is ok ? yes or no :&rdquo;</p>
+
+<p>read i</p>
+
+<p>case $i in</p>
+
+<p>y|yes)</p>
+
+<p>break</p>
+
+<p>;;</p>
+
+<p>n|no)</p>
+
+<p>echo &ldquo;Please recheck the output!&rdquo;</p>
+
+<p>echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</p>
+
+<p>continue</p>
+
+<p>;;</p>
+
+<p>*)</p>
+
+<p>echo &ldquo;please input yes or no&rdquo;</p>
+
+<p>;;</p>
+
+<p>esac</p>
+
+<h1 id="8">#8、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</h1>
+
+<p>#echo &ldquo;#配置rc.d下脚本的权限&rdquo;</p>
+
+<p>echo &ldquo;Configure the scripts right(750) in rc.d directory&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>chmod -R 750 /etc/rc.d/init.d/*</p>
+
+<p>chmod 755 /bin/su 改了之后只能root su，没有了s位别的用户无法成功su</p>
+
+<p>chmod 664 /var/log/wtmp</p>
+
+<p>#chattr +a /var/log/messages</p>
+
+<h1 id="9">#9、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</h1>
+
+<p>echo &ldquo;#查找系统中存在的SUID和SGID程序&rdquo;</p>
+
+<p>echo &ldquo;Find the files have suid or Sgid&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>for PART in <code>grep -v ^# /etc/fstab | awk '($6 != &quot;0&quot;) {print $2 }'</code>; do</p>
+
+<p>find $PART \( -perm -04000 -o -perm -02000 \) -type f -xdev -print |xargs ls
+-ld</p>
+
+<p>done</p>
+
+<p>echo -n &ldquo;Please check if the output is ok ? yes or no :&rdquo;</p>
+
+<p>read i</p>
+
+<p>case $i in</p>
+
+<p>y|yes)</p>
+
+<p>break</p>
+
+<p>;;</p>
+
+<p>n|no)</p>
+
+<p>echo &ldquo;Please recheck the output!&rdquo;</p>
+
+<p>echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</p>
+
+<p>continue</p>
+
+<p>;;</p>
+
+<p>*)</p>
+
+<p>echo &ldquo;please input yes or no&rdquo;</p>
+
+<p>;;</p>
+
+<p>esac</p>
+
+<h1 id="10">#10、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</h1>
+
+<p>echo &ldquo;#查找系统中任何人都有写权限的目录&rdquo;</p>
+
+<p>echo &ldquo;Find the directory everyone have the write right&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>for PART in `awk &lsquo;($3 == &ldquo;ext2&rdquo; || $3 == &ldquo;ext3&rdquo;) </p>
+
+<p>{ print $2 }&rsquo; /etc/fstab`; do</p>
+
+<p>find $PART -xdev -type d \( -perm -0002 -a ! -perm -1000 \) -print |xargs ls
+-ld</p>
+
+<p>done</p>
+
+<p>echo -n &ldquo;Please check if the output is ok ? yes or no :&rdquo;</p>
+
+<p>read i</p>
+
+<p>case $i in</p>
+
+<p>y|yes)</p>
+
+<p>break</p>
+
+<p>;;</p>
+
+<p>n|no)</p>
+
+<p>echo &ldquo;Please recheck the output!&rdquo;</p>
+
+<p>echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</p>
+
+<p>continue</p>
+
+<p>;;</p>
+
+<p>*)</p>
+
+<p>echo &ldquo;please input yes or no&rdquo;</p>
+
+<p>;;</p>
+
+<p>esac</p>
+
+<h1 id="11">#11、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</h1>
+
+<p>#echo &ldquo;#查找系统中任何人都有写权限的文件&rdquo;</p>
+
+<p>echo &ldquo;Find the files everyone have write right&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>for PART in <code>grep -v ^# /etc/fstab | awk '($6 != &quot;0&quot;) {print $2 }'</code>; do</p>
+
+<p>find $PART -xdev -type f \( -perm -0002 -a ! -perm -1000 \) -print |xargs ls
+-ld</p>
+
+<p>done</p>
+
+<p>echo -n &ldquo;Please check if the output is ok ? yes or no :&rdquo;</p>
+
+<p>read i</p>
+
+<p>case $i in</p>
+
+<p>y|yes)</p>
+
+<p>break</p>
+
+<p>;;</p>
+
+<p>n|no)</p>
+
+<p>echo &ldquo;Please recheck the output!&rdquo;</p>
+
+<p>echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</p>
+
+<p>continue</p>
+
+<p>;;</p>
+
+<p>*)</p>
+
+<p>echo &ldquo;please input yes or no&rdquo;</p>
+
+<p>;;</p>
+
+<p>esac</p>
+
+<h1 id="12">#12、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</h1>
+
+<p>echo &ldquo;#查找系统中没有属主的文件&rdquo;</p>
+
+<p>echo &ldquo;Find no owner or no group files in system&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>for PART in <code>grep -v ^# /etc/fstab |grep -v swap| awk '($6 != &quot;0&quot;) {print $2
+}'</code>; do</p>
+
+<p>find $PART -nouser -o -nogroup |grep -v &ldquo;vmware&rdquo;|grep -v &ldquo;dev&rdquo;|xargs ls -ld</p>
+
+<p>done</p>
+
+<p>echo -n &ldquo;Please check if the output is ok ? yes or no :&rdquo;</p>
+
+<p>read i</p>
+
+<p>case $i in</p>
+
+<p>y|yes)</p>
+
+<p>break</p>
+
+<p>;;</p>
+
+<p>n|no)</p>
+
+<p>echo &ldquo;Please recheck the output!&rdquo;</p>
+
+<p>echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</p>
+
+<p>continue</p>
+
+<p>;;</p>
+
+<p>*)</p>
+
+<p>echo &ldquo;please input yes or no&rdquo;</p>
+
+<p>;;</p>
+
+<p>esac</p>
+
+<h1 id="13">#13、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</h1>
+
+<p>###echo &ldquo;#查找系统中的隐藏文件&rdquo;</p>
+
+<p>##echo &ldquo; Find the hiding file in system&rdquo;</p>
+
+<p>##echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>###linux执行报错\排除/dev”目录下的那些文件</p>
+
+<p>####find / -name \(&ldquo;.. <em>&rdquo; -o &ldquo;…</em>&rdquo; -o &ldquo;.xx&rdquo; -o &ldquo;.mail&rdquo; \) -print -xdev</p>
+
+<h2 id="find-name-print-xdev-cat-v">#find / -name &ldquo;…*&rdquo; -print -xdev | cat -v</h2>
+
+<p>##find / \( -name &ldquo;.<em>&rdquo; -o -name &ldquo;…</em>&rdquo; -o -name &ldquo;.xx&rdquo; -o -name &ldquo;.mail&rdquo; \)
+-xdev</p>
+
+<p>##echo -n &ldquo;If you have check all the output files if correct yes or no ? :&rdquo;</p>
+
+<p>##read i</p>
+
+<h2 id="case-i-in">case $i in</h2>
+
+<h2 id="y-yes">y|yes)</h2>
+
+<h2 id="break">break</h2>
+
+<h2 id="toc_17">;;</h2>
+
+<h2 id="n-no">n|no)</h2>
+
+<h2 id="echo-please-recheck-the-output">echo &ldquo;Please recheck the output!&rdquo;</h2>
+
+<h2 id="echo">echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</h2>
+
+<h2 id="continue">continue</h2>
+
+<h2 id="toc_22">;;</h2>
+
+<h2 id="toc_23">*)</h2>
+
+<h2 id="echo-please-input-yes-or-no">echo &ldquo;please input yes or no&rdquo;</h2>
+
+<h2 id="toc_25">;;</h2>
+
+<h2 id="esac">esac</h2>
+
+<p>##</p>
+
+<h1 id="14">#14、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>echo &ldquo;#判断日志与审计是否合规&rdquo;</p>
+
+<p>echo &ldquo;Judge if the syslog audition if follow the rules&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>autmesg=<code>cat /etc/syslog.conf |egrep ^authpriv</code></p>
+
+<p>if [ ! -n &ldquo;$autmesg&rdquo; ]</p>
+
+<p>then</p>
+
+<p>echo &ldquo;there don&rsquo;t have authpriv set in /etc/syslog.conf&rdquo;</p>
+
+<p>echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</p>
+
+<p>echo -n &ldquo;If you have know this y or n ?&rdquo;</p>
+
+<p>read i</p>
+
+<p>case $i in</p>
+
+<p>y|yes)</p>
+
+<p>break</p>
+
+<p>;;</p>
+
+<p>n|no)</p>
+
+<p>echo &ldquo;there don&rsquo;t have authpriv set in /etc/syslog.conf&rdquo;</p>
+
+<p>echo &ldquo;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!&rdquo;</p>
+
+<p>continue</p>
+
+<p>;;</p>
+
+<p>*)</p>
+
+<p>echo &ldquo;please input yes or no&rdquo;</p>
+
+<p>;;</p>
+
+<p>esac</p>
+
+<p>else</p>
+
+<h1 id="echo-日志与审计合规">echo &ldquo;日志与审计合规&rdquo;</h1>
+
+<p>echo &ldquo;syslog audition follow the rules&rdquo;</p>
+
+<p>fi</p>
+
+<h1 id="15">#15、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>echo &ldquo;#关闭linux core dump&rdquo;</p>
+
+<p>echo &ldquo;Turn off the system core dump&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>mesg1=<code>grep &quot;* soft core 0&quot; /etc/security/limits.conf</code></p>
+
+<p>mesg2=<code>grep &quot;* hard core 0&quot; /etc/security/limits.conf</code></p>
+
+<p>if [ ! -n &ldquo;$mesg1&rdquo; -o ! -n &ldquo;$mesg2&rdquo; ]</p>
+
+<p>then</p>
+
+<p>cp /etc/security/limits.conf /etc/security/limits.conf_$date</p>
+
+<p>if [ ! -n &ldquo;$mesg1&rdquo; ]</p>
+
+<p>then</p>
+
+<p>echo &ldquo;* soft core 0&rdquo; &gt;&gt; /etc/security/limits.conf</p>
+
+<p>fi</p>
+
+<p>if [ ! -n &ldquo;$mesg2&rdquo; ]</p>
+
+<p>then</p>
+
+<p>echo &ldquo;* hard core 0&rdquo; &gt;&gt; /etc/security/limits.conf</p>
+
+<p>fi</p>
+
+<p>fi</p>
+
+<p>#修改login文件使limits限制生效</p>
+
+<p>cp /etc/pam.d/login /etc/pam.d/login_$date</p>
+
+<p>echo &ldquo;session required /lib/security/pam_limits.so&rdquo; &gt;&gt; /etc/pam.d/login</p>
+
+<h1 id="16">#16、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>#登录超时设置</p>
+
+<p>#检查/etc/pam.d/system-auth文件是否存在account required /lib/security/pam_tally.so
+deny=的相关设置</p>
+
+<p>#建议设置为auth required pam_tally.so onerr=fail deny=6 unlock_time=300</p>
+
+<h1 id="17">#17、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>#su命令使用,对su命令使用进行限制设置</p>
+
+<p>#检查/etc/pam.d/su文件设置</p>
+
+<p>#文件中包含</p>
+
+<p>#auth sufficient /lib/security/pam_rootok.so debug</p>
+
+<p>#auth required /lib/security/pam_wheel.so group=isd</p>
+
+<h1 id="20">#20、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>echo &ldquo;#登录超时自动退出&rdquo;</p>
+
+<p>echo &ldquo;set session time out terminal &ldquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>tmout=<code>grep -i TMOUT /etc/profile</code></p>
+
+<p>if [ ! -n &ldquo;$tmout&rdquo; ]</p>
+
+<p>then</p>
+
+<p>echo</p>
+
+<p>echo -n &ldquo;do you want to set login timeout to 300s? [yes]:&rdquo;</p>
+
+<p>read i</p>
+
+<p>case $i in</p>
+
+<p>y|yes)</p>
+
+<p>cp /etc/profile /etc/profile_$date</p>
+
+<p>echo &ldquo;export TMOUT=300&rdquo; &gt;&gt; /etc/profile</p>
+
+<p>. /etc/profile</p>
+
+<p>;;</p>
+
+<p>n|no)</p>
+
+<p>break</p>
+
+<p>;;</p>
+
+<p>*)</p>
+
+<p>echo &ldquo;please input yes or no&rdquo;</p>
+
+<p>;;</p>
+
+<p>esac</p>
+
+<p>else</p>
+
+<p>mesg=<code>echo $tmout |awk -F&quot;=&quot; '{print $2}'</code></p>
+
+<p>if [ &ldquo;$mesg&rdquo; -ne 300 ]</p>
+
+<p>then</p>
+
+<p>echo &ldquo;The login session timeout is $mesg now will change to 300 seconds&rdquo;</p>
+
+<p>cp /etc/profile /etc/profile_$date</p>
+
+<p>echo &ldquo;export TMOUT=300&rdquo; &gt;&gt; /etc/profile</p>
+
+<p>. /etc/profile</p>
+
+<p>fi</p>
+
+<p>fi</p>
+
+<p>sed -i &rsquo;s/HISTSIZE=1000/HISTSIZE=100/g&rsquo; /etc/profile</p>
+
+<h1 id="21"><em>#21、&mdash;&mdash;&mdash;&mdash;</em></h1>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</p>
+
+<p>echo &ldquo;#禁用telnet启用ssh&rdquo;</p>
+
+<p>echo &ldquo;Stop telnet and start up sshd&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>mesg1=<code>lsof -i:23</code></p>
+
+<p>mesg2=<code>lsof -i:22</code></p>
+
+<p>if [ ! -n &ldquo;$mesg2&rdquo; ]</p>
+
+<p>then</p>
+
+<p>service start sshd</p>
+
+<p>chkconfig sshd on</p>
+
+<p>mesg2=<code>lsof -i:22</code></p>
+
+<p>fi</p>
+
+<p>if [ ! -n &ldquo;$mesg1&rdquo; -a ! -n &ldquo;$mesg2&rdquo; ]</p>
+
+<p>then</p>
+
+<p>echo</p>
+
+<p>echo &ldquo;Will Deactive telnet&rdquo;</p>
+
+<p>chkconfig krb5-telnet off</p>
+
+<p>chkconfig ekrb5-telnet off</p>
+
+<p>fi</p>
+
+<h1 id="22">#22、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>#echo &ldquo;#设置终端超时，使系统10分钟后自动退出不活动的Shell&rdquo;</p>
+
+<p>#echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>#mesg=<code>grep &quot;export TMOUT=600&quot; /etc/profile</code></p>
+
+<p>#if [ -z $mesg ]</p>
+
+<p>#then</p>
+
+<p>#echo &ldquo;export TMOUT=600&rdquo; &gt;&gt;/etc/profile</p>
+
+<p>#. /etc/profile</p>
+
+<p>#fi</p>
+
+<h1 id="23">#23、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>echo &ldquo;#禁用不必要的服务&rdquo;</p>
+
+<p>echo &ldquo;Stop unuseing services&rdquo;</p>
+
+<p>echo &ldquo;#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;</p>
+
+<p>list=&ldquo;avahi-daemon bluetooth cups firstboot hplip ip6tables iptables iscsi
+iscsid isdn kudzu pcscd rhnsd rhsmcertd rpcgssd rpcidmapd sendmail smartd yum-
+updatesd netfs portmap autofs nfslock nfs&rdquo;</p>
+
+<p>for i in $list</p>
+
+<p>do</p>
+
+<p>chkconfig $i off</p>
+
+<p>service $i stop</p>
+
+<p>done</p>
+
+<p>echo &ldquo;change kernel parameter for network secure&rdquo;</p>
+
+<p>cp /etc/sysctl.conf /etc/sysctl.conf.$date</p>
+
+<p>#echo &ldquo;net.ipv4.icmp_echo_ignore_all = 1&rdquo;&gt;&gt;/etc/sysctl.conf</p>
+
+<p>sysctl -a |grep arp_filter|sed -e &rsquo;s/\=\ 0/\=\ 1/g&rsquo; &gt;&gt;/etc/sysctl.conf</p>
+
+<p>sysctl -a |grep accept_redirects|sed -e &rsquo;s/\=\ 1/\=\ 0/g&rsquo; &gt;&gt;/etc/sysctl.conf</p>
+
+<p>sysctl -a |grep send_redirects|sed -e &rsquo;s/\=\ 1/\=\ 0/g&rsquo; &gt;&gt;/etc/sysctl.conf</p>
+
+<p>sysctl -a |grep log_martians |sed -e &rsquo;s/\=\ 0/\=\ 1/g&rsquo;&gt;&gt;/etc/sysctl.conf</p>
+
+<p>sysctl -p</p>
+
+<h1 id="24">#24、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>echo &ldquo;设置热键&rdquo;</p>
+
+<p>#ctrl+alt+del</p>
+
+<p>if [ -d /etc/init ]</p>
+
+<p>then</p>
+
+<p>sed -i &rsquo;s/^[^#]/#&amp;/g&rsquo; /etc/control-alt-delete.conf</p>
+
+<p>else</p>
+
+<p>sed -i &rsquo;s/^ca::/#&amp;/g&rsquo; /etc/inittab</p>
+
+<p>fi</p>
+
+<h1 id="25">#25、&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>echo &ldquo;demo:禁止除了db2inst1的用户su到root&rdquo;</p>
+
+<p>usermod -G wheel db2inst1</p>
+
+<p>sed -i &lsquo;/pam_wheel.so use_uid/s/^#//g&rsquo; /etc/pam.d/su</p>
+
+<p>echo &ldquo;SU_WHEEL_ONLY yes&rdquo;&gt;&gt;/etc/login.defs</p>
+
+<p><a href="http://www.jianshu.com/p/850ac59fae41">http://www.jianshu.com/p/850ac59fae41</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

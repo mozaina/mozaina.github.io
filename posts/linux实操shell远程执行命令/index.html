@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux实操Shell远程执行命令 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux实操Shell远程执行命令 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux实操Shell远程执行命令">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E5%AE%9E%E6%93%8Dshell%E8%BF%9C%E7%A8%8B%E6%89%A7%E8%A1%8C%E5%91%BD%E4%BB%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux实操Shell远程执行命令</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="引言">引言</h1>
+
+<p>目前，开发人员的部署方式是，将项目打包(Maven 打包) 然后将 生成的 jar 包等文件，通过Xshell
+等终端工具手动传输到远程服务器上，然后再通过在终端执行远程服务器上的 shell 脚本来启动服务。</p>
+
+<p>本篇博客聚焦这样一种解决方案，通过在本地（Windows或Mac 系统等）运行 Shell 脚本，使用 scp 命令传输，并通过 ssh
+命令执行远程服务器上的指令或脚本，来完成这一系列各种软件切换、复制粘贴、启动运行的操作，达到 “一键部署” 的效果。这在前期频繁更新部署 jar
+包到远程服务器有很大的效率提升。</p>
+
+<h1 id="一-准备条件">一、准备条件</h1>
+
+<p>如果本机是 Windows 系统，那么如果希望执行 shell 脚本，至少需要安装一个类似 Xshell 的终端工具，普通的 dos 命令行肯定是不行的。</p>
+
+<p>不过如果有装过 git ，那么通过Git Bash 来执行 Shell 脚本是个不错的选择。</p>
+
+<p>另外，文件上传和远程执行 Shell 脚本需要对 scp 命令、 Shell 命令 、ssh 等命令有一定的了解。</p>
+
+<h1 id="二-文件上传">二、文件上传</h1>
+
+<p>一般在主机之间传输文件除了使用 SFTP 等协议外，还会使用 scp 命令，这些协议都基于 ssh 安全登录协议。scp
+命令在之前的文章中有简单介绍过，详情参考我的《Linux进阶之路————scp指令介绍与演示》</p>
+
+<p>于是，我们可以像下面这样将打包好的 jar 文件通过 scp 命令传输到 远程主机上：</p>
+
+<pre><code>#!/bin/bash
+## 通过 scp 命令上传
+scp ../target/demo-0.0.1-SNAPSHOT.jar root@192.168.1.140:~/myapp/
+</code></pre>
+
+<p>这个格式非常简单，首先 scp 命令先行，其次是源文件，再然后就是远程主机的 ip 地址以及存放的位置，其中 ~ 代表用户的 HOME 目录，比如 root
+用户的 HOME 目录就是 /root，tom用户的 HOME 目录就是 /home/tom/
+。如果希望传输多个文件，可以直接用空格隔开（多个空格没有关系），类似这样：</p>
+
+<blockquote>
+<p>scp 文件1 文件2 文件3&hellip; user@IP:目标路径</p>
+</blockquote>
+
+<p>其实，完全可以在项目的 classpath 下建立一个专门管理 shell 文件的文件夹，类似这样：</p>
+
+<p><a href="https://img.it610.com/image/info8/b36d3db81f084da08f563496c93ca65c.jpg"><img src="https://img.it610.com/image/info8/b36d3db81f084da08f563496c93ca65c.jpg" alt="Linux 实操———— Shell
+远程执行命令_第1张图片" /></a></p>
+
+<p>这样的话，shell 和 target 下打包出来的 jar 包始终保持相对路径，就不会因为在不同开发者主机上的项目位置不同而频繁修改 shell 中的
+jar 包路径。</p>
+
+<h1 id="三-远程执行-shell-项目启动脚本">三、远程执行 Shell 项目启动脚本</h1>
+
+<p>当执行完文件上传命令之后，接下来就是启动远程主机的 Shell 脚本，让服务启动。</p>
+
+<p>通常，我们会在远程服务器上放置一个配置好固定参数的启动脚本，类似这样：</p>
+
+<p><a href="https://img.it610.com/image/info8/b90b770cc152499383eb2c9b4bb57ef3.jpg"><img src="https://img.it610.com/image/info8/b90b770cc152499383eb2c9b4bb57ef3.jpg" alt="Linux 实操———— Shell
+远程执行命令_第2张图片" /></a></p>
+
+<p>但每次都需要登录远程主机，切换到目标位置，再执行启动脚本有些麻烦，于是，我们可以在保留远程脚本的同时将调用执行的操作放在本地 Windows 主机上。</p>
+
+<p>于是，我们可以在上面的 scp 命令之后，添加 ssh 命令用于执行远程脚本：</p>
+
+<pre><code>#!/bin/bash
+## 通过 scp 命令上传
+scp ../target/demo-0.0.1-SNAPSHOT.jar root@192.168.1.140:~/myapp/
+
+## 上传后执行启动脚本
+ssh root@192.168.1.140 &lt;&lt; bash
+source /etc/profile
+cd ~/myapp
+./app.sh restart demo-0.0.1-SNAPSHOT.jar
+bash
+</code></pre>
+
+<p>我们可以使用 ssh 命令在本地执行远程主机上的命令，包括执行 shell 脚本。</p>
+
+<p>其中，&rdquo;&lt;</p>
+
+<blockquote>
+<p>格式：cmd &lt;&lt; text</p>
+
+<p>从命令行读取输入，直到一个与text 相同的行结束。text 是自定义的文本，可以是任何字符串，那么 text 与 text
+之间的全部内容，都会被当做输入的参数，并被输入到 &lt;&lt; 左边的指令中。</p>
+</blockquote>
+
+<p>于是，红框内的部分就是我们要执行的 Shell 调用的具体命令（由于我的Eclipse安装了 shell编辑插件，&lt;&lt; 的部分会被灰色处理）：</p>
+
+<p><a href="https://img.it610.com/image/info8/554f4873f66d484496b4c8c1928922ad.jpg"><img src="https://img.it610.com/image/info8/554f4873f66d484496b4c8c1928922ad.jpg" alt="Linux 实操———— Shell
+远程执行命令_第3张图片" /></a></p>
+
+<p>值得一提的是，在真正执行远程 app.sh 脚本之前，需要执行 source /etc/profile 命令，这在我的《Linux 实操———CentOS
+6 安装配置 Oracle JDK 1.8》和《Linux进阶之路———Shell
+编程入门》中都有说明，意思就是刷新环境变量。这是因为远程连接的情况下不会自动加载环境变量，因此，如果你调用的远程脚本中存在类似 java
+的环境变量的命令，就会报 command not found 错误。因此只要在执行脚本之前刷新环境变量就可以了。</p>
+
+<p>另外，远程的输出会被传回到本地的 Git Bash 窗口，如果希望将输出保存到远程的 nohup.out 文件中，需要添加 &gt;&gt; 重定向：</p>
+
+<p><a href="https://img.it610.com/image/info8/46261bfe9f3d44cbbeca00ef74dd6564.jpg"><img src="https://img.it610.com/image/info8/46261bfe9f3d44cbbeca00ef74dd6564.jpg" alt="Linux 实操———— Shell
+远程执行命令_第4张图片" /></a></p>
+
+<p>当加入输出重定向后，服务端的输出就会保留在nohup.out 中，而 Git Bash 也不会有任何输出内容，从而安静的执行完脚本并返回。下面第四节采用了
+<strong>非重定向的方式</strong> ，可以根据实际情况酌情考虑。</p>
+
+<p>本博客暂未做.log 日志文件的输出检查，如果对是否会影响每天日志保存的情况，还有待进一步验证。未来验证后会追加这个问题。</p>
+
+<h1 id="四-远程传输并启动项目">四、远程传输并启动项目</h1>
+
+<p>到此为止，通过本地的 deploy.sh ，我们就 <strong>有足够的能力传输 jar 包并启动远程服务（deploy.sh—
+&gt;app.sh—&gt;启动服务）</strong>，接下来我们实际演示一下，看看能否成功。</p>
+
+<p>当然，Eclipse 貌似也有执行 bash 的插件。这里由于操作比较简单，我们可以通过 Eclipse 编辑完 Shell 后在系统盘中打开，然后通过
+Git Bash 来执行，方法是选中文件，右键——&gt;Show In——&gt;System Explorer：</p>
+
+<p><a href="https://img.it610.com/image/info8/6eeca02376c944dc80821ac75a95fd4d.jpg"><img src="https://img.it610.com/image/info8/6eeca02376c944dc80821ac75a95fd4d.jpg" alt="Linux 实操———— Shell
+远程执行命令_第5张图片" /></a></p>
+
+<p>然后在打开的资源管理器中右键空白，选择 Git Bash：</p>
+
+<p><a href="https://img.it610.com/image/info8/bcf9dbcb067249c6b87a1d896bcb0f8a.jpg"><img src="https://img.it610.com/image/info8/bcf9dbcb067249c6b87a1d896bcb0f8a.jpg" alt="Linux 实操———— Shell
+远程执行命令_第6张图片" /></a></p>
+
+<p>最后执行脚本：</p>
+
+<p><a href="https://img.it610.com/image/info8/151bf4589caf43b3b5fc33589c049359.jpg"><img src="https://img.it610.com/image/info8/151bf4589caf43b3b5fc33589c049359.jpg" alt="Linux 实操———— Shell
+远程执行命令_第7张图片" /></a></p>
+
+<p>我们可以看到远程服务的日志输出（如果是重定向到远程文件，例如 &ldquo;&gt;&gt;
+nohup.out&rdquo;，就会在远程服务器上保留输出），这更加方便了我们判断是否启动成功，当看到启动成功后，将Git Bash 关闭即可。这并不会影响远程服务。</p>
+
+<p>我们来检查一下，服务的访问，以及远程服务器上的资源情况，应该是都没有问题的：</p>
+
+<p><a href="https://img.it610.com/image/info8/06527a2a1de240c9bf92beb117eef667.jpg"><img src="https://img.it610.com/image/info8/06527a2a1de240c9bf92beb117eef667.jpg" alt="Linux 实操———— Shell
+远程执行命令_第8张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/18ee3c41ad57470d93dc5d849bfd26ec.jpg"><img src="https://img.it610.com/image/info8/18ee3c41ad57470d93dc5d849bfd26ec.jpg" alt="Linux 实操———— Shell
+远程执行命令_第9张图片" /></a></p>
+
+<p>值得一提的是， <strong>在scp 和 ssh 执行部署工作的时候，需要两次交互式的输入密码（scp 一次，ssh 一次）</strong>
+，密码是不可见的，如果你的密码非常长，建议复制粘贴。</p>
+
+<p>虽然脚本已经足够简化文件上传和启动的操作，但是依然不能避免输入密码的痛苦。</p>
+
+<p>还有一种方式是使用 rsa
+公私钥来解决免密操作的方式，但是如果是多开发者的话，就需要为每台开发者机器配置公私钥，这就极大地增加了前期的部署工作和操作难度，但如果大家每次都复制粘贴密码的话好像也会使密码渐渐变得不那么安全，容易泄露。另外有一种支持非交互式免密的方式是
+sshpass ，它可以在ssh 之前通过 -P &ldquo;password&rdquo; 指定登录密码， 不过这东西貌似在 Git Bash 上不支持，甚至在 CentOS
+6 上也找不到yum 安装，比较难搞。</p>
+
+<p>总之，目前我还没有找到比较好的权宜之计，所以，暂且就复制粘贴吧，其实已经足够简单了。</p>
+
+<p><strong>参考与鸣谢</strong> ：</p>
+
+<p>Linux Shell远程执行命令（命令行与脚本方式）</p>
+
+<p>linux shell 远程执行命令</p>
+
+<p>linux：shell脚本中一些特殊符号</p>
+
+<p>linux几种文件传输方式</p>
+
+<p>ssh登录时在参数中加入密码的解决方案</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

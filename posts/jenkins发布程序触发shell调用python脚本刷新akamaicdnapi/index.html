@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>jenkins发布程序触发shell调用python脚本刷新akamaicdnapi | 开发者问答集锦</title>
+    <meta property="og:title" content="jenkins发布程序触发shell调用python脚本刷新akamaicdnapi - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="jenkins发布程序触发shell调用python脚本刷新akamaicdnapi">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/jenkins%E5%8F%91%E5%B8%83%E7%A8%8B%E5%BA%8F%E8%A7%A6%E5%8F%91shell%E8%B0%83%E7%94%A8python%E8%84%9A%E6%9C%AC%E5%88%B7%E6%96%B0akamaicdnapi/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">jenkins发布程序触发shell调用python脚本刷新akamaicdnapi</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>刷新cdn的流程：<br />
+jenkins获取git中的代码，触发脚本推送到生产环境中(即cdn的源站) &ndash;&gt;
+触发脚本获取git工作目录的更新列表，将更新列表拼凑成带域名信息的url，写入到目录中 &ndash;&gt;
+触发python脚本读取目录中的url发送给akamai的api进行cdn的刷新</p>
+
+<p>参考文档创建client api，此次我们的账号没有创建client api的权限，需要管理员处理<br />
+文档地址：<a href="https://developer.akamai.com/api/getting-started#beforeyoubegin">https://developer.akamai.com/api/getting-started#beforeyoubegin</a></p>
+
+<p>创建和api交互的client api后会得到类似如下信息</p>
+
+<p>client_secret = &ldquo;pass&rdquo;<br />
+host = &ldquo;host.purge.akamaiapis.net&rdquo;<br />
+access_token = &ldquo;token&rdquo;<br />
+client_token = &ldquo;client_token&rdquo;</p>
+
+<p><a href="https://img.it610.com/image/info8/030310f497bf48aaa1b6b170e06db239.jpg"><img src="https://img.it610.com/image/info8/030310f497bf48aaa1b6b170e06db239.jpg" alt="jenkins发布程序触发shell调用python脚本刷新akamai cdn
+api_第1张图片" /></a></p>
+
+<p>api参考地址：</p>
+
+<p><a href="https://github.com/akamai/api-kickstart">https://github.com/akamai/api-kickstart</a></p>
+
+<p>jenkins中的shell脚本</p>
+
+<pre><code>[root@jenkins:/usr/local/worksh/jeninks_task]# cat neveragain_chinasoft_com.sh 
+#!/bin/bash
+#############################################
+# 通过jenkins发布任务 neveragain.chinasoft.com 发布  注意/data/www/vhosts/neveragain.chinasoft.com/httpdocs/dist/ 发布到线上对应的是2019目录
+
+cart_iplist=&quot;1.1.1.1&quot;
+
+function neveragain_chinasoft_eus_rsync()
+{
+for ip in $cart_iplist
+do
+        echo &quot;-- start pub --- 预发布到外网 ${ip} ----------------------------------------&quot;
+    /usr/local/bin/rsync -vazP --bwlimit=1000 --exclude='.git/' --exclude='.gitignore/' --password-file=/data/www/.rsync/rsyncd.pass /data/www/vhosts/neveragain.chinasoft.com/httpdocs/dist/ apache@$ip::apache/data/www/vhosts/neveragain.chinasoft.com/httpdocs/2019/
+    if [[ $? == 0 || $? == 23 ]];then
+            rsync_edit=1
+    else
+            rsync_edit=0
+            echo &quot;`date` rsync发布失败! -&gt; editUrls.txt&quot;
+            exit 1
+    fi
+
+    echo -e &quot;-- end pub ${ip} ----------------------------------------------------------\n\n&quot;
+done
+}
+
+# 执行同步
+neveragain_chinasoft_eus_rsync
+
+# 读取git的更新列表，发送请求调用python脚本刷新akamai CDN
+function update_cdn
+{
+    # 工作目录
+    WORKSPACE=&quot;/data/jenkins_home/workspace/DesignCenter.neveragain.chinasoft.com/&quot;
+    cd $WORKSPACE
+
+    # 获取git变更列表
+    changefiles=$(git diff --name-only HEAD~ HEAD)
+    #echo $changefiles
+    # 先把文件路径写死，作为测试使用
+    #changefiles=&quot;dist/assets/image/box/drfone-mac.png dist/assets/image/box/drfone-win.png dist/assets/image/box/dvdcreator-mac.png dist/assets/image/box/dvdcreator-win.png&quot;
+
+    #20190812103337
+    now_time=&quot;`date +%Y%m%d%H%M%S`&quot;
+    # 将更新的文件列表写入日志文件中
+    for newfile in $changefiles;
+    do
+        start_str=${newfile:0:4}
+        #echo $start_str
+        # 如果变更的文件是 dist 目录下的文件就触发该文件刷新CDN
+        if [ $start_str == 'dist' ];then
+            need_file=${newfile:5}
+            #echo $need_file
+            need_url=&quot;https://neveragain.chinasoft.com/2019/$need_file&quot;
+            #echo $need_url
+            echo &quot;${need_url}&quot; &gt;&gt; &quot;/usr/local/worksh/jeninks_task/akamai_api/logs/${now_time}.log&quot;
+        fi
+    done
+
+# 调用Python脚本刷新cdn
+/usr/local/worksh/jeninks_task/akamai_api_venv/bin/python /usr/local/worksh/jeninks_task/akamai_api/akamai_api.py $now_time
+if [ $? != 0 ];then
+    echo &quot;刷新CDN失败&quot;
+    exit 1
+else
+    echo &quot;刷新CDN成功&quot;
+fi
+
+}
+# 刷新cdn
+update_cdn
+</code></pre>
+
+<h1 id="python脚本">python脚本</h1>
+
+<h1 id="刷新cdn的python脚本结构">刷新cdn的python脚本结构</h1>
+
+<p>[root@jenkins:/usr/local/worksh/jeninks_task/akamai_api]# tree<br />
+.<br />
+├── akamai_api.py<br />
+├── lib<br />
+│ ├── http_calls.py<br />
+│ ├── <strong>init</strong>.py<br />
+├── logs<br />
+│ ├── 20190814164047.log<br />
+│ └── 20190814172256.log<br />
+├── log.txt<br />
+├── README.md<br />
+└── requirement.txt</p>
+
+<h1 id="cat-usr-local-worksh-jeninks-task-akamai-api-logs-20190814172256-log">cat /usr/local/worksh/jeninks_task/akamai_api/logs/20190814172256.log</h1>
+
+<p><a href="https://neveragain.chinasoft.com/2019/assets/icon/brand/finder.svg">https://neveragain.chinasoft.com/2019/assets/icon/brand/finder.svg</a><br />
+<a href="https://neveragain.chinasoft.com/2019/assets/icon/logo/edraw-horizontal-">https://neveragain.chinasoft.com/2019/assets/icon/logo/edraw-horizontal-</a>
+white.png</p>
+
+<pre><code># 主程序
+[root@jenkins:/usr/local/worksh/jeninks_task]# cat /usr/local/worksh/jeninks_task/akamai_api/akamai_api.py
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @File  : akamai_api.py
+# @Desc  : 读取指定文件中url的路径内容，刷新Akamai CDN的边缘节点数据
+
+import requests, json,time,os,sys
+from lib.http_calls import EdgeGridHttpCaller
+from akamai.edgegrid import EdgeGridAuth
+import logging
+
+class Akamai_API():
+    def __init__(self,api_host,api_access_token,api_client_token,api_client_secret,verbose=False,debug=False,action=&quot;delete&quot;,network=&quot;production&quot;):
+        self.host = api_host
+        self.access_token = api_access_token
+        self.client_token = api_client_token
+        self.client_secret = api_client_secret
+
+        self.verbose = verbose
+        self.debug = debug
+
+        #API的清除动作:delete invalidate
+        self.action =action
+        self.network =network
+
+        self.session = requests.Session()
+
+    def __auth(self):
+        self.session.auth = EdgeGridAuth(
+            client_token=self.client_token,
+            client_secret=self.client_secret,
+            access_token=self.access_token
+        )
+        return self.session
+
+    def postPurgeRequest(self,refush_url_list):
+        self.__auth()
+        baseurl = '%s://%s/' % ('https', self.host)
+        httpCaller = EdgeGridHttpCaller(self.session, self.debug, self.verbose, baseurl)
+        purge_obj = {
+            # &quot;objects&quot;: [
+            #     &quot;https://bc.akamaiapibootcamp.com/index.html&quot;
+            # ]
+            &quot;objects&quot;: refush_url_list,
+        }
+        # print(&quot;Adding %s request to queue - %s&quot; % (self.action, json.dumps(purge_obj)))
+        purge_post_result = httpCaller.postResult('/ccu/v3/%s/url/%s' % (self.action, self.network), json.dumps(purge_obj))
+        return purge_post_result
+
+def ReadFile(filename):
+    &quot;&quot;&quot;
+    读取文件内容中的url路径
+    每行一条url路径
+    &quot;&quot;&quot;
+    l = []
+    error_l = []
+    with open(filename) as f:
+        for url in  f.readlines():
+            url_str = str(url).strip(&quot;\n&quot;)
+            if str(url).startswith(&quot;https://neveragain.chinasoft.com&quot;):
+                l.append(url_str)
+            else:
+                error_l.append(url_str)
+    if error_l:
+        raise Exception(&quot;The format of the file path is incorrect. %s&quot;%('\n'.join(error_l)))
+    return l
+
+if __name__ == &quot;__main__&quot;:
+    #API信息
+    API_HOST = &quot;host.purge.akamaiapis.net&quot;
+    API_ACCESS_TOKEN = &quot;token&quot;
+    API_CLIENT_TOKEN = &quot;client_token&quot;
+    API_CLIENT_SECRET = &quot;api_client_secret=&quot;
+
+    api = Akamai_API(api_host=API_HOST,api_access_token=API_ACCESS_TOKEN,api_client_token=API_CLIENT_TOKEN,api_client_secret=API_CLIENT_SECRET)
+
+    #接收url文件名称
+    if len(sys.argv) != 2:
+        raise Exception(&quot;Not enough parameters for %s&quot;%sys.argv[0])
+    prefix_url_filename = sys.argv[1]
+
+    # 定义日志级别
+    baseDir = os.path.dirname(os.path.abspath(__file__))
+    logfile = os.path.join(baseDir,&quot;log.txt&quot;)
+    logging.basicConfig(level=logging.INFO,
+                        filename=logfile,
+                        filemode='a',
+                        format='%(asctime)s - %(filename)s - %(levelname)s: %(message)s')
+    logger = logging.getLogger(__name__)
+
+    #读取url的文件内容
+    filename = os.path.join(baseDir,os.path.join(&quot;logs&quot;,&quot;%s.log&quot;%prefix_url_filename))
+    if not os.path.isfile(filename):
+        raise Exception(&quot;Not exists file %s&quot; %filename)
+    url_list = ReadFile(filename)
+
+    #每次POST提交url的条数
+    MAX_REQUEST_SIZE = 800
+    while url_list:
+        batch = []
+        batch_size = 0
+
+        while url_list and batch_size &lt; MAX_REQUEST_SIZE:
+            next_url = url_list.pop()
+            batch.append(next_url)
+            batch_size += 1
+        if batch:
+            response = api.postPurgeRequest(batch)
+            if response[&quot;httpStatus&quot;] != 201:
+                # 将本次请求url返回到总url列表中，以便稍后在试
+                url_list.extend(batch)
+                #速率限制
+                if response[&quot;httpStatus&quot;] == 507:
+                    details = response.json().get('detail', '')
+                    print('Will retry request in 1s seconds due to API rate-limit: %s,Try again now.'%details)
+                    logger.info('Will retry request in 1s seconds due to API rate-limit: %s,Try again now.'%details)
+                    time.sleep(1)
+                # 针对速率限制以外的错误  抛出
+                if response[&quot;httpStatus&quot;] != 507:
+                    details = response.json().get('detail', '')
+                    print(&quot;{status:Failed,detail:%s}&quot;%details)
+                    logger.info(&quot;{status:Failed,detail:%s}&quot;%details)
+                    response.raise_for_status()
+            else:
+                logger.info(&quot;{status:Success,supportId:%s,purgeId:%s,queue:%s}&quot;%(response[&quot;supportId&quot;],response[&quot;purgeId&quot;],json.dumps(batch)))
+
+
+# 依赖包：
+
+[root@jenkins:/usr/local/worksh/jeninks_task/akamai_api]# cat requirement.txt 
+asn1crypto==0.24.0
+certifi==2019.6.16
+cffi==1.12.3
+chardet==3.0.4
+configparser==3.7.4
+cryptography==2.7
+edgegrid-python==1.1.1
+idna==2.8
+ndg-httpsclient==0.5.1
+pyasn1==0.4.6
+pycparser==2.19
+pyOpenSSL==19.0.0
+requests==2.22.0
+six==1.12.0
+urllib3==1.25.3
+
+
+[root@jenkins:/usr/local/worksh/jeninks_task/akamai_api]# cat lib/http_calls.py
+#!/usr/bin/env python
+
+
+# Python edgegrid module
+&quot;&quot;&quot; Copyright 2015 Akamai Technologies, Inc. All Rights Reserved.
+
+ Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ you may not use this file except in compliance with the License.
+
+ You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+&quot;&quot;&quot;
+import sys
+
+if sys.version_info[0] &gt;= 3:
+    # python3
+    from urllib import parse
+else:
+    # python2.7
+    import urlparse as parse
+
+import logging, json
+
+logger = logging.getLogger(__name__)
+
+
+class EdgeGridHttpCaller():
+    def __init__(self, session, debug, verbose, baseurl):
+        self.debug = debug
+        self.verbose = verbose
+        self.session = session
+        self.baseurl = baseurl
+        return None
+
+    def urlJoin(self, url, path):
+        return parse.urljoin(url, path)
+
+    def getResult(self, endpoint, parameters=None):
+        path = endpoint
+        endpoint_result = self.session.get(parse.urljoin(self.baseurl, path), params=parameters)
+        if self.verbose: print(&quot;&gt;&gt;&gt;\n&quot; + json.dumps(endpoint_result.json(), indent=2) + &quot;\n&lt;&lt;&quot;)
+        status = endpoint_result.status_code
+        if self.verbose: print(&quot;LOG: GET %s %s %s&quot; % (endpoint, status, endpoint_result.headers[&quot;content-type&quot;]))
+        self.httpErrors(endpoint_result.status_code, path, endpoint_result.json())
+        return endpoint_result.json()
+
+    def httpErrors(self, status_code, endpoint, result):
+        if not isinstance(result, list):
+            details = result.get('detail') or result.get('details') or &quot;&quot;
+        else:
+            details = &quot;&quot;
+        if status_code == 403:
+            error_msg = &quot;ERROR: Call to %s failed with a 403 result\n&quot; % endpoint
+            error_msg += &quot;ERROR: This indicates a problem with authorization.\n&quot;
+            error_msg += &quot;ERROR: Please ensure that the credentials you created for this script\n&quot;
+            error_msg += &quot;ERROR: have the necessary permissions in the Luna portal.\n&quot;
+            error_msg += &quot;ERROR: Problem details: %s\n&quot; % details
+            exit(error_msg)
+
+        if status_code in [400, 401]:
+            error_msg = &quot;ERROR: Call to %s failed with a %s result\n&quot; % (endpoint, status_code)
+            error_msg += &quot;ERROR: This indicates a problem with authentication or headers.\n&quot;
+            error_msg += &quot;ERROR: Please ensure that the .edgerc file is formatted correctly.\n&quot;
+            error_msg += &quot;ERROR: If you still have issues, please use gen_edgerc.py to generate the credentials\n&quot;
+            error_msg += &quot;ERROR: Problem details: %s\n&quot; % result
+            exit(error_msg)
+
+        if status_code in [404]:
+            error_msg = &quot;ERROR: Call to %s failed with a %s result\n&quot; % (endpoint, status_code)
+            error_msg += &quot;ERROR: This means that the page does not exist as requested.\n&quot;
+            error_msg += &quot;ERROR: Please ensure that the URL you're calling is correctly formatted\n&quot;
+            error_msg += &quot;ERROR: or look at other examples to make sure yours matches.\n&quot;
+            error_msg += &quot;ERROR: Problem details: %s\n&quot; % details
+            exit(error_msg)
+
+        error_string = None
+        if &quot;errorString&quot; in result:
+            if result[&quot;errorString&quot;]:
+                error_string = result[&quot;errorString&quot;]
+        else:
+            for key in result:
+                if type(key) is not str or isinstance(result, dict) or not isinstance(result[key], dict):
+                    continue
+                if &quot;errorString&quot; in result[key] and type(result[key][&quot;errorString&quot;]) is str:
+                    error_string = result[key][&quot;errorString&quot;]
+        if error_string:
+            error_msg = &quot;ERROR: Call caused a server fault.\n&quot;
+            error_msg += &quot;ERROR: Please check the problem details for more information:\n&quot;
+            error_msg += &quot;ERROR: Problem details: %s\n&quot; % error_string
+            exit(error_msg)
+
+    def postResult(self, endpoint, body, parameters=None):
+        headers = {'content-type': 'application/json'}
+        path = endpoint
+        endpoint_result = self.session.post(parse.urljoin(self.baseurl, path), data=body, headers=headers,
+                                            params=parameters)
+        status = endpoint_result.status_code
+        if self.verbose: print(&quot;LOG: POST %s %s %s&quot; % (path, status, endpoint_result.headers[&quot;content-type&quot;]))
+        if status == 204:
+            return {}
+        self.httpErrors(endpoint_result.status_code, path, endpoint_result.json())
+
+        if self.verbose: print(&quot;&gt;&gt;&gt;\n&quot; + json.dumps(endpoint_result.json(), indent=2) + &quot;\n&lt;&lt;&quot;)
+        return endpoint_result.json()
+
+    def postFiles(self, endpoint, file):
+        path = endpoint
+        endpoint_result = self.session.post(parse.urljoin(self.baseurl, path), files=file)
+        status = endpoint_result.status_code
+        if self.verbose: print(&quot;LOG: POST FILES %s %s %s&quot; % (path, status, endpoint_result.headers[&quot;content-type&quot;]))
+        if status == 204:
+            return {}
+        self.httpErrors(endpoint_result.status_code, path, endpoint_result.json())
+
+        if self.verbose: print(&quot;&gt;&gt;&gt;\n&quot; + json.dumps(endpoint_result.json(), indent=2) + &quot;\n&lt;&lt;&quot;)
+        return endpoint_result.json()
+
+    def putResult(self, endpoint, body, parameters=None):
+        headers = {'content-type': 'application/json'}
+        path = endpoint
+
+        endpoint_result = self.session.put(parse.urljoin(self.baseurl, path), data=body, headers=headers,
+                                           params=parameters)
+        status = endpoint_result.status_code
+        if self.verbose: print(&quot;LOG: PUT %s %s %s&quot; % (endpoint, status, endpoint_result.headers[&quot;content-type&quot;]))
+        if status == 204:
+            return {}
+        if self.verbose: print(&quot;&gt;&gt;&gt;\n&quot; + json.dumps(endpoint_result.json(), indent=2) + &quot;\n&lt;&lt;&quot;)
+        return endpoint_result.json()
+
+    def deleteResult(self, endpoint):
+        endpoint_result = self.session.delete(parse.urljoin(self.baseurl, endpoint))
+        status = endpoint_result.status_code
+        if self.verbose: print(&quot;LOG: DELETE %s %s %s&quot; % (endpoint, status, endpoint_result.headers[&quot;content-type&quot;]))
+        if status == 204:
+            return {}
+        if self.verbose: print(&quot;&gt;&gt;&gt;\n&quot; + json.dumps(endpoint_result.json(), indent=2) + &quot;\n&lt;&lt;&quot;)
+        return endpoint_result.json()
+</code></pre>
+
+<p>转载于:<a href="https://www.cnblogs.com/reblue520/p/11359944.html">https://www.cnblogs.com/reblue520/p/11359944.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

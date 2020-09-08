@@ -1,0 +1,1206 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>hive表hive视图spark处理数据入mysqlshell获取url数据下载jsonSparksql处理jsonshell脚本执行kylinazkaban任务调度 | 开发者问答集锦</title>
+    <meta property="og:title" content="hive表hive视图spark处理数据入mysqlshell获取url数据下载jsonSparksql处理jsonshell脚本执行kylinazkaban任务调度 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="hive表hive视图spark处理数据入mysqlshell获取url数据下载jsonSparksql处理jsonshell脚本执行kylinazkaban任务调度">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/hive%E8%A1%A8hive%E8%A7%86%E5%9B%BEspark%E5%A4%84%E7%90%86%E6%95%B0%E6%8D%AE%E5%85%A5mysqlshell%E8%8E%B7%E5%8F%96url%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BDjsonsparksql%E5%A4%84%E7%90%86jsonshell%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8Ckylinazkaban%E4%BB%BB%E5%8A%A1%E8%B0%83%E5%BA%A6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">hive表hive视图spark处理数据入mysqlshell获取url数据下载jsonSparksql处理jsonshell脚本执行kylinazkaban任务调度</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="1-spark获取json数据-并将json数据存hive库">1 Spark获取json数据，并将json数据存hive库</h2>
+
+<p>hive表建立Demo</p>
+
+<pre><code>--如果存在hive表，直接删除这个hive表。
+drop table if EXISTS tb_trade_info;
+--创建hive表(第一次全量，后续增量)
+CREATE TABLE IF NOT EXISTS tb_trade_info (
+salesmanId VARCHAR(40) comment '发展业务员Id',
+salesmanName VARCHAR(20) comment '发展店铺的业务员名称',
+createDate bigint comment '交易订单创建天，时间格式为yyyyMMdd的integer值，分区时间'
+)
+partitioned by(pt_createDate integer comment '创建天，时间格式为yyyyMMdd的integer值，分区时间') 
+ROW FORMAT DELIMITED 
+FIELDS TERMINATED BY '\t' 
+LINES TERMINATED BY '\n' 
+STORED AS TEXTFILE;
+</code></pre>
+
+<p>hive视图建立Demo</p>
+
+<pre><code>--- 交易客单价对应的视图（第一次全量，后续增量）
+DROP VIEW IF EXISTS trade_info_view;
+CREATE VIEW IF NOT EXISTS trade_info_view
+(
+shopRegTime COMMENT '商户注册时间',
+levelOne COMMENT '客单价 &lt;10元',
+pt_createDate COMMENT '创建天，时间格式为yyyyMMdd的integer值，分区时间'
+) COMMENT '客单价视图'
+AS
+select 
+shopRegTime,
+(case when (balanceFee + payFee) &lt; 10.0 then 1 else 0 end) as levelOne,
+pt_createDate
+from 
+tb_trade_info;
+</code></pre>
+
+<p>按照某个字段分组降序，获取最开始的第一条的hive视图demo</p>
+
+<pre><code>-- 广告主，流量主对应的 按照广告发布时间进行控制
+DROP VIEW IF EXISTS advert_flowofmain_view;
+CREATE VIEW IF NOT EXISTS advert_flowofmain_view
+(
+shopId COMMENT '店铺Id,主键唯一',
+action COMMENT '动作类型：10，发布广告，20：流量任务（流量主）'
+) COMMENT '广告主、流量主数量统计视图'
+AS
+select 
+t.shopId,
+t.action
+from 
+(
+select 
+shopId,
+action,
+ROW_NUMBER() OVER(PARTITION BY advertId ORDER BY actionTime desc) AS rn 
+FROM 
+table_name
+) t 
+where t.rn=1;
+</code></pre>
+
+<p>代码示例：</p>
+
+<pre><code>import java.util.Date
+
+import xxx.xxx.bigdata.common.utils.DateUtils
+import org.apache.spark.sql.SparkSession
+
+object TradeDataClean {
+
+//  def main(args: Array[String]): Unit = {
+//    val conf = new SparkConf().setAppName(&quot;TradeDataClean&quot;).setMaster(&quot;local&quot;)
+//    val sc = new SparkContext(conf)
+//    val input = sc.textFile(&quot;hdfs://bigdata1:9000/bplan/data-center/alitradelist.log.2018-06-21&quot;)
+//
+//    input.collect().foreach(
+//      x =&gt; {
+//        println(x);
+//        val json = JSON.parseObject(x)
+//        println(&quot;====value====&quot;)
+//        println(json)
+//        println(json.getString(&quot;agentId&quot;))
+//      }
+//    )
+//
+//    sc.stop()
+//  }
+
+  /**
+    * 如果有参数，直接返回参数中的值，如果没有默认是前一天的时间
+    * @param args        :系统运行参数
+    * @param pattern     :时间格式
+    * @return
+    */
+//  def gainDayByArgsOrSysCreate(args: Array[String],pattern: String):String = {
+//    //如果有参数，直接返回参数中的值，如果没有默认是前一天的时间
+//    if(args.length &gt; 1) {
+//      args(1)
+//    } else {
+//      val previousDay = DateUtils.addOrMinusDay(new Date(), -1);
+//      DateUtils.dateFormat(previousDay, &quot;yyyy-MM-dd&quot;);
+//    }
+//  }
+
+  /**
+    * args(0)      :要处理的json文件路径
+    * @param args
+    */
+  def main(args: Array[String]): Unit = {
+
+    val spark = SparkSession
+      .builder()
+      .appName(&quot;TradeDataClean&quot;)
+      //.master(&quot;local[*]&quot;)
+      .config(&quot;spark.sql.warehouse.dir&quot;,&quot;/user/hive/warehouse&quot;)
+      //为解决：Use the CROSS JOIN syntax to allow cartesian products between these relations
+      //.config(&quot;spark.sql.crossJoin.enabled&quot;,true)
+      //.config(&quot;spark.sql.warehouse.dir&quot;,&quot;hdfs://bigdata1:9000/user/hive/warehouse&quot;)
+      .enableHiveSupport()
+      .getOrCreate();
+
+    //val previousDayStr = gainDayByArgsOrSysCreate(args,&quot;yyyy-MM-dd&quot;)
+
+    //val df = spark.read.json(&quot;/bplan/data-center/tradeInfo/&quot;+ previousDayStr +&quot;/tradeInfo.json&quot;)
+    val df = spark.read.json(args(0))
+    //val df = spark.read.json(&quot;hdfs://bigdata1:9000/xxx/xxx/xxxx&quot;)
+    spark.sql(&quot;use data_center&quot;)
+    df.createOrReplaceTempView(&quot;tb_trade_info_temp&quot;);
+
+    val previousDay = DateUtils.addOrMinusDay(new Date(), -1)
+    //val tmepRdd = rs.rdd.saveAsTextFile(&quot;hdfs://bigdata1:9000/bplan/data-center/temp.txt&quot;)
+    val pt_createDate = DateUtils.dateFormat(previousDay, &quot;yyyyMMdd&quot;);
+    spark.sql(&quot;INSERT INTO TABLE tb_trade_info partition(pt_createDate=&quot; + pt_createDate + &quot;) &quot; +
+      &quot;SELECT &quot; +
+      &quot;    ttit.agentId as agentId, &quot; +
+      &quot;    from_unixtime(ttit.payTimeUnix,'yyyyMMdd') as createDate &quot; +
+      &quot;FROM &quot; +
+      &quot;    tb_sys_industry si,  &quot; +
+      &quot;    tb_shop ts,&quot; +
+      &quot;    tb_trade_info_temp ttit &quot; +
+      &quot;WHERE &quot; +
+      &quot;    si.category_id = ts.industryId  &quot; +
+      &quot;    and ts.shopId = ttit.shopId&quot; +
+      &quot;    and ts.storeType != 10&quot;);
+
+    spark.stop()
+  }
+}
+</code></pre>
+
+<p><strong>spark处理数据入mysql数据库：</strong></p>
+
+<pre><code>package xxx.shop
+
+import java.sql.{Connection, DriverManager, PreparedStatement}
+import xxxx.common.utils.snowflake.SnowflakeUtils
+import org.apache.spark.sql.SparkSession
+
+object ShopExtDataClean {
+
+  //  /**
+  //    * 如果有参数，直接返回参数中的值，如果没有默认是前一天的时间
+  //    * @param args        :系统运行参数
+  //    * @param pattern     :时间格式
+  //    * @return
+  //    */
+  //  def gainDayByArgsOrSysCreate(args: Array[String],pattern: String):String = {
+  //    //如果有参数，直接返回参数中的值，如果没有默认是前一天的时间
+  //    if(args.length &gt; 1) {
+  //      args(1)
+  //    } else {
+  //      val previousDay = DateUtils.addOrMinusDay(new Date(), -1);
+  //      DateUtils.dateFormat(previousDay, &quot;yyyy-MM-dd&quot;);
+  //    }
+  //  }
+
+  /**
+    * args(0)         :json数据
+    * args(1)         :mysql的ip地址
+    * args(2)         :mysql数据库的端口号
+    * args(3)         :mysql数据库用户
+    * args(4)         :mysql数据库密码
+    *
+    * @param args
+    */
+  def main(args: Array[String]): Unit = {
+    val spark = SparkSession
+      .builder()
+      .appName(&quot;ShopDataClean&quot;)
+      //.master(&quot;local[*]&quot;)
+      .config(&quot;spark.sql.warehouse.dir&quot;, &quot;/user/hive/warehouse&quot;)
+      .enableHiveSupport()
+      .getOrCreate();
+
+    //    val previousDayStr = gainDayByArgsOrSysCreate(args,&quot;yyyy-MM-dd&quot;)
+
+    //val df = spark.read.json(&quot;/bplan/data-center/shop/&quot; + previousDayStr + &quot;/shop.json&quot;);
+    val df = spark.read.json(args(0));
+    spark.sql(&quot;use data_center&quot;);
+    df.createOrReplaceTempView(&quot;shop_ext_temp&quot;)
+
+    val df2 = spark.sql(&quot;SELECT &quot; +
+      &quot;   st.areaName as areaName, &quot; +
+      &quot;   st.areaCode as areaCode, &quot; +
+      &quot;   st.agentId as agentId, &quot; +
+      &quot;   st.agentName as agentName, &quot; +
+      &quot;   st.rootCategoryId as rootCategoryId, &quot; +
+      &quot;   st.parentCategoryId as parentCategoryId, &quot; +
+      &quot;   st.industryId as industryId, &quot; +
+      &quot;   st.industryName as industryName, &quot; +
+      &quot;   set.shopId as shopId, &quot; +
+      &quot;   set.businessType as businessType, &quot; +
+      &quot;   set.addTime as addTime, &quot; +
+      &quot;   set.num as num &quot; +
+      &quot;FROM &quot; +
+      &quot;    shop_ext_temp set left join tb_shop st &quot; +
+      &quot;ON &quot; +
+      &quot;    set.shopId = st.shopId and st.storeType in(1, 20)&quot;)
+    //&quot;    set.shopId = st.shopId and st.storeType = 1 or st.storeType = 20&quot;)
+
+    //    val previousDay = DateUtils.addOrMinusDay(new Date(), -1);
+    //    //将临时的数据存入到实际的tb_shop表中
+    //    val pt_createDate = DateUtils.dateFormat(previousDay, &quot;yyyyMMdd&quot;)
+
+    var conn: Connection = null;
+    var ps: PreparedStatement = null;
+    val sql = s&quot;insert into tb_shop_ext(&quot; +
+      s&quot;id,&quot; +
+      s&quot;area_name,&quot; +
+      s&quot;area_code,&quot; +
+      s&quot;agent_id,&quot; +
+      s&quot;agent_name,&quot; +
+      s&quot;root_category_id,&quot; +
+      s&quot;parent_category_id,&quot; +
+      s&quot;industry_id,&quot; +
+      s&quot;industry_name,&quot; +
+      s&quot;shop_id,&quot; +
+      s&quot;business_type,&quot; +
+      s&quot;add_time,&quot; +
+      s&quot;num) &quot; +
+      s&quot;values (?,?,?,?,?,?,?,?,?,?,?,?,?)&quot;
+    try {
+      Class.forName(&quot;com.mysql.jdbc.Driver&quot;)
+      conn = DriverManager.getConnection(s&quot;jdbc:mysql://&quot; + args(1) + &quot;:&quot; + args(2) + &quot;/data_center&quot;, args(3), args(4))
+      ps = conn.prepareStatement(sql)
+
+      //关闭自动提交，即开启事务
+      conn.setAutoCommit(false)
+
+      var i = 1;
+      df2.collect().foreach(
+        x =&gt; {
+          ps.setLong(1, SnowflakeUtils.getId)
+          ps.setString(2, x.get(0).toString)
+          ps.setString(3, x.get(1).toString)
+          ps.setString(4, x.get(2).toString)
+          ps.setString(5, x.get(3).toString)
+          ps.setString(6, x.get(4).toString)
+          ps.setString(7, x.get(5).toString)
+          ps.setString(8, x.get(6).toString)
+          ps.setString(9, x.get(7).toString)
+          ps.setString(10, x.get(8).toString)
+          ps.setInt(11, x.get(9).toString.toInt)
+          ps.setLong(12, x.get(10).toString.toLong)
+          ps.setInt(13, x.get(11).toString.toInt)
+          ps.addBatch()
+
+          i += 1;
+          if (i % 500 == 0) {
+            ps.executeBatch()
+          }
+        }
+      )
+      //最后不足500条的，直接执行批量更新操作
+      ps.executeBatch()
+      ps.close()
+      //执行完后，手动提交事务
+      conn.commit()
+      //再把自动提交打开
+      conn.setAutoCommit(true)
+    } catch {
+      case e: Exception =&gt; {
+        //先打印出异常
+        e.printStackTrace()
+        try {
+          //发生异常，事务回滚
+          if (conn != null &amp;&amp; !conn.isClosed) {
+            conn.rollback()
+            conn.setAutoCommit(true)
+          }
+        } catch {
+          case ex: Exception =&gt; ex.printStackTrace()
+        }
+      }
+    } finally {
+      if (ps != null) {
+        try {
+          ps.close()
+        } catch {
+          //下面两行等价 case e : Exception =&gt; e.printStackTrace()
+          //case e : ClassNotFoundException =&gt; e.printStackTrace()
+          //case e : SQLException =&gt; e.printStackTrace()
+          case e: Exception =&gt; e.printStackTrace()
+        }
+      }
+      if (conn != null) {
+        try {
+          conn.close()
+        } catch {
+          case ex: Exception =&gt; ex.printStackTrace()
+        }
+      }
+    }
+
+    spark.stop();
+    //程序正常退出
+    System.exit(0)
+  }
+}
+</code></pre>
+
+<h2 id="2-shell脚本中下载json数据">2 Shell脚本中下载json数据</h2>
+
+<pre><code>自己定义的env的脚本：
+env.sh
+
+#!/bin/bash
+
+#定义接口请求url地址
+export webUrl='http://xxx/xxx/xxx/xxxx'
+export backUpWebUrl='http://xxxx/xxxx/xxxx/xxxx'
+
+#echo ${webUrl}
+#设置默认的数据类型,默认下载全量数据
+export dataType=&quot;full&quot;
+
+#昨天时间(时间格式类:2018-10-24)
+export yesterday=`date --date='1 days ago' +%Y-%m-%d`
+export today=`date +%Y-%m-%d`
+#1周前数据（用于保留7天数据）
+export aweekAgo=`date --date='7 days ago' +%Y-%m-%d`
+export aweekAgoFolder=
+#echo $yesterday
+
+#oss中json的位置
+export ossUrl=&quot;https://ossurl&quot;
+
+#当前路径
+export current=$PWD
+
+#Spark运行所需的参数配置等信息
+export sparkArgs=&quot;--jars /xxxx/apache-phoenix-4.14.1-HBase-1.4-bin/phoenix-spark-4.14.1-HBase-1.4.jar,/xxx/apache-phoenix-4.14.1-HBase-1.4-bin/phoenix-4.14.1-HBase-1.4-client.jar --master spark://xxxx:7077 --executor-memory 2g --total-executor-cores 6 --class &quot;
+#Spark程序所在位置
+export programPrefixPath=&quot;/xxxx/program&quot;
+
+
+#kylin的参数
+export kylinUserInfo=&quot;--user ADMIN:KYLIN&quot;
+export kylinCubeUrl=&quot;http://xxxx:7070/kylin/api/cubes/&quot;
+export kylinJobsUrl=&quot;http://xxxx:7070/kylin/api/jobs/&quot;
+export startTime=&quot;2015-01-01 00:00&quot;
+export startTimeTimeStamp=`date -d &quot;$startTime&quot; +%s`
+export startTimeTimeStampMs=$(($startTimeTimeStamp * 1000))
+export endTime=`date +%Y-%m-%d -d &quot;+1days&quot;`
+export endTimeTimeStamp=`date -d &quot;$endTime&quot; +%s`
+#将时间戳编程毫秒值
+export endTimeTimeStampMs=$(($endTimeTimeStamp * 1000))
+
+#phoenix对应的ZkUrl
+#export phoenixZkUrl=&quot;jdbc:phoenix:ip地址:2181&quot;
+
+#########################################################
+#3、订单交易数据请求参数(第一次全量，后续增量)
+#请求地址：curl -d &quot;dataName=tradeInfo&amp;dataType=full&amp;dataTime=2018-10-23&quot; http://xxxxx/oss/selectList
+export tradeInfoArgs=&quot;dataName=tradeInfo&amp;dataType=&quot;  #$dataType&quot;&amp;dataTime=&quot;$yesterday
+#json的url信息存储的文件路径
+export tradeInfoJsonUrls=$current/tmpfile/tradeInfoJsonUrls
+#json的url存储位置前缀
+export tradeInfoJsonUrlPrefix=$current/tmpfile/tradeInfoJsonUrlPrefix
+export tradeAnalyzeCubeName=&quot;tb_trade_analyze_cube&quot;
+export tradeCollectMoneyCubeName=&quot;tb_trade_collect_money_cube&quot;
+#用于存储是否下载了的变量文件
+export tradeInfoVariableFile=$current/tmpfile/tradeInfoVariableFile
+
+
+#!/bin/bash
+
+source /etc/profile
+
+#求结果中的url路径长度，如果是4，表示这里的值是一个控制了(下面这两行是等效的)
+#urlLength=`echo ${urlInfo} |jq '.data.urls[1]' | awk '{print length($0)}'`
+#urlLength=$(echo ${urlInfo} |jq '.data.urls[1]' | awk '{print length($0)}')
+#echo $urlLength
+
+#引用公共文件中定义的参数变量
+source $PWD/env.sh
+
+
+#定义变量
+urlInfo=
+#定义尝试次数
+retryTimes=1
+#json数据所在的文件目录（相对于脚本所在的相对路径）
+urlPrefix=
+#Json数据文件存放的实际目录
+fileFolder=
+#最新的数据下载位置
+newUrlArgs=
+
+#传递变量存储的路径的位置，返回当前当前数据类型
+function resetArgs() {
+   #如果文件存在，读取相应的数据类型
+   if [[ `ls $tradeInfoVariableFile | grep tradeInfoVariableFile | grep -v grep` != &quot;&quot; ]];then
+        #存在这个文件的时候，返回存储在文件中的这个类型的值
+        #获取数据类型，然后读取出文件中dataType的值,将dataType=变成空值
+        dataType=`cat $tradeInfoVariableFile | grep dataType | sed 's/dataType=//g'`
+        newUrlArgs=$tradeInfoArgs$dataType&quot;&amp;dataTime=&quot;$yesterday
+
+        #并返回dataType
+        #return $dataType
+    else
+        mkdir -p $current/tmpfile
+        cd $current/tmpfile
+        #不存在这个文件的时候，返回0，并创建这个文件，将变量的类型的值写入到文件中
+        #将数据类型写入进去，表示后续都是按照增量的方式进行计算
+        echo &quot;dataType=increment&quot; &gt; $tradeInfoVariableFile
+        newUrlArgs=$tradeInfoArgs&quot;full&amp;dataTime=&quot;$yesterday
+
+        #return &quot;full&quot;
+    fi 
+}
+
+#获取代理商和区域的数据json url地址信息
+function getUrlInfo() {
+    resetArgs
+
+    echo $newUrlArgs
+
+    #获取代理商的地址信息
+    urlInfo=`curl -d $newUrlArgs $webUrl`
+}
+
+#获取url参数
+#返回值
+#1:请求url的结果为200，且成功做了相关操作
+#0:请求url的结果不为为200
+function getUrlsArray() {
+    code=$(echo ${urlInfo} |jq '.code')
+    if [[ &quot;$code&quot; = 200 ]];then
+        echo &quot;状态码为200&quot;
+        mkdir -p $current/tmpfile
+        #删除上次生成的临时的json url地址
+        rm -rf $tradeInfoJsonUrls
+        rm -rf $tradeInfoJsonUrlPrefix
+        touch $tradeInfoJsonUrls
+        touch $tradeInfoJsonUrlPrefix
+
+        dataInfo=$(echo ${urlInfo} |jq '.data')
+        if [[ $dataInfo == &quot;&quot; ]];then
+            return 1
+        fi
+
+        #获取url的前缀
+        echo &quot;===============开始获取 json url 路径前缀===========================&quot;
+        echo ${urlInfo} |jq '.data.urlPrefix' &gt; $tradeInfoJsonUrlPrefix
+        sed -i 's/&quot;//g' $tradeInfoJsonUrlPrefix
+        echo &quot;===============获取 json url 路径前缀结束===========================&quot;
+
+        echo &quot;===============开始获取 json url ===================================&quot;
+        #do while方式获取url的列表，然后把结果存入新的数组中
+        #定义数组的角标
+        index=0
+        while :
+        do
+            #获取url
+            url=$(echo ${urlInfo} |jq '.data.urls['$index']')
+            #查看字符串中是否有指定字符串
+            hasBplan=$(echo $url | grep &quot;bplan/data-center&quot;)
+            #如果url中有bplan/data-center这样的表示，将这些url存入到临时文件中
+            if [[ &quot;$hasBplan&quot; != &quot;&quot; ]]
+            then
+                echo $url &gt;&gt; $tradeInfoJsonUrls
+                index=`expr $index + 1`
+            else
+                break
+            fi           
+        done
+
+        #将文本中的所有的字符串中的引号去除掉
+        sed -i 's/&quot;//g' $tradeInfoJsonUrls
+        echo &quot;===============获取 json url 成功===================================&quot;
+
+        #如果最终成功，返回1
+        return 1
+    else
+        #如果没有得到url的值，返回0，表示失败
+        webUrl=$backUpWebUrl
+        return 0
+    fi
+}
+
+#如果获取url的过程失败，则一直失败重试，直到程序被处理好了
+function getUrlRetry() {
+    while :
+    do
+        echo &quot;开始执行第${retryTimes}次任务，结果如下：&quot;       
+
+        #调用方法
+        getUrlInfo
+        getUrlsArray
+        #判断本地执行是否成功
+        if [[ $? = 1 ]];then
+            echo &quot;第${retryTimes}次执行之后,处理json数据成功了，接着处理后续任务&quot;
+            break            
+        else
+            echo &quot;第${retryTimes}次执行程序失败,休眠5分钟后再次重试，知道144次之后停止&quot;
+
+            #重试144次，即144 * 5 = 720min (半天)
+            if [[ &quot;$retryTimes&quot; -eq 144 ]];then
+                echo &quot;已经执行了${retryTimes}次,程序达到预定次数,后续停止执行&quot;
+                break
+            else
+                retryTimes=`expr $retryTimes + 1`
+                #休眠5分钟
+                sleep 5m
+                #再次执行这个函数
+            fi
+        fi
+
+        #为了让打印的日志显示好看一些，空3行
+        echo &quot;&quot;
+        echo &quot;&quot;
+        echo &quot;&quot;
+    done
+}
+
+#1、获取Json文件相对脚本的文件目录（相对路径）
+#2、获取Json数据文件在磁盘上的绝对路径
+function getJsonFolderPath() {
+    #查看指定文件是否存在
+    urlPrefix=`cat $tradeInfoJsonUrlPrefix`
+    #数据文件所在位置
+    fileFolder=$current$urlPrefix
+}
+
+#下载Json文件
+function downloadJsons() {
+    #获取到url路径前缀
+    echo &quot;开始下载Json文件&quot;
+    #urlPrefix=`cat $tradeInfoJsonUrlPrefix`
+    #echo $current$urlPrefix
+    #最终下载的文件存放位置在下面
+    #fileFolder=$current$urlPrefix 
+    getJsonFolderPath
+
+    if [[ $urlPrefix == &quot;&quot; ]];then
+        echo &quot;当天没有数据文件，直接返回&quot;
+        return 0;
+    fi
+
+    mkdir -p $fileFolder
+    #删除指定目录下的文件，然后删除
+    rm -rf $fileFolder/*
+
+    #进入$current$urlPrefix，开始循环下载json文件
+    cd $fileFolder
+    #开始循环文件，然后下载文件
+    for line in `cat $tradeInfoJsonUrls`
+    do
+        jsonOssPath=$ossUrl$line
+        echo $jsonOssPath
+        wget $jsonOssPath
+        echo &quot;文件路径:&quot;$current$line
+        newPath=`echo $line |sed 's/_//g'`
+        mv $current$line $current$newPath
+    done
+    #修改替换文件中文件名称
+    sed -i 's/_//g' $tradeInfoJsonUrls
+    echo &quot;下载json文件结束&quot;
+}
+
+#上传json文件到HDFS中
+function putJsonFile2Hdfs() {
+    #上传数据文件到HDFS中
+    cd $current
+    getJsonFolderPath
+
+    if [[ $urlPrefix == &quot;&quot; ]];then
+        echo &quot;当天没有数据文件，直接返回&quot;
+        return 0;
+    fi
+
+    echo &quot;hdfs中的文件路径&quot;
+    echo $urlPrefix    
+    hdfs dfs -rm -r $urlPrefix
+    hdfs dfs -mkdir -p $urlPrefix
+
+    #下面是上传文件到hdfs中
+    for line in `cat $tradeInfoJsonUrls`
+    do
+        echo $current$line
+        #将文件上传到指定的目录中
+        hdfs dfs -put $current$line $urlPrefix
+        #上传完成之后，删除留在本地的Json文件
+        rm -rf $current$line
+    done
+    echo &quot;上传json文件到HDFS中完成&quot;
+}
+
+#获取数据json文件路径，前缀等信息
+getUrlRetry
+
+#下载json数据到指定目录
+downloadJsons
+
+#上传数据文件到HDFS中
+putJsonFile2Hdfs
+
+#清理Linux系统中不用的垃圾暂用的内存
+sync
+echo 3 &gt; /proc/sys/vm/drop_caches
+</code></pre>
+
+<h2 id="3-shell脚本中执行spark程序">3、Shell脚本中执行Spark程序</h2>
+
+<pre><code>#!/bin/bash
+
+source /etc/profile
+
+#求结果中的url路径长度，如果是4，表示这里的值是一个控制了(下面这两行是等效的)
+#urlLength=`echo ${urlInfo} |jq '.data.urls[1]' | awk '{print length($0)}'`
+#urlLength=$(echo ${urlInfo} |jq '.data.urls[1]' | awk '{print length($0)}')
+#echo $urlLength
+
+#引用公共文件中定义的参数变量
+source $PWD/env.sh
+
+
+#json数据所在的文件目录（相对于脚本所在的相对路径）
+urlPrefix=
+#Json数据文件存放的实际目录
+fileFolder=
+
+
+#1、获取Json文件相对脚本的文件目录（相对路径）
+#2、获取Json数据文件在磁盘上的绝对路径
+function getJsonFolderPath() {
+    #查看指定文件是否存在
+    urlPrefix=`cat $tradeInfoJsonUrlPrefix`
+    #数据文件所在位置
+    fileFolder=$current$urlPrefix
+}
+
+#是否执行过初始化程序了的控制逻辑
+function isInited() {
+   #如果文件存在，读取相应的数据类型
+   if [[ `ls $tradeInfoVariableFile | grep tradeInfoVariableFile | grep -v grep` != &quot;&quot; ]];then
+        dataType=`cat $tradeInfoVariableFile | grep sparkInited | sed 's/sparkInited=//g'`
+        #如果没有，说明这个Spark程序还没有初始化过    
+        if [[ $dataType == &quot;&quot; ]];then
+            echo -e &quot;\n&quot; &gt;&gt; $tradeInfoVariableFile
+            echo &quot;sparkInited=inited&quot; &gt;&gt; $tradeInfoVariableFile
+            return 0;
+        else
+            return 1;
+        fi
+    else
+        mkdir -p $current/tmpfile
+        cd $current/tmpfile
+        #如果没有这个文件，则是在这个文件中添加
+        echo &quot;sparkInited=inited&quot; &gt; $tradeInfoVariableFile
+        return 0;
+    fi 
+}
+
+function mergeFiles() {
+    #上传数据文件到HDFS中
+    cd $current
+    getJsonFolderPath
+
+    isInited
+
+    if [[ $? == 1 ]];then
+        echo &quot;开始合并小文件为大文件&quot;
+        hdfs dfs -getmerge $urlPrefix $PWD/tradeInfo
+        #删除$urlPrefix 下的文件
+        hdfs dfs -rm $urlPrefix/*
+        #将文件上传到指定的位置
+        hdfs dfs -put $PWD/tradeInfo $urlPrefix
+        echo $urlPrefix&quot;tradeInfo&quot; &gt; $tradeInfoJsonUrls
+        echo &quot;文件合并完成，并且已经将新文件路径写入文件&quot;
+        rm -rf $PWD/tradeInfo
+        echo &quot;删除存储在本地的文件&quot;
+    fi
+}
+
+#Spark处理
+function sparkHandler() {
+    #上传数据文件到HDFS中
+    cd $current
+    getJsonFolderPath
+
+    if [[ $urlPrefix == &quot;&quot; ]];then
+        echo &quot;当天没有数据文件，直接返回&quot;
+        return 0;
+    fi
+
+    isInited
+    if [[ $? == 0 ]];then
+        #由于是全量数据，在处理之前，删除hive库中的所有数据
+        echo '开始drop hive中的tb_trade_info表'
+        hive -e &quot;
+            use data_center;
+            drop table if EXISTS tb_trade_info;
+
+            CREATE TABLE IF NOT EXISTS tb_trade_info (
+            createDate bigint comment '交易订单创建天，时间格式为yyyyMMdd的integer值，分区时间'
+            )
+            partitioned by(pt_createDate integer comment '创建天，时间格式为yyyyMMdd的integer值，分区时间') 
+            ROW FORMAT DELIMITED 
+            FIELDS TERMINATED BY '\t' 
+            LINES TERMINATED BY '\n' 
+            STORED AS TEXTFILE;
+        &quot;
+        echo 'drop hive中的tb_trade_info表 完成'
+    fi
+
+    #下面是上传文件到hdfs中
+    for line in `cat $tradeInfoJsonUrls`
+    do
+        #执行Spark程序来
+        echo $line
+        cd $SPARK_HOME
+        bin/spark-submit $sparkArgs xxx.xxx.xxx.xxx.xxx.TradeDataClean $programPrefixPath/trade-info/trade-info-1.0.1-SNAPSHOT.jar $line
+    done
+    echo &quot;完成执行Spark程序&quot;
+}
+
+mergeFiles
+
+#上传数据文件到HDFS中
+sparkHandler
+
+#清理Linux系统中不用的垃圾暂用的内存
+sync
+echo 3 &gt; /proc/sys/vm/drop_caches
+</code></pre>
+
+<h2 id="4-shell脚本中执行kylin-restapi让kylin任务执行">4 Shell脚本中执行kylin restapi让kylin任务执行</h2>
+
+<pre><code>env.sh 内容：
+
+#!/bin/bash
+
+#kylin的参数
+export kylinUserInfo=&quot;--user ADMIN:KYLIN&quot;
+export kylinCubeUrl=&quot;http://xxx:7070/kylin/api/cubes/&quot;
+export kylinJobsUrl=&quot;http://xxxx:7070/kylin/api/jobs/&quot;
+export startTime=&quot;2015-01-01 00:00&quot;
+export startTimeTimeStamp=`date -d &quot;$startTime&quot; +%s`
+export startTimeTimeStampMs=$(($startTimeTimeStamp * 1000))
+export endTime=`date +%Y-%m-%d -d &quot;+1days&quot;`
+export endTimeTimeStamp=`date -d &quot;$endTime&quot; +%s`
+#将时间戳编程毫秒值
+export endTimeTimeStampMs=$(($endTimeTimeStamp * 1000))
+
+export tradeInfoArgs=&quot;dataName=tradeInfo&amp;dataType=&quot;    #$dataType&quot;&amp;dataTime=&quot;$yesterday
+#json的url信息存储的文件路径
+export tradeInfoJsonUrls=$current/tmpfile/tradeInfoJsonUrls
+#json的url存储位置前缀
+export tradeInfoJsonUrlPrefix=$current/tmpfile/tradeInfoJsonUrlPrefix
+export tradeAnalyzeCubeName=&quot;xxxx&quot;
+export tradeCollectMoneyCubeName=&quot;xxxx&quot;
+#用于存储是否下载了的变量文件
+export tradeInfoVariableFile=$current/tmpfile/tradeInfoVariableFile
+
+#!/bin/bash
+
+source /etc/profile
+
+#引用公共文件中定义的参数变量
+source $PWD/env.sh
+
+jobId=
+
+#是否执行过初始化程序了的控制逻辑
+function isInited() {
+   #如果文件存在，读取相应的数据类型
+   if [[ `ls $tradeInfoVariableFile | grep tradeInfoVariableFile | grep -v grep` != &quot;&quot; ]];then
+        dataType=`cat $tradeInfoVariableFile | grep kylinTradeAnalyzeCubeInited | sed 's/kylinTradeAnalyzeCubeInited=//g'`
+        #如果没有，说明这个Spark程序还没有初始化过    
+        if [[ $dataType == &quot;&quot; ]];then
+            echo -e &quot;\n&quot; &gt;&gt; $tradeInfoVariableFile
+            echo &quot;kylinTradeAnalyzeCubeInited=inited&quot; &gt;&gt; $tradeInfoVariableFile
+            return 0;
+        else
+            return 1;
+        fi
+    else
+        mkdir -p $current/tmpfile
+        cd $current/tmpfile
+        #如果没有这个文件，则是在这个文件中添加
+        echo &quot;kylinTradeAnalyzeCubeInited=inited&quot; &gt; $tradeInfoVariableFile
+        return 0;
+    fi 
+}
+
+#Spark处理
+function kylinHandler() {
+    isInited
+    if [[ $? == 0 ]];then
+        #上传数据文件到HDFS中
+        cd $current
+        #1、Disable Cube
+        curl -X PUT $kylinUserInfo -H &quot;Content-Type: application/json;charset=utf-8&quot; $kylinCubeUrl$tradeAnalyzeCubeName/disable
+        echo &quot;&quot;
+        echo &quot;&quot;
+
+        #2、Purge Cube
+        curl -X PUT $kylinUserInfo -H &quot;Content-Type: application/json;charset=utf-8&quot; $kylinCubeUrl$tradeAnalyzeCubeName/purge
+        echo &quot;&quot;
+        echo &quot;&quot;
+
+        #3、Enable Cube
+        curl -X PUT $kylinUserInfo -H &quot;Content-Type: application/json;charset=utf-8&quot; $kylinCubeUrl$tradeAnalyzeCubeName/enable
+        echo &quot;&quot;
+        echo &quot;&quot;
+
+        #4、Build cube
+        cubeBuildInfo=`curl -X PUT $kylinUserInfo -H &quot;Content-Type: application/json;charset=utf-8&quot; -d '{ &quot;startTime&quot;:'$startTimeTimeStampMs',&quot;endTime&quot;:'$endTimeTimeStampMs', &quot;buildType&quot;: &quot;BUILD&quot;}' $kylinCubeUrl$tradeAnalyzeCubeName/build`
+        echo &quot;&quot;
+        echo &quot;&quot;
+    else
+        cubeBuildInfo=`curl -X PUT $kylinUserInfo -H &quot;Content-Type: application/json;charset=utf-8&quot; -d '{&quot;endTime&quot;:'$endTimeTimeStampMs', &quot;buildType&quot;: &quot;BUILD&quot;}' $kylinCubeUrl$tradeAnalyzeCubeName/rebuild`
+        echo &quot;&quot;
+        echo &quot;&quot;
+    fi
+
+
+    echo &quot;cube build的状态结果:&quot;
+    echo $cubeBuildInfo
+    echo &quot;&quot;
+    echo &quot;&quot;
+    #查看是否build好了，如果build好了，发现last_build_time变成了build的最后时间了。
+    jobId=$(echo $cubeBuildInfo |jq '.uuid')
+    echo $jobId &gt; $jobId
+    sed -i 's/&quot;//g' $jobId
+    realJobId=`cat $jobId`
+    echo $realJobId
+    rm -rf $jobId
+    echo &quot;&quot;
+    echo &quot;&quot;
+
+    while :
+    do
+        sleep 1m
+        cubeJobInfo=`curl -X GET --user ADMIN:KYLIN $kylinJobsUrl$realJobId`
+        echo &quot;获取cube job运行的状态&quot;
+        echo $cubeJobInfo
+        echo &quot;&quot;
+        echo &quot;&quot;
+
+        jobStatus=$(echo $cubeJobInfo | jq &quot;.job_status&quot;)
+        echo &quot;jobStatus&quot;
+        echo $jobStatus &gt; $realJobId
+        sed -i 's/&quot;//g' $realJobId
+        realJobStatus=`cat $realJobId`
+        echo &quot;$realJobStatus&quot;
+        echo &quot;&quot;
+
+
+        if [[ $realJobStatus == &quot;NEW&quot; ]];then
+            echo &quot;kylin cube build job status：NEW; sleep 1m;&quot;
+        elif [[ $realJobStatus == &quot;PENDING&quot; ]];then
+            echo &quot;kylin cube build job status：PENDING; sleep 1m;&quot;
+        elif [[ $realJobStatus == &quot;RUNNING&quot; ]];then
+            echo &quot;kylin cube build job status：RUNNING; sleep 1m;&quot;
+        elif [[ $realJobStatus == &quot;STOPPED&quot; ]];then
+            echo &quot;kylin cube build job status：STOPPED&quot;
+            #如果stop了，停掉kylin脚本的运行
+            break;
+        elif [[ $realJobStatus == &quot;FINISHED&quot; ]];then
+            echo &quot;kylin cube build job status：FINISHED&quot;
+            break;
+        elif [[ $realJobStatus == &quot;ERROR&quot; ]];then
+            echo &quot;kylin cube build job status：ERROR&quot;
+            break;
+        elif [[ $realJobStatus == &quot;DISCARDED&quot; ]];then
+            echo &quot;kylin cube build job status：DISCARDED&quot;
+            break;
+        else 
+            echo &quot;kylin cube build job status：OTHER UNKNOWN STATUS&quot;
+            break;
+        fi
+    done
+
+    #删除文件
+    rm -rf $realJobId
+}
+
+#上传数据文件到HDFS中
+kylinHandler
+
+#清理Linux系统中不用的垃圾暂用的内存
+sync
+echo 3 &gt; /proc/sys/vm/drop_caches
+</code></pre>
+
+<h2 id="5-编写azkaban的job">5 编写Azkaban的job</h2>
+
+<p>目的：编写一个类似下面图能够并行执行任务，串行往下执行任务，最终到一个结束任务。<br />
+<a href="https://img.it610.com/image/info8/ad0bbf09158045fbb64d99d38dc69465.jpg"><img src="https://img.it610.com/image/info8/ad0bbf09158045fbb64d99d38dc69465.jpg" alt="hive表，hive视图，spark处理数据入mysql，shell获取url数据下载json,Spark
+sql处理json,shell脚本执行kylin,azkaban任务调度_第1张图片" /></a><br />
+最顶层的一个job脚本</p>
+
+<pre><code>#jsonHandler-all.job
+type=command
+command=sh /xxx/jsonHandler-all.sh
+</code></pre>
+
+<p>对于下面一行并行的任务，其中的一个的写法如下：</p>
+
+<pre><code>#sparkHandler-advertiserFlowofmain
+type=command
+dependencies=sparkHandler-shop
+command=sh /xxxx/sparkHandler-advertiserFlowofmain.sh
+</code></pre>
+
+<p>注意上面的dependencies，这种写法之后，在上面的那种图中，这个job上只有一个sparkHandler-shop相关的任务</p>
+
+<p>对于最底层的那个任务，需要依赖上面的多个任务的名称，类似如下：</p>
+
+<pre><code>#sparkHandler-tradeInfo
+type=command
+dependencies=sparkHandler-couponCard,sparkHandler-memberCard
+command=sh /data/workspace/bplan-data-center-job/sparkHandler-tradeInfo.sh
+</code></pre>
+
+<p>这个写完之后，在sparkHandler-tradeInfo的上面就会存在2个任务job，分别是：sparkHandler-
+couponCard,sparkHandler-memberCard。sparkHandler-tradeInfo会在最底层。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

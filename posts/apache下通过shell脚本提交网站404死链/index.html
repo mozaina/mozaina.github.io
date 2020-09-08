@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Apache下通过shell脚本提交网站404死链 | 开发者问答集锦</title>
+    <meta property="og:title" content="Apache下通过shell脚本提交网站404死链 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Apache下通过shell脚本提交网站404死链">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/apache%E4%B8%8B%E9%80%9A%E8%BF%87shell%E8%84%9A%E6%9C%AC%E6%8F%90%E4%BA%A4%E7%BD%91%E7%AB%99404%E6%AD%BB%E9%93%BE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Apache下通过shell脚本提交网站404死链</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>网站运营人员对于死链这个概念一定不陌生，网站的一些数据删除或页面改版等都容易制造死链，影响用户体验不说，过多的死链还会影响到网站的整体权重或排名。</p>
+
+<p>百度站长平台提供的死链提交工具,可将网站存在的死链(协议死链、404页面)进行提交,可快速删除死链,帮助网站SEO优化。在提交死链的文件中逐个手动填写死链的话太麻烦，工作中我们提倡复杂自动化，所以本文我们一起交流分享Apache服务中通过shell脚本整理网站死链，便于我们提交。</p>
+
+<p><img src="https://img.it610.com/image/info8/b7f2ad4ff67b481ea0b410f429dade7b.jpg" alt="" /></p>
+
+<h4 id="1-配置apache记录搜索引擎">1.配置Apache记录搜索引擎</h4>
+
+<p>Apache是目前网站建设最为主流的web服务，但是apache的日志文件默认是不记录百度、谷歌等各大搜索引擎的爬取程序的，所以首先需要我们设置Apache的配置文件。</p>
+
+<p>找到Apache的配置文件httpd.conf，在配置文件中找到下面两行：</p>
+
+<pre><code> CustomLog &quot;logs/access_log&quot; common
+ #CustomLog &quot;logs/access_log&quot; combined
+</code></pre>
+
+<p>默认采用的是common，这里我们只需要将common这一行前面加#注释掉,然后将combined这一行前的#去掉即可。然后保存重启Apache服务。</p>
+
+<p>注：如果你的服务器上添加了多个站点，每个站点有单独的配置文件，则我们只需要在相应站点的配置文件中设置CustomLog项即可，例如：</p>
+
+<pre><code>vim /usr/local/apache/conf/vhost/www.chanzhi.org.conf
+
+
+    ServerAdmin [email protected] DocumentRoot &quot;/data/wwwroot/www.chanzhi.org&quot;
+    ServerName www.chanzhi.org
+    ServerAlias chanzhi.org
+    ErrorLog &quot;/data/wwwlogs/www.chanzhi.org_error_apache.log&quot;
+    CustomLog &quot;/data/wwwlogs/www.chanzhi.org_apache.log&quot; combined
+&quot;=&quot;&quot; data=&quot;&quot; wwwroot=&quot;&quot; www.chanzhi.org&quot;=&quot;&quot;&gt;
+    SetOutputFilter DEFLATE
+    Options FollowSymLinks ExecCGI
+    Require all granted
+    AllowOverride All
+    Order allow,deny
+    Allow from all
+    DirectoryIndex index.html index.php
+</code></pre>
+
+<p>下面是配置前后的网站日志记录格式：</p>
+
+<p>配置前：</p>
+
+<p><img src="https://img.it610.com/image/info8/6fd56e78c8b043a6aa448cda7bab7cbc.png" alt="" /></p>
+
+<p>配置后：</p>
+
+<p><img src="https://img.it610.com/image/info8/05d05706b6854dfaa2d48425cd1356fe.png" alt="" /></p>
+
+<h4 id="2-编写shell脚本">2.编写shell脚本</h4>
+
+<p>我们通过shell脚本获取网站日志中指定爬虫的抓取记录，然后汇总到一个文件中，便于后期使用。代码如下，比如保存为deathlink.sh</p>
+
+<pre><code>#!/bin/bash
+#初始化变量
+#定义蜘蛛UA信息（默认是百度蜘蛛）
+UA='+http://www.baidu.com/search/spider.html'
+
+#前一天的日期（apache日志）
+DATE=`date +%Y%m%d -d &quot;1 day ago&quot;`
+
+#定义日志路径
+logfile=/data/wwwlogs/www.chanzhi.org_apache.log-${DATE}.log
+
+#定义死链文件存放路径
+deathfile=/data/wwwroot/www.chanzhi.org/deathlink.txt
+
+#定义网站访问地址
+website=http://www.chanzhi.org
+
+#分析日志并保存死链数据
+for url in `awk -v str=&quot;${UA}&quot; '$9==&quot;404&quot; &amp;&amp; $15~str {print $7}' ${logfile}`
+do
+  grep -q &quot;$url&quot; ${deathfile} || echo ${website}${url} &gt;&gt;${deathfile}
+done
+</code></pre>
+
+<p>大家在使用该脚本时，根据自己服务器情况调整下路径和字段即可，然后执行脚本,：</p>
+
+<pre><code>bash deathlink.sh
+</code></pre>
+
+<h4 id="3-提交死链">3.提交死链</h4>
+
+<p>执行上面脚本时候，就会在指定目录下生成包含所有获取的404页面链接的文件，每个连接占一行。例如：</p>
+
+<p><img src="https://img.it610.com/image/info8/87afd0234530426e95ff7585d0f1a0a0.png" alt="" /></p>
+
+<p>最后在站长平台提交死链页面中，填写自己的死链文件地址即可，例如：</p>
+
+<p><img src="https://img.it610.com/image/info8/2c8118cc31534294bb232c4606753bd5.jpg" alt="" /></p>
+
+<p>百度在审核通过之后，会将已经收录的失效链接删除，以避免失效页面链接对网站造成不良的影响。</p>
+
+<h4 id="总结">总结：</h4>
+
+<p>本文和大家分享了在Apache服务环境下，如何利用shell脚本自动获取百度蜘蛛等爬虫抓取的死链，并生成汇总文件提交给搜索引擎。如果大家还有其他更好的方法或者疑问，欢迎一起分享交流。</p>
+
+<p><img src="https://img.it610.com/image/info8/b59c2cb228a94e52bf2ccbaa453d0678.gif" alt="" /></p>
+
+<p>转载于:<a href="https://www.cnblogs.com/chanzhi/p/6756703.html">https://www.cnblogs.com/chanzhi/p/6756703.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

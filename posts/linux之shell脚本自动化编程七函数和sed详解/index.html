@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux之Shell脚本自动化编程七函数和sed详解 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux之Shell脚本自动化编程七函数和sed详解 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux之Shell脚本自动化编程七函数和sed详解">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E4%B9%8Bshell%E8%84%9A%E6%9C%AC%E8%87%AA%E5%8A%A8%E5%8C%96%E7%BC%96%E7%A8%8B%E4%B8%83%E5%87%BD%E6%95%B0%E5%92%8Csed%E8%AF%A6%E8%A7%A3/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux之Shell脚本自动化编程七函数和sed详解</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="shell函数">shell函数</h1>
+
+<p>shell里函数里面的语句需要用大括号括起来，这一点和c语言是一样的。上面函数格式中的[]的意思是可选的，也就是说function可有可无，funnanme后面的小括号可有可无？我下面试了一下，这个还真的必须有，应该是调用的时候不需要加括号，这一点和其他的语言不同，比如python，c。return可有可无。</p>
+
+<p>如果写在一行需要注意{后面需要一个空格，还有}的前面必须有一个分号，不过分行写就不存在这样的问题了。和前面一样，如果是在子shell里执行的，当前shell还是找不到，只有.
+./a这种才能调用定义的函数f。函数的返回值必须是一个数字，并且在0-255之间。</p>
+
+<p>看下面的return后面没有加;也是ok的。</p>
+
+<p>数字和字符串相加，返回的是数字。</p>
+
+<p>返回值应该是自然数，可以大于255，返回值应该是只有8位来存的，所以就是0-2^8-1，也就是0-255，如果超过255，会溢出，256=100000000，而最高位溢出了，那就是0了，因为只有8位，并且一定要是整数才行。</p>
+
+<p>c语言，python都是可以在调用函数的时候给函数传递参数，不过我们看到bash里调用函数连括号都不用，函数里面也根本没办法去接受参数，那怎么传递参数呢？就是通过$n这个机制。</p>
+
+<p>10以上是需要大括号的，$10是先$1=1，然后加一个0。</p>
+
+<p>了解一下$-。</p>
+
+<p>我们man set一下可以看看。</p>
+
+<p>这些一般我们也不需要去改，就不展开了。下面是一点数组的知识。</p>
+
+<p>这种替换其实我不说我们也是可以看懂的，它也没有改变a原来的元素，要想改变直接a[0]去赋值就可以了。unset是可以删除数组的，当然它本身也就是删除变量的一个命令，数组也算是变量嘛。shell函数还有一个比较特别的地方，就是函数不会在子shell中执行，当然看过我前面文章的小伙伴知道，放在管道后面还是会在子shell里执行的。所以就导致了在函数里面定义变量的作用域是当前shell，这和python函数里面定义的变量是局部变量不一样。</p>
+
+<p>不过shell这种方式未必就是好的。我们有两种方式可以让函数里面的变量不影响当前shell，一个是在函数的变量前面加一个local，还有就是在脚本中执行，并且是子shell的形式。</p>
+
+<p>那么其实第三种也很好理解，就是加一对小括号，让语句在子shell里面执行。</p>
+
+<p>这里我再说一个小问题，就是vim的语法高亮问题。</p>
+
+<p>如果文件有后缀或者第一行有#!/bin/bash，那么bash脚本就会有语法高亮，不然就不会，虽然可以运行。而c语言貌似怎么都会高亮，我猜这个原因还是因为内核是c编写的，不过必须是以.c结尾，用gcc编译的时候才能编译，不然会有file
+not recognized: File format not
+recognized，也就是不识别文件格式。虚拟机启动以后，sshd要过一段时间才能启动，所以可能xshell连不上，这个没出问题的话等一会就可以连上了。</p>
+
+<h1 id="shell文件包含">shell文件包含</h1>
+
+<p>在脚本里面.或者source有两个地方需要注意，一个就是不需要后面的脚本有可执行权限，也就是上面的c，二就是如果有一些参数传递或者前后联系，加.或者source是在脚本的那个shell执行，而不是又开了一个shell，参数或者操作是可以供a脚本使用的，因为我们前面也学过嘛，脚本本身不加.或者source的话是在子shell执行的，子shell的参数变化不会影响到父shell。</p>
+
+<p>使用.或者source可以不要可执行权限不是脚本里面的专利，这一点是都有的，可能以前讲子shell的时候忽略了这一点。a没有执行权限，加.或者source可以执行，但是不加执行就会报错。</p>
+
+<p>那么lcl可以执行脚本a吗？不可以，因为其实lcl对于/root这个目录都没有任何权限，是不可能执行里面的文件的，lcl其实只需要一个/root的x权限就可以用.执行了。</p>
+
+<p>不过echo 这个命令需要的权限很低。换个级别高的useradd也就不行了。</p>
+
+<h1 id="sed详解">sed详解</h1>
+
+<p>先来看一个官方的文档。</p>
+
+<p>sed是一个过滤和转换文本的流编辑命令。一个流编辑器被用来对一个输入的流（一个文件或者通过管道输入）进行基本的文本转换操作。</p>
+
+<p>a的作用是文本添加，如果多行的话，需要\，这个下面会看到，i,c同样是\换行。</p>
+
+<p>这个确实是在第3行的下一行也就是第四行加了一行后面的字，而且原来的文件内容是没有变化的。如果是3a呢？第四行是会被覆盖吗？看下图就知道答案是没有，原来的第四行变成了第5行。这个\其实可以不要，a后面的字符串会直接被操作的，不过中间不要有空格，因为空格是分隔符。但是我们发现3a<br />
+newline，newline却还是顶头写了。下图还可以看出，如果a前面不加数字，每一行的后面都会加上新的一行。</p>
+
+<p>=是在每一行的上一行打印行号。</p>
+
+<p>2,3a是在原来的2,3行后面加，而下图中的2,4a是在原文的2,3,4后面加，我如果想在偶数行加呢？本来想试下{2，4}a，但是不行。</p>
+
+<p>数组也不行，并且从下图中还发现，似乎顶头的空格都是不管用的，都是会被忽略，还有就是这个命令的输入和输出定向都是同一个文件的时候，这个文件会被清空，这个以前也见过，我们可以重定向到别的文件。</p>
+
+<p>nl就是在cat的基础上加一个行数而已。</p>
+
+<p>我们还是用testfile试一试。看下图会发现，其实一般不需要用引号，但是当出现$这种符号的时候，还必须得用单引号，本来想试一下有没有^，看来是没有，不过第一行直接写1就行，也不需要。</p>
+
+<p>下图看出只有单引号配合\有添加多行的能力，双引号不行，d后面不用跟字符串，跟了还会报错。</p>
+
+<p>i确实是加到了2的上一行，也就是第一行。</p>
+
+<p>其实我们可以用/etc/passwd，因为不会改变原文，不用担心。下图：</p>
+
+<p>如果要替换添加的字符串中有空格，还是要用引号引起来，单双引号都可以。</p>
+
+<p>也可以把2,5c也引进去。</p>
+
+<p>打印指定行。但是暂时还是做不到打印不连续的行，比如第5行和第7行。</p>
+
+<p>上面举的例子颇具误导性，其实找的不是/root/p是root，不过人家也说了，这个//是正则表达式的边界p是打印的意思。</p>
+
+<p>其实这不和-n搭配其实没有什么意义。</p>
+
+<p>但是对于d来说，加-n反而什么都看不见，其实也很好理解，因为它们已经被i删除了嘛。</p>
+
+<p>加了{}，就得用引号了，并且不能用小括号。最后的那个q我的理解是这样的，如果有q，正则替换一次就结束命令，如果没有，会匹配出所有的root，然后把匹配到的所有行的bash替换为blueshell。</p>
+
+<p>换一个文件a试一试，果然是如此。请看下下张图。如果你们还记得花括号的一个用处。</p>
+
+<p>但是这里也是用不了。因为其实看起来像，但是格式其实还是有区别的。</p>
+
+<p>上面的方法已经不适用了，因为ifconfig这个命令是没有了。我们可以用ip
+a。一步一步去去除多余的得到ip。^.*inet的意思就是从最左边到inet，/g是什么意思呢，g这个参数上面没有提到。</p>
+
+<p>我们来看一下g是什么意思，官方的意思是把保持空间拷贝到模式空间，而G的意思是追加。d的意思是清空模式空间，开始下一轮循环。</p>
+
+<p>保持空间和模式空间是什么？参考了<a href="http://blog.51cto.com/13691477/2113141">http://blog.51cto.com/13691477/2113141</a></p>
+
+<p>我们就先来看着图分析一下，<code>1!G;h;$!d的过程：首先sed没是一行一行读的，先执行的是G，G的作用是追加hold space的内容到pattern
+space，而且第一行不执行G，此时第一行的内容One进入pattern space,然后是h,作用是覆盖pattern space的内容到hold
+place，那么现在保持空间和模式空间都是One，然后是d，清空模式空间，但是保持空间不受影响，sed是每读一行执行一次后面的命令。那么第一行结束以后。该第二行了，首先Two先进入模式空间，第二行是要执行G的，于是One就从保持空间追加到了模式空间了，当然模式空间已经有一个Two，现在也就是Two和One，保持空间还是One,然后是h，那么保持空间就和模式空间一样了，复制是要覆盖的，保持空间现在有Two和One，然后又清空模式空间，进入下一行，模式空间现在是</code></p>
+
+<p><code>Three，然后G，注意追加是往后追加，所以模式空间现在从上到下依次是Three,Two，One，然后是h，保持空间现在从上到下依次是Three,Two，One，最后一行不执行d，就直接输出了，那么实际上h最后一行不执行h也是可以的。</code></p>
+
+<p>上面有一个有意思的命令tac，它其实就是倒着输出而已，tac就是cat倒过来嘛，也很形象。</p>
+
+<p>我们分析一下上面的&rsquo;1!G;H;$!d&rsquo;，第一行首先模式空间是One,然后H，保持空间原来应该是空的，那么就作为空行，现在就是空行和One,然后清空模式空间，进入下一行，模式空间是Two，然后G，那么模式空间就是Two，空行，One，然后H，那么保持空间就是空行，One,Two,空行，One，然后清空模式空间，进入下一行，模式空间是Three，G一下，模式空间就是Three，空行，One,Two,空行，One，H一下，保持空间就是空行，One,Two,空行，One，Three，空行，One,Two,空行，One，然后输出模式空间里面的值，就是Three，空行，One,Two,空行，One，图解会更清晰</p>
+
+<p>。然后再分析一下&rsquo;1!g;h;$!d&rsquo;，这个我就直接图解了：</p>
+
+<p>sed &lsquo;1!g;h&rsquo;
+1为什么会输出三个one呢？其实是因为每次读一行之后如果不清空模式空间的话，就会自动输出模式空间里面的内容，并自动清空，也就是输出一次自动清空一次，所以是三个One，大家可以试着自己分析一下。如果是sed
+&lsquo;1!g;h;d&rsquo;
+1就应该什么都不输出了，因为最后一行也把模式空间清空了，那么就不会有输出了。还需要补充的是，保持空间是每次执行sed完毕就自动清空一次或者说每次执行sed命令是就自动清空一次保持空间，不是说保持空间就不会清空，sed
+&lsquo;1!G;h;$!d&rsquo; 1执行后，如果不清空保持空间，那么下一次的sed &lsquo;1G&rsquo;
+1应该结果是One,Three,Two,One,Two,One，因为上一次的保持空间还是Three,Two,One呢，但是不是，最后的结果是One，空格，Two,three，这是因为保持空间清空了，当然清空了还是相当于有一个空行，第一行就是模式空间先是One,然后G了一下就是One，空行，然后第二三行正常输出了。</p>
+
+<p>知道了模式空间和保持空间，我们先验证一下d是不是直接开始下一行，也就是d在这一行执行了，后面的命令不会在这一行执行了。观察下图确实如此，d在第一行执行之后，后面的1asds&hellip;就没有执行，直接跳到第二行了，所以输出也就是第一行被删除了而已。如果是2d，d在第二行执行呢？就没有这个问题了，因为第一行没有执行d，所以后面的1asda&hellip;&hellip;执行了，结果也是和我们的分析一样。</p>
+
+<p>我们再来理解一下nl /etc/passwd | sed -n &lsquo;/root/{s/bash/blueshell/;p;q}&rsquo;
+，首先理解一下p,p的意思是打印当前的模式空间，这个不是每一行的自动打印，而是另一种，我暂且称之为强制打印。</p>
+
+<p>并且p打印是不会清空模式空间的，1p;1h;2g是第一行先强制打印一下，然后保持空间又是ab了，第一行结束后又打印了一遍ab，2g把保持空间的ab复制到了模式空间，于是ab就输出了三次，后面的行就是自动输出了。</p>
+
+<p>再来看一下-n是什么意思，-n的意思是组织自动打印，也就是说每一行结束模式空间自动打印清空的功能被关闭了，那这个时候怎么打印呢？也就只能靠p了。</p>
+
+<p>虽然关闭了自动打印a,i,c这些后面的内容还是可以打印出来的。nl /etc/passwd | sed -n
+&lsquo;/root/d&rsquo;打印不出来的原因也一目了然了，也知道了为什么nl /etc/passwd | sed -n &lsquo;/root/p&rsquo;后面要加一个p了。</p>
+
+<p>然后来学习一下q，q是立即退出sed脚本，忽略更多输入，除非自动打印没有被停用，那么现在模式空间的内容还是会打印。</p>
+
+<p>nl /etc/passwd | sed -n &lsquo;/root/{s/bash/blueshell/;p;q}&lsquo;和nl /etc/passwd | sed
+-n
+&lsquo;/root/{s/bash/blueshell/p;q}&lsquo;是一样的，意思都是一行一行去匹配，匹配到root的那一行把bash替换为blueshell，然后打印，然后退出。</p>
+
+<p>我们来慢慢分析一下上面的命令，首先，nl /etc/passwd | sed &lsquo;/root/{s/bash/blueshell/p;q}&rsquo;</p>
+
+<p>没有加-
+n也就是说自动打印功能还在，为什么打印两次第一行呢？因为第一行里面匹配到了root，然后完成替换操作，先是p强制打印了一次，遇到q，（q前面没有指定行号，也就是每一行都会执行）因为有自动打印，所以还是要打印，然后再退出，所以结果是打印两次第一行。而nl
+/etc/passwd | sed -n &lsquo;/root/{s/bash/blueshell/;p;q}&lsquo;加了-
+n来关闭了自动打印，所以纸打印一次第一行就q了。nl /etc/passwd | sed -n
+&lsquo;/root/{s/bash/blueshell/;p}&lsquo;不加q的话，每一行都不会退出了，所以就打印全了有root的行。nl /etc/passwd |
+sed -n &lsquo;/root/{s/bash/blueshell/;p;d;q}&lsquo;为什么可以打印出来全部呢?这是因为d的开始下一行的功能，导致q没有执行。nl
+/etc/passwd | sed -n &lsquo;/root/{s/bash/blueshell/;d;p;q}&lsquo;这个什么都没有打印还是因为d的作用。 nl
+/etc/passwd | sed -n
+&lsquo;/root/s/bash/blueshell/;p;d;q&rsquo;打印出来了所有的行是因为没有了大括号，这样执行的意思是每一行先匹配root，匹配到的行替换，但是由于没有大括号，p是每一行都会执行的，而不是只针对匹配到的行，因为只是用了;隔开而且没有大括号，然后因为d，所以q没有能够执行。如果是nl
+/etc/passwd | sed -n
+&lsquo;/root/s/bash/blueshell/p;d;q&rsquo;，这个p和root的匹配和bash的替换就是关联的，但是这种写法也只是打印一次，并不能打印全部，比较下面画红线和命令的结果。</p>
+
+<p>nl /etc/passwd | sed -n
+&lsquo;/root/s/bash/blueshell/;p;q&rsquo;只会打印第一行是因为q。这个在上上张图李倒数第二个命令。再来分析一下下面几条命令。</p>
+
+<p>nl /etc/passwd | sed -n
+&lsquo;/root/{s/bash/blueshell/;p};11q&rsquo;这个因为11q在大括号外面，所以q在地1行执行，所以第10行能打印出来，nl
+/etc/passwd | sed -n
+&lsquo;/root/{s/bash/blueshell/;p;11q}&lsquo;11q在括号里面，但是括号里面的命令都是匹配到的行才会执行的，而匹配到的是1和10行，所以11q到最后都没有机会执行。那么nl
+/etc/passwd | sed -n
+&lsquo;/root/{s/bash/blueshell/;p;10q}&lsquo;是在匹配到的第10行执行了10q,这个10q确确实实是执行了,不过是在p后执行的，所以第十行还是p出来了。nl
+/etc/passwd | sed -n &lsquo;/root/{s/bash/blueshell/;p;9q}&lsquo;里的9q没有机会执行，因为第9行不是匹配行。nl
+/etc/passwd | sed -n
+&lsquo;/root/{s/bash/blueshell/;p};9q&rsquo;放在大括号外面就可以执行了，就不会看到第10行了，因为第9行已经退出了。其实指定行输出很简单。</p>
+
+<p>nl /etc/passwd |sed -n
+&lsquo;2p;4p;8p;6p&rsquo;就是输出2，4，6，8行，2，4，6，8顺序无所谓，因为是每一行都会执行这些命令的。多点编辑-
+e是不能省略的。当然如果你把命令内容写到文件中-f不能省略。</p>
+
+<p>那么回过头来看看，我们如何得到ip。s/^.*inet//g的意思是从开头到inet替换为空，因为//之间没有东西嘛，这个g其实可要可不要的。</p>
+
+<p>当然不用grep也是可以的，下图中有例子，不过这个/号有点烦，怎么都去不掉。</p>
+
+<p>这种多点编辑的关系不是前面的先执行，然后后面的再执行，相反，应该是同时执行的，所以我们看到并不是只有有global的行打印出来了，而是把有brd的三行都打印出来了，没有global的只执行了后面去除brd后面的命令，而有global的把去除inet前面的命令也执行了。</p>
+
+<p>-i的意思其实就是把改动加入到源文件了。不加i就只是放在内存里面，没有写入磁盘了。</p>
+
+<p>我也知道了为什么上面的/没去掉，我把转义符\弄成/了233。可以看到加-
+i确实可以把改动影响到源文件，而且sed也没有输出了.和!需要转义是因为.在正则里面有特殊含义，！在bash里面有特殊含义。$a就是在最后一行的下一行再加一行，其实也就是新起一行，g可以不加的，着不知道为什么要加一个g。</p>
+
+<p>说实话，这篇文章编排的确实有点差，因为我是直到g才知道有模式空间和保持空间这个东西的，其实这个应该放在sed的最前面，不过上面已经写了很多了，就懒得去改了，也算是一种由浅入深吧，好了，也不自我安慰了，感谢看完的读者老爷们。还有一些例子放在下一篇了。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

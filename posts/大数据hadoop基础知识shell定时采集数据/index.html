@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>大数据Hadoop基础知识Shell定时采集数据 | 开发者问答集锦</title>
+    <meta property="og:title" content="大数据Hadoop基础知识Shell定时采集数据 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="大数据Hadoop基础知识Shell定时采集数据">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%A4%A7%E6%95%B0%E6%8D%AEhadoop%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86shell%E5%AE%9A%E6%97%B6%E9%87%87%E9%9B%86%E6%95%B0%E6%8D%AE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">大数据Hadoop基础知识Shell定时采集数据</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="1-namenode概述">1. NameNode概述</h2>
+
+<ul>
+<li>NameNode是HDFS的核心</li>
+<li>NameNode也称为Master</li>
+<li>NameNode仅存储HDFS的元数据 : 文件系统中所有文件的目录树 , 并跟踪整个集群的文件</li>
+<li>NameNode不存储实际数据或数据集 , 数据本身实际存储在DataNode中</li>
+<li>NameNode知道任何文件的快列表及其位置</li>
+<li>NameNode并不持久化存储每个文件中各个块所在的datanode的位置信息</li>
+<li>NameNode对于HDFS至关重要 , 当NameNode关闭 , HDFS/Hadoop集群无法访问</li>
+<li>NameNode是Hadoop集群中的单点故障</li>
+<li>NameNode所在的机器通常会配置大量内存(RAM)</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/401809ad9d444924a783624635cc2023.jpg"><img src="https://img.it610.com/image/info8/401809ad9d444924a783624635cc2023.jpg" alt="大数据----【Hadoop基础知识、Shell定时采集数据】_第1张图片" /></a></p>
+
+<h2 id="2-datanode概述">2. DataNode概述</h2>
+
+<ul>
+<li>DataNode负责将实际数据存储在HDFS中</li>
+<li>DataNode也称为Slave</li>
+<li>NameNode和DataNode会保持不断通信</li>
+<li>DataNode启动时 , 它将自己发布到NameNode并汇报自己持有的块列表</li>
+<li>当某个DataNode关闭时 , 不会影响数据或集群的可用性 , NameNode将安排由其他DataNode管理的块进行副本复制.</li>
+<li>DataNode所在的机器通常配置有大量的硬盘空间 , 故实际数据存储在其中</li>
+<li>DataNode会定期（<code>dfs.heartbeat.interval</code> 配置项配置，默认是 3 秒）向NameNode 发送心跳，如果 NameNode 长时间没有接受到 DataNode 发送的心跳， NameNode 就会认为该 DataNode 失效。</li>
+<li>block 汇报时间间隔取参数<code>dfs.blockreport.intervalMsec</code>,参数未配置的话默认为 6 小时.</li>
+</ul>
+
+<p>Q:nn如何保证自己记录的元数据跟dn实际存储的信息是一致的。</p>
+
+<ul>
+<li>定时汇报机制
+
+<ul>
+<li>datanodes在启动的时候首先汇报一次自己持有的块信息</li>
+<li>后续每隔一段时间 再次发生块的信息</li>
+<li>默认是每隔6小时汇报一次</li>
+</ul></li>
+<li>心跳机制
+
+<ul>
+<li>datanodes在启动的时候向nn注册自己</li>
+<li>后续每隔3秒发送心跳信息 报活</li>
+</ul></li>
+</ul>
+
+<h2 id="3-hdfs的工作机制">3. HDFS的工作机制</h2>
+
+<p>​ HDFS 的内部工作机制对客户端保持透明，客户端请求访问 HDFS 都是通过向NameNode 申请来进行。</p>
+
+<p><a href="https://img.it610.com/image/info8/f9630c7c195545d5bb5d4750eb77df08.jpg"><img src="https://img.it610.com/image/info8/f9630c7c195545d5bb5d4750eb77df08.jpg" alt="大数据----【Hadoop基础知识、Shell定时采集数据】_第2张图片" /></a></p>
+
+<h2 id="4-hdfs的应用开发">4. HDFS的应用开发</h2>
+
+<h3 id="4-1-hdfs的java-api操作">4.1 HDFS的Java API操作</h3>
+
+<p>HDFS 在生产应用中主要是客户端的开发，其核心步骤是从 HDFS 提供的 api中构造一个 HDFS
+的访问<code>客户端对象</code>，然后通过该客户端对象操作（增删改查）HDFS 上的文件。</p>
+
+<h4 id="4-1-1-搭建开发环境">4.1.1 搭建开发环境</h4>
+
+<p>创建maven工程 , 引入pom依赖</p>
+
+<pre><code>&lt;dependencies&gt;
+  &lt;dependency&gt;  
+          &lt;groupId&gt;org.apache.hadoopgroupId&gt;  
+          &lt;artifactId&gt;hadoop-commonartifactId&gt;  
+          &lt;version&gt;2.7.4version&gt;  
+   dependency&gt;  
+   &lt;dependency&gt;  
+          &lt;groupId&gt;org.apache.hadoopgroupId&gt;  
+          &lt;artifactId&gt;hadoop-hdfsartifactId&gt;  
+          &lt;version&gt;2.7.4version&gt;  
+   dependency&gt;  
+   &lt;dependency&gt;  
+          &lt;groupId&gt;org.apache.hadoopgroupId&gt;  
+          &lt;artifactId&gt;hadoop-clientartifactId&gt;  
+          &lt;version&gt;2.7.4version&gt;  
+   dependency&gt;
+   &lt;dependency&gt;
+          &lt;groupId&gt;junitgroupId&gt;
+          &lt;artifactId&gt;junitartifactId&gt;
+          &lt;version&gt;RELEASEversion&gt;
+   dependency&gt;      
+dependencies&gt;
+</code></pre>
+
+<p><strong><code>配置windows平台Hadoop环境</code></strong></p>
+
+<p>​ 在 windows 上做 HDFS 客户端应用开发，需要设置 Hadoop 环境,而且要求是windows 平台编译的
+Hadoop,不然会报以下的错误:</p>
+
+<p>Failed to locate the winutils binary in the hadoop binary path
+java.io.IOException: Could not locate executable null\bin\winutils.exe in the
+Hadoop binaries.</p>
+
+<p>为此我们需要进行如下的操作：</p>
+
+<ul>
+<li><p>A、在 windows 平台下编译 Hadoop 源码（可以参考资料编译，但不推荐）</p></li>
+
+<li><p>B、使用已经编译好的 Windows 版本 Hadoop：</p></li>
+</ul>
+
+<p><code>hadoop-2.7.4-with-windows.tar.gz</code></p>
+
+<ul>
+<li><p>C、解压一份到 windows 的任意一个目录下</p></li>
+
+<li><p>D、在 windows 系统中配置 HADOOP_HOME 指向你解压的安装包目录</p></li>
+
+<li><p>E、在 windows 系统的 path 变量中加入 HADOOP_HOME 的 bin 目录</p>
+
+<p>HADOOP_HOME=D:\software\commansoftware\hadoop-2.7.4-with-windows
+path=;%HADOOP_HOME%\bin</p></li>
+</ul>
+
+<p>配置好环境变量后点击<code>D:\software\commansoftware\hadoop-2.7.4-with-
+windows\bin</code>下的<code>winutils.exe</code> , 如果窗口一闪而过表明成功 , 否则根据错误解决</p>
+
+<p>验证 cmd敲<code>hadoop</code> 无任何报错信息</p>
+
+<h4 id="4-1-2-构造客户端对象">4.1.2 构造客户端对象</h4>
+
+<p><code>Configuration</code>：该类的对象封转了客户端或者服务器的配置;<br />
+<code>FileSystem</code>：该类的对象是一个文件系统对象，可以用该对象的一些方法来对文件进行操作，通过 FileSystem 的静态方法 get 获得该对象。</p>
+
+<h5 id="4-1-3-代码示例">4.1.3 代码示例</h5>
+
+<pre><code>import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+import java.net.URI;
+
+/**
+ * @author CoderCK
+ * @Title: com.itck.hadoop.demo
+ * @ProjectName example-hadoop
+ * @Description: TODO
+ * @create 2018/11/15  19:08
+ **/
+public class HadoopDemo {
+    public static void main(String[] args) throws Exception {
+        Configuration conf = new Configuration();
+        //指定文件系统的类型是hdfs
+        //conf.set(&quot; fs.defaultFS&quot;,&quot;hdfs://node-1:9000&quot;);
+        //FileSystem fs = FileSystem.get(conf);
+        //通过构造指定文件系统类型和所代表的客户端身份
+        FileSystem fs = FileSystem.get(new URI(&quot;hdfs://node-1:9000&quot;), conf, &quot;root&quot;);
+        //在根目录下创建文件夹
+        //fs.mkdirs(new Path(&quot;/createbyjava&quot;));
+        //从本地上传文件到hdfs上
+        //fs.copyFromLocalFile(new Path(&quot;I:\\ideaworkspace\\case\\src\\com\\itheima\\Main.java&quot;),new Path(&quot;/createbyjava&quot;));
+        //下载文件
+        //fs.copyToLocalFile(new Path(&quot;/test/statusZk.sh&quot;),new Path(&quot;J:\\bigdatatest\\statusZk.sh&quot;));
+        //删除 , true代表递归删除 , false表示非递归删除
+        fs.delete(new Path(&quot;/createbyjava&quot;),true);
+        fs.close();
+    }
+}
+</code></pre>
+
+<p><strong>Stream 流形式操作</strong></p>
+
+<pre><code>import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+import java.io.FileInputStream;
+import java.net.URI;
+
+/**
+ * @author CoderCK
+ * @Title: com.itck.hadoop.demo
+ * @ProjectName example-hadoop
+ * @Description: TODO
+ * @create 2018/11/15  19:08
+ **/
+public class HadoopDemo {
+    public static void main(String[] args) throws Exception {
+        Configuration conf = new Configuration();
+        //通过构造指定文件系统类型和所代表的客户端身份
+        FileSystem fs = FileSystem.get(new URI(&quot;hdfs://node-1:9000&quot;), conf, &quot;root&quot;);
+        //更加底层的形式操作hdfs Stream
+        FileInputStream in = new FileInputStream(&quot;J:\\bigdatatest\\statusZk.sh&quot;);
+        FSDataOutputStream out = fs.create(new Path(&quot;/statusZk.sh&quot;));
+        IOUtils.copy(in,out);
+        fs.close();
+    }
+}
+</code></pre>
+
+<p>底层的传输更加快速 , 但是编写起来相对于麻烦 , 因此作为了解即可<br />
+<a href="https://img.it610.com/image/info8/eac87038372642d3a5ad66618497f63f.jpg"><img src="https://img.it610.com/image/info8/eac87038372642d3a5ad66618497f63f.jpg" alt="大数据----【Hadoop基础知识、Shell定时采集数据】_第3张图片" /></a></p>
+
+<h4 id="案例-shell定时采集数据至hdfs">案例 : shell定时采集数据至HDFS</h4>
+
+<p>shell采集数据到hdfs图解</p>
+
+<p><a href="https://img.it610.com/image/info8/97b6dc1a53984f9994776a877813fd6f.jpg"><img src="https://img.it610.com/image/info8/97b6dc1a53984f9994776a877813fd6f.jpg" alt="大数据----【Hadoop基础知识、Shell定时采集数据】_第4张图片" /></a></p>
+
+<blockquote>
+<ol>
+<li><p>WebServer产生日志文件 , 以某种格式存储的</p></li>
+
+<li><p>判断哪些日志文件是<code>符合上传需求</code>的 , 将符合需求的文件上传到hdfs上</p></li>
+
+<li><p>Q : 如何满足回头看 , 上传了哪些 , 失败了哪些?</p></li>
+</ol>
+
+<p>将文件进行分类 , 将要做的(willdoing) , 正在做的(doing) , 成功的(done)</p>
+
+<p>人为的使用标识 , 标记任务所处的各个环节</p>
+
+<ol>
+<li>根据时间分类等进行存储即可</li>
+</ol>
+</blockquote>
+
+<h5 id="代码实现">代码实现</h5>
+
+<p>创建shell程序 , 首先创建产生日志文件的位置以及存放上传的位置</p>
+
+<p><code>mkdir -p /root/logs/log/</code></p>
+
+<p><code>mkdir -p /root/logs/toupload/</code></p>
+
+<p>向log文件夹中添加测试的日志文件</p>
+
+<pre><code>[root@node-2 log]# 下
+echo 111 &gt; access.log.1
+echo 111 &gt; access.log.2
+echo 111 &gt; access.log.3
+echo 111 &gt; access.log
+
+
+
+#!/bin/bash
+
+#set java env
+export JAVA_HOME=/export/servers/jdk1.8.0_65
+export JRE_HOME=${JAVA_HOME}/jre
+export CLASSPATH=.:${JAVA_HOME}/lib:${JRE_HOME}/lib
+export PATH=${JAVA_HOME}/bin:$PATH
+
+#set hadoop env
+export HADOOP_HOME=/export/servers/hadoop-2.7.4
+export PATH=${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin:$PATH
+
+
+#日志文件存放的目录
+log_src_dir=/root/logs/log/
+
+#待上传文件存放的目录
+log_toupload_dir=/root/logs/toupload/
+
+
+#日志文件上传到hdfs的根路径
+date1=`date -d last-day +%Y_%m_%d`
+hdfs_root_dir=/data/clickLog/$date1/ 
+
+#打印环境变量信息
+echo &quot;envs: hadoop_home: $HADOOP_HOME&quot;
+
+
+#读取日志文件的目录，判断是否有需要上传的文件
+echo &quot;log_src_dir:&quot;$log_src_dir
+ls $log_src_dir | while read fileName
+do
+    if [[ &quot;$fileName&quot; == access.log.* ]]; then
+    # if [ &quot;access.log&quot; = &quot;$fileName&quot; ];then
+        date=`date +%Y_%m_%d_%H_%M_%S`
+        #将文件移动到待上传目录并重命名
+        #打印信息
+        echo &quot;moving $log_src_dir$fileName to $log_toupload_dir&quot;xxxxx_click_log_$fileName&quot;$date&quot;
+        mv $log_src_dir$fileName $log_toupload_dir&quot;xxxxx_click_log_$fileName&quot;$date
+        #将待上传的文件path写入一个列表文件willDoing
+        echo $log_toupload_dir&quot;xxxxx_click_log_$fileName&quot;$date &gt;&gt; $log_toupload_dir&quot;willDoing.&quot;$date
+    fi
+
+done
+#找到列表文件willDoing
+ls $log_toupload_dir | grep will |grep -v &quot;_COPY_&quot; | grep -v &quot;_DONE_&quot; | while read line
+do
+    #打印信息
+    echo &quot;toupload is in file:&quot;$line
+    #将待上传文件列表willDoing改名为willDoing_COPY_
+    mv $log_toupload_dir$line $log_toupload_dir$line&quot;_COPY_&quot;
+    #读列表文件willDoing_COPY_的内容（一个一个的待上传文件名）  ,此处的line 就是列表中的一个待上传文件的path
+    cat $log_toupload_dir$line&quot;_COPY_&quot; |while read line
+    do
+        #打印信息
+        echo &quot;puting...$line to hdfs path.....$hdfs_root_dir&quot;
+        hadoop fs -mkdir -p $hdfs_root_dir
+        hadoop fs -put $line $hdfs_root_dir
+    done    
+    mv $log_toupload_dir$line&quot;_COPY_&quot;  $log_toupload_dir$line&quot;_DONE_&quot;
+done
+</code></pre>
+
+<p>查看log中的文件 , 发现符合的都已经上传到toupload文件中了</p>
+
+<blockquote>
+<ul>
+<li><p>shell定时采集数据到hdfs</p>
+
+<ul>
+<li><p>首先把日志目录下符合上传规律的文件移动到待上传目录toupload 并且移动后重命名</p></li>
+
+<li><p>把待上传的文件名字记录在下面的文件里面</p></li>
+</ul></li>
+</ul>
+
+<p>toupload is in file: willDoing.2018_11_15_11_04_34</p>
+
+<pre><code>* 上传文件 上传成功 把文件名记录在done中
+</code></pre>
+
+<ul>
+<li><p><strong>成熟的shell三框架</strong></p>
+
+<ul>
+<li>首先集中定义本次shell运行所需的一些软件环境变量</li>
+</ul></li>
+</ul>
+
+<p>保证下面的shell执行一定可以加载的软件</p>
+
+<pre><code>* 其次集中定义一些变量 常量 比如时间 类名 路径 等等
+</code></pre>
+
+<p>集中管理方便修改 后续需要直接<code>$</code>引用即可</p>
+
+<pre><code>* 程序主体逻辑 往往结合流程控制逻辑判断
+</code></pre>
+</blockquote>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

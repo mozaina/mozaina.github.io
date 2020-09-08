@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux系统shell脚本编程生产实战案例批量检查在线IP与开放端口 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux系统shell脚本编程生产实战案例批量检查在线IP与开放端口 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux系统shell脚本编程生产实战案例批量检查在线IP与开放端口">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E7%B3%BB%E7%BB%9Fshell%E8%84%9A%E6%9C%AC%E7%BC%96%E7%A8%8B%E7%94%9F%E4%BA%A7%E5%AE%9E%E6%88%98%E6%A1%88%E4%BE%8B%E6%89%B9%E9%87%8F%E6%A3%80%E6%9F%A5%E5%9C%A8%E7%BA%BFip%E4%B8%8E%E5%BC%80%E6%94%BE%E7%AB%AF%E5%8F%A3/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux系统shell脚本编程生产实战案例批量检查在线IP与开放端口</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <blockquote>
+<p>Linux系统shell脚本编程——生产实战案例</p>
+</blockquote>
+
+<hr />
+
+<p>在日常的生产环境中，可能会遇到需要批量检查内网目前在线的主机IP地址有哪些，还可能需要检查这些在线的主机哪些端口是开放状态，因此依靠手工来检查是可以实现，但比较费时费力，所以需要结合shell脚本来实现批量检查的功能，那么今天就来做个小小的实验。</p>
+
+<hr />
+
+<blockquote>
+<p>1、开发脚本前准备</p>
+</blockquote>
+
+<hr />
+
+<p>一般大家都知道，测试主机是否在线，常用的命令无非就是ping、nmap，因此，首先找一个地址来测试下ping命令的效果</p>
+
+<hr />
+
+<p>[root@centos6 scripts]#ping 172.16.1.1</p>
+
+<p>PING 172.16.1.1 (172.16.1.1) 56(84) bytes of data.</p>
+
+<p>64 bytes from 172.16.1.1: icmp_seq=1 ttl=255 time=3.43 ms</p>
+
+<p>64 bytes from 172.16.1.1: icmp_seq=2 ttl=255 time=0.699 ms</p>
+
+<p>^C</p>
+
+<p>-&ndash; 172.16.1.1 ping statistics &mdash;</p>
+
+<p>9 packets transmitted, 9 received, 0% packet loss, time 8448ms</p>
+
+<p>rtt min/avg/max/mdev = 0.<sup>525</sup>&frasl;<sub>1</sub>.053/3.<sup>436</sup>&frasl;<sub>0</sub>.884 ms</p>
+
+<hr />
+
+<p>好像单纯的这种命令是无法来做批量检查的，必须要带一些参数，否则它们一直ping下去</p>
+
+<hr />
+
+<p>[root@centos6 scripts]#ping -W 2 -c 2 172.16.1.1</p>
+
+<p>PING 172.16.1.1 (172.16.1.1) 56(84) bytes of data.</p>
+
+<p>64 bytes from 172.16.1.1: icmp_seq=1 ttl=255 time=0.704 ms</p>
+
+<p>64 bytes from 172.16.1.1: icmp_seq=2 ttl=255 time=0.481 ms</p>
+
+<p>-&ndash; 172.16.1.1 ping statistics &mdash;</p>
+
+<p>2 packets transmitted, 2 received, 0% packet loss, time 1000ms</p>
+
+<p>rtt min/avg/max/mdev = 0.<sup>481</sup>&frasl;<sub>0</sub>.<sup>592</sup>&frasl;<sub>0</sub>.<sup>704</sup>&frasl;<sub>0</sub>.114 ms</p>
+
+<hr />
+
+<p>这种方法可以实现，测试发送2个数据包，然后加上超时时间，自动停止，可以达到效果</p>
+
+<hr />
+
+<p>[root@centos6 scripts]#echo $?</p>
+
+<p>0</p>
+
+<p>[root@centos6 scripts]#ping -W 2 -c 2 172.16.1.100</p>
+
+<p>PING 172.16.1.100 (172.16.1.100) 56(84) bytes of data.</p>
+
+<p>^C</p>
+
+<p>-&ndash; 172.16.1.100 ping statistics &mdash;</p>
+
+<p>2 packets transmitted, 0 received, 100% packet loss, time 2836ms</p>
+
+<p>[root@centos6 scripts]#echo $?</p>
+
+<p>1</p>
+
+<p>因此，我们可以通过返回值来判断是否在线</p>
+
+<hr />
+
+<hr />
+
+<blockquote>
+<p>2、开发简单脚本</p>
+</blockquote>
+
+<p>既然有实现的方法了，那么接下来就开始开发脚本了</p>
+
+<p>[root@centos6 scripts]# vi checkip.sh</p>
+
+<p>#!/bin/sh</p>
+
+<p>. /etc/init.d/functions</p>
+
+<p>#加载系统函数库</p>
+
+<p>CMD=&ldquo;ping -W 2 -c 2&rdquo;</p>
+
+<p>#定义命令变量</p>
+
+<p>IP=&ldquo;172.16.1.2 172.16.1.3 172.16.1.100&rdquo;</p>
+
+<p>#定义IP变量</p>
+
+<p>for n in $IP</p>
+
+<p>#for循环语句</p>
+
+<p>do</p>
+
+<p>$CMD $IP$n &gt;/dev/null 2&gt;&amp;1</p>
+
+<p>#将命令结果不输出</p>
+
+<p>if [ $? -eq 0 ];then</p>
+
+<p>#如果返回值为0就表明在线</p>
+
+<p>action &ldquo;$IP$n is online&rdquo; /bin/true</p>
+
+<p>#在线就打印此信息</p>
+
+<p>else</p>
+
+<p>#否则就表示不在线</p>
+
+<p>action &ldquo;$IP$n is not online&rdquo; /bin/false</p>
+
+<p>#不在线就打印此信息</p>
+
+<p>fi</p>
+
+<p>done</p>
+
+<p>执行下脚本看看结果如何</p>
+
+<p>[root@centos6 scripts]# sh checkip.sh</p>
+
+<p>172.16.1.2 is online [ OK ]</p>
+
+<p>172.16.1.3 is online [ OK ]</p>
+
+<p>172.16.1.100 is not online  [FAILED]</p>
+
+<hr />
+
+<p>此时肯定有小伙伴问了，你这个脚本测试的只有三个IP，如果内网整个网段IP都手工写上去，岂不是更费时费力，因此，如果是整个网段，那么定义IP变量时可以定义成这样IP=&ldquo;172.16.1.&rdquo;
+，因为前三位是相同的，写for 循环时可以修改成如下</p>
+
+<p>for n in <code>seq 254</code></p>
+
+<p>do</p>
+
+<p>$CMD $IP$n(将两段数字拼接成IP地地址)</p>
+
+<p>done</p>
+
+<p>具体这里就不再测试了，有兴趣的可以自行测试下</p>
+
+<hr />
+
+<hr />
+
+<blockquote>
+<p>3、开发nmap脚本检查在线IP与在线IP的开放端口情况</p>
+</blockquote>
+
+<hr />
+
+<p>首先得了解下nmap的一些参数，它也是非常实用的命令之一，在日常实际生产环境中，经常用来检查IP、端口、URL地址信息，具体其中的参数这里就不做详细介绍了，后续有时间会分享它的相关参数用法</p>
+
+<hr />
+
+<p>[root@centos6 scripts]#nmap -sP 172.16.1.1</p>
+
+<p>Starting Nmap 5.51 ( <a href="http://nmap.org">http://nmap.org</a> ) at 2016-12-03 21:09 CST</p>
+
+<p>Nmap scan report for 172.16.1.1</p>
+
+<p>Host is up (0.0091s latency).</p>
+
+<p>MAC Address: 04:BD:70:FB:A9:B7 (Unknown)</p>
+
+<p>Nmap done: 1 IP address (1 host up) scanned in 0.04 seconds</p>
+
+<p>[root@centos6 scripts]# nmap -sP 172.16.1.100</p>
+
+<p>Starting Nmap 5.51 ( <a href="http://nmap.org">http://nmap.org</a> ) at 2016-12-03 21:09 CST</p>
+
+<p>Note: Host seems down. If it is really up, but blocking our ping probes, try
+-Pn</p>
+
+<p>Nmap done: 1 IP address (0 hosts up) scanned in 0.41 seconds</p>
+
+<hr />
+
+<p>从上面的结果来看，很容易发现在线与不在线返回的信息不同，但是我们需要取得在线的IP地址信息，那到就只能取Nmap scan report for
+172.16.1.1 ，因为所有在线的IP返回的信息中都会有这一行信息，所以取相同的信息。</p>
+
+<hr />
+
+<p>[root@centos6 scripts]#nmap -sS 172.16.1.1|grep &ldquo;Nmap scan report for&rdquo;</p>
+
+<p>Nmap scan report for 172.16.1.1</p>
+
+<p>[root@centos6 scripts]#</p>
+
+<p>nmap -sS 172.16.1.1|grep &ldquo;Nmap scan report for&rdquo;|awk &lsquo;{print $5}&rsquo;</p>
+
+<p>172.16.1.1</p>
+
+<p>#取出IP信息</p>
+
+<hr />
+
+<p>[root@centos6 scripts]# nmap -sS 172.16.1.1</p>
+
+<p>Starting Nmap 5.51 ( <a href="http://nmap.org">http://nmap.org</a> ) at 2016-12-03 20:56 CST</p>
+
+<p>Nmap scan report for 172.16.1.1</p>
+
+<p>Host is up (0.041s latency).</p>
+
+<p>Not shown: 994 closed ports</p>
+
+<p>PORT STATE SERVICE</p>
+
+<p>21/tcp open ftp</p>
+
+<p>22/tcp filtered ssh</p>
+
+<p>23/tcp open telnet</p>
+
+<p>80/tcp open http</p>
+
+<p>179/tcp filtered bgp</p>
+
+<p>443/tcp open https</p>
+
+<p>MAC Address: 04:BD:70:FB:A9:B7 (Unknown)</p>
+
+<p>Nmap done: 1 IP address (1 host up) scanned in 8.74 seconds</p>
+
+<hr />
+
+<p>检查开启端口，我们可以通过过滤关键字open 来实现，通过上面的信息很容易观察出来</p>
+
+<hr />
+
+<p>[root@centos6 scripts]# nmap -sS 172.16.1.1|grep &ldquo;open&rdquo;</p>
+
+<p>21/tcp open ftp</p>
+
+<p>23/tcp open telnet</p>
+
+<p>80/tcp open http</p>
+
+<p>443/tcp open https</p>
+
+<p>[root@centos6 scripts]# nmap -sS 172.16.1.1|grep &ldquo;open&rdquo;|awk &lsquo;{print $1}&rsquo;</p>
+
+<p>21/tcp</p>
+
+<p>23/tcp</p>
+
+<p>80/tcp</p>
+
+<p>443/tcp</p>
+
+<hr />
+
+<hr />
+
+<blockquote>
+<p>4、编写脚本并测试效果</p>
+</blockquote>
+
+<p>[root@centos6 scripts]# vi checkip_namp01.sh</p>
+
+<p>#!/bin/sh</p>
+
+<p>. /etc/init.d/functions</p>
+
+<p>#加载系统函数库</p>
+
+<p>FCMD=&ldquo;nmap -sP &ldquo;</p>
+
+<p>#定义第一个命令变量</p>
+
+<p>IP=&ldquo;172.16.1.1 172.16.1.2 172.16.1.100&rdquo;</p>
+
+<p>#定义IP变量</p>
+
+<p>TCMD=&ldquo;nmap -sS&rdquo;</p>
+
+<p>#定义第一个命令变量</p>
+
+<p>UPIP=<code>$FCMD $IP|grep &quot;Nmap scan report for&quot;|awk '{print $5}'</code></p>
+
+<p>#定义获取在线IP的变量</p>
+
+<p>for ip in ${UPIP}</p>
+
+<p>#for手环语句</p>
+
+<p>do</p>
+
+<p>action &ldquo;$ip is on line&rdquo; /bin/true</p>
+
+<p>#打印信息</p>
+
+<p>UPPORT=<code>$TCMD $ip|grep &quot;open&quot;|awk '{print $1}'</code></p>
+
+<p>#定义获取在线IP的开放端口变量</p>
+
+<p>for port in ${UPPORT}</p>
+
+<p>#二层循环检查端口</p>
+
+<p>do</p>
+
+<p>action &ldquo;$ip $port is open&rdquo; /bin/true</p>
+
+<p>#将上面在线IP开放的端口信息打印输出</p>
+
+<p>done</p>
+
+<p>done</p>
+
+<p>注：UPPORT=<code>$TCMD $ip|grep &quot;open&quot;|awk '{print $1}'</code>
+定义这个变量时，取的IP地址一定要是上一个循环取出的IP地址，否则会有问题</p>
+
+<hr />
+
+<p>执行脚本，测试效果如何？</p>
+
+<hr />
+
+<p>[root@centos6 scripts]# sh checkip_namp01.sh</p>
+
+<p>172.16.1.1 is on line [ OK ]</p>
+
+<p>172.16.1.1 21/tcp is open [ OK ]</p>
+
+<p>172.16.1.1 23/tcp is open [ OK ]</p>
+
+<p>172.16.1.1 80/tcp is open [ OK ]</p>
+
+<p>172.16.1.1 443/tcp is open [ OK ]</p>
+
+<p>172.16.1.2 is on line [ OK ]</p>
+
+<p>172.16.1.2 23/tcp is open [ OK ]</p>
+
+<p>172.16.1.100没有出现的原因是它不在线</p>
+
+<hr />
+
+<p>接下来测试下脚本检查的端口是否正确</p>
+
+<hr />
+
+<p>[root@centos6 scripts]# telnet 172.16.1.1 443</p>
+
+<p>Trying 172.16.1.1&hellip;</p>
+
+<p>Connected to 172.16.1.1.</p>
+
+<p>Escape character is &lsquo;^]&rsquo;.</p>
+
+<p>^]</p>
+
+<p>telnet&gt; quit</p>
+
+<p>Connection closed.</p>
+
+<p>[root@centos6 scripts]# telnet 172.16.1.1 21</p>
+
+<p>Trying 172.16.1.1&hellip;</p>
+
+<p>Connected to 172.16.1.1.</p>
+
+<p>Escape character is &lsquo;^]&rsquo;.</p>
+
+<p>220 FTP service ready.</p>
+
+<p>^]</p>
+
+<p>telnet&gt; quit</p>
+
+<p>Connection closed.</p>
+
+<p>[root@centos6 scripts]# telnet 172.16.1.2 23</p>
+
+<p>Trying 172.16.1.2&hellip;</p>
+
+<p>Connected to 172.16.1.2.</p>
+
+<p>Escape character is &lsquo;^]&rsquo;.</p>
+
+<p>TL-AP301C login:</p>
+
+<p>telnet&gt; quit</p>
+
+<p>Connection closed.</p>
+
+<hr />
+
+<p>从上面的结果来看，脚本检查的结果是正确，如果需要检查整个网段只需要将定义IP变量时定义成“IP=&ldquo;172.16.1.0/24&rdquo;”即可</p>
+
+<hr />
+
+<p>脚本写的可能也不太完美，需要进行改进，欢迎各位大牛多指导，感谢！！！</p>
+
+<p>更多内容请关注民工哥个人微信公众号：友侃有笑（youkanyouxiao）</p>
+
+<p><a href="https://img.it610.com/image/info8/abfea6045fc946ffa1ea8cedcf31bb26.jpg"><img src="https://img.it610.com/image/info8/abfea6045fc946ffa1ea8cedcf31bb26.jpg" alt="Linux系统shell脚本编程——生产实战案例\(批量检查在线IP与开放端口\)_第1张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

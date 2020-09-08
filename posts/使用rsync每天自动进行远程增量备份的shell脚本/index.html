@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用rsync每天自动进行远程增量备份的shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用rsync每天自动进行远程增量备份的shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用rsync每天自动进行远程增量备份的shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8rsync%E6%AF%8F%E5%A4%A9%E8%87%AA%E5%8A%A8%E8%BF%9B%E8%A1%8C%E8%BF%9C%E7%A8%8B%E5%A2%9E%E9%87%8F%E5%A4%87%E4%BB%BD%E7%9A%84shell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用rsync每天自动进行远程增量备份的shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="rsync-incremental-backup">rsync-incremental-backup</h2>
+
+<p>可配置的bash脚本，使用rsync将数据的增量备份发送到本地或远程目标。</p>
+
+<ul>
+<li>项目地址：<a href="https://github.com/pedroetb/rsync-incremental-backup">https://github.com/pedroetb/rsync-incremental-backup</a></li>
+<li>码云fork: <a href="https://gitee.com/shangyexin/rsync-incremental-backup">https://gitee.com/shangyexin/rsync-incremental-backup</a></li>
+</ul>
+
+<h3 id="译者理解">译者理解</h3>
+
+<p>这里只针对<code>rsync-incremental-backup-remote</code>远程备份脚本谈一下自己的理解。</p>
+
+<h4 id="1-使用说明">1.使用说明</h4>
+
+<ul>
+<li>需求</li>
+</ul>
+
+<p>我想把A机器的<code>/personal</code>文件夹备份到B机器的<code>/store</code>文件夹。</p>
+
+<ul>
+<li>复制脚本</li>
+</ul>
+
+<p>首先将<code>rsync-incremental-backup-remote</code>脚本复制到A机器的<code>/usr/bin</code>目录。</p>
+
+<ul>
+<li>配置免密登入</li>
+</ul>
+
+<p>如果不想每次备份时都输入密码，需要配置A机器免密登入到B机器，这里不展开说明，主要步骤就是将A机器用户的<code>id_rsa.pub</code>添加到B机器用户的<code>authorized_keys</code>中。</p>
+
+<ul>
+<li>执行备份</li>
+</ul>
+
+<p>可以输入下面的命令：</p>
+
+<pre><code>rsync-incremental-backup-remote /software /store user@ip_of_machineB
+</code></pre>
+
+<ul>
+<li><p>文件列表<br />
+这时候B机器的文件结构如下：</p>
+
+<p>/store
+  |&ndash;backup
+    |&ndash;backup.1
+    |&ndash;backup.2
+    |&ndash;backup.3
+    |&ndash;backup.N
+    |&ndash;log
+  |&ndash;data</p></li>
+</ul>
+
+<p><code>data</code>文件夹中是文件的最新版本，对应下面配置中的<code>pathBak0</code>。</p>
+
+<p><code>backup</code>文件夹里是文件的历史备份版本，对应下面配置中的<code>pathBakN</code>。</p>
+
+<p><code>backup.1</code>是具体的版本， <strong>每一个文件中都是完整备份，不需要额外合成操作</strong> ，数字越小，版本越新，对应下面配置中的<code>nameBakN</code>。</p>
+
+<p><code>log</code>文件夹存放的是备份的日志。</p>
+
+<h4 id="2-增量备份的含义">2.增量备份的含义</h4>
+
+<p>该脚本使用<code>rsync</code>进行增量备份，只传输文件改变的部分，目标目录里面的相同文件采用<code>硬链接</code>， <strong>相同的文件只有保存一份</strong> ，以节省空间。</p>
+
+<p>但是如果变化的是一个很大的文件，虽然每次备份传输的都是增量部分，但是目标端会根据增量变化和之前的文件版本合成文件的最新版本。</p>
+
+<p>如果一直变化的都是这个很大的文件，虽然传输节省了流量，但是目标端并不会节省太多空间。</p>
+
+<h4 id="3-定时任务">3.定时任务</h4>
+
+<p>因为我这边的机器是24小时开机，所以没有使用<code>anacron</code>，直接使用的<code>crontab</code>。</p>
+
+<h5 id="step1">step1:</h5>
+
+<p>我们将需要备份的多条命令都写在<code>backup.sh</code>脚本中：</p>
+
+<pre><code>#!/bin/bash
+
+# gerrit
+rsync-incremental-backup-remote /software/gerrit /workspace/backup/1_gerrit root@114.114.114.114
+# gitlab
+rsync-incremental-backup-remote /software/gitlab /workspace/backup/2_gitlab root@114.114.114.114
+# openldap
+rsync-incremental-backup-remote /software/openldap /workspace/backup/3_openldap root@114.114.114.114
+# self-service-password
+rsync-incremental-backup-remote /software/self-service-password /workspace/backup/4_self-service-password root@114.114.114.114
+</code></pre>
+
+<h5 id="step2">step2:</h5>
+
+<p>使用<code>crontab -e</code>创建定时任务：</p>
+
+<pre><code>0 3 * * * /root/backup.sh
+</code></pre>
+
+<p>意思每天凌晨3点执行一次<code>backup.sh</code>。</p>
+
+<p>添加完成后可以使用<code>crontab -l</code>查看创建的任务。</p>
+
+<hr />
+
+<h4 id="下面是完整的翻译">下面是完整的翻译：</h4>
+
+<h2 id="一-描述">一、描述</h2>
+
+<p>这些脚本执行目标目录到另一个本地或远程目录的增量备份(数量不限)。第一个目录充当主目录(不进行修改)，在第二个目录(从目录)中复制自己。然后，你可以浏览从目录并将任何文件包含到任何以前的备份中。</p>
+
+<p>仅存储新的或修改的数据（因为它们是增量数据），因此备份的大小不会增加太多。</p>
+
+<p>如果备份过程被中断，请不要担心。你可以在脚本的下一次运行中继续执行此操作，而不会丢失数据，也不会重新发送以前传输的数据。</p>
+
+<p>此外，还有一个具有特殊配置的本地备份脚本，用于为<code>GNU/Linux</code>文件系统进行备份。例如，它已经省略了临时路径，可移动路径和其他有问题的路径，并且打算备份到外部挂载点（位于<code>/mnt</code>）。</p>
+
+<h2 id="二-配置">二、配置</h2>
+
+<p>你可以设置一些配置变量来自定义脚本：</p>
+
+<ul>
+<li><code>src</code>：源目录的路径。将对目录里内容进行备份。可以是相对或绝对路径。可被参数覆盖。</li>
+<li><code>dst</code>：目标目录的路径。备份将放置在这里。必须是绝对路径。可被参数覆盖。</li>
+<li><code>remote</code>：ssh_config连接到远程主机的主机名（仅适用于远程版本）。可被参数覆盖。</li>
+<li><code>backupDepth</code>：要保留的备份数量。当达到限制时，最早的备份将被删除。</li>
+<li><code>timeout</code>：备份超时时间，如果超时备份进程没有响应，备份将被取消。</li>
+<li><code>pathBak0</code>：<code>dst</code>存储最新备份的目录。</li>
+<li><code>partialFolderName</code>：<code>dst</code>存储部分文件的目录。</li>
+<li><code>rotationLockFileName</code>：锁定文件的名称，用于检测先前的备份失败。</li>
+<li><code>pathBakN</code>：<code>dst</code>存放其余备份的目录。</li>
+<li><code>nameBakN</code>：增量备份目录的名称。最后会添加一个索引来显示文件的新旧。</li>
+<li><code>logName</code>：给备份时生成的日志文件的名称。</li>
+<li><code>exclusionFileName</code>：排除模式的文本文件的名称。 你必须在<code>ownFolderName</code>定义的目录中创建它。</li>
+<li><code>ownFolderName</code>：用于在备份进行时保存配置文件和日志的文件夹。</li>
+<li><code>logFolderName</code>：<code>dst</code>存储日志文件的目录。</li>
+<li><code>dateCmd</code>：为GNU运行的命令<code>date</code></li>
+<li><code>interactiveMode</code>：当设置为yes时，标志允许密码登录(仅用于远程版本)。</li>
+</ul>
+
+<p>备份中的所有文件和文件夹(仅本地和远程)对所有用户具有读权限，因为不可读的备份是无用的。如果你担心权限问题，可以在备份访问级别上添加一个安全层(例如，使用密码保护的FTP帐户)。你还可以保留原始文件和文件夹的权限，从脚本中删除<code>--chmod=+r</code>标志。在系统备份中，默认情况下保留原始权限。</p>
+
+<h2 id="三-用法">三、用法</h2>
+
+<h3 id="一-设置ssh-config-对于远程版本">（一）设置ssh_config（对于远程版本）</h3>
+
+<p>这个脚本是在没有用户干预的情况下运行的，因此需要授权源机器访问远程机器。要做到这一点，你应该使用ssh密钥来识别你，并设置一个ssh主机来正确地使用它们。</p>
+
+<p>有很多教程专门介绍这些主题，你可以遵循其中之一。我不会对此做更详细的解释，但这里有一些很好的参考资料:</p>
+
+<ul>
+<li>How To Set Up SSH Keys</li>
+<li>OpenSSH Config File Examples</li>
+</ul>
+
+<p>之后，应该使用ssh配置文件中的<code>Host</code>值作为脚本中的<code>remote</code>值。</p>
+
+<p>如果你确实需要在没有SSH密钥身份验证的情况下使用这个脚本，请不要担心。可以将<code>interactiveMode</code>配置变量设置为<code>yes</code>，如果需要，将提示输入密码(仅一次)。当远程服务器需要通过密码进行身份验证时，这对于手动备份非常有用。</p>
+
+<h3 id="二-自定义配置值">（二）自定义配置值</h3>
+
+<p>你至少需要配置<code>src</code>和<code>dst</code>(远程版本中还必须要配置<code>remote</code>)的值，可以在脚本里配置或者在运行时传参:</p>
+
+<ul>
+<li><code>$ ./rsync-incremental-backup-local /new/path/to/source /new/path/to/target</code>(<code>src</code>and <code>dst</code>).</li>
+<li><code>$ ./rsync-incremental-backup-remote /new/path/to/source /new/path/to/target new_ssh_remote</code>(<code>src</code>, <code>dst</code>and <code>remote</code>).</li>
+<li><code>$ ./rsync-incremental-backup-system /mnt/new/path/to/target</code>(only <code>dst</code>, <code>src</code>is always <em>root</em> on this case).</li>
+</ul>
+
+<p>如果要从备份中排除某些文件或目录，请将其路径（相对于备份根目录）添加到引用的文本文件中<code>exclusionFileName</code>。</p>
+
+<p>配置好自己的变量值后，您只需运行脚本即可开始备份过程。</p>
+
+<p>此外，所有的配置变量，除了那些是由参数重写（<code>src</code>，<code>dst</code>和<code>remote</code>），都可以从外部通过脚本执行之前设置变量（或导出为环境变量）改变。例如，在<code>ownFolderName</code>不编辑脚本的情况下更改变量：</p>
+
+<pre><code>$ ownFolderName=&quot;.backup&quot; rsync-incremental-backup-remote /path/to/src /path/to/dst user@remote
+
+# Or using an environment variable (maybe set at user session startup)
+$ export ownFolderName=&quot;.backup&quot;
+$ rsync-incremental-backup-remote /path/to/src /path/to/dst user@remote
+</code></pre>
+
+<h3 id="三-自动备份">（三）自动备份</h3>
+
+<p>就我个人而言，我将它安排为每周在anacron的用户模式下运行。这样，我就不需要记得运行它了。</p>
+
+<p>要在用户模式下使用anacron，必须遵循以下步骤:</p>
+
+<ul>
+<li><p>在home目录创建<code>.anacron</code>，并使用子文件夹<code>etc</code>和<code>spool</code>。</p>
+
+<p>$ mkdir -p ~/.anacron/etc ~/.anacron/spool</p></li>
+</ul>
+
+<p>使用以下内容在<code>~/.anacron/etc</code>创建<code>anacrontab</code>文件。（或等效文件，请确保指定正确的脚本路径）：</p>
+
+<pre><code># /etc/anacrontab: configuration file for anacron
+
+# See anacron(8) and anacrontab(5) for details.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+START_HOURS_RANGE=8-22
+
+# period delay job-identifier command
+7 5 weekly_backup ~/bin/rsync-incremental-backup-remote
+</code></pre>
+
+<ul>
+<li><p>让你的anacron在登录时开始。将以下内容添加到<code>~/.profile</code>文件的末尾：</p>
+
+<h1 id="user-anacron">User anacron</h1>
+
+<p>/usr/sbin/anacron -s -t ${HOME}/.anacron/etc/anacrontab -S ${HOME}/.anacron/spool</p></li>
+</ul>
+
+<h3 id="四-检查备份内容">（四）检查备份内容</h3>
+
+<p>如果使用默认文件夹名称，则最新的数据备份将位于<code>/data</code>中。 第二个最新备份位于<code>/backup/backup.1</code>内部，下一个位于<code>
+/backup/backup.2</code>中，依此类推。每个备份操作的日志文件将存储在<code>/log</code>中。</p>
+
+<h2 id="四-rsync参数说明">四、rsync参数说明</h2>
+
+<ul>
+<li><p><code>-a</code>：存档模式；等于-rlptgoD（无-H，-A，-X）。强制使用备份。</p></li>
+
+<li><p><code>-c</code>：根据校验和而不是修改时间和大小跳过。更可信，但速度较慢。如果要更快地备份，请忽略此标志，但是不会检测到未更改修改时间或大小的文件是否包含在备份中。</p></li>
+
+<li><p><code>-h</code>：以易于阅读的格式输出数字。</p></li>
+
+<li><p><code>-v</code>：增加日志记录的详细程度。</p></li>
+
+<li><p><code>-z</code>：在传输过程中压缩文件数据。传输的数据较少，但速度较慢。当备份目标是本地设备或本地网络中的计算机（或远程计算机的带宽较高）时，请忽略此标志。</p></li>
+
+<li><p><code>--progress</code>：显示传输过程中每个文件的进度。仅用于交互式使用。</p></li>
+
+<li><p><code>--timeout</code>：以秒为单位设置I/O超时。如果在指定时间内未传输任何数据，则备份将中止。</p></li>
+
+<li><p><code>--delete</code>：从目标目录中删除无关的文件。强制使用主从备份。</p></li>
+
+<li><p><code>--link-dest</code>：在未更改的情况下硬链接到指定目录中的文件，以减少备份之间重复文件的存储使用量。</p></li>
+
+<li><p><code>--log-file</code>：将我们正在执行的操作记录到指定的文件中。</p></li>
+
+<li><p><code>--chmod</code>：影响文件和/或目录权限。</p></li>
+
+<li><p><code>--exclude</code>：排除文件匹配模式。</p></li>
+
+<li><p><code>--exclude-from</code>：同<code>--exclude</code>，但从指定的文件获取模式。</p></li>
+
+<li><p>仅用于远程备份：</p>
+
+<ul>
+<li><code>--no-W</code>：确保使用rsync的增量传输算法，因此如果目标处存在整个文件，则永远不会传输整个文件。仅当您具有高带宽目标时才省略，备份可能会更快。</li>
+<li><code>--partial-dir</code>：将部分传输的文件放入指定目录，而不是在传输文件的原始路径中使用隐藏文件。强制允许部分传输以避免文件不完整或者文件损坏造成的误导。</li>
+</ul></li>
+
+<li><p>仅用于本地备份：</p>
+
+<ul>
+<li><code>-W</code>：忽略rsync的增量传输算法，因此它始终传输整个文件。当目标带宽较高（本地文件系统或LAN）时，备份可能会更快。</li>
+</ul></li>
+
+<li><p>仅用于系统备份：</p>
+
+<ul>
+<li><code>-A</code>：保留ACL（表示-p）。</li>
+</ul></li>
+
+<li><p>仅用于日志发送：</p>
+
+<ul>
+<li><code>-r</code>：递归到目录中。</li>
+<li><code>--remove-source-files</code>：发送方删除同步文件（非目录）。</li>
+</ul></li>
+</ul>
+
+<h2 id="五-参考文献">五、参考文献</h2>
+
+<p>灵感来自于：</p>
+
+<ul>
+<li>Incremental Backups on Linux.</li>
+<li>Rsync full system backup.</li>
+</ul>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

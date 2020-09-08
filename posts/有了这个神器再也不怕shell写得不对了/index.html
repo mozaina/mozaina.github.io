@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>有了这个神器再也不怕shell写得不对了 | 开发者问答集锦</title>
+    <meta property="og:title" content="有了这个神器再也不怕shell写得不对了 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="有了这个神器再也不怕shell写得不对了">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%9C%89%E4%BA%86%E8%BF%99%E4%B8%AA%E7%A5%9E%E5%99%A8%E5%86%8D%E4%B9%9F%E4%B8%8D%E6%80%95shell%E5%86%99%E5%BE%97%E4%B8%8D%E5%AF%B9%E4%BA%86/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">有了这个神器再也不怕shell写得不对了</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>来源：公众号【编程珠玑】</p>
+
+<p>作者：守望先生</p>
+
+<p>ID：shouwangxiansheng</p>
+
+<p>​</p>
+
+<p>写过shell脚本的人都知道，即便出现一些简单的语法错误，运行的时候也可能没有办法发现。有些看似运行正确的脚本，实际上可能在某些分支，某些场景下仍然出现错误，而有的写法可能运行正常，但是却不符合POSIX标准，不具备可移植性。</p>
+
+<p>诚然，shell脚本是解释运行，没有办法向C/C++那样严格检查，但是我们仍然可以借助一些工具帮助我们提前发现一些错误。</p>
+
+<h2 id="shellcheck">shellcheck</h2>
+
+<p>shellcheck就是这样的一个工具。它可以在多种场景下使用，包括在线，命令行检查，编辑器配置，下面逐一介绍。</p>
+
+<h2 id="在线使用">在线使用</h2>
+
+<p>顾名思义，它提供了一个在线的检查地址，<a href="https://www.shellcheck.net/，进入网址即可使用。">https://www.shellcheck.net/，进入网址即可使用。</a><br />
+例如，你输入你的脚本内容：</p>
+
+<pre><code>#!/bin/sh
+for n in {1..$RANDOM}
+do
+  str=&quot;&quot;
+  if (( n % 3 == 0 ))
+  then
+    str=&quot;fizz&quot;
+  fi
+  if [ $[n%5] == 0 ]
+  then
+    str=&quot;$strbuzz&quot;
+  fi
+  if [[ ! $str ]]
+  then
+    str=&quot;$n&quot;
+  fi
+  echo &quot;$str&quot;
+done
+</code></pre>
+
+<p>shell<br />
+它会给出错误提示或者建议：</p>
+
+<pre><code>Line 2:
+for n in {1..$RANDOM}
+         ^-- SC2039: In POSIX sh, brace expansion is undefined.
+             ^-- SC2039: In POSIX sh, RANDOM is undefined.
+
+Line 5:
+  if (( n % 3 == 0 ))
+     ^-- SC2039: In POSIX sh, standalone ((..)) is undefined.
+
+Line 9:
+  if [ $[n%5] == 0 ]
+       ^-- SC2039: In POSIX sh, $[..] in place of $((..)) is undefined.
+       ^-- SC2007: Use $((..)) instead of deprecated $[..]
+              ^-- SC2039: In POSIX sh, == in place of = is undefined.
+
+Line 11:
+    str=&quot;$strbuzz&quot;
+         ^-- SC2154: strbuzz is referenced but not assigned.
+
+Line 13:
+  if [[ ! $str ]]
+     ^-- SC2039: In POSIX sh, [[ ]] is undefined.
+</code></pre>
+
+<p>怎么样，是不是很给力，每个可能的错误都提示了。新手写shell出现莫名的报错时，可以尝试使用奥。当然例子中很多并不是真的错误，而是某种写法不符合POSIX标准，这种情况也应该避免。<br />
+关于shell的基本内容，也可以参考《shell必备基础知识》。</p>
+
+<h2 id="命令行使用">命令行使用</h2>
+
+<p>命令行安装也很简单(记得使用root权限)，ubuntu下：</p>
+
+<pre><code>$ apt-get install shellcheck
+</code></pre>
+
+<p>centos下：</p>
+
+<pre><code>$ yum -y install epel-release
+</code></pre>
+
+<p>Fedora下：</p>
+
+<pre><code>$ dnf install ShellCheck
+</code></pre>
+
+<p>使用方法也很简单了：</p>
+
+<pre><code>$ shellcheck myscript.sh
+</code></pre>
+
+<p>举个例子，下面的写法是新手最容易出错的地方之一：</p>
+
+<pre><code>//来源：公众号【编程珠玑】
+//作者：守望先生
+#!/bin/bash
+if[ $# -eq 0 ]
+then
+    echo &quot;no para&quot;
+else
+    echo &quot;$# para&quot;
+fi
+exit 0
+</code></pre>
+
+<p>看运行报错：</p>
+
+<pre><code>./test.sh: line 4: if[ 0 -eq 0 ]: command not found
+./test.sh: line 5: syntax error near unexpected token `then'
+./test.sh: line 5: `then'
+</code></pre>
+
+<p>只是告诉你在then附近有语法问题，到底什么问题呢？我们用shellcheck看看：</p>
+
+<pre><code>$ shellcheck test.sh
+In test.sh line 4:
+if[ $# -eq 0 ]
+  ^-- SC1069: You need a space before the [.
+</code></pre>
+
+<p>这么一看，就很清楚了，原来[前面少了空格。</p>
+
+<h2 id="编辑器中使用">编辑器中使用</h2>
+
+<p>当然也可以把它安装到你熟悉的编辑器中，虽然它们本身都有语法高亮的功能，但是并没有直接的信息提示，安装shellcheck类工具，达到编写即提示的效果。</p>
+
+<ul>
+<li><p>Emacs, 可以使用 Flycheck.</p></li>
+
+<li><p>Sublime,可以使用 SublimeLinter.</p></li>
+
+<li><p>Atom，可以使用 Linter.</p></li>
+
+<li><p>vim ,可以使用ale或者syntastic</p></li>
+</ul>
+
+<p>当然了，现代很多IDE都有这样检查功能，这里只说编辑器。</p>
+
+<p>这里以syntastic为例，实际上它支持多种语言的语法检查。<br />
+安装过程：</p>
+
+<p>1.安装pathogen.vim</p>
+
+<pre><code>$ mkdir -p ~/.vim/autoload ~/.vim/bundle &amp;&amp; \
+curl -LSso ~/.vim/autoload/pathogen.vim https://tpo.pe/pathogen.vim
+</code></pre>
+
+<p>并且在vimrc文件中配置以下内容：</p>
+
+<pre><code>execute pathogen#infect()
+</code></pre>
+
+<p>2.安装 Install syntastic</p>
+
+<pre><code>cd ~/.vim/bundle &amp;&amp; \
+git clone --depth=1 https://github.com/vim-syntastic/syntastic.git
+</code></pre>
+
+<p>3.测试安装情况<br />
+打开vim，输入以下内容</p>
+
+<pre><code>:Helptags
+</code></pre>
+
+<p>如果没有报错，说明安装正常。<br />
+在vimrc中配置以下内容：</p>
+
+<pre><code>set statusline+=%#warningmsg#
+set statusline+=%{SyntasticStatuslineFlag()}
+set statusline+=%*
+
+let g:syntastic_always_populate_loc_list = 1
+let g:syntastic_auto_loc_list = 1
+let g:syntastic_check_on_open = 1
+</code></pre>
+
+<p>常用：</p>
+
+<pre><code>:Errors 显示错误面板
+:lnext  到下一个错误
+:lprevious 到上一个错误
+</code></pre>
+
+<p>更多安装详情也可以参考<a href="https://github.com/vim-syntastic/syntastic。">https://github.com/vim-syntastic/syntastic。</a></p>
+
+<p>以上是官网推荐的安装方式，也可以在安装了Vundle（这是一种老旧的插件管理方式，你可以尝试vim-
+plug等其他插件管理工具）的前提下，通过在配置文件中加入：</p>
+
+<pre><code>Plugin 'scrooloose/syntastic'
+</code></pre>
+
+<p>打开vim输入：</p>
+
+<pre><code>：PluginInstall
+</code></pre>
+
+<p>即可安装。<br />
+，具体安装方式可以参考《vim完整开发环境配置&ndash;老旧版》。</p>
+
+<p>使用效果：</p>
+
+<p>shell检查：</p>
+
+<p><a href="https://img.it610.com/image/info8/a2ae2bef2d4440c5bd61502231c1fa39.jpg"><img src="https://img.it610.com/image/info8/a2ae2bef2d4440c5bd61502231c1fa39.jpg" alt="有了这个神器，再也不怕shell写得不对了_第1张图片" /></a></p>
+
+<p>C语言语法检查：</p>
+
+<p><a href="https://img.it610.com/image/info8/6be1307d22124c10aebf53936e186cd5.jpg"><img src="https://img.it610.com/image/info8/6be1307d22124c10aebf53936e186cd5.jpg" alt="有了这个神器，再也不怕shell写得不对了_第2张图片" /></a></p>
+
+<p>实际上它可以支持几乎所有常见编程语言的语法检查。</p>
+
+<p>具体可以查看这里<br />
+<a href="https://github.com/vim-syntastic/syntastic/blob/master/doc/syntastic-">https://github.com/vim-syntastic/syntastic/blob/master/doc/syntastic-</a>
+checkers.txt</p>
+
+<p>不知道vimrc文件在哪里？<br />
+打开vim，输入：</p>
+
+<pre><code>：version
+</code></pre>
+
+<p>就可以看到啦：</p>
+
+<pre><code>   system vimrc file: &quot;$VIM/vimrc&quot;
+     user vimrc file: &quot;$HOME/.vimrc&quot;
+ 2nd user vimrc file: &quot;~/.vim/vimrc&quot;
+      user exrc file: &quot;$HOME/.exrc&quot;
+  system gvimrc file: &quot;$VIM/gvimrc&quot;
+    user gvimrc file: &quot;$HOME/.gvimrc&quot;
+2nd user gvimrc file: &quot;~/.vim/gvimrc&quot;
+    system menu file: &quot;$VIMRUNTIME/menu.vim&quot;
+</code></pre>
+
+<p>它们区别在于生效范围不一样，对于用户的vimrc，自然只是对特定用户生效。</p>
+
+<h2 id="总结">总结</h2>
+
+<p>工欲善其事必先利其器，有好的工具，自然就该用起来。欢迎分享更多的方法或工具。</p>
+
+<p><img src="https://img.it610.com/image/info8/45ab7a1906044f7394ce3c117292e727.jpg" alt="" /></p>
+
+<p>相关精彩推荐</p>
+
+<p><img src="https://img.it610.com/image/info8/a3f2f4ad6d0847c4a2850c8f83c7a49d.jpg" alt="" /></p>
+
+<p>这些必备的shell知识你都掌握了吗</p>
+
+<p>如何理解 Linux shell中“2&gt;&amp;1”？</p>
+
+<p>两步将Linux终端骚操作做成动图！</p>
+
+<p>关注公众号【编程珠玑】，获取更多Linux/C/C++/数据结构与算法/计算机基础/工具等原创技术文章。后台免费获取经典电子书和视频资源</p>
+
+<p><img src="https://img.it610.com/image/info8/ba3febee044a43eea762978e5489cd93.jpg" alt="" /></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

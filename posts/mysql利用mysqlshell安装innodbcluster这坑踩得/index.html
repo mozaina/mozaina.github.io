@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>MYSQL利用MYSQLShell安装INNODBCluster这坑踩得 | 开发者问答集锦</title>
+    <meta property="og:title" content="MYSQL利用MYSQLShell安装INNODBCluster这坑踩得 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="MYSQL利用MYSQLShell安装INNODBCluster这坑踩得">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/mysql%E5%88%A9%E7%94%A8mysqlshell%E5%AE%89%E8%A3%85innodbcluster%E8%BF%99%E5%9D%91%E8%B8%A9%E5%BE%97/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">MYSQL利用MYSQLShell安装INNODBCluster这坑踩得</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><a href="https://img.it610.com/image/info8/39a81490b6264d21a4f5b68f77a0f886.jpg"><img src="https://img.it610.com/image/info8/39a81490b6264d21a4f5b68f77a0f886.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第1张图片" /></a></p>
+
+<p>MYSQL 8 发布有一段时间了，关于MGR 哦不现在叫MGR，雅致的名字 innodb cluster
+的官方解决方案也是有一段时间了。虽然解决方案不止这个，但官方的方案还是要熟悉了解的。(注意：一定要用官方的社区版，如果使用percona最新的8.019版本依然在使用
+mysqlsh 会报用户权限的错误，但这个错误是在官方版本8.014发生的问题,所以使用官方的解决方案,需要配合官方的社区版，另外使用 MYSQL
+8.019的percona版本用传统方式安装也会有问题，唉)</p>
+
+<p>基本上用了半天的时间,研究了mysql shell 的方式安装，也看了很多其他的文章，但实际上基本按照上面去做，成功的概率&hellip;&hellip;</p>
+
+<p>下面是踩坑实录</p>
+
+<p>以下安装环境均已官方社区最新版 8.019为基准</p>
+
+<p>【实验环境</p>
+
+<p>192.168.198.100</p>
+
+<p>192.168.198.101</p>
+
+<p>192.168.198.102</p>
+
+<p>】</p>
+
+<p>当然官方的架构图如下</p>
+
+<p><a href="https://img.it610.com/image/info8/847c03921b584c04a2d95789bf83722e.png"><img src="https://img.it610.com/image/info8/847c03921b584c04a2d95789bf83722e.png" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第2张图片" /></a></p>
+
+<p>作为计划的一部分 mysql shell 除了上次讲的主要的功能，还有一个上次没有说的，就是对集群的管理和安装。</p>
+
+<p>在使用mysql shell 之前还要给你的帐号（这里我们用 admin）,赋予相关的权限，否则是无法进行工作的，如果不赋予相关的权限，mysql
+shell也会在你使用的时候，报错。（这里仅仅是指安装集群时）</p>
+
+<p>下面是相关的权限。</p>
+
+<p>CREATE USER admin@&lsquo;%&rsquo; identified by &lsquo;admin&rsquo;;</p>
+
+<p>GRANT BACKUP_ADMIN, CLONE_ADMIN, CREATE USER, EXECUTE, FILE,
+PERSIST_RO_VARIABLES_ADMIN, PROCESS, RELOAD, REPLICATION CLIENT, REPLICATION
+SLAVE, SELECT, SHUTDOWN, SUPER, SYSTEM_VARIABLES_ADMIN ON <em>.</em> TO &lsquo;admin&rsquo;@&lsquo;%&rsquo;
+WITH GRANT OPTION;<br />
+GRANT DELETE, INSERT, UPDATE ON mysql.* TO &lsquo;admin&rsquo;@&lsquo;%&rsquo; WITH GRANT OPTION;<br />
+GRANT ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES,
+CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES,
+REFERENCES, SHOW VIEW, TRIGGER, UPDATE ON mysql_innodb_cluster_metadata.* TO
+&lsquo;admin&rsquo;@&lsquo;%&rsquo; WITH GRANT OPTION;<br />
+GRANT ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES,
+CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES,
+REFERENCES, SHOW VIEW, TRIGGER, UPDATE ON mysql_innodb_cluster_metadata_bkp.*
+TO &lsquo;admin&rsquo;@&lsquo;%&rsquo; WITH GRANT OPTION;<br />
+GRANT ALTER, ALTER ROUTINE, CREATE, CREATE ROUTINE, CREATE TEMPORARY TABLES,
+CREATE VIEW, DELETE, DROP, EVENT, EXECUTE, INDEX, INSERT, LOCK TABLES,
+REFERENCES, SHOW VIEW, TRIGGER, UPDATE ON
+mysql_innodb_cluster_metadata_previous.* TO &lsquo;admin&rsquo;@&lsquo;%&rsquo; WITH GRANT OPTION;</p>
+
+<p>以上的帐号也是我们在操作mysql innodb cluster 的帐号</p>
+
+<p>直接下载mysqlshell 的rpm 安装包，直接键入 mysqlsh ，每台MYSQL 都要安装，以后如果采用这一方案 mysql shell
+将是你必要的工具</p>
+
+<p><a href="https://img.it610.com/image/info8/5284555128a840c28bc6ec45f4f0cfc3.jpg"><img src="https://img.it610.com/image/info8/5284555128a840c28bc6ec45f4f0cfc3.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第3张图片" /></a></p>
+
+<p>就进入到了mysql shell ,其中mysql shell中有很多关于DBA 的命令集合，可以看出，这些命令基本都是围绕我们的 innodb
+cluster</p>
+
+<p>checkInstanceConfiguration()</p>
+
+<p>createReplicaSet()</p>
+
+<p>getReplicaSet()</p>
+
+<p>stopSandboxInstance()<br />
+configureInstance()</p>
+
+<p>deleteSandboxInstance()</p>
+
+<p>help()</p>
+
+<p>upgradeMetadata()<br />
+configureLocalInstance()</p>
+
+<p>deploySandboxInstance()</p>
+
+<p>killSandboxInstance()<br />
+configureReplicaSetInstance()</p>
+
+<p>dropMetadataSchema()</p>
+
+<p>rebootClusterFromCompleteOutage()<br />
+createCluster()</p>
+
+<p>getCluster()</p>
+
+<p>startSandboxInstance()</p>
+
+<p>1 我们先对我们的单机的 mysql 进行检查，看看我们的配置哪里还有问题（针对innodb cluster）</p>
+
+<p>dba.checkInstanceConfiguration(&lsquo;admin@192.168.198.100:3306&rsquo;)</p>
+
+<p><a href="https://img.it610.com/image/info8/f7adafa3fe614581b1f570817fa5ef1a.jpg"><img src="https://img.it610.com/image/info8/f7adafa3fe614581b1f570817fa5ef1a.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第4张图片" /></a></p>
+
+<p>我们可以很明显的看出来，我当前如果要使用 innodb cluster 中在配置有一个错误，我的 binlog_checksum
+当前的设置是有问题的。我需要将其改为none</p>
+
+<p><a href="https://img.it610.com/image/info8/247cf442ab98499bb156c16a813c2bf9.jpg"><img src="https://img.it610.com/image/info8/247cf442ab98499bb156c16a813c2bf9.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第5张图片" /></a></p>
+
+<p>三台机器，在均ok的情况下，可以进行下一步的配置 （当然这里很可能有不会OK ，可能的问题 ，GTID 开没有开， 你设置那个帐号是要进行innodb
+cluster 集群操作的帐号，权限是否有，你的 enforce_gtid_consistency 开没有看，如果这些都不知道，建议先百度一下）</p>
+
+<p>这里假设，你一切都是OK 的</p>
+
+<p>我们直接通过刚才 admin 帐号来进行操作,进入mysqlsh</p>
+
+<p>通过 \connect 命令来连接进来你的第一个 mysql innodb cluster ,这里我连接了100</p>
+
+<p><a href="https://img.it610.com/image/info8/a64a9c066e43491cb2300ed224d6bd6c.jpg"><img src="https://img.it610.com/image/info8/a64a9c066e43491cb2300ed224d6bd6c.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第6张图片" /></a></p>
+
+<p>dba.createCluster(&lsquo;cluster&rsquo;) 通过这个命令我们开始建立我们的 innodb cluster</p>
+
+<p><a href="https://img.it610.com/image/info8/be9cbd044b8342eb8dd905b66d2658c3.jpg"><img src="https://img.it610.com/image/info8/be9cbd044b8342eb8dd905b66d2658c3.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第7张图片" /></a></p>
+
+<p>var cluster = dba.getCluster()<br />
+cluster.status()</p>
+
+<p><a href="https://img.it610.com/image/info8/1f4084b47d7e4ac8ac24a33b9d2f670f.jpg"><img src="https://img.it610.com/image/info8/1f4084b47d7e4ac8ac24a33b9d2f670f.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第8张图片" /></a></p>
+
+<p>目前到这里是一切OK ，坑就就在下面了，而且看了一轮文章，包括中文的，英文的，一概不谈。</p>
+
+<p>按照文档，下面我们直接使用cluster.addInstance(&lsquo;admin@mgr2:3306&rsquo;)，将第二个节点加入到集群中。</p>
+
+<p><a href="https://img.it610.com/image/info8/3c30c47199ac4b98b36c0c8e3106c700.jpg"><img src="https://img.it610.com/image/info8/3c30c47199ac4b98b36c0c8e3106c700.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第9张图片" /></a></p>
+
+<p>报错了，原因也找到了，是我其中一台机器和其他的机器（primary 和standby 的小版本不同导致，虽然都是8.019，但percona 和
+社区版是无法之间是无法使用 clone的功能的）。</p>
+
+<p>OK 我们将所有的节点都更换成，官方的社区版，再次添加节点，依然报错</p>
+
+<p><a href="https://img.it610.com/image/info8/0c5006643578475ea75356633006f65c.jpg"><img src="https://img.it610.com/image/info8/0c5006643578475ea75356633006f65c.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第10张图片" /></a></p>
+
+<p>卡在哪里，卡在clone 里，这也是最浪费时间的排错的问题，因为无论在官方的文档，还是第三方的中文，英文的文档都没有谈这个问题，所以耗费了一点时间。</p>
+
+<p>实际上我们只要在standby节点做以下两个工作即可（按正常的逻辑说，系统是应该在操作clone之前判断的，但实际上，根本没有，导致操作的过程系统是克隆了，但对方的机器根本不接受这个clone的文件）</p>
+
+<p>INSTALL PLUGIN clone SONAME &lsquo;mysql_clone.so&rsquo;;<br />
+SET GLOBAL clone_valid_donor_list = &lsquo;mgr1:3306&rsquo;;</p>
+
+<p>关键就是差者两句，应该是所有的节点都要安装插件，然后需要在standby节点设置，允许standby节点能接受来自mgr1节点的数据，否则无法添加节点，进入到集群中。做完这两句在mgr
+2 mgr 3 后，整体的工作就很顺利了。</p>
+
+<p><a href="https://img.it610.com/image/info8/5d5bf8003c384628ae71858dd07e1bfb.jpg"><img src="https://img.it610.com/image/info8/5d5bf8003c384628ae71858dd07e1bfb.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第11张图片" /></a></p>
+
+<p>所以到此为止，我的集群通过mysql shell 的方式来安装是成功的。</p>
+
+<p><a href="https://img.it610.com/image/info8/f8564b5f9fdb4b489217fa1861fc2d2f.jpg"><img src="https://img.it610.com/image/info8/f8564b5f9fdb4b489217fa1861fc2d2f.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第12张图片" /></a></p>
+
+<p>整体的感官就是MYSQL 的集群安装通过mysql shell的方式来安装，很方便，但你要有一些基本的知识</p>
+
+<p>1 JS 的简单语法</p>
+
+<p>2 CLONE 的基本知识</p>
+
+<p>否则你的安装很难顺利。</p>
+
+<p>当然上面的安装整体的过程，以及后续的故障转移过程，上面的方式还会有漏洞。</p>
+
+<p>1 需要设置整体集群的clone 的参数设置，这样在故障转移时就会游刃有余</p>
+
+<p>2 每个节点要添加除自己以外的所有节点的 clone_valid_donor_list 否则故障转移成功后，故障节点重新加入不会那么顺利。</p>
+
+<p>另外根据以上操作，以后通过mysqlshell + 程序的方式来对 INNODB CLUSTER 进行管理，将比以前管理MYSQL
+的集群要方便，并且可以进行更多的高度自动化。</p>
+
+<p>对8.017的clone 功能不熟悉的可以按去年的一篇，下方链接</p>
+
+<p><a href="https://img.it610.com/image/info8/6fbaeab0904d4019bb23d6a000af9361.jpg"><img src="https://img.it610.com/image/info8/6fbaeab0904d4019bb23d6a000af9361.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第13张图片" /></a></p>
+
+<p><a href="https://mp.weixin.qq.com/s?__biz=Mzg4NDA0NTEwNA==&amp;mid=2247487298&amp;idx=1&amp;sn=68cac3a74b2c19479e8792a0810bd606&amp;chksm=cfbf6b1df8c8e20b69e6d19fede969a31d010dc069fb38862bd01c1294942a7c813eeb8b89e0&amp;token=1927311027&amp;lang=zh_CN#rd">https://mp.weixin.qq.com/s?__biz=Mzg4NDA0NTEwNA==&amp;mid=2247487298&amp;idx=1&amp;sn=68cac3a74b2c19479e8792a0810bd606&amp;chksm=cfbf6b1df8c8e20b69e6d19fede969a31d010dc069fb38862bd01c1294942a7c813eeb8b89e0&amp;token=1927311027&amp;lang=zh_CN#rd</a></p>
+
+<p><a href="https://img.it610.com/image/info8/e722a457d30049da8d27878ed1d7ce5e.jpg"><img src="https://img.it610.com/image/info8/e722a457d30049da8d27878ed1d7ce5e.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第14张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/fbd0aebd71114603b549c76d9eb2315b.jpg"><img src="https://img.it610.com/image/info8/fbd0aebd71114603b549c76d9eb2315b.jpg" alt="MYSQL 利用 MYSQL Shell 安装 INNODB Cluster
+这坑踩得_第15张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

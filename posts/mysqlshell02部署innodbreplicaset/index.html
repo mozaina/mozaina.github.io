@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>MySQLShell02部署InnoDBReplicaSet | 开发者问答集锦</title>
+    <meta property="og:title" content="MySQLShell02部署InnoDBReplicaSet - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="MySQLShell02部署InnoDBReplicaSet">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/mysqlshell02%E9%83%A8%E7%BD%B2innodbreplicaset/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">MySQLShell02部署InnoDBReplicaSet</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><a href="https://img.it610.com/image/info8/d86708dbd6a242aca5feac53217bf015.jpg"><img src="https://img.it610.com/image/info8/d86708dbd6a242aca5feac53217bf015.jpg" alt="MySQL Shell：02 部署InnoDB
+ReplicaSet_第1张图片" /></a></p>
+
+<p>点击 <strong>蓝字</strong> 关注我们</p>
+
+<p>2020年1月除了来源信息如迷之故事会一般的冠状病毒外，MySQL 官方发布了全新的8.0.19版本，而其中最大的亮点莫过于ReplicaSet功能。</p>
+
+<p><strong>I</strong> nnoDB <strong>R</strong> eplicaSet由一个主数据库和多个辅助数据库组成 ，
+可以使用ReplicaSet对象和AdminAPI操作，在发生故障时手动故障转移到新的主数据库。</p>
+
+<p>官方的MySQL Router同样也支持ReplicaSet，可自动配置、使用InnoDB ReplicaSet，无需手动配置文件。</p>
+
+<p>InnoDB ReplicaSet 先决条件：</p>
+
+<ul>
+<li><p>仅支持MySQL 8.0及更高版本</p></li>
+
+<li><p>仅支持基于GTID的复制</p></li>
+
+<li><p>仅支持基于行的复制（RBR），不支持基于语句的复制（SBR）</p></li>
+
+<li><p>不支持复制过滤,比如只复制某个库、表。</p></li>
+
+<li><p>一个副本集最多包含一个 primary 主实例，支持一个或多个 secondaries 辅助实例。可以添加的辅助实例数量无限制，但由于会占用路由资源，也不要搞得太多。</p></li>
+
+<li><p>ReplicaSet必须由MySQL Shell管理, 如：复制帐户的创建和管理。直接用SQL语句无法操作副本集</p></li>
+</ul>
+
+<p>通常InnoDB ReplicaSet本身不能提供高可用性。与InnoDB Cluster相比，InnoDB
+ReplicaSet并不十分完善，使用起来也有不少限制，因此还是建议尽可能部署InnoDB Cluster。</p>
+
+<p>InnoDB ReplicaSet的限制包括：</p>
+
+<ul>
+<li><p>没有自动故障转移。如果主服务器不可用，则需要使用AdminAPI手动触发故障转移，然后才能再次进行任何更改。</p></li>
+
+<li><p>故障之前尚未应用的事务可能会丢失。虽然辅助实例仍然可用于读取，但是无法防止因意外停止或不可用而导致部分数据丢失。</p></li>
+
+<li><p>无法防止崩溃或不可用后出现不一致情况。如果故障转移在辅助节点仍可用的情况下提升了辅助节点（例如，由于网络分区），则可能会因脑裂而引起不一致。</p></li>
+</ul>
+
+<hr />
+
+<p><strong>1. 配置ReplicaSet</strong></p>
+
+<h1 id="在-etc-hosts-中加入主机名">在/etc/hosts 中加入主机名</h1>
+
+<p>192.168.0.77 bj77</p>
+
+<p>192.168.0.78 bj78</p>
+
+<p>192.168.0.79 bj79</p>
+
+<h1 id="在3个库中修改参数文件-确保server-id不同-gtid开启">在3个库中修改参数文件，确保server_id不同，gtid开启：</h1>
+
+<h1 id="测试库1">测试库1：</h1>
+
+<p>report_host = bj77</p>
+
+<p>report_port = 3306</p>
+
+<p>enforce_gtid_consistency = 1</p>
+
+<p>gtid_mode = 1</p>
+
+<p>server_id = 777</p>
+
+<h1 id="测试库2">测试库2：</h1>
+
+<p>report_host = bj78</p>
+
+<p>report_port = 3306</p>
+
+<p>enforce_gtid_consistency = 1</p>
+
+<p>gtid_mode = 1</p>
+
+<p>server_id = 888</p>
+
+<h1 id="测试库3">测试库3：</h1>
+
+<p>report_host = bj79</p>
+
+<p>report_port = 3306</p>
+
+<p>enforce_gtid_consistency = 1</p>
+
+<p>gtid_mode = 1</p>
+
+<p>server_id = 999</p>
+
+<h1 id="在节点1-192-168-0-77-bj77-启动mysql-shell">在节点1 (192.168.0.77 bj77)启动MySQL Shell：</h1>
+
+<p>mysqlsh -uroot -P3306 -p&rdquo;*****&rdquo;</p>
+
+<h1 id="配置replicaset实例-根据提示输入root密码">配置ReplicaSet实例，根据提示输入root密码</h1>
+
+<pre><code>MySQL 8.0.19 localhost:33060+ ssl  JS &gt; dba.configureReplicaSetInstance('root@localhost:3306', {clusterAdmin: &quot;'rsadmin'@'%'&quot;, clusterAdminPassword: 'TestRepl@123'});
+Please provide the password for 'root@localhost:3306': *********
+Save password for 'root@localhost:3306'? [Y]es/[N]o/Ne[v]er (default No): 
+Configuring local MySQL instance listening at port 3306 for use in an InnoDB ReplicaSet...
+
+This instance reports its own address as bj77:3306
+Clients and other cluster members will communicate with it through this address by default. If this is not correct, the report_host MySQL system variable should be changed.
+
+The instance 'bj77:3306' is valid to be used in an InnoDB ReplicaSet.
+Cluster admin user 'rsadmin'@'%' created.
+The instance 'bj77:3306' is already ready to be used in an InnoDB ReplicaSet.
+</code></pre>
+
+<h1 id="创建replicaset">创建ReplicaSet</h1>
+
+<pre><code>MySQL 8.0.19 localhost:33060+ ssl  JS &gt; var rs = dba.createReplicaSet(&quot;TestReplicaset&quot;)
+A new replicaset with instance 'bj77:3306' will be created.
+
+* Checking MySQL instance at bj77:3306
+
+This instance reports its own address as bj77:3306
+bj77:3306: Instance configuration is suitable.
+
+* Updating metadata...
+
+ReplicaSet object successfully created for bj77:3306.
+Use rs.addInstance() to add more asynchronously replicated instances to this replicaset and rs.status() to check its status.
+</code></pre>
+
+<h1 id="检查状态">检查状态：</h1>
+
+<p><a href="https://img.it610.com/image/info8/a2ef6b9edf7d470e933f669f49d1e982.jpg"><img src="https://img.it610.com/image/info8/a2ef6b9edf7d470e933f669f49d1e982.jpg" alt="MySQL Shell：02 部署InnoDB
+ReplicaSet_第2张图片" /></a></p>
+
+<h1 id="添加第二个节点-bj78-192-168-0-78-仍然在节点1操作">添加第二个节点：bj78 192.168.0.78 （仍然在节点1操作）</h1>
+
+<h1 id="这里用刚才建立的用户配置失败-这是因为rsadmin并没有在节点2创建">这里用刚才建立的用户配置失败，这是因为rsadmin并没有在节点2创建。</h1>
+
+<p><a href="https://img.it610.com/image/info8/654f1985109a4ada81f636390993fe7c.jpg"><img src="https://img.it610.com/image/info8/654f1985109a4ada81f636390993fe7c.jpg" alt="" /></a></p>
+
+<h1 id="因此偷个懒不指定用户-由系统自动生成">因此偷个懒不指定用户，由系统自动生成</h1>
+
+<p><a href="https://img.it610.com/image/info8/d7704b65d0274584936d9a6f1d5f4a3e.jpg"><img src="https://img.it610.com/image/info8/d7704b65d0274584936d9a6f1d5f4a3e.jpg" alt="MySQL Shell：02 部署InnoDB
+ReplicaSet_第3张图片" /></a></p>
+
+<h1 id="从库数据恢复方式-选择-c-克隆方式">从库数据恢复方式：选择 C 克隆方式</h1>
+
+<p><a href="https://img.it610.com/image/info8/758dbef9e3fc400b8365fd4c84cba717.jpg"><img src="https://img.it610.com/image/info8/758dbef9e3fc400b8365fd4c84cba717.jpg" alt="MySQL Shell：02 部署InnoDB
+ReplicaSet_第4张图片" /></a></p>
+
+<h1 id="再次查看集群状态-可以看到节点2已经添加-角色secondary">再次查看集群状态，可以看到节点2已经添加，角色SECONDARY</h1>
+
+<p><a href="https://img.it610.com/image/info8/bfdfe517604747e3afeb6e2caf81f1ab.jpg"><img src="https://img.it610.com/image/info8/bfdfe517604747e3afeb6e2caf81f1ab.jpg" alt="MySQL Shell：02 部署InnoDB
+ReplicaSet_第5张图片" /></a></p>
+
+<h1 id="同样方式添加节点3-bj79-192-168-0-79-仍然在节点1操作">同样方式添加节点3：bj79 192.168.0.79 （仍然在节点1操作）</h1>
+
+<p><a href="https://img.it610.com/image/info8/69f6d9f822e149059358b22616b803ba.jpg"><img src="https://img.it610.com/image/info8/69f6d9f822e149059358b22616b803ba.jpg" alt="MySQL Shell：02 部署InnoDB
+ReplicaSet_第6张图片" /></a></p>
+
+<h1 id="查看集群状态-3个节点都有了-1个primary-2个secondary">查看集群状态，3个节点都有了，1个PRIMARY，2个SECONDARY</h1>
+
+<pre><code>MySQL 8.0.19 localhost:3306 ssl  JS &gt; rs.status() 
+{
+    &quot;replicaSet&quot;: {
+        &quot;name&quot;: &quot;TestReplicaset&quot;, 
+        &quot;primary&quot;: &quot;bj77:3306&quot;, 
+        &quot;status&quot;: &quot;AVAILABLE&quot;, 
+        &quot;statusText&quot;: &quot;All instances available.&quot;, 
+        &quot;topology&quot;: {
+            &quot;bj77:3306&quot;: {
+                &quot;address&quot;: &quot;bj77:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;PRIMARY&quot;, 
+                &quot;mode&quot;: &quot;R/W&quot;, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }, 
+            &quot;bj78:3306&quot;: {
+                &quot;address&quot;: &quot;bj78:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;SECONDARY&quot;, 
+                &quot;mode&quot;: &quot;R/O&quot;, 
+                &quot;replication&quot;: {
+                    &quot;applierStatus&quot;: &quot;APPLIED_ALL&quot;, 
+                    &quot;applierThreadState&quot;: &quot;Slave has read all relay log; waiting for more updates&quot;, 
+                    &quot;receiverStatus&quot;: &quot;ON&quot;, 
+                    &quot;receiverThreadState&quot;: &quot;Waiting for master to send event&quot;, 
+                    &quot;replicationLag&quot;: null
+                }, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }, 
+            &quot;bj79:3306&quot;: {
+                &quot;address&quot;: &quot;bj79:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;SECONDARY&quot;, 
+                &quot;mode&quot;: &quot;R/O&quot;, 
+                &quot;replication&quot;: {
+                    &quot;applierStatus&quot;: &quot;APPLIED_ALL&quot;, 
+                    &quot;applierThreadState&quot;: &quot;Slave has read all relay log; waiting for more updates&quot;, 
+                    &quot;receiverStatus&quot;: &quot;ON&quot;, 
+                    &quot;receiverThreadState&quot;: &quot;Waiting for master to send event&quot;, 
+                    &quot;replicationLag&quot;: null
+                }, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }
+        }, 
+        &quot;type&quot;: &quot;ASYNC&quot;
+    }
+}
+</code></pre>
+
+<h1 id="连接到2个secondary节点-看到复制状态正常">连接到2个SECONDARY节点，看到复制状态正常。</h1>
+
+<h1 id="而自动建立复制账号的格式-mysql-innodb-rs-加-本机的server-id">而自动建立复制账号的格式：mysql_innodb<em>rs</em> 加 本机的server_id</h1>
+
+<pre><code>[root@localhost][(none)]&gt; show slave status\G
+*************************** 1. row ***************************
+               Slave_IO_State: Waiting for master to send event
+                  Master_Host: bj77
+                  Master_User: mysql_innodb_rs_888   show slave status\G
+*************************** 1. row ***************************
+               Slave_IO_State: Waiting for master to send event
+                  Master_Host: bj77
+                  Master_User: mysql_innodb_rs_999 
+</code></pre>
+
+<h1 id="在user表里也可看到这3个用户-和对应的权限">在user表里也可看到这3个用户，和对应的权限</h1>
+
+<p><a href="https://img.it610.com/image/info8/1c14075b849b418599abf74d105b0b15.jpg"><img src="https://img.it610.com/image/info8/1c14075b849b418599abf74d105b0b15.jpg" alt="MySQL Shell：02 部署InnoDB
+ReplicaSet_第7张图片" /></a></p>
+
+<hr />
+
+<p>**2 <strong>.</strong> 管理ReplicaSet**</p>
+
+<p>常用的命令：</p>
+
+<ul>
+<li><p>ReplicaSet.addInstance() 添加实例</p></li>
+
+<li><p>ReplicaSet.removeInstance() 移除实例</p></li>
+
+<li><p>ReplicaSet.getName() 检查ReplicaSet名称</p></li>
+
+<li><p>ReplicaSet.status() 检查ReplicaSet的状态信息</p></li>
+
+<li><p>ReplicaSet.rejoinInstance() 重新加入集群</p></li>
+
+<li><p>\help ReplicaSet或 ReplicaSet.help() 获取帮助命令</p>
+
+<p>MySQL 8.0.19 localhost:3306 ssl  mysql  JS &gt; \help ReplicaSet
+NAME
+      ReplicaSet - Represents an InnoDB ReplicaSet.</p>
+
+<p>DESCRIPTION
+      The ReplicaSet object is used to manage MySQL server topologies that use
+      asynchronous replication. It can be created using the
+      dba.createReplicaSet() or dba.getReplicaSet() functions.</p>
+
+<p>PROPERTIES
+      name
+            Returns the name of the replicaset.</p>
+
+<p>FUNCTIONS
+      addInstance(instance[, options])
+            Adds an instance to the replicaset.</p>
+
+<p>      disconnect()
+            Disconnects all internal sessions used by the replicaset object.</p>
+
+<p>      forcePrimaryInstance(instance, options)
+            Performs a failover in a replicaset with an unavailable PRIMARY.</p>
+
+<p>      getName()
+            Returns the name of the replicaset.</p>
+
+<p>      help([member])
+            Provides help about this class and it s members</p>
+
+<p>      listRouters([options])
+            Lists the Router instances.</p>
+
+<p>      rejoinInstance(instance[, options])
+            Rejoins an instance to the replicaset.</p>
+
+<p>      removeInstance(instance[, options])
+            Removes an Instance from the replicaset.</p>
+
+<p>      removeRouterMetadata(routerDef)
+            Removes metadata for a router instance.</p>
+
+<p>      setPrimaryInstance(instance, options)
+            Performs a safe PRIMARY switchover, promoting the given instance.</p>
+
+<p>      status([options])
+            Describe the status of the replicaset.</p>
+
+<p>      For more help on a specific function, use the \help shell command, e.g.:
+      \help ReplicaSet.addInstance</p></li>
+</ul>
+
+<hr />
+
+<p>**3 <strong>.</strong> 主从切换测试**</p>
+
+<h1 id="目前的集群角色">目前的集群角色：</h1>
+
+<p>192.168.0.77 bj77 &ndash;主</p>
+
+<p>192.168.0.78 bj78 &ndash;从</p>
+
+<p>192.168.0.79 bj79 &ndash;从</p>
+
+<h1 id="使用setprimaryinstance可以手动切换">使用setPrimaryInstance可以手动切换：</h1>
+
+<h1 id="在此示例中-将把-bj78-更改为primary并将-bj77-更改为-secondary成员">在此示例中，将把 bj78 更改为PRIMARY并将 bj77 更改为 SECONDARY成员。</h1>
+
+<pre><code> MySQL 8.0.19 localhost:3306 ssl  mysql  JS &gt; var rs = dba.getReplicaSet()  
+You are connected to a member of replicaset 'TestReplicaset'.
+ MySQL 8.0.19 localhost:3306 ssl  mysql  JS &gt; rs.setPrimaryInstance('bj78:3306')
+bj78:3306 will be promoted to PRIMARY of 'TestReplicaset'.
+The current PRIMARY is bj77:3306.
+
+* Connecting to replicaset instances
+** Connecting to bj77:3306
+** Connecting to bj78:3306
+** Connecting to bj79:3306
+** Connecting to bj77:3306
+** Connecting to bj78:3306
+** Connecting to bj79:3306
+
+* Performing validation checks
+** Checking async replication topology...
+** Checking transaction state of the instance...
+
+* Synchronizing transaction backlog at bj78:3306
+
+* Updating metadata
+
+* Acquiring locks in replicaset instances
+** Pre-synchronizing SECONDARIES
+** Acquiring global lock at PRIMARY
+** Acquiring global lock at SECONDARIES
+
+* Updating replication topology
+** Configuring bj77:3306 to replicate from bj78:3306
+** Changing replication source of bj79:3306 to bj78:3306
+
+bj78:3306 was promoted to PRIMARY.
+</code></pre>
+
+<h1 id="检查状态-当前主库已经是bj78了">检查状态，当前主库已经是bj78了。</h1>
+
+<pre><code>MySQL 8.0.19 localhost:3306 ssl  mysql  JS &gt; rs.status()
+{
+    &quot;replicaSet&quot;: {
+        &quot;name&quot;: &quot;TestReplicaset&quot;, 
+        &quot;primary&quot;: &quot;bj78:3306&quot;, 
+        &quot;status&quot;: &quot;AVAILABLE&quot;, 
+        &quot;statusText&quot;: &quot;All instances available.&quot;, 
+        &quot;topology&quot;: {
+            &quot;bj77:3306&quot;: {
+                &quot;address&quot;: &quot;bj77:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;SECONDARY&quot;, 
+                &quot;mode&quot;: &quot;R/O&quot;, 
+                &quot;replication&quot;: {
+                    &quot;applierStatus&quot;: &quot;APPLIED_ALL&quot;, 
+                    &quot;applierThreadState&quot;: &quot;Slave has read all relay log; waiting for more updates&quot;, 
+                    &quot;receiverStatus&quot;: &quot;ON&quot;, 
+                    &quot;receiverThreadState&quot;: &quot;Waiting for master to send event&quot;, 
+                    &quot;replicationLag&quot;: null
+                }, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }, 
+            &quot;bj78:3306&quot;: {
+                &quot;address&quot;: &quot;bj78:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;PRIMARY&quot;, 
+                &quot;mode&quot;: &quot;R/W&quot;, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }, 
+            &quot;bj79:3306&quot;: {
+                &quot;address&quot;: &quot;bj79:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;SECONDARY&quot;, 
+                &quot;mode&quot;: &quot;R/O&quot;, 
+                &quot;replication&quot;: {
+                    &quot;applierStatus&quot;: &quot;APPLIED_ALL&quot;, 
+                    &quot;applierThreadState&quot;: &quot;Slave has read all relay log; waiting for more updates&quot;, 
+                    &quot;receiverStatus&quot;: &quot;ON&quot;, 
+                    &quot;receiverThreadState&quot;: &quot;Waiting for master to send event&quot;, 
+                    &quot;replicationLag&quot;: null
+                }, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }
+        }, 
+        &quot;type&quot;: &quot;ASYNC&quot;
+    }
+}
+</code></pre>
+
+<hr />
+
+<p>**4 <strong>.</strong> 故障转移**</p>
+
+<p>与InnoDB Cluster不同，InnoDB ReplicaSet
+没有自动故障检测与组复制机制。在主库发生意外故障时，并不会自动故障转移。如果主库损坏不可用，ReplicaSet实际上是只读的，必须选择一个新主库。</p>
+
+<p>使用ReplicaSet.forcePrimaryInstance()
+可以强制配置（故障转移）PRIMARY实例。这只能在当前主库不可用，且无法还原的灾难发生中才使用。</p>
+
+<p>这次测试切换到bj79</p>
+
+<h1 id="目前的集群角色-1">目前的集群角色：</h1>
+
+<p>192.168.0.77 bj77 从</p>
+
+<p>192.168.0.78 bj78 主</p>
+
+<p>192.168.0.79 bj79 从</p>
+
+<h1 id="当主库正常可用时使用这个命令是无效的">当主库正常可用时使用这个命令是无效的。</h1>
+
+<pre><code>MySQL 8.0.19 localhost:3306 ssl  mysql  JS &gt; rs.forcePrimaryInstance('bj79:3306')
+* Connecting to replicaset instances
+** Connecting to bj77:3306
+** Connecting to bj79:3306
+
+* Waiting for all received transactions to be applied
+** Waiting for received transactions to be applied at bj77:3306
+** Waiting for received transactions to be applied at bj79:3306
+bj79:3306 will be promoted to PRIMARY of the replicaset and the former PRIMARY will be invalidated.
+
+* Checking status of last known PRIMARY
+PRIMARY bj78:3306 is still available.
+Operation not allowed while there is still an available PRIMARY. Use setPrimaryInstance() to safely switch the PRIMARY.
+ReplicaSet.forcePrimaryInstance: PRIMARY still available (MYSQLSH 51116)
+</code></pre>
+
+<h1 id="在主库bj78-上kill掉mysqld-safe-mysqld">在主库bj78 上kill掉mysqld_safe、mysqld</h1>
+
+<p>步骤略</p>
+
+<h1 id="连接到bj79-确认当前集群主库bj78已不可用报错">连接到bj79，确认当前集群主库bj78已不可用报错。</h1>
+
+<pre><code> MySQL 8.0.19 localhost:3306 ssl  JS &gt; var rs = dba.getReplicaSet() 
+You are connected to a member of replicaset 'TestReplicaset'.
+ MySQL 8.0.19 localhost:3306 ssl  JS &gt; rs.status()
+ERROR: Unable to connect to the PRIMARY of the replicaset TestReplicaset: bj78:3306: Can't connect to MySQL server on 'bj78' (111)
+Cluster change operations will not be possible unless the PRIMARY can be reached.
+If the PRIMARY is unavailable, you must either repair it or perform a forced failover.
+See \help forcePrimaryInstance for more information.
+WARNING: MYSQLSH 51118: PRIMARY instance is unavailable
+{
+    &quot;replicaSet&quot;: {
+        &quot;name&quot;: &quot;TestReplicaset&quot;, 
+        &quot;primary&quot;: &quot;bj78:3306&quot;, 
+        &quot;status&quot;: &quot;UNAVAILABLE&quot;, 
+        &quot;statusText&quot;: &quot;PRIMARY instance is not available, but there is at least one SECONDARY that could be force-promoted.&quot;, 
+        &quot;topology&quot;: {
+            &quot;bj77:3306&quot;: {
+                &quot;address&quot;: &quot;bj77:3306&quot;, 
+                &quot;fenced&quot;: true, 
+                &quot;instanceErrors&quot;: [
+                    &quot;ERROR: Replication I/O thread (receiver) has stopped with an error.&quot;
+                ], 
+                &quot;instanceRole&quot;: &quot;SECONDARY&quot;, 
+                &quot;mode&quot;: &quot;R/O&quot;, 
+                &quot;replication&quot;: {
+                    &quot;applierStatus&quot;: &quot;APPLIED_ALL&quot;, 
+                    &quot;applierThreadState&quot;: &quot;Slave has read all relay log; waiting for more updates&quot;, 
+                    &quot;expectedSource&quot;: &quot;bj78:3306&quot;, 
+                    &quot;receiverLastError&quot;: &quot;error reconnecting to master 'mysql_innodb_rs_777@bj78:3306' - retry-time: 60 retries: 2 message: Can't connect to MySQL server on 'bj78' (111)&quot;, 
+                    &quot;receiverLastErrorNumber&quot;: 2003, 
+                    &quot;receiverLastErrorTimestamp&quot;: &quot;2020-01-23 19:55:59.782554&quot;, 
+                    &quot;receiverStatus&quot;: &quot;ERROR&quot;, 
+                    &quot;receiverThreadState&quot;: &quot;&quot;, 
+                    &quot;replicationLag&quot;: null, 
+                    &quot;source&quot;: &quot;bj78:3306&quot;
+                }, 
+                &quot;status&quot;: &quot;ERROR&quot;, 
+                &quot;transactionSetConsistencyStatus&quot;: null
+            }, 
+            &quot;bj78:3306&quot;: {
+                &quot;address&quot;: &quot;bj78:3306&quot;, 
+                &quot;connectError&quot;: &quot;bj78:3306: Can't connect to MySQL server on 'bj78' (111)&quot;, 
+                &quot;fenced&quot;: null, 
+                &quot;instanceRole&quot;: &quot;PRIMARY&quot;, 
+                &quot;mode&quot;: null, 
+                &quot;status&quot;: &quot;UNREACHABLE&quot;
+            }, 
+            &quot;bj79:3306&quot;: {
+                &quot;address&quot;: &quot;bj79:3306&quot;, 
+                &quot;fenced&quot;: true, 
+                &quot;instanceErrors&quot;: [
+                    &quot;ERROR: Replication I/O thread (receiver) has stopped with an error.&quot;
+                ], 
+                &quot;instanceRole&quot;: &quot;SECONDARY&quot;, 
+                &quot;mode&quot;: &quot;R/O&quot;, 
+                &quot;replication&quot;: {
+                    &quot;applierStatus&quot;: &quot;APPLIED_ALL&quot;, 
+                    &quot;applierThreadState&quot;: &quot;Slave has read all relay log; waiting for more updates&quot;, 
+                    &quot;expectedSource&quot;: &quot;bj78:3306&quot;, 
+                    &quot;receiverLastError&quot;: &quot;error reconnecting to master 'mysql_innodb_rs_999@bj78:3306' - retry-time: 60 retries: 2 message: Can't connect to MySQL server on 'bj78' (111)&quot;, 
+                    &quot;receiverLastErrorNumber&quot;: 2003, 
+                    &quot;receiverLastErrorTimestamp&quot;: &quot;2020-01-23 19:55:59.782926&quot;, 
+                    &quot;receiverStatus&quot;: &quot;ERROR&quot;, 
+                    &quot;receiverThreadState&quot;: &quot;&quot;, 
+                    &quot;replicationLag&quot;: null, 
+                    &quot;source&quot;: &quot;bj78:3306&quot;
+                }, 
+                &quot;status&quot;: &quot;ERROR&quot;, 
+                &quot;transactionSetConsistencyStatus&quot;: null
+            }
+        }, 
+        &quot;type&quot;: &quot;ASYNC&quot;
+    }
+}
+</code></pre>
+
+<h1 id="强制提升bj79为新主库">强制提升bj79为新主库</h1>
+
+<pre><code> MySQL 8.0.19 localhost:3306 ssl  JS &gt; rs.forcePrimaryInstance('bj79:3306')
+* Connecting to replicaset instances
+** Connecting to bj77:3306
+** Connecting to bj79:3306
+
+* Waiting for all received transactions to be applied
+** Waiting for received transactions to be applied at bj79:3306
+** Waiting for received transactions to be applied at bj77:3306
+bj79:3306 will be promoted to PRIMARY of the replicaset and the former PRIMARY will be invalidated.
+
+* Checking status of last known PRIMARY
+NOTE: bj78:3306 is UNREACHABLE
+* Checking status of promoted instance
+NOTE: bj79:3306 has status ERROR
+* Checking transaction set status
+* Promoting bj79:3306 to a PRIMARY...
+
+* Updating metadata...
+
+bj79:3306 was force-promoted to PRIMARY.
+NOTE: Former PRIMARY bj78:3306 is now invalidated and must be removed from the replicaset.
+* Updating source of remaining SECONDARY instances
+** Changing replication source of bj77:3306 to bj79:3306
+
+Failover finished successfully.
+</code></pre>
+
+<h1 id="检查当前状态">检查当前状态：</h1>
+
+<h1 id="注意现在是available-partial即-主库虽然可用-但有secondary节点不可用">注意现在是AVAILABLE_PARTIAL即：主库虽然可用，但有SECONDARY节点不可用</h1>
+
+<pre><code> MySQL 8.0.19 localhost:3306 ssl  JS &gt; rs.status()
+{
+    &quot;replicaSet&quot;: {
+        &quot;name&quot;: &quot;TestReplicaset&quot;, 
+        &quot;primary&quot;: &quot;bj79:3306&quot;, 
+        &quot;status&quot;: &quot;AVAILABLE_PARTIAL&quot;, 
+        &quot;statusText&quot;: &quot;The PRIMARY instance is available, but one or more SECONDARY instances are not.&quot;, 
+        &quot;topology&quot;: {
+            &quot;bj77:3306&quot;: {
+                &quot;address&quot;: &quot;bj77:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;SECONDARY&quot;, 
+                &quot;mode&quot;: &quot;R/O&quot;, 
+                &quot;replication&quot;: {
+                    &quot;applierStatus&quot;: &quot;APPLIED_ALL&quot;, 
+                    &quot;applierThreadState&quot;: &quot;Slave has read all relay log; waiting for more updates&quot;, 
+                    &quot;receiverStatus&quot;: &quot;ON&quot;, 
+                    &quot;receiverThreadState&quot;: &quot;Waiting for master to send event&quot;, 
+                    &quot;replicationLag&quot;: null
+                }, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }, 
+            &quot;bj78:3306&quot;: {
+                &quot;address&quot;: &quot;bj78:3306&quot;, 
+                &quot;connectError&quot;: &quot;bj78:3306: Can't connect to MySQL server on 'bj78' (111)&quot;, 
+                &quot;fenced&quot;: null, 
+                &quot;instanceRole&quot;: null, 
+                &quot;mode&quot;: null, 
+                &quot;status&quot;: &quot;INVALIDATED&quot;
+            }, 
+            &quot;bj79:3306&quot;: {
+                &quot;address&quot;: &quot;bj79:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;PRIMARY&quot;, 
+                &quot;mode&quot;: &quot;R/W&quot;, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }
+        }, 
+        &quot;type&quot;: &quot;ASYNC&quot;
+    }
+}
+</code></pre>
+
+<h1 id="启动原主库bj78">启动原主库bj78：</h1>
+
+<p>步骤略</p>
+
+<h1 id="启动后的bj78仍然无法加入集群">启动后的bj78仍然无法加入集群：</h1>
+
+<pre><code>&quot;bj78:3306&quot;: {
+     &quot;address&quot;: &quot;bj78:3306&quot;, 
+     &quot;fenced&quot;: false, 
+     &quot;instanceErrors&quot;: [
+          &quot;WARNING: Instance was INVALIDATED and must be removed from the replicaset.&quot;, 
+          &quot;ERROR: Instance is NOT a PRIMARY but super_read_only option is OFF. Accidental updates to this instance are possible and will cause inconsistencies in the replicaset.&quot;
+     ], 
+     &quot;instanceRole&quot;: null, 
+     &quot;mode&quot;: null, 
+     &quot;status&quot;: &quot;INVALIDATED&quot;, 
+     &quot;transactionSetConsistencyStatus&quot;: &quot;OK&quot;
+},
+</code></pre>
+
+<h1 id="使用-rs-rejoininstance-重新加入集群">使用 rs.rejoinInstance() 重新加入集群</h1>
+
+<pre><code> MySQL 8.0.19 localhost:3306 ssl  JS &gt; rs.rejoinInstance('bj78:3306')  
+* Validating instance...
+** Checking transaction state of the instance...
+The safest and most convenient way to provision a new instance is through automatic clone provisioning, which will completely overwrite the state of 'bj78:3306' with a physical snapshot from an existing replicaset member. To use this method by default, set the 'recoveryMethod' option to 'clone'.
+
+WARNING: It should be safe to rely on replication to incrementally recover the state of the new instance if you are sure all updates ever executed in the replicaset were done with GTIDs enabled, there are no purged transactions and the new instance contains the same GTID set as the replicaset or a subset of it. To use this method by default, set the 'recoveryMethod' option to 'incremental'.
+
+Incremental state recovery was selected because it seems to be safely usable.
+
+* Rejoining instance to replicaset...
+** Configuring bj78:3306 to replicate from bj79:3306
+** Checking replication channel status...
+** Waiting for rejoined instance to synchronize with PRIMARY...
+
+* Updating the Metadata...
+The instance 'bj78:3306' rejoined the replicaset and is replicating from bj79:3306.
+</code></pre>
+
+<h1 id="最后检查一下-集群已经完全恢复正常">最后检查一下，集群已经完全恢复正常</h1>
+
+<pre><code> MySQL 8.0.19 localhost:3306 ssl  JS &gt; rs.status()
+{
+    &quot;replicaSet&quot;: {
+        &quot;name&quot;: &quot;TestReplicaset&quot;, 
+        &quot;primary&quot;: &quot;bj79:3306&quot;, 
+        &quot;status&quot;: &quot;AVAILABLE&quot;, 
+        &quot;statusText&quot;: &quot;All instances available.&quot;, 
+        &quot;topology&quot;: {
+            &quot;bj77:3306&quot;: {
+                &quot;address&quot;: &quot;bj77:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;SECONDARY&quot;, 
+                &quot;mode&quot;: &quot;R/O&quot;, 
+                &quot;replication&quot;: {
+                    &quot;applierStatus&quot;: &quot;APPLIED_ALL&quot;, 
+                    &quot;applierThreadState&quot;: &quot;Slave has read all relay log; waiting for more updates&quot;, 
+                    &quot;receiverStatus&quot;: &quot;ON&quot;, 
+                    &quot;receiverThreadState&quot;: &quot;Waiting for master to send event&quot;, 
+                    &quot;replicationLag&quot;: null
+                }, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }, 
+            &quot;bj78:3306&quot;: {
+                &quot;address&quot;: &quot;bj78:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;SECONDARY&quot;, 
+                &quot;mode&quot;: &quot;R/O&quot;, 
+                &quot;replication&quot;: {
+                    &quot;applierStatus&quot;: &quot;APPLIED_ALL&quot;, 
+                    &quot;applierThreadState&quot;: &quot;Slave has read all relay log; waiting for more updates&quot;, 
+                    &quot;receiverStatus&quot;: &quot;ON&quot;, 
+                    &quot;receiverThreadState&quot;: &quot;Waiting for master to send event&quot;, 
+                    &quot;replicationLag&quot;: null
+                }, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }, 
+            &quot;bj79:3306&quot;: {
+                &quot;address&quot;: &quot;bj79:3306&quot;, 
+                &quot;instanceRole&quot;: &quot;PRIMARY&quot;, 
+                &quot;mode&quot;: &quot;R/W&quot;, 
+                &quot;status&quot;: &quot;ONLINE&quot;
+            }
+        }, 
+        &quot;type&quot;: &quot;ASYNC&quot;
+    }
+}
+</code></pre>
+
+<p>总体来说，ReplicaSet的管理方式和MongoDB挺像，但是目前提供出来的功能还不是太完善，而且目的也不是很明确。短期内应该还不会有生产场景敢用，等后期周边配套都完善后，我们再做进一步的测试。</p>
+
+<p><a href="https://img.it610.com/image/info8/ace90f78613f45c29f31a635309505da.jpg"><img src="https://img.it610.com/image/info8/ace90f78613f45c29f31a635309505da.jpg" alt="MySQL Shell：02 部署InnoDB
+ReplicaSet_第8张图片" /></a></p>
+
+<hr />
+
+<p><strong># 历史文章归档</strong></p>
+
+<ul>
+<li>GitHub都在用的高可用工具Orch：</li>
+</ul>
+
+<p>Orchestrator：01 基础篇</p>
+
+<p>Orchestrator：02 高可用方案VIP篇</p>
+
+<p>Orchestrator：03 高可用方案ProxySQL篇</p>
+
+<p>Orchestrator：04 高可用方式部署</p>
+
+<ul>
+<li>Percona 全力打造的监控平台 PMM：</li>
+</ul>
+
+<p>监控利器 PMM2.0X GA 版本发布！</p>
+
+<p>PMM监控的告警配置</p>
+
+<p>PMM的Ansible部署与重点指标</p>
+
+<p>在PMM中添加Redis和ES</p>
+
+<hr />
+
+<p>叶老师新课程《 <strong>MySQL性能优化</strong> 》已经在腾讯课堂发布，本课程讲解读几个MySQL性能优化的核心要素：
+<strong>合理利用索引，降低锁影响，提高事务并发度</strong> 。下面是报名小程序码，厚着脸皮请求大家推荐给需要的小伙伴们。</p>
+
+<p><img src="https://img.it610.com/image/info8/88efb3f0469342d597cf7a0ebf67ff1d.jpg" alt="" /></p>
+
+<p>下面是本课程内容目录</p>
+
+<p><img src="https://img.it610.com/image/info8/af2a5c2c41b04e129b6a2b2fd39bda67.jpg" alt="" /></p>
+
+<p>扫码加入MySQL技术Q群</p>
+
+<p><strong>（群号：</strong> <strong>650149401）</strong></p>
+
+<p><img src="https://img.it610.com/image/info8/9cb01b6825ca49a4ae886e365e604df4.jpg" alt="" /></p>
+
+<p>点“在看”给我一朵小黄花<img src="https://img.it610.com/image/info8/33caca5e27d0406fb4defabf2e794c1f.gif" alt="" /></p>
+
+<p><img src="https://img.it610.com/image/info8/408c37f4af7248ebabd0167083b72fec.jpg" alt="" /></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>树莓派RaspberryPi使用Shell编写的极简Service | 开发者问答集锦</title>
+    <meta property="og:title" content="树莓派RaspberryPi使用Shell编写的极简Service - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="树莓派RaspberryPi使用Shell编写的极简Service">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%A0%91%E8%8E%93%E6%B4%BEraspberrypi%E4%BD%BF%E7%94%A8shell%E7%BC%96%E5%86%99%E7%9A%84%E6%9E%81%E7%AE%80service/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">树莓派RaspberryPi使用Shell编写的极简Service</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>2019独角兽企业重金招聘Python工程师标准&gt;&gt;&gt;
+<img src="https://img.it610.com/image/info8/35bf71b4b7ad4a72bcb9c6561b5679b1.jpg" alt="hot3.png" /></p>
+
+<p>树莓派(Raspberry
+Pi)运行的系统是基于Debian的，不仅可以运行Shell，还支持systemd和docker，可以编写一个简单的服务，让其在启动时运行，执行一些自动化的操作。这里在RaspPi
+Zero W上使用shell、systemd和Docker 18.06.1完成，详细步骤介绍如下。</p>
+
+<h2 id="1-初始化系统">1、初始化系统</h2>
+
+<p>从树莓派官网(<a href="https://www.raspberrypi.org/)下载镜像，烧写到SD卡(我用Etcher)。">https://www.raspberrypi.org/)下载镜像，烧写到SD卡(我用Etcher)。</a></p>
+
+<ul>
+<li>下载：<a href="https://www.raspberrypi.org/downloads/raspbian/">https://www.raspberrypi.org/downloads/raspbian/</a></li>
+<li>福利：一个开源的超好用的SD卡/U盘烧写工具</li>
+</ul>
+
+<p>将SD卡插入树莓派，加电启动。</p>
+
+<p>登录使用：pi，raspberry。</p>
+
+<p>如果想要通过ssh远程操作，还需要安装和启用sshd服务开机启动（下面介绍）。</p>
+
+<p>当然，首先是要开通WiFi，能够联网。</p>
+
+<h2 id="2-wifi-设置">2、WiFi 设置</h2>
+
+<p>Wifi AP设置，使用命令 “nano /etc/wpa_supplicant/wpa_supplicant.conf”
+编辑配置文件，参照下面的方法添加WiFi热点：</p>
+
+<pre><code>ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid=&quot;HiWiFi_xxxxxx&quot;
+    psk=&quot;mypassword&quot;
+}
+</code></pre>
+
+<p>建立服务需要使用静态地址。修改文件dhcpcd(使用nano /etc/dhcpcd)，编辑如下内容：</p>
+
+<pre><code>interface wlan0
+noipv6rs
+noipv6
+static ip_address=192.168.199.190
+static routers=192.168.199.1
+domain_name_servers=192.168.199.1 8.8.8.8 9.9.9.9
+</code></pre>
+
+<p>将上面的IP地址和DNS改为自己的，其中8.8.8.<sup>8</sup>&frasl;<sub>9</sub>.9.9.9为公共的DNS服务地址，不需修改。</p>
+
+<p>重启dhcpcd服务（或者需要重启树莓派）。</p>
+
+<p>联网成功后，执行软件版本更新操作。如下：</p>
+
+<pre><code>sudo apt update &amp;&amp; sudo apt upgrade -y 
+</code></pre>
+
+<h2 id="3-编写watchdog和service">3、编写WatchDog和Service</h2>
+
+<p>创建一个自己的目录，创建下面三个文件：</p>
+
+<ul>
+<li>sshp.service，由systemd调用的服务配置文件。</li>
+<li>sshp.daemon，执行服务控制（启动、停止、状态）的脚本文件。</li>
+<li>sshp.worker，执行服务的任务脚本文件。</li>
+</ul>
+
+<p>文件的内容如下。</p>
+
+<h4 id="3-1-sshp-service文件">3.1 sshp.service文件</h4>
+
+<pre><code>[Unit]
+Description=Secure Shell server proxy
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/home/pi/openthings/tutools/sshp.daemon start
+ExecStop=/home/pi/openthings/tutools/sshp.daemon stop
+TimeoutSec=0
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+Alias=sshp.service
+</code></pre>
+
+<h4 id="3-2-sshp-daemon文件">3.2 sshp.daemon文件</h4>
+
+<pre><code>#!/bin/sh
+
+echo &quot;SSHP tools.&quot;
+#=======================
+start() {
+  now=`date '+%Y-%m-%d %H:%M:%S'`
+  echo &quot;$now  Start SSHP worker ...&quot; &gt;&gt; /home/pi/openthings/tutools/sshp.log
+  nohup /home/pi/openthings/tutools/sshp.worker &amp;
+}
+
+#=======================
+stop() {
+  PID=`ps -aux | grep &quot;sshp.worker&quot; | grep -v grep | awk -F &quot; &quot; '{print $2}'`
+  kill -9 $PID
+  echo &quot;Stop SSHP worker, PID=&quot;$PID &gt;&gt; /home/pi/openthings/tutools/sshp.log
+}
+
+#=======================
+restart() {
+  echo &quot;Restart Service...&quot;
+  Stop
+  Start
+  echo &quot;Restarted SSHT worker, PID=&quot;$PID
+}
+
+#=======================
+status() {
+  now=`date '+%Y-%m-%d %H:%M:%S'`
+  echo &quot;$now  Service status ssht.&quot;
+  ps -aux | grep &quot;sshp.worker&quot; | grep -v grep
+}
+
+case &quot;$1&quot; in
+  start) start ;;
+  stop)  stop  ;;
+  restart) restart ;;
+  status) status ;;
+  *)
+    echo &quot;Usage: (start|stop|restart|status)&quot;
+    exit 1
+    ;;
+esac
+
+echo &quot;Service SSHP tools done.&quot;
+exit 0
+</code></pre>
+
+<h4 id="3-3-sshp-worker文件">3.3 sshp.worker文件</h4>
+
+<pre><code>#!/bin/sh
+while true; do
+  sshpass -p mypassword ssh -o &quot;ExitOnForwardFailure yes&quot; -o &quot;StrictHostKeyChecking no&quot; -y -p 22000 -NgD *:5555 root@myserver
+done
+</code></pre>
+
+<ul>
+<li>这里仅使用ssh演示worker编写方法，具体可以参考：SSH 命令行参数详解【英】</li>
+<li>这里有个坑是，以服务启动时的账户是root，与当前用户pi的配置信息和缺省参数是不同的。</li>
+</ul>
+
+<h4 id="3-4-设为启动时运行">3.4 设为启动时运行</h4>
+
+<p>使用下面的命令将刚才编写的服务设为启动时运行：</p>
+
+<pre><code>sudo systemctl enable sshp.service
+</code></pre>
+
+<p>查看一下，系统里的启动运行服务：</p>
+
+<pre><code># ls -l /etc/systemd/system/multi-user.target.wants/
+
+total 0
+lrwxrwxrwx 1 root root 40 Nov 29  2017 avahi-daemon.service -&gt; /lib/systemd/system/avahi-daemon.service
+lrwxrwxrwx 1 root root 41 Nov 29  2017 console-setup.service -&gt; /lib/systemd/system/console-setup.service
+lrwxrwxrwx 1 root root 38 Apr 12 05:45 containerd.service -&gt; /lib/systemd/system/containerd.service
+lrwxrwxrwx 1 root root 32 Nov 29  2017 cron.service -&gt; /lib/systemd/system/cron.service
+lrwxrwxrwx 1 root root 34 Nov 29  2017 dhcpcd.service -&gt; /lib/systemd/system/dhcpcd.service
+lrwxrwxrwx 1 root root 34 Dec 25  2017 docker.service -&gt; /lib/systemd/system/docker.service
+lrwxrwxrwx 1 root root 35 Nov 29  2017 hciuart.service -&gt; /lib/systemd/system/hciuart.service
+lrwxrwxrwx 1 root root 38 Nov 29  2017 networking.service -&gt; /lib/systemd/system/networking.service
+lrwxrwxrwx 1 root root 37 Nov 29  2017 nfs-client.target -&gt; /lib/systemd/system/nfs-client.target
+lrwxrwxrwx 1 root root 48 Nov 29  2017 raspberrypi-net-mods.service -&gt; /lib/systemd/system/raspberrypi-net-mods.service
+lrwxrwxrwx 1 root root 36 Nov 29  2017 remote-fs.target -&gt; /lib/systemd/system/remote-fs.target
+lrwxrwxrwx 1 root root 33 Nov 29  2017 rsync.service -&gt; /lib/systemd/system/rsync.service
+lrwxrwxrwx 1 root root 35 Nov 29  2017 rsyslog.service -&gt; /lib/systemd/system/rsyslog.service
+lrwxrwxrwx 1 root root 40 Apr 12 15:43 sshp.service -&gt; /home/pi/openthings/tutools/sshp.service
+lrwxrwxrwx 1 root root 31 Apr 12 12:40 ssh.service -&gt; /lib/systemd/system/ssh.service
+lrwxrwxrwx 1 root root 37 Nov 29  2017 sshswitch.service -&gt; /lib/systemd/system/sshswitch.service
+lrwxrwxrwx 1 root root 40 Nov 29  2017 triggerhappy.service -&gt; /lib/systemd/system/triggerhappy.service
+lrwxrwxrwx 1 root root 47 Dec 25  2017 unattended-upgrades.service -&gt; /lib/systemd/system/unattended-upgrades.service
+lrwxrwxrwx 1 root root 40 Mar 24  2018 wifi-country.service -&gt; /lib/systemd/system/wifi-country.service
+lrwxrwxrwx 1 root root 42 Apr 12 05:46 wpa_supplicant.service -&gt; /lib/systemd/system/wpa_supplicant.service
+</code></pre>
+
+<h4 id="3-5-测试服务启停">3.5 测试服务启停</h4>
+
+<p>使用下面的命令来控制服务。</p>
+
+<pre><code># 查看服务运行状态。
+sudo systemctl status
+
+# 启动服务。
+sudo systemctl start
+# 然后，可以使用ps -aux查看ssh进程是否已经启动。
+
+# 停止服务。
+sudo systemctl stop
+# 然后，可以使用ps -aux查看ssh进程是否已经关闭。
+</code></pre>
+
+<p>这里设置了一个日志文件，为上面的目录下sshp.log，可以查看输出的信息。</p>
+
+<p>可以修改上面的脚本，添加自己的日志信息输出。</p>
+
+<h2 id="4-docker安装">4、Docker安装</h2>
+
+<p>也可以把任务放到Docker中运行。我这里用于创建一个Nginx服务，然后运行pac信息提供者，为iPhone等设备提供网络配置参数时使用。</p>
+
+<p>获取docker自动安装脚本并执行：</p>
+
+<pre><code>wget https://get.docker.io -O docker.sh
+sudo chmod docker.sh
+./docker.sh
+</code></pre>
+
+<p>目前，最新的Docker版本是18.09，但是运行时有Bug，暂时还没有解决。</p>
+
+<p>我们使用18.06.1版。安装指定的Docker版本：</p>
+
+<pre><code>sudo apt install docker-ce=18.06.1-ce
+</code></pre>
+
+<p>将版本锁定，以避免apt upgrade时自动升级到最新版本，命令如下：</p>
+
+<pre><code>sudo echo &quot;docker-ce hold&quot; | sudo dpkg --set-selections
+</code></pre>
+
+<p>测试一下Docker，看看安装是否成功：</p>
+
+<pre><code>docker info
+</code></pre>
+
+<h2 id="5-构建pac服务">5 构建PAC服务</h2>
+
+<h4 id="pac是什么">pac是什么？</h4>
+
+<p>pac是一种网络配置的机制，客户端通过获取pac文件来自动获取一系列配置参数，从而对网络进行初始化设置。</p>
+
+<p>编写一个pac文件，如下：</p>
+
+<pre><code>function FindProxyForURL(url, host)
+{ 
+     return &quot;SOCKS 192.168.199.190:5555&quot;;
+}
+</code></pre>
+
+<h4 id="pac服务构建">pac服务构建</h4>
+
+<p>然后，将pac文件放入Web服务器，构建一个文件服务（也可以动态生成）。</p>
+
+<p>这里使用Nginx的Docker镜像来提供服务（注意Nginx有多种Docker镜像，只有为树莓派编译的才可以在上面运行）。</p>
+
+<p>运行：</p>
+
+<pre><code>docker run --name nginx -v /home/pi/openthings/web:/usr/share/nginx/www:ro -d -p 80:80 akkerman/rpi-nginx
+</code></pre>
+
+<p>这个安装说明运行了后，所编写的文件并没有发布出来，进去看是因为Nginx缺省路径为/var/www/html，而不是/usr/share/nginx/www。可以修改上面的命令为：</p>
+
+<pre><code>docker run --name nginx -v /home/pi/openthings/web:/var/www/html:ro -d -p 80:80 akkerman/rpi-nginx
+</code></pre>
+
+<p>或者执行Exec进入Docker进行修改，如下：</p>
+
+<pre><code>docker exec -it nginx /bin/sh
+</code></pre>
+
+<p>查看Nginx的service目录：</p>
+
+<pre><code>cat /etc/nginx/sites-available/default
+</code></pre>
+
+<p>建立软连接：</p>
+
+<pre><code>ln -s /usr/share/nginx/www /var/www/html
+</code></pre>
+
+<p>在目录下，建立一个index.html文件，然后到浏览器输入<a href="http://my-raspberrypi-ip，看是否能够发布出来。">http://my-raspberrypi-ip，看是否能够发布出来。</a></p>
+
+<p>然后， _ <strong>将上面的pac文件放到该发布目录下</strong>_ 。</p>
+
+<h2 id="6-测试可用性">6、测试可用性</h2>
+
+<p>现在，可以测试一下，上面建立的服务是否可用。</p>
+
+<ul>
+<li>#### 使用浏览器</li>
+</ul>
+
+<p>打开setting页面，进入网络设置，勾选sokcs5，填入上面的pac地址，勾选dns over https等选项。</p>
+
+<p>输入任何想要访问的地址，等待奇迹出现。</p>
+
+<ul>
+<li>#### 使用iPhone</li>
+</ul>
+
+<p>进入setting，选择网络设置，里面有个“自动”选项，填入上面的pac地址。</p>
+
+<h2 id="7-小结">7、小结</h2>
+
+<p>编写一个Linux服务还是有一些难度的，上面提供了一个极简的框架。</p>
+
+<p>树莓派体积虽小，运行一些控制性服务也是足够了，关键是功耗足够低，还没有任何噪音。</p>
+
+<p>一些定期执行的任务，如缩时摄影、温湿度监测、自动浇水等等有趣的事都可以使用上面的机制来完成。</p>
+
+<h2 id="8-更多参考">8、更多参考</h2>
+
+<ul>
+<li>使用shell编写的极简Ubuntu Service</li>
+<li>AutoSSH-增强ssh的用法【英】</li>
+<li>SSH 命令行参数详解【英】</li>
+<li>vi、vim、nano如何退出？</li>
+<li>wget 持续下载确保完成</li>
+<li>scp实现断点续传的方法</li>
+<li>使用shell编写的极简WatchDog</li>
+</ul>
+
+<p>转载于:<a href="https://my.oschina.net/u/2306127/blog/3036575">https://my.oschina.net/u/2306127/blog/3036575</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>外壳模式shell | 开发者问答集锦</title>
+    <meta property="og:title" content="外壳模式shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="外壳模式shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%A4%96%E5%A3%B3%E6%A8%A1%E5%BC%8Fshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">外壳模式shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>《系统程序员成长计划》这本书中提到了外壳模式的概念。所谓的外壳模式的作用就是：不需要修改原来的应用程序，而控制它的输入和输出（即用户界面），同时应用程序也不知道外壳的存在。当然这样理解会比较麻烦，我们就举个简单的例子，比如已经存在一个应用程序，我们想给该应用程序增添一个新的用户界面，这里有两种选择：1.
+根据该应用程序的内部实现重新编写一个用户界面，但是如果原来的应用程序的用户界面和内部实现没有很好的分离，那么在我们创建新的用户界面的时候就不可避免的会牵扯到旧的用户界面；2.
+利用外壳模式，外壳模式需要一个前提条件：应用程序实现了基于终端的用户界面，即从标准输入中读取数据，向标准输出和标准错误输出显示结果。这时我们可以把标准输入、标准输出和标准错误输出重定向到管道上，向管道里写数据来模拟应用程序的输入和输出。这样就实现了外壳模式。</p>
+
+<p>下面是一个实现自动输入的程序，通过对该程序的解析，在分析过程中会总结下该程序涉及的有关知识。</p>
+
+<pre><code>#include 
+#include 
+
+int main(int argc, char * argv[])
+{
+    int n = 0;
+
+    printf(&quot;Input number: \n&quot;);
+    fflush(stdout);
+    scanf(&quot;%d&quot;, &amp;n);
+    printf(&quot;Your input %d\n&quot;, n);
+
+    return 0;
+}
+
+
+
+
+
+#include 
+#include 
+int main(int argc, char * argv[])
+{
+    int shell_to_app[2] = {0};
+    int app_to_shell[2] = {0};
+
+    pipe(shell_to_app);
+    pipe(app_to_shell);
+
+    if(fork() == 0)
+    {
+        close(shell_to_app[1]);
+        close(app_to_shell[0]);
+        dup2(shell_to_app[0], STDIN_FILENO);
+        dup2(app_to_shell[1], STDOUT_FILENO);
+
+        execl(&quot;./app.exe&quot;, &quot;./app.exe&quot;, NULL);
+    }
+    else
+    {
+        FILE * in = fdopen(app_to_shell[0], &quot;r&quot;);
+        FILE * out = fdopen(shell_to_app[1], &quot;w&quot;);
+
+        char message[256] = {0};
+        close(shell_to_app[0]);
+        close(app_to_shell[1]);
+
+        fgets(message, sizeof(message), in);
+
+        printf(&quot;1: %s\n&quot;, message);
+        fprintf(out, &quot;1234\n&quot;);
+        fflush(out);
+        fgets(message, sizeof(message), in);
+        printf(&quot;2: %s\n&quot;, message);
+        printf(&quot;2: %s\n&quot;, message);
+        fclose(in);
+        fclose(out);
+    }
+    return 0;
+
+}
+</code></pre>
+
+<p>第一个程序就是一个main函数，实现的是简单的输入输出。外壳模式的基本原理主要体现在了第二个程序中，这里面涉及了进程，管道，文件描述符，输入输出流,，execl等一系列的概念，稍后我们会进一步的总结。这里我们针对这个程序对外壳模式的基本原理进行分析。</p>
+
+<p>在讲解外壳模式的概念的时候，曾提到外壳模式是利用管道模拟标准的输入输出。首先我们建立两个管道（为什么是两个呢？在讲解管道概念是会提到），两个管道分别负责两个进程间的读写通信，其次利用dup2函数重定向子进程的标准输入输出，此时我们可以利用建立的两个管道来模拟子程序中的输入输出。</p>
+
+<p>我们逐个解析上面程序用到的概念：</p>
+
+<p>1. 文件描述符</p>
+
+<p>文件描述符（File
+Discriptor）在形式上是一个非负整数。实际上，它是一个索引值，指向内核为每一个进程所维护的该进程打开文件的记录表。当程序打开一个现有文件或者创建一个新文件时，内核向进程返回一个文件描述符。在程序设计中，一些涉及底层的程序编写往往会围绕着文件描述符展开。但是文件描述符这一概念往往只适用于UNIX、Linux这样的操作系统。习惯上把0,1,2的文件描述符定义为标准输入、标准输出和标准错误输出，POSIX
+定义了 STDIN_FILENO、STDOUT_FILENO 和 STDERR_FILENO 来代替 0、1、2。这三个符号常量的定义位于头文件
+unistd.h。这也是上面程序用到的。但是除了Linux和UNIX意外，其他操作系统很难兼容文件描述符，为了解决这个问题，ANSI
+C规范中定义的标准库的文件I/O操作。ANSI
+C规范给出了一个解决方法，就是使用FILE结构体的指针。事实上，UNIX/Linux平台上的FILE结构体的实现中往往都是封装了文件描述符变量在其中。</p>
+
+<p>提到文件描述符，就不得不说另外两个概念：文件描述符表，文件表和V节点。</p>
+
+<p>下面用一个图可以清晰的表述他们之间的关系</p>
+
+<p><a href="https://img.it610.com/image/info8/e019eca1d0dc4ef3825b0f7b96e8b969.jpg"><img src="https://img.it610.com/image/info8/e019eca1d0dc4ef3825b0f7b96e8b969.jpg" alt="外壳模式（shell）_第1张图片" /></a></p>
+
+<p>每个进程都有一个进程表项（包括文件描述符表），其中每项包含了文件描述符和文件指针，未见指针指向文件表中的某一项，文件表中某一项中包含了操作该文件的标志，偏移量以及V节点，V节点指向了文件在物理内存中的具体地址。从图中也可以看出，1个V节点对应多个文件表项，一个文件表可以对应多个进程表项。</p>
+
+<p>与文件描述符相关的函数：</p>
+
+<p>文件描述符的生成<br />
+open(), open64(), creat(), creat64() // 通过文件路径打开或创建一个文件描述符<br />
+socket() //创建一个socket描述符<br />
+socketpair() //创建一个socket对，用于进程间的通信<br />
+pipe() // 创建管道</p>
+
+<p>与单一文件描述符相关的操作<br />
+read(), write() // 对文件描述符的读写，read是指从文件读取数据到内存，write是把内存中的数据写入到文件中去。<br />
+recv(), send() // 用于tcp通信的发送和接受的函数，和read，write类似，但功能更强大<br />
+recvmsg(),sendmsg() // 用于udp通信的发送和接受函数<br />
+sendfile() //升级版的用于通信的函数，可以直接通过内核调用，减少了到应用程序读写两道操作程序，并降低了内存的使用。<br />
+lseek(), lseek64() // 定位当前文件描述符的操作指针<br />
+fstat(), fstat64() // 获取文件状态的函数<br />
+fchmod()// 改变文件rwe权限的函数<br />
+fchown()//改变文件所属用户的函数</p>
+
+<p>与复数文件描述符相关的操作<br />
+select(), pselect()<br />
+poll()</p>
+
+<p>与文件描述符表相关的操作<br />
+close() // 关闭文件描述符<br />
+dup() //复制一个文件描述符<br />
+dup2() // 用于重定向文件描述符<br />
+fcntl (F_DUPFD) //fcntl()用来操作文件描述符的一些特性。fcntl
+不仅可以施加建议性锁，还可以施加强制锁。同时，fcntl还能对文件的某一记录进行上锁，也就是记录锁。<br />
+fcntl (F_GETFD and F_SETFD)</p>
+
+<p>改变进程状态的操作<br />
+fchdir() //改变当前工作目录<br />
+mmap() // 创建共享内存</p>
+
+<p>与文件加锁的操作<br />
+flock()<br />
+fcntl (F_GETLK, F_SETLK and F_SETLKW)<br />
+lockf()</p>
+
+<p>与套接字相关的操作<br />
+connect()<br />
+bind()<br />
+listen()<br />
+accept()<br />
+getsockname()<br />
+getpeername()<br />
+getsockopt(), setsockopt()<br />
+shutdown()</p>
+
+<p>2. 管道</p>
+
+<p>管道是一种半双工的进程通信机制。在另一篇博文进程通信（一）中有提到。这也是上面提到代码中为什么要用两个管道了，因为一个管道只能实现两个进程间单方向的写或者读，使用两个管道可以实现两个进程间的互相的读写。</p>
+
+<p>在回到该代码的分析上，子进程保留了app_to_shell[1],，即app到shell的写的文件描述符，保留了shell_to_app[0]，即app从shell读的文件描述符。代码中的两个dup2函数实现了标准输入输出的重定向，即从shell_to_app[0]文件操作符中读取数据等同于从标准输入（STDIN_FILENO）读取数据；向标准输出（STDOUT_FILENO）写入数据等同于向app_to_shell[1]写入数据。那么这样解释应该对上面的程序有些明了的吧。execl函数的作用是用app.exe应用程序替换子进程进行执行。那么我们就逐一的分析父进程的每个设计文件描述符的语句的意思：</p>
+
+<p>22行： FILE * in = fdopen(app_to_shell[0], &ldquo;r&rdquo;);
+以只读状态打开app_to_shell[0]的文件操作符，返回一个FILE指针，为什么要用fdopen（）函数呢？用fopen（）函数可以吗？答案是不可以的。因为app_to_shell[0]是由pipe（管道创建函数）创建的文件描述符，它是一种特殊类型的文件，它不能用标准I/O
+open函数打开，这类型的文件描述符包括：从 o p e n , d u p , d u p 2 , f c n t l或p i p
+e函数得到此文件描述符。</p>
+
+<p>23行：与22行类似</p>
+
+<p>29行：从in的FILE指针指向的文件中从读取数据到message，而与in对应的文件描述符是app_to_shell[0]，也就是从in中读取的数据应该是由app_to_shell[1]写入的数据，由于子进程向标准输出写入了数据，因此此时的输出应该是“Input
+your number: ”。</p>
+
+<p>32行：向out写入数据“1234\n”，也就是向shell_to_app[1]中写入数据；又因为在子进程app.exe中我们重定向了标准输入为shell_to_app[0]；也即是说app.c中的scanf等同于从shell_to_app[0]中读取数据。</p>
+
+<p>34行：与29行类似，不过这里要说的是，此时在app.exe中的n的值是1234，是由32行决定的，而且子进程app.c也向标准输出写入了n，此时再从app_to_shell[0]中读取数据，可以得到数据“Your
+input number is : 1234”。</p>
+
+<p>最终程序的运行结果是：</p>
+
+<p><a href="https://img.it610.com/image/info8/94cf152ae5a44206a89f3c1bfeafd074.jpg"><img src="https://img.it610.com/image/info8/94cf152ae5a44206a89f3c1bfeafd074.jpg" alt="" /></a></p>
+
+<p>因为我的表述能力不够，不知道这样说大家能明白么，可以尝试的调试下程序，或者自己查查有关函数的概念，就会明白这个外壳模式demo的基本原理了。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

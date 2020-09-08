@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本探测UDP端口状态 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本探测UDP端口状态 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本探测UDP端口状态">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E6%8E%A2%E6%B5%8Budp%E7%AB%AF%E5%8F%A3%E7%8A%B6%E6%80%81/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本探测UDP端口状态</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="udp-端口探测及shell重定向">UDP 端口探测及shell重定向</h1>
+
+<h2 id="需求背景">需求背景</h2>
+
+<p>需要检测服务的某个UDP的端口是否正常。</p>
+
+<h2 id="分析">分析</h2>
+
+<p>UDP是一种无状态，无连接的协议，这一知识点牢记我心，所以第一反应就是这探测没办法做了。只能从其他层面想办法，比如说服务增加一个状态检查的rest接口。通过检查rest接口的状态来判断对应的UDP端口的状态。</p>
+
+<p>直到我终于了解到，原来，不仅仅是TCP，当UDP端口未开启监听时，操作系统也会发送ICMP端口不可达报文。ICMP并不是UDP的一部分,
+所以这和UDP是无连接，无状态的协议这一说法并不矛盾。之前真是一知半解啊。</p>
+
+<h2 id="方案">方案</h2>
+
+<p>总共两步：</p>
+
+<ol>
+<li><p>ping对应IP检测对应IP是否正常。<br />
+约束：对应节点不能关闭ping响应。防火墙不能过滤ICMP 请求和响应报文</p></li>
+
+<li><p>发送一个内容为空的UDP报文：<br />
+1）如果收到了ICMP端口不可达的回复。则认为端口关闭。<br />
+2）如果未收到ICMP端口不可达报文。则有两种可能：<br />
+I）端口正常。不回复。<br />
+约束：UDP端口对应的程序要能够处理报文内容为空的报文。<br />
+II) 防火墙过滤掉了ICMP端口不可达报文<br />
+约束：<br />
+操作系统不能过滤ICMP端口不可达报文<br />
+本身处于同一个局域网，报文传输过程中应该是不会经过防火墙的。</p></li>
+</ol>
+
+<p>备注：<br />
+由于和待检测的节点处于同一个局域网，所以以上约束都是可以实施的。<br />
+由于UDP协议本身的不可靠，所以，可以考虑探测多次，只要有一次不成功则认为不成功。</p>
+
+<h2 id="实现">实现</h2>
+
+<h3 id="python">python</h3>
+
+<p>有人提供了一个基于python的解决方案：</p>
+
+<ol>
+<li>启动抓包程序。</li>
+<li>发送内容为空UDP报文。</li>
+<li>判断一定时间内是否抓到对应的ICMP端口不可达报文。<br />
+此方案通过抓包的方式实现，显然不够优雅。直觉告诉我，显然应该有更优雅的解决方案。<br />
+更重要的是，交付的版本层面上来说，由于涉及到python2和python3的切换，以及如果项目中使用python脚本之后，就需要增加对应的安全扫描之类的工作。总体来说，如果使用python脚本，会增大版本层面的工作量。</li>
+</ol>
+
+<h3 id="java">java</h3>
+
+<p>前段时间，在看这篇文章的时候，看到了这样一段话：</p>
+
+<blockquote>
+<p>这个ICMP错误消息虽然不属于telnet引发的TCP流，但它跟该TCP流却是RELATED的，而RELATED的流会继承原始流的conntrack结构体表项，这就是问题的根本，如果缺失了这个细节，就会带来错误的判断。</p>
+</blockquote>
+
+<p>结合现在遇到的问题，我想到，我们在使用tcp的socket连接时，接收到的connection
+refused信息就是由于操作系统接收到了ICMP端口不可达报文。所以说，这个TCP流收发的ICMP报文，被操作系统送到了同一个socket。</p>
+
+<p>而我们在使用UDP的时候，也是使用的socket连接的，那么UDP是不是也是同样的情况呢？<br />
+查找了一番，果然如此。只不过UDP稍微特殊一点:</p>
+
+<ol>
+<li>需要明确调用bind()函数</li>
+<li>并且发送报文的时候不会直接抛出错误，而是在接收报文的时候返回PortUnreachableException</li>
+</ol>
+
+<p>这个方案显然是比python脚本抓包要优雅一些了。但是：</p>
+
+<ol>
+<li>还需先检测IP是否能ping通，java代码显然不太方便。</li>
+<li>等待可能需要设置一定的超时时间，所以可能需要新开线程去处理。</li>
+<li>java代码产生的结果最终需要传递给keepalived, 比较麻烦。</li>
+</ol>
+
+<h3 id="shell脚本">shell脚本</h3>
+
+<p>既然java的socket能够搞定这个问题，那么shell脚本的socket能不能搞定这个问题呢？如果能够搞定的话，shell脚本应该就是一个比较优雅的解决方案了。</p>
+
+<p>shell提供了一种建立TCP/UDP连接的方法：<br />
+/dev/udp/host/port<br />
+/dev/tcp/host/port</p>
+
+<p>所以，直接重定向当前shell的一个文件描述符到对应的ip/端口：<br />
+<code>exec 8&lt;&gt;/dev/udp/10.0.2.15/12345</code><br />
+就相当于建立一个UDP socket。<br />
+发送报文：<br />
+<code>echo &quot;&quot; &gt;&amp;8</code><br />
+抓包结果：</p>
+
+<pre><code>00:48:18.291124 IP 10.0.2.15.40371 &gt; 10.0.2.15.12345: UDP, length 1
+00:48:18.291145 IP 10.0.2.15 &gt; 10.0.2.15: ICMP 10.0.2.15 udp port 12345 unreachable, length 37
+</code></pre>
+
+<p>由于UDP的无连接性，命令返回的结果依然为成功。</p>
+
+<p>从对应的文件描述符中读取状态：</p>
+
+<pre><code>root@debian2:~# cat 
+</code></pre>
+
+<p>当然，直接往流中再次写入数据，也会得到同样的错误：</p>
+
+<pre><code>root@debian2:~# exec 8&lt;&gt;/dev/udp/10.0.2.15/12345
+root@debian2:~# echo &quot;&quot; &gt;&amp;8
+root@debian2:~# echo &quot;&quot; &gt;&amp;8
+-bash: echo: write error: Connection refused
+</code></pre>
+
+<p>使用完毕之后，关闭对应的流：<br />
+<code>exec 8&gt;&amp;-</code></p>
+
+<p>参考：<br />
+bash shell 连接socket<br />
+Bash One-Liners Explained, Part III: All about redirections</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

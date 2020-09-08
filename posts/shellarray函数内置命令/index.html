@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shellarray函数内置命令 | 开发者问答集锦</title>
+    <meta property="og:title" content="shellarray函数内置命令 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shellarray函数内置命令">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shellarray%E5%87%BD%E6%95%B0%E5%86%85%E7%BD%AE%E5%91%BD%E4%BB%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shellarray函数内置命令</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>变量<br />
+普通数组（索引是整数）<br />
+books=(aaa bbb)<br />
+关联数组（索引可以是字符串）(需用declare -A 数组名 来定义关联数组，否则会被视为普通数组）</p>
+
+<pre><code>declare -A info
+info=([name]=aaaa [age]=bbbb)
+echo ${info[name]}
+</code></pre>
+
+<p>echo ${数组名[@]} 访问所有数组元素 等同于echo ${数组名[*]}<br />
+echo ${数组名[#@]} 访问所有数组元素个数<br />
+echo ${!数组名[@]} 访问所有数组元素的索引</p>
+
+<p>echo ${数组名[@]:1} 访问从数组下标1开始的后面所有元素（仅普通数组，关联数组不行）<br />
+echo ${数组名[@]:1:2} 访问从数组下标1开始的后面两个元素（仅普通数组，关联数组不行）</p>
+
+<h2 id="遍历和赋值">遍历和赋值</h2>
+
+<p>vim array_while.sh</p>
+
+<pre><code>#!/usr/bin/bash
+while read line
+do
+    hosts[++i]=$line
+done &lt;/etc/hosts 这里应该是数组定义的位置
+
+echo &quot;hosts first: ${hosts[1]}&quot;
+echo
+
+for i in ${!hosts[@]}
+do
+    echo &quot;$i: ${hosts[i]}&quot;
+done
+</code></pre>
+
+<p>vim vim array_for.sh</p>
+
+<pre><code>#!/usr/bin/bash
+OLD_IFS=$IFS 通过这个东西把分隔符为回车设置作用域
+IFS=$'\n'
+
+for line in `cat /etc/hosts`
+do
+    hosts[++j]=$line
+done
+for i in ${!hosts[@]}
+do
+    echo &quot;$i: ${hosts[i]}&quot;
+done
+
+IFS=$OLD_IFS
+</code></pre>
+
+<p>以上其实用awk一行就搞定了。。</p>
+
+<pre><code>awk -F&quot;:&quot; '{print $NF}'  其中-F的作用是定义分割点，这里是定以：分割。NF最后一列
+</code></pre>
+
+<h2 id="统计tcp连接状态数量">统计TCP连接状态数量</h2>
+
+<pre><code>#!/usr/bin/bash
+declare -A status
+type=`ss -an |grep :80 |awk '{print $2}'`
+
+for i in $type
+do
+    let status[$type]++
+done
+
+for j in ${!status[@]}
+do
+    echo &quot;$j: ${status[$j]}&quot;
+done
+</code></pre>
+
+<p>使用watch -n2 ./shell文件.sh查看脚本实时变化 -n2表示每2秒刷新一次，或者也可以自己用循环实现</p>
+
+<h1 id="函数">函数</h1>
+
+<p>传参 $1 $2（函数内的，是与函数外的$1区分开的）<br />
+变量 local 作用域仅在函数内<br />
+返回值 return $?</p>
+
+<p>#!/usr/bin/env bash自动寻找bash位置</p>
+
+<h2 id="算阶乘">算阶乘</h2>
+
+<pre><code>#!/bin/bash
+factorial(){
+factorial=1
+for((i=1;i&lt;=10;i++))
+do
+    factorial=$[$factorial * $i]
+done
+echo &quot;sum: $factorial&quot;
+factorial
+</code></pre>
+
+<p>带参数</p>
+
+<pre><code>#!/bin/bash
+factorial(){
+factorial=1
+for((i=1;i&lt;=$1;i++))
+do
+    factorial=$[$factorial * $i]
+done
+echo &quot;$1: $factorial&quot;
+factorial 10 参数10从这加
+</code></pre>
+
+<p>函数的返回值默认是函数内部最后一条命令的返回值或者手动定义return。<br />
+注意shell的返回码最高只能是255（其实可以，但是不能这么直接返回）</p>
+
+<pre><code>fun2()
+return $[2*2]
+
+fun2
+echo &quot;$?&quot;
+</code></pre>
+
+<p>如何让返回值可以是任意的<br />
+这里不是用return，而是用echo+变量,如下</p>
+
+<pre><code>fun(){
+read num
+echo $[2*$num]
+}
+
+result=`fun` 也就是将fun内打印的结果传给变量就行了
+echo &quot;$result&quot;
+</code></pre>
+
+<h2 id="函数的数组参数传递">函数的数组参数传递</h2>
+
+<pre><code>#!/usr/bin/bash
+num=(1 2 3 4 5)
+
+array(){
+    local f=1  加了loacl表示仅函数内部有效
+    for i in &quot;$@&quot; 这里 就是遍历了所有参数
+    do
+        f=$i
+    done
+    echo &quot;$f&quot;
+}
+array ${num[@]}
+</code></pre>
+
+<p>没有in的for</p>
+
+<pre><code>#!/usr/bin/bash
+for i  不写in相当于遍历所有参数 相当于in &quot;$@&quot;
+do
+    let sum=$sum+$i
+done
+echo $sum
+</code></pre>
+
+<h1 id="shell内置命令">shell内置命令</h1>
+
+<dl>
+<dd><p>冒号类似于python的pass<br />
+true<br />
+false<br />
+exit<br />
+break<code>break 2 跳出两层循环break 1或break跳出1层循环</code><br />
+continue continue 2跳过本次和下一次循环continue 3同理<br />
+shift 位置变量,将位置变量全部左移一位即 $1的值被$2的值覆盖 $3的值被$4覆盖依次下去。shift x将位置变量全部左移x位<br />
+vim shift.sh</p>
+
+<p>while [ $# -ne 0 ]
+do
+    let sum+=$1
+    shift
+done
+echo &ldquo;sum: $sum&rdquo;</p></dd>
+</dl>
+
+<p>./shift.sh 2 3 4<br />
+运行结果为9</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

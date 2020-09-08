@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Java执行shell遇到的各种问题 | 开发者问答集锦</title>
+    <meta property="og:title" content="Java执行shell遇到的各种问题 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Java执行shell遇到的各种问题">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/java%E6%89%A7%E8%A1%8Cshell%E9%81%87%E5%88%B0%E7%9A%84%E5%90%84%E7%A7%8D%E9%97%AE%E9%A2%98/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Java执行shell遇到的各种问题</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>1、判断子进程是否执行结束</strong></p>
+
+<p>有的时候我们用java调用shell之后，之后的操作要在Process子进程正常执行结束的情况下才可以继续，所以我们需要判断Process进程什么时候终止。</p>
+
+<p>Process类提供了waitFor()方法。该方法导致当前线程等待，直到Process线程终止。</p>
+
+<p>Process.waitFor()是有一个int类型返回值的，当返回值为0的时候表Process进程正常终止。否则一般是脚本执行出错了（我遇到的一般是这种情况）。</p>
+
+<p><strong>2、Process.waitFor()导致当前线程阻塞。</strong></p>
+
+<p>有的时候我们发现调用waitFor（）方法后，java主线程会一直阻塞在waitFor（）处，阻塞的原因是什么呢？分析一下：</p>
+
+<p>Java在执行Runtime.getRuntime().exec(jyName)之后，Linux会创建一个进程，该进程与JVM进程建立三个管道连接，标准输入流、标准输出流、标准错误流，假设linux进程不断</p>
+
+<p>向标准输出流和标准错误流写数据，而JVM却不读取，数据会暂存在linux缓存区，当缓存区存满之后导致该进程无法继续写数据，会僵死，导致java进程会卡死在waitFor()处，</p>
+
+<p>永远无法结束。</p>
+
+<p>解决办法：java进程在waitFor()前不断读取标准输出流和标准错误流：</p>
+
+<pre><code>        //jyName  解压脚本路径
+        String fileName=fileList.get(0).toString().substring(fileList.get(0).toString().lastIndexOf(File.separator)+1);
+        String  jyName=&quot;/etc/zxvf.sh &quot;+fileName;
+        try {
+            Process p0 = Runtime.getRuntime().exec(jyName);
+            //读取标准输出流
+            BufferedReader bufferedReader =new BufferedReader(new InputStreamReader(p0.getInputStream()));
+            String line;
+            while ((line=bufferedReader.readLine()) != null) {
+                System.out.println(line);
+            }   
+            //读取标准错误流
+            BufferedReader brError = new BufferedReader(new InputStreamReader(p0.getErrorStream(), &quot;gb2312&quot;));
+            String errline = null;
+            while ((errline = brError.readLine()) != null) {
+                 System.out.println(errline);
+            }
+            //waitFor()判断Process进程是否终止，通过返回值判断是否正常终止。0代表正常终止
+            int c=p0.waitFor();
+            if(c!=0){
+                baseRes.put(&quot;desc&quot;, &quot;软件升级失败：执行zxvf.sh异常终止&quot;);
+                baseRes.setReturnFlag(false);
+                return baseRes;
+            }
+        } catch (IOException e1) {
+            baseRes.put(&quot;desc&quot;, &quot;软件升级失败：文件解压失败&quot;);
+            baseRes.setReturnFlag(false);
+            return baseRes;
+        } catch (InterruptedException e1) {
+            baseRes.put(&quot;desc&quot;, &quot;软件升级失败：文件解压失败&quot;);
+            baseRes.setReturnFlag(false);
+            return baseRes;
+        }
+</code></pre>
+
+<p>也可以在执行Runtime.getRuntime().exec(jyName)之后另外再启动两个线程分别读取标准错误流和标准输出流</p>
+
+<pre><code>import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
+public class ExcuteThread extends Thread {
+    private String name;
+
+    public ExcuteThread(String name) {
+        this.name = name;
+    }
+    @Override
+    public void run() {
+        try {
+            Process p = Runtime.getRuntime().exec(name);
+            InputStream fis = p.getInputStream();
+            final BufferedReader brError = new BufferedReader(
+                    new InputStreamReader(p.getErrorStream(), &quot;gb2312&quot;));
+            InputStreamReader isr = new InputStreamReader(fis, &quot;gb2312&quot;);
+            final BufferedReader br = new BufferedReader(isr);
+            Thread t1 = new Thread() {
+                public void run() {
+                    String line = null;
+                    try {
+                        while ((line = brError.readLine()) != null) {
+                            // System.out.println(line);
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            if (brError != null)
+                                brError.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            };
+            Thread t2 = new Thread() {
+                public void run() {
+                    String line = null;
+                    try {
+                        while ((line = br.readLine()) != null) {
+                            // System.out.println(line);
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            if (br != null)
+                                br.close();
+                        } catch (IOException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            };
+            t1.start();
+            t2.start();
+
+        } catch (IOException e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        } finally {
+        }
+
+    }
+
+}
+</code></pre>
+
+<p><strong>3、shell脚本中有关联脚本，注意路径</strong></p>
+
+<p>就是shell脚本中还要执行其他脚本，这时候就是注意一个路径的问题，这个问题也是我找了好长时间的一个问题。</p>
+
+<p>Process p=Runtime.getRuntime().exec(“/etc/a.sh”)</p>
+
+<p>在Test.java类调用了etc目录下的a.sh脚本，
+a.sh脚本中执行etc目录下的b.sh脚本，原来我在a.sh脚本中写的是./b.sh。其实这样linux是找不到b.sh的，因为我们执行是在</p>
+
+<p>Test.class目录下调用的/etc/a.sh
+所以当a.sh中执行./b.sh的时候他会在Test.class目录下寻找，所以找不到，所以a.sh中要写成/etc/b.sh</p>
+
+<p><strong>4、java连续调用多个脚本</strong></p>
+
+<pre><code>        String[] cmd = { &quot;/bin/sh&quot;, &quot;-c&quot;, &quot;rm -rf /installation/upgrade/ ; mkdir /installation/upgrade/&quot; };
+        Process p = Runtime.getRuntime().exec(cmd);
+        p.waitFor();
+</code></pre>
+
+<p>就是这种数组的方式。</p>
+
+<p>5、java执行.sh脚本文件的时候直接写目录就行，例如这样：Runtime.getRuntime().exec(“/etc/a.sh”)</p>
+
+<p>java 直接执行语句的时候需要加上&rdquo;/bin/sh&rdquo; 例如这样：</p>
+
+<pre><code>            String name=&quot;/bin/sh cd /installation/upgrade/ip89_install_packet&quot;;
+            Process p = Runtime.getRuntime().exec(name);
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

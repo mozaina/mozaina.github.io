@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>情景linuxshell如何实现多线程 | 开发者问答集锦</title>
+    <meta property="og:title" content="情景linuxshell如何实现多线程 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="情景linuxshell如何实现多线程">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%83%85%E6%99%AFlinuxshell%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0%E5%A4%9A%E7%BA%BF%E7%A8%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">情景linuxshell如何实现多线程</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="情景">情景</h2>
+
+<p>shell脚本的执行效率虽高，但当任务量巨大时仍然需要较长的时间，尤其是需要执行一大批的命令时。因为默认情况下，shell脚本中的命令是串行执行的。如果这些命令相互之间是独立的，则可以使用“并发”的方式执行这些命令，这样可以更好地
+<strong>利用系统资源，提升运行效率，缩短脚本执行的时间</strong> 。如果命令相互之间存在交互，则情况就复杂了，那么不建议使用shell脚本来完成多线程的实现。</p>
+
+<p>为了方便阐述，使用一段测试代码。在这段代码中，通过<code>seq</code>命令输出1到10，使用<code>for...in</code>语句产生一个执行10次的循环。每一次循环都执行<code>sleep
+1</code>，并<code>echo</code>出当前循环对应的数字。</p>
+
+<p>注意：</p>
+
+<ol>
+<li>真实的使用场景下，循环次数不一定等于10，或高或低，具体取决于实际的需求。</li>
+<li>真实的使用场景下，循环体内执行的语句往往比较耗费系统资源，或比较耗时等。</li>
+</ol>
+
+<p><strong>请根据真实场景的各种情况理解本文想要表达的内容</strong> 。</p>
+
+<pre><code>$ cat test1.sh  
+
+
+#/bin/bash
+
+all_num=10
+
+a=$(date +%H%M%S)
+
+for num in `seq 1 ${all_num}`
+do
+    sleep 1
+    echo ${num}
+done
+
+b=$(date +%H%M%S)
+
+echo -e &quot;startTime:\t$a&quot;
+echo -e &quot;endTime:\t$b&quot;
+</code></pre>
+
+<p>通过上述代码可知，为了体现执行的时间，将循环体开始前后的时间打印了出来。</p>
+
+<p>运行结果：</p>
+
+<pre><code>$ sh test1.sh 
+
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+startTime:  193649
+endTime:    193659
+</code></pre>
+
+<p>10次循环，每次sleep 1秒，所以总执行时间10s。</p>
+
+<h2 id="方案">方案</h2>
+
+<h3 id="方案1-使用-使命令后台运行">方案1：使用&rdquo;&amp;&ldquo;使命令后台运行</h3>
+
+<p>在linux中，在命令的末尾加上<code>&amp;</code>符号，则表示该命令将在后台执行，这样后面的命令不用等待前面的命令执行完就可以开始执行了。示例中的循环体内有多条命令，则可以以<code>{}</code>括起来，在大括号后面添加<code>&amp;</code>符号。</p>
+
+<pre><code>$ cat test2.sh 
+
+
+#/bin/bash
+
+all_num=10
+
+a=$(date +%H%M%S)
+
+for num in `seq 1 ${all_num}`
+do
+{
+    sleep 1
+    echo ${num}
+} &amp;
+done
+
+b=$(date +%H%M%S)
+
+echo -e &quot;startTime:\t$a&quot;
+echo -e &quot;endTime:\t$b&quot;
+</code></pre>
+
+<p>运行结果：</p>
+
+<pre><code>sh test2.sh 
+
+
+startTime:  194147
+endTime:    194147
+[j-tester@merger142 ~/bin/multiple_process]$ 1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</code></pre>
+
+<p>通过结果可知，程序没有先打印数字，而是直接输出了开始和结束时间，然后显示出了命令提示符<code>[j-tester@merger142
+~/bin/multiple_process]$</code>（出现命令提示符表示脚本已运行完毕），然后才是数字的输出。这是因为循环体内的命令全部进入后台，所以均在sleep了1秒以后输出了数字。开始和结束时间相同，即循环体的执行时间不到1秒钟，这是由于循环体在后台执行，没有占用脚本主进程的时间。</p>
+
+<h3 id="方案2-命令后台运行-wait-命令">方案2：命令后台运行+<code>wait</code>命令</h3>
+
+<p>解决上面的问题，只需要在上述循环体的done语句后面加上<code>wait</code>命令，该命令等待当前脚本进程下的子进程结束，再运行后面的语句。</p>
+
+<pre><code>$ cat test3.sh 
+
+
+#/bin/bash
+
+all_num=10
+
+a=$(date +%H%M%S)
+
+for num in `seq 1 ${all_num}`
+do
+{
+    sleep 1
+    echo ${num}
+} &amp;
+done
+
+wait
+
+b=$(date +%H%M%S)
+
+echo -e &quot;startTime:\t$a&quot;
+echo -e &quot;endTime:\t$b&quot;
+</code></pre>
+
+<p>运行结果：</p>
+
+<pre><code>$ sh test3.sh 
+
+
+1
+2
+3
+4
+5
+6
+7
+9
+8
+10
+startTime:  194221
+endTime:    194222
+</code></pre>
+
+<p>但这样依然存在一个问题：<br />
+因为<code>&amp;</code>使得所有循环体内的命令全部进入后台运行，那么倘若循环的次数很多，会使操作系统在瞬间创建出所有的子进程，这会非常消耗系统的资源。如果循环体内的命令又很消耗系统资源，则结果可想而知。</p>
+
+<p>最好的方法是并发的进程是可配置的。</p>
+
+<h3 id="方案3-使用文件描述符控制并发数">方案3：使用文件描述符控制并发数</h3>
+
+<pre><code>$ cat test4.sh 
+
+
+#/bin/bash
+
+all_num=10
+# 设置并发的进程数
+thread_num=5
+
+a=$(date +%H%M%S)
+
+
+# mkfifo
+tempfifo=&quot;my_temp_fifo&quot;
+mkfifo ${tempfifo}
+# 使文件描述符为非阻塞式
+exec 6&lt;&gt;${tempfifo}
+rm -f ${tempfifo}
+
+# 为文件描述符创建占位信息
+for ((i=1;i&lt;=${thread_num};i++))
+do
+{
+    echo 
+}
+done &gt;&amp;6 
+
+
+# 
+for num in `seq 1 ${all_num}`
+do
+{
+    read -u6
+    {
+        sleep 1
+        echo ${num}
+        echo &quot;&quot; &gt;&amp;6
+    } &amp; 
+} 
+done 
+
+wait
+
+# 关闭fd6管道
+exec 6&gt;&amp;-
+
+b=$(date +%H%M%S)
+
+echo -e &quot;startTime:\t$a&quot;
+echo -e &quot;endTime:\t$b&quot;
+</code></pre>
+
+<p>运行结果：</p>
+
+<pre><code>$ sh test4.sh 
+
+
+1
+3
+2
+4
+5
+6
+7
+8
+9
+10
+startTime:  195227
+endTime:    195229
+</code></pre>
+
+<h3 id="方案4-使用-xargs-p-控制并发数">方案4：使用<code>xargs -P</code>控制并发数</h3>
+
+<p>xargs命令有一个<code>-P</code>参数，表示支持的最大进程数，默认为1。为0时表示尽可能地大，即<code>方案2</code>的效果。</p>
+
+<pre><code>$ cat test5.sh 
+
+
+#/bin/bash
+
+all_num=10
+thread_num=5
+
+a=$(date +%H%M%S)
+
+seq 1 ${all_num} | xargs -n 1 -I {} -P ${thread_num} sh -c &quot;sleep 1;echo {}&quot;
+
+b=$(date +%H%M%S)
+
+echo -e &quot;startTime:\t$a&quot;
+echo -e &quot;endTime:\t$b&quot;
+</code></pre>
+
+<p>运行结果：</p>
+
+<pre><code>$ sh test5.sh 
+
+
+
+1
+2
+3
+4
+5
+6
+8
+7
+9
+10
+startTime:  195257
+endTime:    195259
+</code></pre>
+
+<h3 id="方案5-使用-gnu-parallel-命令控制并发数">方案5：使用<code>GNU parallel</code>命令控制并发数</h3>
+
+<p><code>GNU parallel</code>命令是非常强大的并行计算命令，使用<code>-j</code>参数控制其并发数量。</p>
+
+<pre><code>$ cat test6.sh 
+
+
+#/bin/bash
+
+all_num=10
+thread_num=6
+
+a=$(date +%H%M%S)
+
+
+parallel -j 5 &quot;sleep 1;echo {}&quot; ::: `seq 1 10`
+
+b=$(date +%H%M%S)
+
+echo -e &quot;startTime:\t$a&quot;
+echo -e &quot;endTime:\t$b&quot;
+</code></pre>
+
+<p>运行结果：</p>
+
+<pre><code>$ sh test6.sh 
+
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+startTime:  195616
+endTime:    195618
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<p>“多线程”的好处不言而喻，虽然shell中并没有真正的多线程，但上述解决方案可以实现“多线程”的效果，重要的是，在实际编写脚本时应有这样的考虑和实现。<br />
+另外：<br />
+方案3、4、5虽然都可以控制并发数量，但方案3显然写起来太繁琐。<br />
+方案4和5都以非常简洁的形式完成了控制并发数的效果，但由于方案5的parallel命令非常强大，所以十分建议系统学习下。<br />
+方案3、4、5设置的并发数均为5，实际编写时可以将该值作为一个参数传入。</p>
+
+<p>特此声明这篇文章是转载过来的，本着转载过来以备之后学习之用，支持原创。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

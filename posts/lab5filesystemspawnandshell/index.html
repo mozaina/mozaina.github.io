@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Lab5FilesystemSpawnandShell | 开发者问答集锦</title>
+    <meta property="og:title" content="Lab5FilesystemSpawnandShell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Lab5FilesystemSpawnandShell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/lab5filesystemspawnandshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Lab5FilesystemSpawnandShell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="1-introduction">1. Introduction</h1>
+
+<p>在本实验中，我们将实现spawn，一个加载并运行磁盘可执行文件的库调用。 然后，我们要充分利用内核和操作系统库，以便在控制台上运行shell。
+这些功能需要一个文件系统，本实验室引入了一个简单的读/写文件系统。</p>
+
+<blockquote>
+<p>You should run the pingpong, primes, and forktree test cases from lab 4
+again after merging in the new lab 5 code.</p>
+</blockquote>
+
+<p>按照文档说明注释掉两条语句后运行<code>python grade-lab4</code>，一开始发现 lab4 的 Test 都过不了了。 发现不知道为什么几句
+cprintf 被注释掉了，而且输出也有了一丝变化，在<code>env_free</code> and <code>env_alloc</code>取消掉相应注释就好啦。有惊无险，let’s
+move.</p>
+
+<h1 id="2-file-system-preliminaries">2. File system preliminaries</h1>
+
+<p>我们要完成一个相对简单的文件系统，其可以实现创建、读、写以及删除在分层目录结构中组织的文件。目前我们的OS只支持单用户，因此我们的文件系统也不支持UNIX文件拥有或权限的概念。同时也不支持硬链接、符号链接、时间戳或是特别的设备文件。</p>
+
+<h2 id="2-1-on-disk-file-system-structure">2.1. On-Disk File System Structure</h2>
+
+<p>大多是 Unix 文件系统将磁盘空间分为 <code>inode</code>和数据 区域。目录包含文件名和指向inode的指针;
+如果文件系统中的多个目录引用该文件的inode，则称文件是硬链接的。由于我们的文件系统不需要支持硬链接，因此我们不需要这一间接层并且能做一个方便的简化：我们的文件系统根本不使用<code>inode</code>，相反我们仅仅将所有文件(或子目录)的
+meta-data存储在描述该文件的唯一的目录中。</p>
+
+<p>我们的文件系统允许用户环境直接读取目录元数据（例如，通过
+<code>read</code>），这意味着用户环境本身可以执行目录扫描操作（例如，实现<code>ls</code>），而不必依赖额外的特殊调用 到文件系统。
+目录扫描的这种方法的缺点，以及大多数现代UNIX变体不鼓励这种做法的原因在于，它使应用程序依赖于目录元数据的格式，使得难以在不改变或至少改变文件系统的内部布局的情况下
+重新编译应用程序。</p>
+
+<h2 id="2-2-sectors-and-blocks">2.2. Sectors and Blocks</h2>
+
+<p>扇区是对磁盘的概念，块是对OS的概念。 块的 size 必须是扇区size 的整数倍。</p>
+
+<h2 id="2-3-superblocks">2.3. Superblocks</h2>
+
+<p>文件系统通常在磁盘上的“易于查找”位置保留某些磁盘块（例如从最开始或最后）以保存描述文件系统属性的元数据，例如块大小
+，磁盘大小，查找根目录所需的任何元数据，上次挂载文件系统的时间，文件系统上次检查错误的时间等等。 这些特殊块称为超级块。</p>
+
+<blockquote>
+<p>Our file system will have exactly one superblock, which will always be at
+block 1 on the disk. Its layout is defined by struct Super in <code>inc/fs.h</code>.</p>
+</blockquote>
+
+<pre><code>struct Super {
+    uint32_t s_magic;       // Magic number: FS_MAGIC
+    uint32_t s_nblocks;     // Total number of blocks on disk
+    struct File s_root;     // Root directory node
+};
+</code></pre>
+
+<h2 id="2-4-file-meta-data">2.4. File Meta-data</h2>
+
+<blockquote>
+<p>The layout of the meta-data describing a file in our file system is
+described by struct File in <code>inc/fs.h</code>. Unlike in most “real” file systems,
+for simplicity we will use this one File structure to represent file meta-
+data<br />
+ as it appears both on disk and in memory.</p>
+</blockquote>
+
+<pre><code>struct File {
+    char f_name[MAXNAMELEN];    // filename
+    off_t f_size;           // file size in bytes
+    uint32_t f_type;        // file type
+
+    // Block pointers.
+    // A block is allocated iff its value is != 0.
+    uint32_t f_direct[NDIRECT]; // direct blocks
+    uint32_t f_indirect;        // indirect block
+
+    // Pad out to 256 bytes; must do arithmetic in case we're compiling
+    // fsformat on a 64-bit machine.
+    uint8_t f_pad[256 - MAXNAMELEN - 8 - 4*NDIRECT - 4];
+} __attribute__((packed));  // required only on some 64-bit machines
+</code></pre>
+
+<h2 id="2-5-directories-versus-regular-files">2.5. Directories versus Regular Files</h2>
+
+<p>我们的文件系统中的超级块包含一个
+<code>File</code>结构，其保存了文件系统根目录的元数据。这个目录文件的内容是一系列文件结构体，其描述了文件系统根目录下的文件和目录。任何根目录下的子目录可能包含更多表示子子目录的文件结构体，以此类推。</p>
+
+<h1 id="3-the-file-system">3. The File System</h1>
+
+<p>我们实现的文件系统的关键部分是，读数据到缓存中并能写回到磁盘；分配磁盘块; 将文件偏移映射到磁盘块; 并在IPC接口中实现读，写和打开。</p>
+
+<h2 id="3-1-disk-access">3.1. Disk Access</h2>
+
+<p>我们不采用传统的宏内核操作系统策略。其将 IDE（Integrated Drive Electronics，电子集成驱动器）
+磁盘驱动添加到内核中，并提供一些必要的系统来允许文件系统访问它。相反，我们以用户级文件系统环境的形式来实现 IDE disk
+driver。我们仍然需要稍微修改内核，以便文件系统环境具有实现磁盘访问本身所需的权限。</p>
+
+<p>内核必须在接收设备中断并将它们分派到正确的用户模式环境。</p>
+
+<blockquote>
+<p>The x86 processor uses the IOPL bits in the EFLAGS register to determine
+whether protected-mode code is allowed to perform special device I/O
+instructions such as the IN and OUT instructions.</p>
+
+<p>Note that the GNUmakefile file in this lab sets up QEMU to use the file
+obj/kern/kernel.img as the image for disk 0 (typically “Drive C” under
+DOS/Windows) as before, and to use the (new) file obj/fs/fs.img as the image
+for disk 1 (“Drive D”). In this lab our file system should only ever touch
+disk 1; disk 0 is used only to boot the kernel. If you manage to corrupt
+either disk image in some way, you can reset both of them to their original,
+“pristine” versions simply by typing:</p>
+</blockquote>
+
+<h3 id="3-1-1-execise-1">3.1.1. Execise 1</h3>
+
+<blockquote>
+<p>i386_init identifies the file system environment by passing the type
+ENV_TYPE_FS to your environment creation function, env_create. Modify
+env_create in env.c, so that it gives the file system environment I/O
+privilege, but never gives that privilege to any other environment.</p>
+</blockquote>
+
+<p>在load_icode之前加入以下判断即可。</p>
+
+<pre><code>if (type == ENV_TYPE_FS) {
+        newenv-&gt;env_tf.tf_eflags |= FL_IOPL_MASK;
+    }
+</code></pre>
+
+<h3 id="3-1-2-question">3.1.2. Question</h3>
+
+<ol>
+<li>你是否不得不做一些其他事来确保当环境不断切换时，I/O特权设定依然能被保存和恢复？ 为什么？</li>
+</ol>
+
+<p>不需要，因为在环境切换时，会保存eflags的值，也会用 <code>env_pop_tf</code>恢复eflags的值。</p>
+
+<h2 id="3-2-the-block-cache">3.2. The Block Cache</h2>
+
+<p>we will implement a simple <strong>“buffer cache” (really just a block cache).</strong></p>
+
+<p>我们为文件系统环境保留了巨大固定的地址空间，从 <code>0x10000000 (DISKMAP)</code>到<code>0xD0000000
+(DISKMAP+DISKMAX)</code>，作为磁盘的内存映射。 For example, disk block 0 is mapped at virtual
+address 0x10000000, disk block 1 is mapped at virtual address 0x10001000, and
+so on.</p>
+
+<p>由于我们的文件系统有独立于系统中其他环境的虚拟地址空间（不重叠），因为我们的文件系统唯一需要做的事是实现文件的
+access。如此看来我们为文件系统保留大量的空间也是十分合理的。</p>
+
+<p>Of course, it would take a long time to read the entire disk into memory, so
+instead we’ll implement a form of demand paging, wherein we only allocate
+pages in the disk map region and read the corresponding block from the disk in
+response to a page fault in this region.</p>
+
+<h3 id="3-2-1-execise-2">3.2.1. Execise 2</h3>
+
+<blockquote>
+<p>Implement the bc_pgfault and flush_block functions in fs/bc.c.</p>
+</blockquote>
+
+<p>如之前说明的，块号与扇区号有一定的区别，在完成这两个函数时，要注意区分这两个概念。 JOS
+块大小位4kB，扇区大小为512B，每次读写一个块，就需要读写4个扇区。因此，JOS使用了一个宏定义<code>#define BLKSECTS (BLKSIZE /
+SECTSIZE)</code>来描述两者的关系。</p>
+
+<ol>
+<li><p>bc_pgfault(struct UTrapframe *utf)</p>
+
+<p>// LAB 5: you code here:
+    // envid 传入 0？ 在最初的哪个进程下 alloc 一个page ?
+    addr =(void *) ROUNDDOWN(addr, PGSIZE);
+    if ( (r = sys_page_alloc(0, addr, PTE_P|PTE_W|PTE_U)) &lt; 0) {
+        panic(&ldquo;in bc_pgfault, sys_page_alloc: %e&rdquo;, r);
+    }
+    // size_t secno = (addr - DISKMAP) / BLKSIZE;
+    if ( (r = ide_read(blockno*BLKSECTS, addr, BLKSECTS)) &lt; 0) {
+        panic(&ldquo;in bc_pgfault, ide_read: %e&rdquo;,r);
+    }</p></li>
+
+<li><p>flush_block(void *addr)</p>
+
+<p>// LAB 5: Your code here.
+    addr = (void *)ROUNDDOWN(addr, PGSIZE);
+    if (va_is_mapped(addr) &amp;&amp; va_is_dirty(addr)) {</p>
+
+<pre><code>    ide_write(blockno*BLKSECTS, addr , BLKSECTS);
+    if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] &amp; PTE_SYSCALL)) &lt; 0)
+        panic(&quot;in flush_block, sys_page_map: %e&quot;, r);
+}
+</code></pre></li>
+</ol>
+
+<h3 id="3-2-2-challenge">3.2.2. Challenge</h3>
+
+<blockquote>
+<p>The block cache has no eviction policy. Once a block gets faulted in to it,
+it never gets removed and will remain in memory forevermore. Add eviction to
+the buffer cache. Using the PTE_A “accessed” bits in the page tables, which
+the hardware sets on any access to a page, you can track approximate usage
+of disk blocks without the need to modify every place in the code that
+accesses the disk map region. Be careful with dirty blocks.</p>
+</blockquote>
+
+<h2 id="3-3-the-block-bitmap-位图块">3.3. The Block Bitmap(位图块)</h2>
+
+<p>After fs_init sets the bitmap pointer, we can treat bitmap as a packed array
+of bits, one for each block on the disk. <code>bitmap = diskaddr(2);</code>，位图存放在 2
+号块中。操作系统课程一般都会提到这个概念，位图概念也挺好理解的。每一个bit 标记一个 block 是否 free。</p>
+
+<pre><code>uint32_t *bitmap;       // bitmap blocks mapped in memory
+</code></pre>
+
+<h3 id="3-3-1-exercise-3">3.3.1. Exercise 3</h3>
+
+<blockquote>
+<p>Use free_block as a model to implement alloc_block in fs/fs.c, which should
+find a free disk block in the bitmap, mark it used, and return the number of
+that block.</p>
+</blockquote>
+
+<p>我们以一个实例来分析 bitmap的工作原理， 若标记第35个块（块号为34）为使用状态， 则将bitmap[1] 的第 2 （34%32）位标记为 0。
+讲道理应该位图位为0是free的呀，JOS这里反过来了。</p>
+
+<pre><code>int
+alloc_block(void)
+{
+    // The bitmap consists of one or more blocks.  A single bitmap block
+    // contains the in-use bits for BLKBITSIZE blocks.  There are
+    // super-&gt;s_nblocks blocks in the disk altogether.
+
+    // LAB 5: Your code here.
+    size_t i;
+    for(i=1; i &lt; super-&gt;s_nblocks; i++) {
+        if (block_is_free(i)) {
+          // 清零，标记已经使用。有点令人费解
+            bitmap[i/32] &amp;=  ~(1&lt;
+</code></pre>
+
+<h2 id="3-4-file-operations">3.4. File Operations</h2>
+
+<h3 id="3-4-1-exercise-4">3.4.1. Exercise 4</h3>
+
+<blockquote>
+<p>Implement file_block_walk and file_get_block. file_block_walk maps from a
+block offset within a file to the pointer for that block in the struct File
+or the indirect block, very much like what pgdir_walk did for page tables.
+file_get_block goes one step further and maps to the actual disk block,
+allocating a new one if necessary.</p>
+</blockquote>
+
+<ol>
+<li>file_block_walk 获得文件第<code>filebno</code>块的地址（其本身是个指针），编写需要注意以下几点。具体实现，看代码就好啦。</li>
+</ol>
+
+<ul>
+<li><code>ppdiskbno</code> 是块指针（记录块的地址）</li>
+<li><code>f_indirect</code> 直接记录块号，而不是记地址。</li>
+
+<li><p><strong>Don’t forget to clear any block you allocate.</strong> 对分配的块进行清零操作后，要写入 disk 中。</p>
+
+<p>static int
+file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
+{
+       // LAB 5: Your code here.
+       // ppdiskbno 块指针
+       if (filebno &lt; NDIRECT) {
+            // but note that *ppdiskbno might equal 0
+            if(ppdiskbno)
+                *ppdiskbno = &amp;(f-&gt;f_direct[filebno]);
+            else
+                return 0;
+       }</p>
+
+<pre><code>   if (filebno &gt;= NDIRECT + NINDIRECT)
+        return -E_INVAL;
+
+   filebno -= NDIRECT;
+   // indirect 还未分配
+   if (!!f-&gt;f_indirect) {
+        if (alloc == 0) 
+            return -E_NOT_FOUND;
+        // 分配一个 indirect block
+        uint32_t blockno;
+        if ( (blockno = alloc_block()) &lt; 0)
+            return blockno;
+        // f_indirect 直接记录块号，而不是记地址
+        // f-&gt;f_indirect = (uint32_t)diskaddr(blockno);
+        f-&gt;f_indirect = blockno;
+        memset(diskaddr(blockno), 0, BLKSIZE);
+        flush_block(diskaddr(blockno));
+   }
+   if (ppdiskbno) 
+        *ppdiskbno = (uint32_t *)diskaddr(f-&gt;f_indirect) + filebno;
+   return 0;
+   // panic(&quot;file_block_walk not implemented&quot;);
+</code></pre>
+
+<p>}</p></li>
+</ul>
+
+<ol>
+<li><p>file_get_block.</p>
+
+<p>int
+file_get_block(struct File *f, uint32_t filebno, char **blk)
+{
+    // LAB 5: Your code here.
+    uint32_t *pdiskbno;
+    int r;
+    if ( (r = file_block_walk(f, filebno, &amp;pdiskbno, 1))&lt; 0)
+        return r;</p>
+
+<pre><code>if(*pdiskbno == 0) {
+    // 文件块还未分配
+    if ( (r = alloc_block()) &lt; 0)
+        return r;
+    *pdiskbno = r;
+    memset(diskaddr(r), 0, BLKSIZE);
+    flush_block(diskaddr(r));
+}
+
+// 最终指向块
+*blk = diskaddr(*pdiskbno);
+return 0;
+//panic(&quot;file_get_block not implemented&quot;);
+</code></pre>
+
+<p>}</p></li>
+</ol>
+
+<h2 id="3-5-the-file-system-interface">3.5. The file system interface</h2>
+
+<p>感觉这部分才是这个Lab的重点。一直听说的RPC原来是 Remote Procedure Call 的缩写。</p>
+
+<blockquote>
+<p>它是一种通过网络从远程计算机程序上请求服务，而不需要了解底层网络技术的协议。RPC协议假定某些传输协议的存在，如TCP或UDP，为通信程序之间携带信息数据。在OSI网络通信模型中，RPC跨越了传输层和应用层。RPC使得开发包括网络分布式多程序在内的应用程序更加容易。</p>
+</blockquote>
+
+<p>由于其他环境无法直接调用文件系统环境中的函数，因此我们将通过 RPC 或在JOS的IPC机制上构建的RPC抽象来公开对文件系统环境的访问。
+为什么不能直接调用？不都是用户环境的函数么，是特意不让别的环境直接使用？</p>
+
+<p><a href="https://img.it610.com/image/info8/3bf9100c0db44e6ba6c72b0e86535086.png"><img src="https://img.it610.com/image/info8/3bf9100c0db44e6ba6c72b0e86535086.png" alt="Lab5_File system, Spawn and
+Shell_第1张图片" /></a></p>
+
+<p>在开始时，<code>read</code>只需调度到适当的设备读取函数，就可以适用于任何文件描述符，在本例中为devfile_read（我们可以有更多的设备类型，如管道）。
+devfile<em>read专门为磁盘文件实现读取。 这个和lib / file.c中的其他devfile</em>
+*函数实现了FS操作的客户端，并且所有工作都以大致相同的方式工作，在请求结构体中捆绑参数，调用fsipc发送IPC请求，以及解包和返回 结果。
+fsipc函数只处理向服务器发送请求和接收回复的常见细节。</p>
+
+<p>文件系统的服务端代码在 <code>fs/serv.c</code>中。</p>
+
+<ul>
+<li>32-bit number for the request type.</li>
+<li>store the arguments to the request in a union Fsipc on the page shared via the IPC.</li>
+</ul>
+
+<h3 id="3-5-1-exercise-5">3.5.1. Exercise 5</h3>
+
+<blockquote>
+<p>Implement serve_read in fs/serv.c.<br />
+ Fsipc 联合体是个 sao 操作噢。</p>
+</blockquote>
+
+<pre><code>union Fsipc {
+    struct Fsreq_open {
+        char req_path[MAXPATHLEN];
+        int req_omode;
+    } open;
+    struct Fsreq_set_size {
+        int req_fileid;
+        off_t req_size;
+    } set_size;
+    struct Fsreq_read {
+        int req_fileid;
+        size_t req_n;
+    } read;
+    struct Fsret_read {
+        char ret_buf[PGSIZE];
+    } readRet;
+    struct Fsreq_write {
+        int req_fileid;
+        size_t req_n;
+        char req_buf[PGSIZE - (sizeof(int) + sizeof(size_t))];
+    } write;
+    struct Fsreq_stat {
+        int req_fileid;
+    } stat;
+    struct Fsret_stat {
+        char ret_name[MAXNAMELEN];
+        off_t ret_size;
+        int ret_isdir;
+    } statRet;
+    struct Fsreq_flush {
+        int req_fileid;
+    } flush;
+    struct Fsreq_remove {
+        char req_path[MAXPATHLEN];
+    } remove;
+
+    // Ensure Fsipc is one page
+    char _pad[PGSIZE];
+};
+</code></pre>
+
+<p>OpenFile结构是服务端进程维护的一个映射，它将一个真实文件struct File和用户客户端打开的文件描述符struct Fd对应到一起。</p>
+
+<pre><code>struct OpenFile {
+    uint32_t o_fileid;  // file id
+    struct File *o_file;    // mapped descriptor for open file
+    int o_mode;     // open mode
+    struct Fd *o_fd;    // Fd page
+};
+
+struct Fd {
+    int fd_dev_id;
+    off_t fd_offset;
+    int fd_omode;
+    union {
+        // File server files
+        struct FdFile fd_file;
+    };
+};
+</code></pre>
+
+<p>查看<code>serve_set_size</code>的实现流程，我们不难写出<code>serve_read</code>，首先使用参数<code>envid</code>
+以及<code>fileid</code>调用<code>lookup</code>可以得到 openfile 信息。然后调用已有的实现<code>file_read</code>即可将数据读到 ret 的 buff
+中，实现文件数据的传递。其中要注意一下细节部分，要更改文件的 offset ！
+实际也不用考虑请求的n是否会大于BLOCKSIZE，在<code>file_read</code>中进行了大小处理<code>count = MIN(count, f-&gt;f_size -
+offset);</code>，其只会读取较小的一部分。</p>
+
+<pre><code>int
+serve_read(envid_t envid, union Fsipc *ipc)
+{
+    struct Fsreq_read *req = &amp;ipc-&gt;read;
+    struct Fsret_read *ret = &amp;ipc-&gt;readRet;
+    int r, reqn;
+    // Lab 5: Your code here:
+    struct OpenFile *of;
+    if ( (r = openfile_lookup(envid, req-&gt;req_fileid, &amp;of) )&lt; 0)
+        return r;
+    if ( (r = file_read(of-&gt;o_file, ret-&gt;ret_buf, req-&gt;req_n, of-&gt;o_fd-&gt;fd_offset))&lt; 0)
+        return r;
+
+    // then update the seek position.
+    of-&gt;o_fd-&gt;fd_offset += r;
+    return r;
+}
+</code></pre>
+
+<h3 id="3-5-2-exercise-6">3.5.2. Exercise 6</h3>
+
+<blockquote>
+<p>Implement <code>serve_write</code> in <code>fs/serv.c</code> and <code>devfile_write</code> in <code>lib/file.c</code>.</p>
+</blockquote>
+
+<pre><code>struct Fsreq_write {
+        int req_fileid;
+        size_t req_n;
+        char req_buf[PGSIZE - (sizeof(int) + sizeof(size_t))];
+    } write;
+</code></pre>
+
+<ol>
+<li><p><code>serve_write</code>: <code>serve_write</code>的实现很简单，参考上个Exe的代码即可。 同时我们关注一个细节，在<code>file_write</code>中考虑了块边界的问题<code>bn = MIN(BLKSIZE - pos % BLKSIZE, offset + count - pos);</code>，因此我们同样不需要对 req_n 进行处理。</p>
+
+<p>int
+serve_write(envid_t envid, struct Fsreq_write *req)
+{
+    if (debug)
+        cprintf(&ldquo;serve_write %08x %08x %08x\n&rdquo;, envid, req-&gt;req_fileid, req-&gt;req_n);
+    int r;
+    struct OpenFile *of;
+    int reqn;
+    if ( (r = openfile_lookup(envid, req-&gt;req_fileid, &amp;of)) &lt; 0)
+        return r;
+    reqn = req-&gt;req_n &gt; PGSIZE? PGSIZE:req-&gt;req_n;</p>
+
+<pre><code>if ( (r = file_write(of-&gt;o_file, req-&gt;req_buf, reqn, of-&gt;o_fd-&gt;fd_offset)) &lt; 0)
+    return r;
+
+of-&gt;o_fd-&gt;fd_offset += r;
+return r;
+</code></pre>
+
+<p>}</p></li>
+
+<li><p><code>devfile_write</code>: 根据上面RPC机制的图，我们的 <code>devfile_write</code>需要调用<code>fsipc</code>，其向文件服务器发送一个进程间请求，并等待回复。请求体保存在<code>fsipcbuf</code>中，回复部分也应该写回到 <code>fsipcbuf</code>中。</p>
+
+<p>static ssize_t
+devfile_write(struct Fd *fd, const void *buf, size_t n)
+{
+    // LAB 5: Your code here
+    int r;
+    if ( n &gt; sizeof (fsipcbuf.write.req_buf))
+        n = sizeof (fsipcbuf.write.req_buf);</p>
+
+<pre><code>fsipcbuf.write.req_fileid = fd-&gt;fd_file.id;
+fsipcbuf.write.req_n = n;
+memmove(fsipcbuf.write.req_buf, buf, n);
+
+return  fsipc(FSREQ_WRITE, NULL);
+</code></pre>
+
+<p>}</p></li>
+</ol>
+
+<h1 id="4-spawning-processes">4. Spawning Processes</h1>
+
+<p>We have given you the code for spawn (see lib/spawn.c) which creates a new
+environment, loads a program image from the file system into it, and then
+starts the child environment running this program. The parent process then
+continues running independently of the child.
+<code>spawn</code>函数表现得像在Unix下创建子进程带有一个立刻执行<code>exec</code>的<code>fork</code>函数。</p>
+
+<p>我们实现了<code>spawn</code>而不是UNIX风格的<code>exec</code>，因为在没有内核特殊帮助的情况下，<code>spawn</code>更容易以“exokernel
+fashion”从用户空间实现。</p>
+
+<h2 id="4-1-exercise-7">4.1. Exercise 7</h2>
+
+<blockquote>
+<p>spawn relies on the new syscall <code>sys_env_set_trapframe</code> to initialize the
+state of the newly created environment. Implement sys_env_set_trapframe in
+<code>kern/syscall.c</code> (don’t forget to dispatch the new system call in
+syscall()).</p>
+</blockquote>
+
+<p>直接跳到 <code>sys_env_set_trapframe</code> 有点摸不着头脑，也不知道该 save 哪些内容。先阅读一下 <code>spawn</code>实现的关键代码。</p>
+
+<pre><code>// Create new child environment
+    if ((r = sys_exofork()) &lt; 0)
+        return r;
+    // 父进程返回子进程的PID
+    child = r;
+
+    // Set up trap frame, including initial stack.
+    // 复制 tf, 修改eip 指向子进程代码进入点
+    child_tf = envs[ENVX(child)].env_tf;
+    child_tf.tf_eip = elf-&gt;e_entry;
+
+    // 利用栈向子进程传递参数
+    if ((r = init_stack(child, argv, &amp;child_tf.tf_esp)) &lt; 0)
+        return r;
+
+    // Set up program segments as defined in ELF header.
+    ...
+    ...
+    close(fd);
+    fd = -1;
+
+    // Copy shared library state.
+    if ((r = copy_shared_pages(child)) &lt; 0)
+        panic(&quot;copy_shared_pages: %e&quot;, r);
+
+    child_tf.tf_eflags |= FL_IOPL_3;   // devious: see user/faultio.c
+    if ((r = sys_env_set_trapframe(child, &amp;child_tf)) &lt; 0)
+        panic(&quot;sys_env_set_trapframe: %e&quot;, r);
+  // 子进程可运行
+    if ((r = sys_env_set_status(child, ENV_RUNNABLE)) &lt; 0)
+        panic(&quot;sys_env_set_status: %e&quot;, r);
+
+    return child;
+</code></pre>
+
+<p>在<code>spawn</code>中对 <code>child_tf</code>
+进行了一系列的初始化，最后我们需要调用<code>sys_env_set_trapframe</code>来设定子环境的tf。不过这里为什么要传<code>child_tf</code>的指针呢，一开始我还以为是将env的tf
+复制到 child_tf 中。只是为了减小传递内容的大小吗？ <code>env-&gt;env_tf.tf_cs |= 0x3;</code>保证了子进程在用户态运行。</p>
+
+<pre><code>static int
+sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
+{
+    struct Env *env;
+    int r;
+    if ( (r = envid2env(envid, &amp;env, 1)) &lt; 0)
+        return r;
+
+    // 什么时候会出现没有权限访问的问题？
+    user_mem_assert(env, tf, sizeof(struct Trapframe), PTE_U);
+    // 直接整个结构体也是可以赋值的
+    env-&gt;env_tf = *tf;
+    env-&gt;env_tf.tf_cs |= 0x3; 
+    env-&gt;env_tf.tf_eflags &amp;=  (~FL_IOPL_MASK);
+    env-&gt;env_tf.tf_eflags |= FL_IF;
+    return 0;
+}
+</code></pre>
+
+<h2 id="4-2-sharing-library-state-across-fork-and-spawn">4.2. Sharing library state across fork and spawn</h2>
+
+<p>在JOS中，每个设备类型都具有相应的<code>struct Dev</code>，其中包含指向实现读/写/等的函数指针。对于该设备类型。 lib /
+fd.c在此基础上实现了类似UNIX的通用文件描述符接口。
+每个结构体Fd表示它的设备类型，<code>lib/fd.c</code>中的大多数函数只是将操作分派给适当的<code>struct Dev</code>中的函数。</p>
+
+<pre><code>// Per-device-class file descriptor operations
+struct Dev {
+    int dev_id;
+    const char *dev_name;
+    ssize_t (*dev_read)(struct Fd *fd, void *buf, size_t len);
+    ssize_t (*dev_write)(struct Fd *fd, const void *buf, size_t len);
+    int (*dev_close)(struct Fd *fd);
+    int (*dev_stat)(struct Fd *fd, struct Stat *stat);
+    int (*dev_trunc)(struct Fd *fd, off_t length);
+};
+</code></pre>
+
+<p>lib/fd.c 还在每个应用程序环境的地址空间中维护一个文件描述符表区域，从<code>FDTABLE</code>开始。
+该区域为应用程序一次性打开的最多MAXFD（当前为32个）文件描述符保留一个页面（4KB）的地址空间。
+在任何给定时间，当且仅当相应的文件描述符正在使用时，才映射特定的文件描述符表页面。
+每个文件描述符在从<code>FILEDATA</code>开始的区域中也有一个可选的“data page”，设备可以选择使用。</p>
+
+<p>**We would like to share file descriptor state across fork and spawn, but file
+descriptor state is kept in user-space memory. **</p>
+
+<p>现在，在<code>fork</code>中，内存将被标记为 COW， <strong>所以状态会被复制而不是共享。</strong>
+（这意味着环境将无法在文件中寻找他们自己没有打开的文件，而且管道也无法在fork中工作。）why？</p>
+
+<p>在<code>spawn</code>上，内存将被left behind，而不是复制。（实际上，生成的环境从没有打开的文件描述符开始。）</p>
+
+<p>我们将更改<code>fork</code>以了解“库操作系统”使用的某些内存区域，并且应始终共享。
+我们不会在某个地方硬编码区域列表，而是在页表条目中设置一个未使用的位（就像我们在fork中使用PTE_COW位一样）。</p>
+
+<p>我们在<code>inc/lib.h</code>中定义了一个新的<code>PTE_SHARE</code>位。 该位是Intel和AMD手册中标记为“可供软件使用”的三个PTE位之一。
+我们将建立一个约定，即如果页表项已设置此位，则应在<code>fork</code>和<code>spawn</code>中将PTE直接从父进程复制到子进程。 请注意，这与标记<code>copy-on-
+write</code>不同：如第一段所述，我们希望确保共享页面更新。</p>
+
+<h3 id="4-2-1-exercise-8">4.2.1. Exercise 8</h3>
+
+<blockquote>
+<p>Change <code>duppage</code> in <code>lib/fork.c</code> to follow the new convention. If the page
+table entry has the PTE_SHARE bit set, just copy the mapping directly. (You
+should use PTE_SYSCALL, not 0xfff, to mask out the relevant bits from the
+page table entry. 0xfff picks up the accessed and dirty bits as well.)<br />
+ Likewise, implement <code>copy_shared_pages</code> in <code>lib/spawn.c</code>. It should loop
+through all page table entries in the current process (just like fork did),
+copying any page mappings that have the PTE_SHARE bit set into the child
+process.</p>
+</blockquote>
+
+<ol>
+<li><p>duppage: 在最前面添加一个if 分支即可。</p>
+
+<p>if (uvpt[pn] &amp; PTE_SHARE) {
+        if((ret = sys_page_map(thisenv-&gt;env_id, (void *) va, envid, (void * )va, uvpt[pn] &amp; PTE_SYSCALL)) &lt;0 )
+            return ret;
+    }
+    else if ( (uvpt[pn] &amp; PTE_W) || (uvpt[pn] &amp; PTE_COW)) {</p>
+
+<pre><code>    // 子进程标记
+    if ((ret = sys_page_map(thisenv-&gt;env_id, (void *) va, envid, (void *) va, PTE_P|PTE_U|PTE_COW)) &lt; 0)
+        return ret;
+    // 父进程标记
+    if ((ret = sys_page_map(thisenv-&gt;env_id, (void *)va, thisenv-&gt;env_id, (void *)va, PTE_P|PTE_U|PTE_COW)) &lt; 0)
+        return ret;
+}
+else {
+    // 简单映射
+    if((ret = sys_page_map(thisenv-&gt;env_id, (void *) va, envid, (void * )va, PTE_P|PTE_U)) &lt;0 ) 
+        return ret;
+}
+
+return 0;
+</code></pre></li>
+
+<li><p>copy_shared_pages: 其实现与 fork 中的循环类似。</p>
+
+<p>static int
+copy_shared_pages(envid_t child)
+{
+    // LAB 5: Your code here.
+    size_t pn;
+    int r;
+    struct Env *e;</p>
+
+<pre><code>for (pn = PGNUM(UTEXT); pn &lt; PGNUM(USTACKTOP); ++pn) {
+    if ( (uvpd[pn &gt;&gt; 10] &amp; PTE_P) &amp;&amp; (uvpt[pn] &amp; PTE_P) ) {
+        if (uvpt[pn] &amp; PTE_SHARE) {
+            if ( (r = sys_page_map(thisenv-&gt;env_id, (void *)(pn*PGSIZE), child, (void *)(pn*PGSIZE), uvpt[pn] &amp; PTE_SYSCALL )) &lt; 0)
+                return r;               
+        }
+    }
+}
+return 0;
+</code></pre>
+
+<p>}</p></li>
+</ol>
+
+<h1 id="5-the-keyboard-interface">5. The keyboard interface</h1>
+
+<p>目前我们只能在内核监视器中才能接收输入。<code>kern/console.c</code> already contains the keyboard and serial
+drivers that have been used by the kernel monitor since lab 1, but now you
+need to attach these to the rest of the system.</p>
+
+<h2 id="5-1-exercise-9">5.1. Exercise 9</h2>
+
+<blockquote>
+<p>In your <code>kern/trap.c</code>, call <code>kbd_intr</code> to handle trap <code>IRQ_OFFSET+IRQ_KBD</code>
+and <code>serial_intr</code> to handle trap <code>IRQ_OFFSET+IRQ_SERIAL</code>.</p>
+</blockquote>
+
+<p>在<code>/kern/console.c/cons_getc()</code>中的代码，实现了在 monitor 模式下（禁止中断）可以正常获取用户输入。</p>
+
+<pre><code>// poll for any pending input characters,
+    // so that this function works even when interrupts are disabled
+    // (e.g., when called from the kernel monitor).
+    serial_intr();
+    kbd_intr();
+</code></pre>
+
+<p>在 trap.c 中加入中断处理函数。</p>
+
+<pre><code>case (IRQ_OFFSET + IRQ_KBD):
+    lapic_eoi();
+    kbd_intr();
+    break;
+case (IRQ_OFFSET + IRQ_SERIAL):
+    lapic_eoi();
+    serial_intr();
+    break;
+</code></pre>
+
+<h1 id="6-the-shell">6. The Shell</h1>
+
+<p>Run <code>make run-icode</code>。 QEMU将运行内核并执行<code>user/icode</code>，icode 将 console 设置为 文件描述符 0 和
+1。然后 spawn <code>sh</code>。</p>
+
+<h2 id="6-1-exercise-10">6.1. Exercise 10</h2>
+
+<blockquote>
+<p>The shell doesn’t support I/O redirection. It would be nice to run `sh</p>
+
+<p>`</p>
+</blockquote>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

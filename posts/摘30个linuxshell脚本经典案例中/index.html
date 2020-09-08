@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>摘30个LinuxShell脚本经典案例中 | 开发者问答集锦</title>
+    <meta property="og:title" content="摘30个LinuxShell脚本经典案例中 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="摘30个LinuxShell脚本经典案例中">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%91%9830%E4%B8%AAlinuxshell%E8%84%9A%E6%9C%AC%E7%BB%8F%E5%85%B8%E6%A1%88%E4%BE%8B%E4%B8%AD/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">摘30个LinuxShell脚本经典案例中</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>本章目录</strong></p>
+
+<p>11、iptables自动屏蔽访问网站频繁的IP</p>
+
+<p>12、判断用户输入的是否为IP地址</p>
+
+<p>13、判断用户输入的是否为数字</p>
+
+<p>14、给定目录找出包含关键字的文件</p>
+
+<p>15、监控目录，将新创建的文件名追加到日志中</p>
+
+<p>16、给用户提供多个网卡选择</p>
+
+<p>17、查看网卡实时流量</p>
+
+<p>18、MySQL数据库备份</p>
+
+<p>19、Nginx服务管理脚本</p>
+
+<p>20、用户根据菜单选择要连接的Linux主机</p>
+
+<p><strong>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</strong></p>
+
+<p><strong>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</strong></p>
+
+<p><strong>11、iptables自动屏蔽访问网站频繁的IP</strong></p>
+
+<p>场景：恶意访问,安全防范</p>
+
+<p><strong>1）屏蔽每分钟访问超过200的IP</strong></p>
+
+<p>方法1：根据访问日志（Nginx为例）</p>
+
+<pre><code>#!/bin/bash
+DATE=$(date +%d/%b/%Y:%H:%M)
+ABNORMAL_IP=$(tail -n5000 access.log |grep $DATE |awk '{a[$1]++}END{for(i in a)if(a[i]&gt;100)print i}')
+#先tail防止文件过大，读取慢，数字可调整每分钟最大的访问量。awk不能直接过滤日志，因为包含特殊字符。
+for IP in $ABNORMAL_IP; do
+    if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then
+        iptables -I INPUT -s $IP -j DROP
+    fi
+done
+</code></pre>
+
+<p>方法2：通过TCP建立的连接</p>
+
+<pre><code>#!/bin/bash
+ABNORMAL_IP=$(netstat -an |awk '$4~/:80$/ &amp;&amp; $6~/ESTABLISHED/{gsub(/:[0-9]+/,&quot;&quot;,$5);{a[$5]++}}END{for(i in a)if(a[i]&gt;100)print i}')
+#gsub是将第五列（客户端IP）的冒号和端口去掉
+for IP in $ABNORMAL_IP; do
+    if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then
+        iptables -I INPUT -s $IP -j DROP
+    fi
+done
+</code></pre>
+
+<p><strong>2）屏蔽每分钟SSH尝试登录超过10次的IP</strong></p>
+
+<p>方法1：通过lastb获取登录状态:</p>
+
+<pre><code>#!/bin/bash
+DATE=$(date +&quot;%a %b %e %H:%M&quot;) #星期月天时分  %e单数字时显示7，而%d显示07
+ABNORMAL_IP=$(lastb |grep &quot;$DATE&quot; |awk '{a[$3]++}END{for(i in a)if(a[i]&gt;10)print i}')
+for IP in $ABNORMAL_IP; do
+    if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then
+        iptables -I INPUT -s $IP -j DROP
+    fi
+done
+</code></pre>
+
+<p>方法2：通过日志获取登录状态</p>
+
+<pre><code>#!/bin/bash
+DATE=$(date +&quot;%b %d %H&quot;)
+ABNORMAL_IP=&quot;$(tail -n10000 /var/log/auth.log |grep &quot;$DATE&quot; |awk '/Failed/{a[$(NF-3)]++}END{for(i in a)if(a[i]&gt;5)print i}')&quot;
+for IP in $ABNORMAL_IP; do
+    if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then
+        iptables -A INPUT -s $IP -j DROP
+        echo &quot;$(date +&quot;%F %T&quot;) - iptables -A INPUT -s $IP -j DROP&quot; &gt;&gt;~/ssh-login-limit.log
+    fi
+done
+</code></pre>
+
+<p><strong>12、判断用户输入的是否为IP地址</strong></p>
+
+<p>方法1:</p>
+
+<pre><code>#!/bin/bash
+function check_ip(){
+    IP=$1
+    VALID_CHECK=$(echo $IP|awk -F. '$1&lt;=255&amp;&amp;$2&lt;=255&amp;&amp;$3&lt;=255&amp;&amp;$4&lt;=255{print &quot;yes&quot;}')
+    if echo $IP|grep -E &quot;^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$&quot;&gt;/dev/null; then
+        if [ $VALID_CHECK == &quot;yes&quot; ]; then
+            echo &quot;$IP available.&quot;
+        else
+            echo &quot;$IP not available!&quot;
+        fi
+    else
+        echo &quot;Format error!&quot;
+    fi
+}
+check_ip 192.168.1.1
+check_ip 256.1.1.1
+</code></pre>
+
+<p>方法2：</p>
+
+<pre><code>#!/bin/bash
+function check_ip(){
+    IP=$1
+    if [[ $IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        FIELD1=$(echo $IP|cut -d. -f1)
+        FIELD2=$(echo $IP|cut -d. -f2)
+        FIELD3=$(echo $IP|cut -d. -f3)
+        FIELD4=$(echo $IP|cut -d. -f4)
+        if [ $FIELD1 -le 255 -a $FIELD2 -le 255 -a $FIELD3 -le 255 -a $FIELD4 -le 255 ]; then
+            echo &quot;$IP available.&quot;
+        else
+            echo &quot;$IP not available!&quot;
+        fi
+    else
+        echo &quot;Format error!&quot;
+    fi
+}
+check_ip 192.168.1.1
+check_ip 256.1.1.1
+</code></pre>
+
+<p>增加版：</p>
+
+<p>加个死循环，如果IP可用就退出，不可用提示继续输入，并使用awk判断。</p>
+
+<pre><code>#!/bin/bash
+function check_ip(){
+    local IP=$1
+    VALID_CHECK=$(echo $IP|awk -F. '$1&lt;=255&amp;&amp;$2&lt;=255&amp;&amp;$3&lt;=255&amp;&amp;$4&lt;=255{print &quot;yes&quot;}')
+    if echo $IP|grep -E &quot;^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$&quot; &gt;/dev/null; then
+        if [ $VALID_CHECK == &quot;yes&quot; ]; then
+            return 0
+        else
+            echo &quot;$IP not available!&quot;
+            return 1
+        fi
+    else
+        echo &quot;Format error! Please input again.&quot;
+        return 1
+    fi
+}
+while true; do
+    read -p &quot;Please enter IP: &quot; IP
+    check_ip $IP
+    [ $? -eq 0 ] &amp;&amp; break || continue
+done
+</code></pre>
+
+<p><strong>13、判断用户输入的是否为数字</strong></p>
+
+<p>方法1：</p>
+
+<pre><code>#!/bin/bash
+if [[ $1 =~ ^[0-9]+$ ]]; then
+    echo &quot;Is Number.&quot;
+else
+    echo &quot;No Number.&quot;
+fi
+</code></pre>
+
+<p>方法2：</p>
+
+<pre><code> 
+
+
+#!/bin/bash
+if [ $1 -gt 0 ] 2&gt;/dev/null; then
+echo &quot;Is Number.&quot;
+else
+echo &quot;No Number.&quot;
+fi
+</code></pre>
+
+<p>方法3：</p>
+
+<pre><code>#!/bin/bash
+echo $1 |awk '{print $0~/^[0-9]+$/?&quot;Is Number.&quot;:&quot;No Number.&quot;}'  #三目运算符
+12.14 找出包含关键字的文件
+DIR=$1
+KEY=$2
+for FILE in $(find $DIR -type f); do
+    if grep $KEY $FILE &amp;&gt;/dev/null; then
+        echo &quot;--&gt; $FILE&quot;
+    fi
+done
+</code></pre>
+
+<p><strong>14、给定目录找出包含关键字的文件</strong></p>
+
+<pre><code>#!/bin/bash
+DIR=$1
+KEY=$2
+for FILE in $(find $DIR -type f); do
+    if grep $KEY $FILE &amp;&gt;/dev/null; then
+        echo &quot;--&gt; $FILE&quot;
+    fi
+done
+</code></pre>
+
+<p><strong>15、监控目录，将新创建的文件名追加到日志中</strong></p>
+
+<p>场景：记录目录下文件操作。</p>
+
+<p>需先安装inotify-tools软件包。</p>
+
+<pre><code>#!/bin/bash
+MON_DIR=/opt
+inotifywait -mq --format %f -e create $MON_DIR |\
+while read files; do
+  echo $files &gt;&gt; test.log
+done
+</code></pre>
+
+<p><strong>16、给用户提供多个网卡选择</strong></p>
+
+<p>场景：服务器多个网卡时，获取指定网卡，例如网卡流量</p>
+
+<pre><code>#!/bin/bash
+function local_nic() {
+    local NUM ARRAY_LENGTH
+    NUM=0
+    for NIC_NAME in $(ls /sys/class/net|grep -vE &quot;lo|docker0&quot;); do
+        NIC_IP=$(ifconfig $NIC_NAME |awk -F'[: ]+' '/inet addr/{print $4}')
+        if [ -n &quot;$NIC_IP&quot; ]; then
+            NIC_IP_ARRAY[$NUM]=&quot;$NIC_NAME:$NIC_IP&quot;    #将网卡名和对应IP放到数组
+            let NUM++
+        fi
+    done
+    ARRAY_LENGTH=${#NIC_IP_ARRAY[*]}
+    if [ $ARRAY_LENGTH -eq 1 ]; then     #如果数组里面只有一条记录说明就一个网卡
+        NIC=${NIC_IP_ARRAY[0]%:*}
+        return 0
+    elif [ $ARRAY_LENGTH -eq 0 ]; then   #如果没有记录说明没有网卡
+        echo &quot;No available network card!&quot;
+        exit 1
+    else
+        #如果有多条记录则提醒输入选择
+        for NIC in ${NIC_IP_ARRAY[*]}; do
+            echo $NIC
+        done
+        while true; do
+            read -p &quot;Please enter local use to network card name: &quot; INPUT_NIC_NAME
+            COUNT=0
+            for NIC in ${NIC_IP_ARRAY[*]}; do
+                NIC_NAME=${NIC%:*}
+                if [ $NIC_NAME == &quot;$INPUT_NIC_NAME&quot; ]; then
+                    NIC=${NIC_IP_ARRAY[$COUNT]%:*}
+                    return 0
+                else
+                   COUNT+=1
+                fi
+            done
+            echo &quot;Not match! Please input again.&quot;
+        done
+    fi
+}
+local_nic
+</code></pre>
+
+<p><strong>17、查看网卡实时流量</strong></p>
+
+<p>适用于CentOS6操作系统。</p>
+
+<pre><code>#!/bin/bash
+# Description: Only CentOS6
+traffic_unit_conv() {
+    local traffic=$1
+    if [ $traffic -gt 1024000 ]; then
+        printf &quot;%.1f%s&quot; &quot;$(($traffic/1024/1024))&quot; &quot;MB/s&quot;
+    elif [ $traffic -lt 1024000 ]; then
+        printf &quot;%.1f%s&quot; &quot;$(($traffic/1024))&quot; &quot;KB/s&quot;
+    fi
+}
+NIC=$1
+echo -e &quot; In ------ Out&quot;
+while true; do
+    OLD_IN=$(awk -F'[: ]+' '$0~&quot;'$NIC'&quot;{print $3}' /proc/net/dev)
+    OLD_OUT=$(awk -F'[: ]+' '$0~&quot;'$NIC'&quot;{print $11}' /proc/net/dev)
+    sleep 1
+    NEW_IN=$(awk -F'[: ]+' '$0~&quot;'$NIC'&quot;{print $3}' /proc/net/dev)
+    NEW_OUT=$(awk -F'[: ]+' '$0~&quot;'$NIC'&quot;{print $11}' /proc/net/dev)
+    IN=$(($NEW_IN-$OLD_IN))
+    OUT=$(($NEW_OUT-$OLD_OUT))
+    echo &quot;$(traffic_unit_conv $IN) $(traffic_unit_conv $OUT)&quot;
+    sleep 1
+done
+</code></pre>
+
+<p>使用：./traffic.sh eth0</p>
+
+<p><strong>18、MySQL数据库备份</strong></p>
+
+<pre><code>#!/bin/bash
+DATE=$(date +%F_%H-%M-%S)
+HOST=192.168.1.120
+DB=test
+USER=bak
+PASS=123456
+MAIL=&quot;zhangsan@example.com lisi@example.com&quot;
+BACKUP_DIR=/data/db_backup
+SQL_FILE=${DB}_full_$DATE.sql
+BAK_FILE=${DB}_full_$DATE.zip
+cd $BACKUP_DIR
+if mysqldump -h$HOST -u$USER -p$PASS --single-transaction --routines --triggers -B $DB &gt; $SQL_FILE; then
+    zip $BAK_FILE $SQL_FILE &amp;&amp; rm -f $SQL_FILE
+    if [ ! -s $BAK_FILE ]; then
+            echo &quot;$DATE 内容&quot; | mail -s &quot;主题&quot; $MAIL
+    fi
+else
+    echo &quot;$DATE 内容&quot; | mail -s &quot;主题&quot; $MAIL
+fi
+find $BACKUP_DIR -name '*.zip' -ctime +14 -exec rm {} \;
+</code></pre>
+
+<p>*<strong><em>19、Nginx服务管理脚本</em></strong>*</p>
+
+<p>场景：使用源码包安装Nginx不含带服务管理脚本，也就是不能使用&rdquo;service nginx start&rdquo;或&rdquo;/etc/init.d/nginx
+start&rdquo;，所以写了以下的服务管理脚本。</p>
+
+<pre><code>#!/bin/bash
+# Description: Only support RedHat system
+. /etc/init.d/functions
+WORD_DIR=/usr/local/nginx
+DAEMON=$WORD_DIR/sbin/nginx
+CONF=$WORD_DIR/conf/nginx.conf
+NAME=nginx
+PID=$(awk -F'[; ]+' '/^[^#]/{if($0~/pid;/)print $2}' $CONF)
+if [ -z &quot;$PID&quot; ]; then
+    PID=$WORD_DIR/logs/nginx.pid
+else
+    PID=$WORD_DIR/$PID
+fi
+stop() {
+    $DAEMON -s stop
+    sleep 1
+    [ ! -f $PID ] &amp;&amp; action &quot;* Stopping $NAME&quot;  /bin/true || action &quot;* Stopping $NAME&quot; /bin/false
+}
+start() {
+    $DAEMON
+    sleep 1
+    [ -f $PID ] &amp;&amp; action &quot;* Starting $NAME&quot;  /bin/true || action &quot;* Starting $NAME&quot; /bin/false
+}
+reload() {
+    $DAEMON -s reload
+}
+test_config() {
+    $DAEMON -t
+}
+case &quot;$1&quot; in
+    start)
+        if [ ! -f $PID ]; then
+            start
+        else
+            echo &quot;$NAME is running...&quot;
+            exit 0
+        fi
+        ;;
+    stop)
+        if [ -f $PID ]; then
+            stop
+        else
+            echo &quot;$NAME not running!&quot;
+            exit 0
+        fi
+        ;;
+    restart)
+        if [ ! -f $PID ]; then
+            echo &quot;$NAME not running!&quot; 
+            start
+        else
+            stop
+            start
+        fi
+        ;;
+    reload)
+        reload
+        ;;
+    testconfig)
+        test_config
+        ;;
+    status)
+        [ -f $PID ] &amp;&amp; echo &quot;$NAME is running...&quot; || echo &quot;$NAME not running!&quot;
+        ;;
+    *)
+        echo &quot;Usage: $0 {start|stop|restart|reload|testconfig|status}&quot;
+        exit 3
+        ;;
+esac
+</code></pre>
+
+<p><strong>20、用户根据菜单选择要连接的Linux主机</strong></p>
+
+<p>Linux主机SSH连接信息：</p>
+
+<pre><code># cat host.txt
+Web 192.168.1.10 root 22
+DB 192.168.1.11 root 22
+</code></pre>
+
+<p>内容格式：主机名 IP User Port</p>
+
+<pre><code>#!/bin/bash
+PS3=&quot;Please input number: &quot;
+HOST_FILE=host.txt
+while true; do
+    select NAME in $(awk '{print $1}' $HOST_FILE) quit; do
+        [ ${NAME:=empty} == &quot;quit&quot; ] &amp;&amp; exit 0
+        IP=$(awk -v NAME=${NAME} '$1==NAME{print $2}' $HOST_FILE)
+        USER=$(awk -v NAME=${NAME} '$1==NAME{print $3}' $HOST_FILE)
+        PORT=$(awk -v NAME=${NAME} '$1==NAME{print $4}' $HOST_FILE)
+        if [ $IP ]; then
+            echo &quot;Name: $NAME, IP: $IP&quot;
+            ssh -o StrictHostKeyChecking=no -p $PORT -i id_rsa $USER@$IP  # 密钥免交互登录
+            break
+        else
+            echo &quot;Input error, Please enter again!&quot;
+            break
+        fi
+    done
+done
+</code></pre>
+
+<p>摘自：<a href="https://mp.weixin.qq.com/s/O2vbWbJ-K68nXxvVwUCfaw，原创：李振良">https://mp.weixin.qq.com/s/O2vbWbJ-K68nXxvVwUCfaw，原创：李振良</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

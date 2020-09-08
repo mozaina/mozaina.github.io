@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Liunxshell脚本一键部署虚拟主机初级代码欢迎指教 | 开发者问答集锦</title>
+    <meta property="og:title" content="Liunxshell脚本一键部署虚拟主机初级代码欢迎指教 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Liunxshell脚本一键部署虚拟主机初级代码欢迎指教">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/liunxshell%E8%84%9A%E6%9C%AC%E4%B8%80%E9%94%AE%E9%83%A8%E7%BD%B2%E8%99%9A%E6%8B%9F%E4%B8%BB%E6%9C%BA%E5%88%9D%E7%BA%A7%E4%BB%A3%E7%A0%81%E6%AC%A2%E8%BF%8E%E6%8C%87%E6%95%99/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Liunxshell脚本一键部署虚拟主机初级代码欢迎指教</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>每次在配置服务器的时候，对于配置站点都很烦躁，因为招数都一样，却不得不东改一下西改一下，所以就编写了这个脚本，下次部署网站的时候，直接执行就可以了。</p>
+
+<h1 id="一-切换内定shell为-bash">一、切换内定Shell为 bash</h1>
+
+<p>使用的ubuntu18.04 LTS 版本，默认的是dash</p>
+
+<p>使用 命令查看当前系统的内定Shell是bash还是dash</p>
+
+<pre><code>ls -l /bin/sh
+</code></pre>
+
+<p>如果结果显示为 bash就跳过，如果是dash 则切换过来</p>
+
+<pre><code>sudo dpkg-reconfigure dash
+</code></pre>
+
+<p>在跳出的选择框里选择 NO 回车即可。</p>
+
+<h1 id="二-编写shell脚本-create-hosts-sh">二、编写shell脚本 create_hosts.sh</h1>
+
+<pre><code>#!/bin/bash
+#默认的web服务器名称
+SERVER_NAME=nginx
+#第一步，选择web服务器
+doChooseServer(){
+    echo -n '请选择服务器 1.nginx 2.apache :' 
+    read SERVICE_CODE
+
+    if [ $SERVICE_CODE == 1 ]
+    then    
+            echo '你选择了nginx'
+    elif [ $SERVICE_CODE == 2 ]
+    then
+            echo '你选择了apache'
+            SERVER_NAME=apache2
+    else
+            echo 'default nginx'
+    fi
+
+}
+#第二步，输入域名
+doInputUrl(){
+        echo -e &quot;请输入要添加的域名（不含http/https）:&quot;
+        read INPUT_URL
+
+    if [[ -z $INPUT_URL ]]
+        then
+                echo -e &quot;域名不可为空！\n&quot;
+                doInputUrl
+    fi
+}
+#第三步，输入端口号 默认80
+doInputPort(){
+    echo -e &quot;请输入端口号(默认80):&quot;
+    read INPUT_PORT
+    if [[ -z $INPUT_PORT ]]
+    then
+        echo '80'
+        INPUT_PORT=80
+    fi
+}
+#第四步，输入项目根目录，不存在可以选择是否创建
+doInputDir(){
+    echo -e &quot;请输入网站根目录(如 /var/www/html/myproject):&quot;
+    read INPUT_DIR
+    if [[ -z $INPUT_DIR ]]
+    then
+        echo -e &quot;网站目录不可为空！\n&quot;
+        doInputDir
+    fi
+
+    if [ ! -d $INPUT_DIR ]
+    then
+        echo '文件夹不存在，是否创建?(1.创建2.不创建)'
+        read IS_CREATE_DIR
+        if [[ $IS_CREATE_DIR == 1 ||  -z $IS_CREATE_DIR ]]
+        then
+            mkdir -p $INPUT_DIR
+            if [[ $? -ne 0 ]]
+            then
+                echo '文件夹创建失败,稍后请手动创建';
+            fi
+            echo '文件夹创建成功'
+        else
+            echo '稍后请手动创建项目根目录！'
+        fi
+    fi
+
+}
+
+
+doChooseServer
+doInputUrl
+doInputPort
+doInputDir
+#项目配置文件位置
+SERVER_CONF_DIR=&quot;/etc/$SERVER_NAME/sites-available&quot;
+SERVER_LN_CONF_DIR=&quot;/etc/$SERVER_NAME/sites-enabled/&quot;
+# 再次确认虚拟主机信息
+echo -e &quot;service: $SERVER_NAME \n 网站根目录: $INPUT_DIR \n 域名: $INPUT_URL:$INPUT_PORT \n 确认添加虚拟主机？（yes/no）&quot;
+
+read IS_SURE
+
+if [[ -z $IS_SURE ]]
+then
+    exit 0
+fi
+
+if [ $IS_SURE == 'yes' ]
+then
+    echo '操作进行中......'
+    echo -e &quot;正在生成$INPUT_URL的配置文件...\n&quot;
+
+    #-------------nginx 配置文件 START--------------#
+
+    NGINX_LOCATION_STRING='
+    location / {\n
+        try_files $uri $uri/ /index.php?$query_string;\n
+    }'
+
+    NGINX_PHP_LOCATION_STRING='
+    location ~ \.php$ {\n
+        include snippets/fastcgi-php.conf;\n
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;\n
+        fastcgi_pass unix:/var/run/php/php7.2-fpm.sock;\n
+        include fastcgi_params;\n
+    }'
+
+    NGINX_KNOW_LOCATION_STRING='
+    location ~ /\.(?!well-known).* {\n
+        deny all;\n
+    }'
+
+    NGINX_CONF_STRING=&quot;
+    server {\n
+        listen $INPUT_PORT;\n
+        listen [::]:$INPUT_PORT;\n
+        root $INPUT_DIR;\n
+
+        add_header X-Frame-Options \&quot;SAMEORIGIN\&quot;;\n
+        add_header X-XSS-Protection \&quot;1; mode=block\&quot;;\n
+        add_header X-Content-Type-Options \&quot;nosniff\&quot;;\n
+
+        index index.php index.html index.htm;\n
+        charset utf-8;\n
+        server_name $INPUT_URL;\n
+
+        $NGINX_LOCATION_STRING\n
+
+        location = /favicon.ico { access_log off; log_not_found off; }\n
+        location = /robots.txt  { access_log off; log_not_found off; }\n
+        error_page 404 /index.php;\n
+
+        $NGINX_PHP_LOCATION_STRING\n
+
+        $NGINX_KNOW_LOCATION_STRING\n
+
+    }&quot;
+    #-------------nginx  配置文件 END ---------------#
+
+    #-------------apache 配置文件 START--------------#
+
+    APACHE_ERROR_LOG_STR='Errorlog ${APACHE_LOG_DIR}/error.log\n'
+    APACHE_CUSTON_LOG_STR='CustomLog ${APACHE_LOG_DIR}/access.log combined\n'
+
+    APACHE_CONF_STRING=&quot;\n
+        ServerName $INPUT_URL\n
+        ServerAdmin webmaster@localhost\n
+        DocumentRoot $INPUT_DIR\n
+        $APACHE_ERROR_LOG_STR\n
+        $APACHE_CUSTON_LOG_STR\n
+    &quot;
+    #-------------apache 配置文件 END ---------------#  
+    #写入配置文件
+    if [ $SERVICE_CODE == 2 ]
+    then
+        CONF_PATH=&quot;$SERVER_CONF_DIR/$INPUT_URL.conf&quot;
+        CONF_LN_PATH=&quot;$SERVER_LN_CONF_DIR/$INPUT_URL.conf&quot;
+        echo -e $APACHE_CONF_STRING &gt; $CONF_PATH
+    else
+        CONF_PATH=$SERVER_CONF_DIR/$INPUT_URL
+        CONF_LN_PATH=&quot;$SERVER_LN_CONF_DIR/$INPUT_URL.conf&quot;
+        echo -e $NGINX_CONF_STRING &gt; $CONF_PATH
+    fi
+
+
+    if [[ $? -ne 0 ]]
+    then
+        echo '配置文件写入失败'
+        exit 0
+    fi
+
+    #创建软链接
+    if [[ -L $CONF_LN_PATH ]]
+    then
+        echo '软链接已经存在,跳过此步骤';
+    else
+        ln -s $CONF_PATH $SERVER_LN_CONF_DIR
+
+        if [[ $? -ne 0 ]]
+        then
+            echo '软链接创建失败';
+        fi
+    fi
+
+    #更新hosts文件
+
+    echo -e &quot;正在更新hosts文件\n&quot;
+    echo &quot;127.0.0.1 $INPUT_URL&quot; &gt;&gt; /etc/hosts
+    if [[ $? -ne 0 ]]
+    then
+        echo 'hosts文件更新失败'
+        exit 0
+    fi
+    echo 'hosts文件更新成功'
+
+    echo -e &quot;正在重启$SERVER_NAME服务器\n&quot;
+    service $SERVER_NAME restart
+
+    if [[ $? -ne 0 ]]
+    then
+        echo &quot;$SERVER_NAME重启失败&quot;
+        exit 0
+    fi
+
+    echo -e &quot;重启成功，网站配置完成&quot;
+else
+    exit 0
+fi
+</code></pre>
+
+<p>三、配置权限</p>
+
+<pre><code>sudo chmod +x create_hosts.sh
+</code></pre>
+
+<p>四、开始执行</p>
+
+<pre><code>sudo sh create_hosts.sh
+</code></pre>
+
+<p>然后根据提示输入相应的信息即可，亲测可用。</p>
+
+<p>五、缺陷。</p>
+
+<p>1.没有检测站点是否已经存在，存在的话会覆盖掉原有的配置</p>
+
+<p>2.hosts文件会无限追加</p>
+
+<p>3.没有正则判断输入的格式</p>
+
+<p>so，这只是个人用来偷懒的一个小脚本，如有可以改进的地方，多多指教。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

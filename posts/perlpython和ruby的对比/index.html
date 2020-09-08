@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>perlpython和ruby的对比 | 开发者问答集锦</title>
+    <meta property="og:title" content="perlpython和ruby的对比 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="perlpython和ruby的对比">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/perlpython%E5%92%8Cruby%E7%9A%84%E5%AF%B9%E6%AF%94/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">perlpython和ruby的对比</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="perl-python和ruby的对比">perl,python和ruby的对比</h2>
+
+<p>(2012-05-19 11:00:13) [ 编辑] [ 删除]</p>
+
+<p><img src="https://img.it610.com/image/info8/924275b9184c4118a403dbf3c2cd0348.gif" alt="" />转载▼</p>
+
+<p>标签：</p>
+
+<h3 id="it">it</h3>
+
+<p>|<br />
+&mdash;|&mdash;</p>
+
+<p>看到这篇文章挺好,所以转来,以防将来找不到了.</p>
+
+<p>转: <a href="http://danvk.org/josephus.html">http://danvk.org/josephus.html</a></p>
+
+<h2 id="the-josephus-problem">The Josephus Problem</h2>
+
+<p>What is the Josephus problem? To quote from <em>Concepts, Techniques, and Models
+of Computer Programming</em> (a daunting title if ever there was one):</p>
+
+<blockquote>
+<p>Flavius Josephus was a roman historian of Jewish origin. During the Jewish-
+Roman wars of the first century AD, he was in a cave with fellow soldiers,
+40 men in all, surrounded by enemy Roman troops. They decided to commit
+suicide by standing in a ring and counting off each third man. Each man so
+designated was to commit suicide&hellip;Josephus, not wanting to die, managed to
+place himself in the position of the last survivor.</p>
+
+<p>In the general version of the problem, there are <em>n</em> soldiers numbered from
+1 to <em>n</em> and each <em>k</em> -th soldier will be eliminated. The count starts from
+the first soldier. What is the number of the last survivor?</p>
+</blockquote>
+
+<p>I decided to model this situation using objects in three different scripting
+languages, Perl, Ruby, and Python. The solution in each of the languages is
+similar. A Person class is defined, which knows whether it is alive or dead,
+who the next person in the circle is, and what position number it is in. There
+are methods to pass along a kill signal, and to create a chain of people.
+Either of these could have been implemented using iteration, but I wanted to
+give recursion a whirl, since it&rsquo;s tougher on the languages. Here are my
+results.</p>
+
+<h2 id="perl">Perl</h2>
+
+<pre><code>package Person;
+use overload q(&quot;&quot;) =&gt; \&amp;to_s;
+
+# Create a new, living Person with the given position
+sub new {
+    my $invocant = shift;
+    my $class = ref($invocant) || $invocant;
+    my $pos = shift;
+    my $self = { &quot;position&quot; =&gt; $pos,
+                 &quot;alive&quot; =&gt; 1,
+                 &quot;succ&quot; =&gt; undef };
+    return bless($self,$class);
+}
+
+# Getter/Setter for successor
+sub succ : lvalue {
+    my $self = shift;
+    $self-&gt;{succ}
+}
+
+# Create a chain of people
+sub createChain {
+    my $self = shift;
+    my $n = shift;
+    return $self unless $n;
+
+    my $succ = Person-&gt;new($self-&gt;{position}+1);
+    $self-&gt;succ = $succ;
+    $succ-&gt;createChain($n-1)
+}
+
+# Pass on the killing message
+sub circularKill {
+    my $self = shift;
+    my ($pos,$nth,$remaining)=@_;
+
+    return $self-&gt;{succ}-&gt;circularKill($pos, $nth, $remaining)
+        unless $self-&gt;{alive};
+    return $self unless $remaining &gt; 1;
+
+    if ($pos == $nth) {
+        $self-&gt;{alive} = 0;
+        $pos = 0;
+        $remaining--;
+    }
+    $self-&gt;{succ}-&gt;circularKill($pos+1, $nth, $remaining)
+}
+
+# Print descriptive information
+sub to_s{ 
+    my $self = shift;
+    &quot;Person #&quot;.$self-&gt;{position}.&quot;, &quot;.($self-&gt;{alive} ? &quot;alive&quot; : &quot;dead&quot;)
+}
+
+# Circle of $n people, kill every one out of every $m
+$m = 3;
+$n = 40;
+
+$first = new Person(1);
+$last = $first-&gt;createChain($n-1);
+$last-&gt;succ = $first;
+
+$winner = $first-&gt;circularKill(1,$m,$n);
+print &quot;Winner: &quot;, $winner, &quot;\n&quot;;
+</code></pre>
+
+<p>What&rsquo;s good:</p>
+
+<ul>
+<li>Support for statement modifiers (ie, the &lsquo;if&rsquo; or &lsquo;unless&rsquo; after a line</li>
+<li>Last evaluated expression is assumed to be the return value (look at sub succ)</li>
+<li>Once the class is actually defined, everything seems fairly clean</li>
+<li>It runs, quickly, and gets the right answer</li>
+</ul>
+
+<p>What&rsquo;s bad:</p>
+
+<ul>
+<li>It looks ugly as hell, and feels like a hack. Look at the new routine! Without the help of <em>Programming Perl</em> (aka The Camel), I would have been clueless how to write this.</li>
+<li>Also under the &ldquo;it&rsquo;s a hack&rdquo; heading, I don&rsquo;t like how each subroutine begins by shifting $self off of the arguments stack. This seems unnatural.</li>
+<li>Overloading the &ldquo;stringification&rdquo; operator was a little roundabout (look at the use overload line. Again, this felt unnatural, and I wouldn&rsquo;t have had a clue how to do it without The Camel.</li>
+</ul>
+
+<p>So, in conclusion, defining classes in Perl is decidedly inelegant, and
+unintuitive. If I were to do it often, I&rsquo;d have to cut and paste that new
+routine wherever I went. That&rsquo;s a BIG stumbling block, and it would probably
+be enough to keep me from using OO in Perl. In fact, it has been for the past
+several years.</p>
+
+<p>I wanted to do some OO however, so I checked out Python and Ruby. Here&rsquo;s the
+same problem coded using each of them.</p>
+
+<h2 id="ruby">Ruby</h2>
+
+<pre><code>class Person
+    attr_reader :position, :succ, :alive
+    attr_writer :position, :succ, :alive
+
+    # Everyone is alive, initially
+    def initialize(pos)
+        @position = pos
+        @alive = true
+    end
+
+    # For creating a linked chain of people
+    def createChain(n)
+        return self unless n&gt;0
+        @succ = Person.new(@position + 1)
+        @succ.createChain(n-1)
+    end
+
+    # Kill every nth person
+    # Current position in the cycle is pos
+    # there are remaining people remaining
+    # Stop killing if we're the last one.
+    def kill(pos,nth,remaining)
+        return @succ.kill(pos,nth,remaining) if !@alive
+        return self if (remaining == 1)
+
+        if pos == nth
+            @alive = false
+            puts self
+            pos = 0
+            remaining-=1
+        end
+        @succ.kill(pos+1,nth,remaining)
+    end
+
+    # Information about this person
+    def to_s
+        &quot;Person \##@position, #{@alive ? 'alive' : 'dead'}&quot;
+    end
+end
+
+# Set n to anything much higher (like 10, say)
+# And the program hangs, or has an &quot;Illegal Instruction&quot;
+n = 7
+
+first = Person.new(1)
+last = first.createChain(n-1)
+last.succ = first
+
+winner = first.kill(1,3,n)
+# If I use puts &quot;Winner: &quot; + winner, I get an error:
+# in `+': failed to convert Person into String (TypeError)
+#puts &quot;Winner: &quot; + winner
+puts &quot;Winner: &quot;, winner
+</code></pre>
+
+<p>What&rsquo;s good:</p>
+
+<ul>
+<li>Since this was my first Ruby script, I can&rsquo;t claim to have written good, idiomatic code, but it sure looks nice to me. It&rsquo;s far more elegant than the Perl mess, and significantly shorter as well.</li>
+<li>I like the attr_reader and attr_writer shortcuts.</li>
+<li>&ldquo;stringification&rdquo; overloading was pretty simple, especially since this is done frequently in the online reference.</li>
+<li>As in Perl, there are statement modifiers and the last statement is the return value, a fact which I used in most of these routines.</li>
+<li>I like the flexible interpolation via #{}</li>
+</ul>
+
+<p>What&rsquo;s bad:</p>
+
+<ul>
+<li>While the code looks great, the execution sucks. Ruby&rsquo;s limit on stack depth seems to be set somewhere around 60, which is absurdly low. This clearly prevents setting n particularly high. While n=40 worked in both Perl and Python, Ruby gives an &ldquo;Illegal Instruction&rdquo; error or just hangs, which I eventually figured out was its way of saying that the depth limit had been reached. There may be some way around it, but this limitation seems pretty atrocious.</li>
+<li>When there&rsquo;s an error in a Ruby program, the error messages tend to be pretty useless, usually along the lines of &ldquo;There&rsquo;s an error in line x&rdquo;, if that. When I had n set at 40, I&rsquo;d just get an &ldquo;Illegal Instruction&rdquo; error, which was incredibly misleading. Setting the &ndash;debug flag didn&rsquo;t help in this department.</li>
+<li>Also, and I may just be missing something here, puts &ldquo;Winner: &ldquo; + winner told me that it couldn&rsquo;t convert a Person into a String, which it clearly could, since puts winner worked fine.</li>
+</ul>
+
+<p>So in conclusion, I really liked coding in Ruby, but the execution just wasn&rsquo;t
+there. If there are any Ruby fans out there who know how to fix the problems I
+mentioned, I&rsquo;d be thrilled to hear from you.</p>
+
+<h2 id="python">Python</h2>
+
+<pre><code>class Person:
+    def __init__(self,pos):
+        self.pos = pos
+        self.alive = 1
+    def __str__(self):
+        return &quot;Person #%d, %s&quot; % (self.pos, self.alive)
+
+    # Creates a chain of linked people
+    # Returns the last one in the chain
+    def createChain(self,n):
+        if n&gt;0:
+            self.succ = Person(self.pos+1)
+            return self.succ.createChain(n-1)
+        else:
+            return self
+
+    # Kills in a circle, getting every nth living person
+    # When there is only one remaining, the lone survivor is returned
+    def kill(self,pos,nth,remaining):
+        if self.alive == 0: return self.succ.kill(pos,nth,remaining)
+        if remaining == 1: return self
+        if pos == nth:
+            self.alive = 0
+            pos=0
+            remaining-=1
+        return self.succ.kill(pos+1,nth,remaining)
+
+# n people in a circle
+# kill every mth person
+n = 40
+m = 3
+
+first = Person(1)
+last = first.createChain(n-1)
+last.succ = first
+
+print &quot;In a circle of %d people, killing number %d&quot; % (n,m)
+winner = first.kill(1,m,n)
+print &quot;Winner: &quot;, winner
+</code></pre>
+
+<p>What&rsquo;s good:</p>
+
+<ul>
+<li>It&rsquo;s very compact (shortest of the three), mostly because of the lack of lines to end blocks (ie, &ldquo;end&rdquo; in Ruby or &ldquo;}&rdquo; in Perl). Not having these lines does feel a little weird, but I think I could get used to it.</li>
+<li>I like the printf-style formatting via the % operator. I can&rsquo;t say whether I like it more than the direct interpolation in Ruby and Perl, however.</li>
+<li>Unlike in Ruby, the program ran without a hitch, and got the right answer.</li>
+</ul>
+
+<p>What&rsquo;s bad:</p>
+
+<ul>
+<li><strong>init</strong> and <strong>str</strong>? This seems ugly, though that may be part of the &ldquo;never touch anything starting with __&rdquo; credo coming in from my C background.</li>
+<li>Passing self as the first parameter of every routine makes Python&rsquo;s OO seem almost as hackish as Perl&rsquo;s or PHP&rsquo;s. I much prefer Ruby&rsquo;s system of using @ to indicate an instance variable, rather than &ldquo;self.&rdquo;.</li>
+<li>I wish I could use tabs instead of four spaces to indicate indentation.</li>
+<li>No statement modifiers, and there has to be an explicit return statement. These aren&rsquo;t major drawbacks, but I&rsquo;d rather have them than not.</li>
+</ul>
+
+<p>Python isn&rsquo;t quite as clean as Ruby, though it certainly trounces Perl. It
+would be hard not to trounce Perl. The performance was much better than in
+Ruby, however: Python ran the script for n=40 without any hitches. In the
+debugging department, syntax errors included helpful information, including
+where in the line the error occured.</p>
+
+<hr />
+
+<p>Now for the comparison. First of all, I&rsquo;ll throw Perl right out. I love the
+language, but not for object-oriented programming. To write a purely
+procedural program I&rsquo;d take it over both Ruby and Python any day of the week,
+but not for OO.</p>
+
+<p>If I had my choice in the matter, I would use Ruby. It&rsquo;s syntax seems cleaner,
+and it&rsquo;s object orientation doesn&rsquo;t seem hackish in the least. It&rsquo;s
+performance, however, left a lot to be desired. Granted, deep recursion
+probably isn&rsquo;t the most widely used technique, but there&rsquo;s no reason it
+shouldn&rsquo;t work. For a different sort of problem, I&rsquo;d likely choose Ruby,
+though I&rsquo;m worried I might have to switch over to Python if I ran into similar
+problems.</p>
+
+<p>And that brings us to the aforementioned beast. It seems to present the middle
+ground in this problem. It&rsquo;s syntax is fairly clean though, as I mentioned,
+I&rsquo;d rather not have to type &ldquo;self.&rdquo; all the time. But on the plus side, it
+could actually solve the problem without crashing.</p>
+
+<p>So for this round, the winner is Python, though I really wish it had been
+Ruby. For most problems, I&rsquo;ll go with Ruby. It&rsquo;s more enjoyable to code in,
+and that&rsquo;s what I&rsquo;m coding for&ndash;enjoyment.</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

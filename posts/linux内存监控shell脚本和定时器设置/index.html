@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux内存监控shell脚本和定时器设置 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux内存监控shell脚本和定时器设置 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux内存监控shell脚本和定时器设置">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E5%86%85%E5%AD%98%E7%9B%91%E6%8E%A7shell%E8%84%9A%E6%9C%AC%E5%92%8C%E5%AE%9A%E6%97%B6%E5%99%A8%E8%AE%BE%E7%BD%AE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux内存监控shell脚本和定时器设置</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<pre><code>在没nagios监控软件的情况下，只要服务器能上互联网，就可通过发邮件的方式来提醒管理员系统内存的使用情况
+</code></pre>
+
+<p>一、安装linux下面的一个邮件客户端msmtp软件(类似于一个foxmail的工具)<br />
+1、下载安装：</p>
+
+<p>代码如下:</p>
+
+<pre><code># tar jxvf msmtp-1.4.16.tar.bz2
+# cd msmtp-1.4.16
+# ./configure --prefix=/usr/local/msmtp
+#./configure --prefix=/usr/local/mutt
+# make
+# make install
+</code></pre>
+
+<p>2、创建msmtp配置文件和日志文件（host为邮件域名，邮件用户名test，密码123456）<br />
+代码如下:</p>
+
+<pre><code># vim ~/.msmtprc
+account default
+host 192.168.0.5
+from 发件人邮箱addr
+auth login
+user test
+password 发件人pw
+logfile ~/.msmtp.log 
+# chmod 600~/.msmtprc
+# touch ~/.msmtp.log
+</code></pre>
+
+<p>3、mutt安装配置：（一般linux下有默认安装mutt）<br />
+yum install mutt</p>
+
+<p>代码如下:</p>
+
+<pre><code># vim ~/.muttrc
+set sendmail=&quot;/usr/local/msmtp/bin/msmtp&quot; 
+set use_from=yes 
+set realname=&quot;qqqqqq&quot; 
+set from=11111111@qq.com
+set envelope_from=yes 
+set rfc2047_parameters=yes 
+set charset=&quot;utf-8&quot; 
+</code></pre>
+
+<p>4、邮件发送测试（-s邮件标题，-a表加附件）</p>
+
+<p>复制代码代码如下:</p>
+
+<pre><code># echo &quot;Linux 服务器内存使用情况&quot; | mutt donghp@kingdom.com -s &quot;Linux 服务器内存使用情况警告&quot; -a /scripts/freemem.txt 
+</code></pre>
+
+<p>二、使用free命令监控系统内存：<br />
+1、使用free命令查看linux系统内存使用情况：（以M为单位）</p>
+
+<p>复制代码代码如下:</p>
+
+<h1 id="free-m">free -m</h1>
+
+<p>（执行结果如下样式<br />
+复制代码代码如下:</p>
+
+<pre><code>total used free sharedbuffers cached
+Mem:3952 34145380168484
+-/+ buffers/cache: 2760 1191
+Swap: 8191 86 8105
+</code></pre>
+
+<p>2、查看截取剩余内存free的数值命令：<br />
+(1) 物理内存free值： # free -m | grep Mem | awk &lsquo;{print $4}&rsquo;<br />
+(2) 缓冲区的free值： # free -m | grep - | awk &lsquo;{print $4}&rsquo;<br />
+(3) Swap分区free值： # free -m | grep Swap | awk &lsquo;{print $4}&rsquo;<br />
+3、编写内存监控的脚本文件：</p>
+
+<p>复制代码代码如下:</p>
+
+<pre><code># vim /scripts/free-mem.sh
+#!/bin/bash
+#使用free命令监控linux系统内存变化:
+#取系统当前时间（以追加的方式写入文件&gt;&gt;）
+date &gt;&gt; /scripts/date-time.txt
+#抓取物理内存free值（以追加的方式写入文件&gt;&gt;）
+echo Mem-free: `free -m | grep Mem | awk '{print $4}'`M &gt;&gt; /scripts/mem-free.txt
+#抓取缓冲区的free值（以追加的方式写入文件&gt;&gt;）
+echo buffers/cache-free: `free -m | grep - | awk '{print $4}'`M&gt;&gt; /scripts/buffers-free.txt
+#抓取Swap分区free值（以追加的方式写入文件&gt;&gt;）
+echo Swap-free: `free -m | grep Swap | awk '{print $4}'`M&gt;&gt; /scripts/swap-free.txt
+#抓取磁盘信息
+echo 'df -hl' &gt;&gt;/scripts/disk-free.txt
+#逐行连接上面的时间和内存相关行数据（每次重新写入文件&gt;）
+paste /scripts/date-time.txt /scripts/mem-free.txt/scripts/buffers-free.txt /scripts/swap-free.txt &gt; /scripts/freemem.txt
+
+
+
+
+
+#!/bin/bash
+#取得每个分区的使用百分比（不要百分号）
+percent=`df -k | grep -v Filesystem| awk '{print int($5)}'`
+
+#循环判断分区使用率是否超过90%
+for each_one in $percent
+do
+        #判断使用率是否超过90%
+        if [ $each_one -ge 90 ];then
+                #如果超过90 则把使用情况发给mail_address mail_address换成你的邮件地址
+                df | mail -s &quot;Disk Critical&quot; mail_address
+        fi
+done
+</code></pre>
+
+<h1 id="chmod-a-x-scripts-free-mem-sh-添加执行权限">chmod a+x /scripts/free-mem.sh//添加执行权限</h1>
+
+<h1 id="scripts-free-mem-sh">./scripts/free-mem.sh</h1>
+
+<p>4、查看内存监控的结果文件：</p>
+
+<h1 id="cat-scripts-freemem-txt">cat /scripts/freemem.txt</h1>
+
+<p>5、编写free结果文件邮件发送脚本：</p>
+
+<pre><code># vim /scripts/sendmail-mem.sh
+内存监控报告
+#!/bin/bash
+#把生成的freemem.txt文件通过邮件发送给用户
+#提取本服务器的IP地址信息
+IP=`ifconfig eth0 | grep &quot;inet addr&quot; | cut -f 2 -d &quot;:&quot; | cut -f 1 -d &quot; &quot;`
+#提取当前日期时间
+today=`date -d &quot;0 day&quot; +%Y年%m月%d日`
+#发送内存监控结果邮件
+echo &quot;这是$IP服务器$today的内存监控报告，请下载附件。&quot; | mutt 1173619682@qq.com -s &quot;$IP服务器$today内存监控报告&quot; -a /scripts/freemem.txt  
+# chmod a+x /scripts/sendmail-mem.sh
+</code></pre>
+
+<p>、监控系统交换分区swap的情况，当使用超过80%的时候发告警邮件：<br />
+复制代码代码如下:</p>
+
+<pre><code># vim /scripts/swap-warning.sh
+#!/bin/bash
+#提取本服务器的IP地址信息
+IP=`ifconfig eth0 | grep &quot;inet addr&quot; | cut -f 2 -d &quot;:&quot; | cut -f 1 -d &quot; &quot;`
+#系统分配的交换分区总量
+swap_total=`free -m | grep Swap | awk '{print$2}'`
+#当前剩余的交换分区free大小
+swap_free=`free -m | grep Swap | awk '{print$4}'`
+#当前已使用的交换分区used大小
+swap_used=`free -m | grep Swap | awk '{print$3}'`
+if (($swap_used != 0)); then
+#如果交换分区已被使用，则计算当前剩余交换分区free所占总量的百分比，用小数来表示，要在小数点前面补一个整数位0
+ swap_per=0`echo &quot;scale=2;$swap_free/$swap_total&quot; | bc`
+#设置交换分区的告警值为20%(即使用超过80%的时候告警)。
+ swap_warn=0.20
+#当前剩余交换分区百分比与告警值进行比较（当大于告警值(即剩余20%以上)时会返回1，小于(即剩余不足20%)时会返回0 ）
+ swap_now=`expr $swap_per \&gt; $swap_warn`
+#如果当前交换分区使用超过80%（即剩余小于20%，上面的返回值等于0），立即发邮件告警
+if (($swap_now == 0)); then
+ echo &quot;$IP服务器swap交换分区只剩下 $swap_free M 未使用，剩余不足20%，使用率已经超过80%，请及时处理。&quot; | mutt 1173619682@qq.com -s &quot;$IP服务器$today内存监控报告&quot; -a /scripts/freemem.txt
+fi
+fi
+</code></pre>
+
+<h1 id="chmod-a-x-scripts-swap-warning-sh">chmod a+x /scripts/swap-warning.sh</h1>
+
+<p>四、加入任务计划：内存每十分钟检测一次，有告警则立即发邮件(十分钟发一次)，内存检测结果邮件每天早上8点发一次<br />
+复制代码代码如下:</p>
+
+<h1 id="crontab-e">crontab -e</h1>
+
+<pre><code>*/1 * * * */scripts/diskfree.sh
+*/1 * * * */scripts/free-mem.sh
+*/1 * * * * /scripts/swap-warning.sh
+* /1 * * * /scripts/sendmail-mem.sh
+</code></pre>
+
+<h1 id="service-crond-restart">service crond restart</h1>
+
+<p>以下是 crontab 文件的格式：<br />
+{minute} {hour} {day-of-month} {month} {day-of-week} {full-path-to-shell-
+script}<br />
+o minute: 区间为 0 – 59<br />
+o hour: 区间为0 – 23<br />
+o day-of-month: 区间为0 – 31<br />
+o month: 区间为1 – 12. 1 是1月. 12是12月.<br />
+o Day-of-week: 区间为0 – 7. 周日可以是0或7.<br />
+每个参数后面都要加空格<br />
+rm -f buffers-free.txt diskfree.txt freemem.txt mem-free.txt swap-free.txt
+test.txt date-time.txt disk-date-time.txt disk-free.txt</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

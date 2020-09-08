@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>ShellBash根据日期时间统计消息行数 | 开发者问答集锦</title>
+    <meta property="og:title" content="ShellBash根据日期时间统计消息行数 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="ShellBash根据日期时间统计消息行数">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shellbash%E6%A0%B9%E6%8D%AE%E6%97%A5%E6%9C%9F%E6%97%B6%E9%97%B4%E7%BB%9F%E8%AE%A1%E6%B6%88%E6%81%AF%E8%A1%8C%E6%95%B0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">ShellBash根据日期时间统计消息行数</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>需求：统计某个文件或者特定目录下Kafka消息一段时间范围内每个小时消息条数或者每天消息条数。</p>
+
+<p>一行数据行实例：2018-03-28T03：00：02 &hellip;</p>
+
+<p>分析：</p>
+
+<p>参数：1.指定文件的文件绝对路径</p>
+
+<p>2.指定日期或者开始日期和结束日期</p>
+
+<p>3.指定小时或者开始小时和结束小时</p>
+
+<p>4.指定统计维度（小时或者天）</p>
+
+<p>逻辑：1.输出逻辑 &ndash; 文件 + 屏幕打印</p>
+
+<p>2.统计逻辑 &ndash; grep + wc -l</p>
+
+<p>3.按天范围统计逻辑</p>
+
+<p>4.按小时范围统计逻辑</p>
+
+<p>5.按统计维度选择3/4的函数</p>
+
+<p>6.文件分类处理（单个文件或者特定目录下文件）</p>
+
+<p>7.对用户输入的日期进行判断和初始化处理</p>
+
+<p>8.对用户输入的小时进行判断和初始化处理</p>
+
+<p>9.辅助函数，修剪、加前缀0、自定义LOGGER（检查各函数参数）、文件名格式化</p>
+
+<p>扩展：1.增加目录参数，不再限定单一目录。</p>
+
+<p>2.绝对路径和相对路径均适用。</p>
+
+<p>3.对特大文件进行按行拆分处理后再统计。</p>
+
+<p>4.兼容时间戳格式的时间范围。</p>
+
+<p>Shell阶段性总结：</p>
+
+<p>1. Shell脚本调试全局开启，首行声明 #!/bin/bash -xv .</p>
+
+<p>2.获取脚本目录, $( cd &ldquo;$(dirname $0)&rdquo; &amp;&amp; pwd) .</p>
+
+<p>3.参数选项设置，-o为短参数列表，-l为长参数列表，双引号内不带冒号的为不能带参数值的参数，带冒号的必须带参数值.</p>
+
+<p>OPTS=<code>getopt -o &quot;s:,e:,dd:,df:,sh:,eh:,dh:,hd,h&quot; -l &quot;start-date:,end-
+date:,designed-date:,designed-file:,start-hour:,end-hour:,designed-hour:,hour-
+dimension,help&quot; -- &quot;$@&quot;</code></p>
+
+<p>eval set &ndash; &ldquo;$OPTS&rdquo;</p>
+
+<p>4.Trim函数在shell中实现，%%为右边最长匹配去除，##为左边最长匹配去除.</p>
+
+<p>trimmed=&ldquo;&rdquo;<br />
+function trim(){<br />
+trimmed=$1<br />
+trimmed=${trimmed%%\ }<br />
+trimmed=${trimmed##\ }<br />
+trimmed=${trimmed%%\t}<br />
+trimmed=${trimmed##\t}</p>
+
+<p>}</p>
+
+<p>5.数值比较用符号应使用 （（&gt;,&gt;=,</p>
+
+<p>6.字符串比较使用[ -z,-n,=,==,&gt;,,</p>
+
+<p>7.获取距离指定日期后i天的日期，转换成特定格式字符串，$(date +%Y-%m-%d &ndash;date=&ldquo;${from_date} + ${i} day&rdquo;)
+.</p>
+
+<p>8.获取指定日期的时间戳，$(date -d &ldquo;$to_date&rdquo; +%s)，用于日期比较.</p>
+
+<p>9.函数名变量，$FUNCNAME；函数名调用栈数组 ${FUNCNAME[@]}，如 another_func test_func main
+；主要用于日志定位.</p>
+
+<p>10.函数中局部变量声明，local designed_date .</p>
+
+<p>11.测试使用全部写在USAGE的Example里面的例子，因此Example要写的较为全面，同时写在Example中便于随时补充。</p>
+
+<p>12.help中USAGE变量填充，&lt;&lt; EOF ..
+EOF，告诉主shell，后续的输入，是其他命令或者子shell的输入，直到遇到EOF为止，再回到主shell.</p>
+
+<p>read -d &ldquo; USAGE &lt;&lt; EOF<br />
+##填充具体的使用说明</p>
+
+<p>EOF</p>
+
+<p>附Shell脚本：</p>
+
+<p>#!/bin/bash<br />
+read -d &ldquo; USAGE &lt;&lt; EOF<br />
+USAGE<br />
+$0 [&ndash;start-date=yyyy-mm-dd &ndash;end-date=yyyy-mm-dd] [&ndash;designed-date=yyyy-mm-
+dd] [&ndash;start-hour=HH &ndash;end-hour=HH] [&ndash;designed-hour=HH] [&ndash;designed-
+file=absulte path] [&ndash;hour-dimension] [&ndash;help]</p>
+
+<p>DESCRIPTION<br />
+This script is for count lines between start-date&amp;start-hour and end-date&amp;end-
+hour.<br />
+Or count lines between designed-date&amp;start-hour and designed-date&amp;end-hour.<br />
+Or count lines at designed-date&amp;designed-hour.<br />
+Notice, this script can not count greater than 30 days.<br />
+The following arguments are optional.</p>
+
+<p>--start-date<br />
+The begin of date window which lines should be counted, cooperate with
+&ndash;start-hour,&ndash;end-date,&ndash;end_hour.<br />
+If not specified, it is set to today by default.</p>
+
+<p>--end-date<br />
+The end of date window which lines should be counted, cooperate with &ndash;start-
+hour,&ndash;start-date,&ndash;end_hour.<br />
+If not specified, it is set to today by default.</p>
+
+<p>--start-hour<br />
+The begin of hour window which lines should be counted, cooperate with
+(&ndash;start-date,&ndash;end-date) or &ndash;designed-date,&ndash;end_hour.<br />
+If not specified, it is set to 0 by default.<br />
+--end-hour<br />
+The end of hour window which lines should be counted, cooperate with &ndash;start-
+hour,(&ndash;end-date,&ndash;end_date) or &ndash;designed-date.<br />
+If not specified, it is set to now hour by default.<br />
+--designed-date<br />
+The designed date to be counted.<br />
+If not specified, use &ndash;start-date and &ndash;end-date as default.<br />
+--designed-hour<br />
+The designed hour to be counted.<br />
+If not specified, use &ndash;start-hour and &ndash;end-hour as default.<br />
+--designed-file<br />
+The absulte path of file to be counted.<br />
+If not specified, all path under absulte path /data/rawdata/kafka/ will be
+checked.<br />
+--help<br />
+Display this HELP information</p>
+
+<p>EXAMPLE:<br />
+$0 &ndash;designed-date=2017-10-25<br />
+$0 &ndash;designed-date=2017-10-25 &ndash;designed-hour=06 &ndash;hour-dimension<br />
+$0 &ndash;designed-date=2017-10-25 &ndash;designed-file=/data/123.txt<br />
+$0 &ndash;designed-date=2017-10-25 &ndash;designed-hour=06 &ndash;designed-file=/data/123.txt
+&ndash;hour-dimension<br />
+$0 &ndash;start-date=2017-10-25 &ndash;end-date=2017-10-26<br />
+$0 &ndash;start-date=2017-10-25 &ndash;end-date=2017-10-26 &ndash;start-hour=06 &ndash;end-hour=07
+&ndash;hour-dimension<br />
+$0 &ndash;start-date=2017-10-25 &ndash;end-date=2017-10-26 &ndash;designed-file=/data/123.txt<br />
+$0 &ndash;start-date=2017-10-25 &ndash;end-date=2017-10-26 &ndash;start-hour=06 &ndash;end-hour=07
+&ndash;designed-file=/data/123.txt &ndash;hour-dimension<br />
+EOF</p>
+
+<p>start_date=&ldquo;&rdquo;<br />
+end_date=&ldquo;&rdquo;<br />
+designed_date=&ldquo;&rdquo;<br />
+designed_file=&ldquo;&rdquo;<br />
+start_hour=0<br />
+end_hour=0<br />
+designed_hour=0<br />
+hour_dimension=&ldquo;False&rdquo;</p>
+
+<p>OPTS=<code>getopt -o &quot;s:,e:,dd:,df:,sh:,eh:,dh:,hd,h&quot; -l &quot;start-date:,end-
+date:,designed-date:,designed-file:,start-hour:,end-hour:,designed-hour:,hour-
+dimension,help&quot; -- &quot;$@&quot;</code><br />
+eval set &ndash; &ldquo;$OPTS&rdquo;</p>
+
+<p>while true<br />
+do<br />
+case &ldquo;$1&rdquo; in<br />
+--start-date ) start_date=&ldquo;$2&rdquo;; shift 2 ;;<br />
+--end-date ) end_date=&ldquo;$2&rdquo;; shift 2 ;;<br />
+--designed-date ) designed_date=&ldquo;$2&rdquo;; shift 2 ;;<br />
+--designed-file ) designed_file=&ldquo;$2&rdquo;; shift 2 ;;<br />
+--start-hour ) start_hour=&ldquo;$2&rdquo;; shift 2 ;;<br />
+--end-hour ) end_hour=&ldquo;$2&rdquo;; shift 2 ;;<br />
+--designed-hour ) designed_hour=&ldquo;$2&rdquo;; shift 2 ;;<br />
+--hour-dimension ) hour_dimension=&ldquo;True&rdquo;; shift ;;<br />
+--help )<br />
+echo &ldquo;$USAGE&rdquo;<br />
+shift ;<br />
+exit 0 ;;<br />
+-- ) shift; break ;;<br />
+* ) break ;;<br />
+esac<br />
+done</p>
+
+<p>now_date=$(date &ldquo;+%Y-%m-%d&rdquo;);<br />
+now_hour=$(date &ldquo;+%H&rdquo;);<br />
+now_time=<code>date &quot;+%Y-%m-%d %H:%M:%S&quot;</code><br />
+IS_FILE_OUT=1<br />
+ALLOWED_MAX_PERIOD=30<br />
+DIR=&ldquo;$( cd &ldquo;$( dirname &ldquo;$0&rdquo; )&rdquo; &amp;&amp; pwd )&rdquo;<br />
+echo &ldquo;Today is $now_date,now hour is $now_hour&rdquo;<br />
+echo &ldquo;Script directory:$DIR&rdquo;</p>
+
+<p>num=&ldquo;&rdquo;<br />
+function add_prefix_zero(){<br />
+case &ldquo;$1&rdquo; in<br />
+[0-9]*) ;;<br />
+*) echo &ldquo;Error:not a number.&ldquo;; exit 1;;<br />
+esac<br />
+num=$1<br />
+if [ $num -ge 0 ] &amp;&amp; [ $num -le 9 ] ;then<br />
+num=&ldquo;0$num&rdquo;<br />
+fi<br />
+}<br />
+trimmed=&ldquo;&rdquo;<br />
+function trim(){<br />
+trimmed=$1<br />
+trimmed=${trimmed%%\ }<br />
+trimmed=${trimmed##\ }<br />
+trimmed=${trimmed%%\t}<br />
+trimmed=${trimmed##\t}<br />
+}</p>
+
+<p>IS_INFO_OUT=0<br />
+function info(){<br />
+if [ $IS_INFO_OUT -eq 1 ] ; then<br />
+echo &ldquo;[[ Function=$1 &ndash;&gt; Info=$2 ]]&rdquo;<br />
+fi<br />
+}</p>
+
+<p>saved_filename=&ldquo;&rdquo;<br />
+function format_filename(){<br />
+info &ldquo;$FUNCNAME&rdquo; &ldquo;from_date:$1 to_date:$2 from_hour:$3 to_hour:$4&rdquo;<br />
+local from_date=$1<br />
+local to_date=$2<br />
+local from_hour=$3<br />
+local to_hour=$4<br />
+if [ -z $designed_file ] ; then<br />
+saved_filename=&ldquo;$from_date-$from_hour&ndash;$to_date-$to_hour-<code>echo $now_time |
+md5sum | cut -d- -f 1</code>&rdquo;<br />
+trim $saved_filename<br />
+saved_filename=&ldquo;$trimmed.txt&rdquo;<br />
+else<br />
+file_prefilx=${designed_file##*/}<br />
+saved_filename=&ldquo;${file_prefilx%%\.txt}-$from_date-$from_hour&ndash;$to_date-$to_hour-<code>echo
+$now_time | md5sum | cut -d- -f 1</code>&rdquo;<br />
+trim $saved_filename<br />
+saved_filename=&ldquo;$trimmed.txt&rdquo;<br />
+fi<br />
+info &ldquo;$FUNCNAME&rdquo; &ldquo;saved_filename:$saved_filename&rdquo;<br />
+}</p>
+
+<p>function out_sum_date_hour(){<br />
+info &ldquo;$FUNCNAME&rdquo; &ldquo;designed_file:$1 designed_date:$2 designed_hour:$3&rdquo;<br />
+local designed_file=$1<br />
+local designed_date=$2<br />
+local designed_hour=$3<br />
+local output_message=&ldquo;&rdquo;<br />
+if [ 0 -eq $IS_FILE_OUT ] ; then<br />
+output_message=&ldquo;Filename:${designed_file} Date:${designed_date}
+${designed_hour+Hour:$designed_hour} Count:<code>grep
+&quot;${designed_date}${designed_hour+T$designed_hour}&quot; ${designed_file} | wc -l</code>&rdquo;<br />
+echo $output_message<br />
+else<br />
+output_message=&ldquo;Filename:${designed_file} Date:${designed_date}
+${designed_hour+Hour:$designed_hour} Count:<code>grep
+&quot;${designed_date}${designed_hour+T$designed_hour}&quot; ${designed_file} | wc -l</code>&rdquo;<br />
+echo $output_message<br />
+echo $output_message &gt;&gt; $DIR/&ldquo;$saved_filename&rdquo;<br />
+fi<br />
+}</p>
+
+<p>function file_from_to_date(){<br />
+info &ldquo;$FUNCNAME&rdquo; &ldquo;from_date:$1 to_date:$2 designed_file:$3&rdquo;<br />
+local from_date=$1<br />
+local to_date=$2<br />
+local designed_file=$3<br />
+local to_timestamp=<code>date -d &quot;$to_date&quot; +%s</code><br />
+local someday=&ldquo;&rdquo;<br />
+local timestamp=0<br />
+for ((i=0; i&lt;=$ALLOWED_MAX_PERIOD; i++))<br />
+do<br />
+someday=$(date +%Y-%m-%d &ndash;date=&ldquo;${from_date} + ${i} day&rdquo;)</p>
+
+<p>out_sum_date_hour $designed_file $someday</p>
+
+<p>timestamp=<code>date -d &quot;$someday&quot; +%s</code><br />
+if [ $timestamp -eq $to_timestamp ] ; then<br />
+break<br />
+fi<br />
+done<br />
+}</p>
+
+<p>function file_from_to_date_hour(){<br />
+info &ldquo;$FUNCNAME&rdquo; &ldquo;from_date:$1 to_date:$2 from_hour:$3 to_hour:$4
+designed_file:$5&rdquo;<br />
+local from_date=$1<br />
+local to_date=$2<br />
+local from_hour=$3<br />
+local to_hour=$4<br />
+local designed_file=$5<br />
+local to_timestamp=<code>date -d &quot;$to_date&quot; +%s</code><br />
+for ((i=0; i&lt;=$ALLOWED_MAX_PERIOD; i++))<br />
+do<br />
+someday=$(date +%Y-%m-%d &ndash;date=&ldquo;${from_date} + ${i} day&rdquo;)<br />
+timestamp=<code>date -d &quot;$someday&quot; +%s</code><br />
+for ((j=$from_hour; j&lt;=$to_hour; j++))<br />
+do<br />
+add_prefix_zero $j<br />
+out_sum_date_hour $designed_file $someday $num<br />
+done<br />
+if [ $timestamp -eq $to_timestamp ] ; then<br />
+break<br />
+fi<br />
+done<br />
+}</p>
+
+<p>function judge_date_hour(){<br />
+info &ldquo;$FUNCNAME&rdquo; &ldquo;from_date:$1 to_date:$2 from_hour:$3 to_hour:$4
+designed_file:$5&rdquo;<br />
+local from_date=$1<br />
+local to_date=$2<br />
+local from_hour=$3<br />
+local to_hour=$4<br />
+local designed_file=$5<br />
+if [ &ldquo;$hour_dimension&rdquo; == &ldquo;True&rdquo; ] ; then<br />
+file_from_to_date_hour $from_date $to_date $from_hour $to_hour $designed_file</p>
+
+<p>else<br />
+file_from_to_date $from_date $to_date $designed_file<br />
+fi<br />
+}</p>
+
+<p>function from_to_date_hour(){<br />
+info &ldquo;$FUNCNAME&rdquo; &ldquo;from_date:$1 to_date:$2 from_hour:$3 to_hour:$4&rdquo;<br />
+local from_date=$1<br />
+local to_date=$2<br />
+local from_hour=$3<br />
+local to_hour=$4<br />
+local to_timestamp=<code>date -d &quot;$to_date&quot; +%s</code><br />
+if [ ! -z $designed_file ] ; then<br />
+judge_date_hour $from_date $to_date $from_hour $to_hour $designed_file<br />
+else<br />
+cd /data/rawdata/kafka/<br />
+for file in $(ls <em>.txt</em>)<br />
+do<br />
+if [ ! -d $file ]; then<br />
+judge_date_hour $from_date $to_date $from_hour $to_hour $file<br />
+fi<br />
+done<br />
+fi<br />
+}</p>
+
+<p>function judge_default_date(){<br />
+info &ldquo;$FUNCNAME&rdquo; &ldquo;start_date:$start_date end_date:$end_date&rdquo;<br />
+if [ ! -z $start_date ] || [ ! -z $end_date ] ; then<br />
+if [ -z $start_date ] ; then<br />
+start_date=$now_date<br />
+fi<br />
+if [ -z $end_date ] ; then<br />
+end_date=$now_date<br />
+fi<br />
+return 1<br />
+else<br />
+return 0<br />
+fi<br />
+}</p>
+
+<p>function judge_default_hour(){<br />
+info &ldquo;$FUNCNAME&rdquo; &ldquo;start_hour:$start_hour end_hour:$end_hour&rdquo;<br />
+if [ ! 0 -eq $start_hour ] || [ ! 0 -eq $end_hour ] ; then<br />
+if [ 0 -eq $start_hour ] ; then<br />
+start_hour=0<br />
+fi<br />
+if [ 0 -eq $end_hour ] ; then<br />
+end_hour=$now_hour<br />
+fi<br />
+return 1<br />
+else<br />
+return 0<br />
+fi<br />
+}</p>
+
+<h3 id="start-date-and-end-date-can-not-coexist-with-designed-date">\$start_date and \$end_date can not coexist with \$designed_date</h3>
+
+<p>if [ ! -z $start_date ] || [ ! -z $end_date ] &amp;&amp; [ ! -z $designed_date ] ;
+then<br />
+exit 1<br />
+fi</p>
+
+<h3 id="start-hour-and-end-hour-can-not-coexist-with-designed-hour">\$start_hour and \$end_hour can not coexist with \$designed_hour</h3>
+
+<p>if [ ! 0 -eq $start_hour ] || [ ! 0 -eq $end_hour ] &amp;&amp; [ ! 0 -eq
+$designed_hour ] ; then<br />
+exit 1<br />
+fi</p>
+
+<p>if [ -z $start_date ] &amp;&amp; [ -z $end_date ] &amp;&amp; [ -z $designed_date ] ; then<br />
+start_date=$now_date<br />
+end_date=$now_date<br />
+fi</p>
+
+<p>if [ 0 -eq $start_hour ] &amp;&amp; [ 0 -eq $end_hour ] &amp;&amp; [ 0 -eq $designed_hour ] ;
+then<br />
+start_hour=0<br />
+end_hour=$now_hour<br />
+fi</p>
+
+<p>judge_default_date<br />
+if [ $? -eq 1 ] ; then<br />
+judge_default_hour<br />
+if [ $? -eq 1 ] ; then<br />
+format_filename $start_date $end_date $start_hour $end_hour<br />
+from_to_date_hour $start_date $end_date $start_hour $end_hour<br />
+else<br />
+format_filename $start_date $end_date $designed_hour $designed_hour<br />
+from_to_date_hour $start_date $end_date $designed_hour $designed_hour<br />
+fi<br />
+else<br />
+judge_default_hour<br />
+if [ $? -eq 1 ] ; then<br />
+format_filename $designed_date $designed_date $start_hour $end_hour<br />
+from_to_date_hour $designed_date $designed_date $start_hour $end_hour<br />
+else<br />
+format_filename $designed_date $designed_date $designed_hour $designed_hour<br />
+from_to_date_hour $designed_date $designed_date $designed_hour $designed_hour<br />
+fi<br />
+fi</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

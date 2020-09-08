@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>深入理解mysqlinnodbruby工具 | 开发者问答集锦</title>
+    <meta property="og:title" content="深入理解mysqlinnodbruby工具 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="深入理解mysqlinnodbruby工具">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3mysqlinnodbruby%E5%B7%A5%E5%85%B7/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">深入理解mysqlinnodbruby工具</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>github使用教程</p>
+
+<p>innodb_ruby 主要可查看innodb数据库数据表的各种存储，解析innodb的文件，用于学习数据库底层的一些存储。</p>
+
+<h2 id="安装过程">安装过程</h2>
+
+<p><code>sudo gem install innodb_ruby</code></p>
+
+<p><code>gem install --user-install innodb_ruby</code></p>
+
+<p><code>innodb_space --help # 测试一下可以显示一堆帮助不</code></p>
+
+<h2 id="try-see-see">try see see</h2>
+
+<h3 id="1-查看你数据库的存储文件在哪里">1. 查看你数据库的存储文件在哪里</h3>
+
+<pre><code>mysql&gt; show global variables like &quot;%datadir%&quot;;
++---------------+-----------------+
+| Variable_name | Value           |
++---------------+-----------------+
+| datadir       | /var/lib/mysql/ |
++---------------+-----------------+
+1 row in set (0.00 sec)
+复制代码
+</code></pre>
+
+<h3 id="2-进入数据库目录">2. 进入数据库目录</h3>
+
+<p>因为之后的很多命令需要填写数据表文件路径，每次都要写好长，我觉得浪费时间，因此先进入了数据库目录。你可以忽略这步，在之后需要填写路径的时候，填写绝对路径就ok了。</p>
+
+<pre><code>cd /var/lib/mysql/
+复制代码
+</code></pre>
+
+<h3 id="3-准备好">3. 准备好</h3>
+
+<p>重新建个数据库吧</p>
+
+<pre><code>mysql -uroot -p
+复制代码
+
+
+mysql&gt; create database test
+复制代码
+
+
+mysql&gt; use test
+复制代码
+</code></pre>
+
+<h3 id="4-各种命令各种有">4. 各种命令各种有</h3>
+
+<p>选项</p>
+
+<pre><code>-f 加载表空间，如ibd文件
+-s 加载系统表空间，如ibd
+-T 指定表名
+-I 指定索引名
+复制代码
+</code></pre>
+
+<p>先创建一个简单的表</p>
+
+<pre><code>mysql&gt; CREATE TABLE innodb_ruby(
+    c1 INT,
+    c2 INT,
+    c3 VARCHAR(10000),
+    PRIMARY KEY (c1), 
+    key idx(c2)
+) CHARSET=ascii ROW_FORMAT=Compact;
+Query OK, 0 rows affected (0.36 sec)
+复制代码
+</code></pre>
+
+<p>插入数据</p>
+
+<pre><code>mysql&gt; INSERT INTO innodb_ruby VALUES(1, 1, repeat('a', 7000)), (2, 2, repeat('b', 7000)), (3, 3, repeat('c', 7000)), (4, 4, repeat('d', 7000));
+Query OK, 4 rows affected (0.00 sec)
+Records: 4  Duplicates: 0  Warnings: 0
+复制代码
+</code></pre>
+
+<h4 id="系统文件结构">系统文件结构</h4>
+
+<ol>
+<li><p>列出所有物理对象的数量。</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 system-spaces
+name                            pages       indexes<br />
+(system)                        8832        204
+test/innodb_ruby                              2
+&hellip;
+复制代码</p></li>
+
+<li><p>列出表空间中所有索引统计信息（系统空间或每个文件表空间）</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby space-indexes
+id          name                            root        fseg        used        allocated   fill_factor
+94684       PRIMARY                         3           internal    1           1           100.00%<br />
+94684       PRIMARY                         3           leaf        3           3           100.00%<br />
+94685       idx                             4           internal    1           1           100.00%<br />
+94685       idx                             4           leaf        0           0           0.00%<br />
+复制代码</p></li>
+</ol>
+
+<p>id：此索引的id</p>
+
+<p>name：索引名称。PRIMARY代表的就是聚集索引，因为InnoDB表是聚集索引组织表，行记录就是聚集索引；idx就是辅助索引的名称。</p>
+
+<p>root：索引中根节点的page号。</p>
+
+<p>fseg：page类型。internal非叶子节点；leaf叶子节点</p>
+
+<p>used：索引使用的page页。</p>
+
+<p>allocated：索引分配的page页。</p>
+
+<p>fill_factor：索引使用的百分比</p>
+
+<ol>
+<li><p>统计每个类型的页共占用了多少页</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby space-page-type-regions
+start       end         count       type<br />
+0           0           1           FSP_HDR<br />
+1           1           1           IBUF_BITMAP<br />
+2           2           1           INODE<br />
+3           7           5           INDEX<br />
+8           8           1           FREE (ALLOCATED)
+复制代码</p></li>
+
+<li><p>打印每个类型总计页数</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby space-page-type-summary
+type                count       percent     description<br />
+INDEX               5           55.56       B+Tree index<br />
+FSP_HDR             1           11.11       File space header<br />
+IBUF_BITMAP         1           11.11       Insert buffer bitmap
+INODE               1           11.11       File segment inode<br />
+ALLOCATED           1           11.11       Freshly allocated
+复制代码</p></li>
+
+<li><p>统计所有的页在表空间的饱和度信息，每个页面显示彩色块（按index/purpose着色），根据页面中的数据量调整大小。</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby space-extents-illustrate
+复制代码</p></li>
+
+<li><p>统计所有的页在表空间的饱和度信息，每个页面显示彩色块 (按页面修改LSN的年龄着色)。</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby space-extents-illustrate
+复制代码</p></li>
+</ol>
+
+<h4 id="页文件结构">页文件结构</h4>
+
+<ol>
+<li><p>解释单个页面用途</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -p 3 page-account
+Accounting for page 3:
+  Page type is INDEX (B+Tree index, table and index data stored in B+Tree structure).
+  Extent descriptor for pages 0-63 is at page 0, offset 158.
+  Extent is not fully allocated to an fseg; may be a fragment extent.
+  Page is marked as used in extent descriptor.
+  Extent is in free_frag list of space.
+  Page is in fragment array of fseg 1.
+  Fseg is in internal fseg of index 94684.
+  Index root is page 3.
+  Index is test/innodb_ruby.PRIMARY.
+复制代码</p></li>
+
+<li><p>打印页结构信息</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -p 3 page-dump
+#&lt;:page::index:0x0000000000ef65a0&gt;:</p>
+
+<p>fil header:
+{:checksum=&gt;3506321879,
+ :offset=&gt;3,
+ :prev=&gt;nil,
+ :next=&gt;nil,
+ :lsn=&gt;25811855781,
+ :type=&gt;:INDEX,
+ :flush_lsn=&gt;0,
+ :space_id=&gt;2456}</p>
+
+<p>fil trailer:
+{:checksum=&gt;1027768186, :lsn_low32=&gt;42052005}</p>
+
+<p>page header:
+{:n_dir_slots=&gt;2,
+ :heap_top=&gt;162,
+ :garbage_offset=&gt;0,
+ :garbage_size=&gt;0,
+ :last_insert_offset=&gt;154,
+ :direction=&gt;:right,
+ :n_direction=&gt;2,
+ :n_recs=&gt;3,
+ :max_trx_id=&gt;0,
+ :level=&gt;1,
+ :index_id=&gt;94684,
+ :n_heap=&gt;5,
+ :format=&gt;:compact}</p>
+
+<p>fseg header:
+{:leaf=&gt;
+  &lt;:inode space=&rdquo;<Innodb::Space" file="<span" class="hljs-string">&ldquo;test/innodb_ruby.ibd&rdquo;, page_size=16384, pages=9&gt;, fseg=2&gt;,
+ :internal=&gt;
+  &lt;:inode space=&rdquo;<Innodb::Space" file="<span" class="hljs-string">&ldquo;test/innodb_ruby.ibd&rdquo;, page_size=16384, pages=9&gt;, fseg=1&gt;}</p>
+
+<p>sizes:
+  header           120
+  trailer            8
+  directory          4
+  free           16210
+  used             174
+  record            42
+  per record     14.00</p>
+
+<p>page directory:
+[99, 112]</p>
+
+<p>system records:
+{:offset=&gt;99,
+ :header=&gt;
+  {:next=&gt;126,
+   :type=&gt;:infimum,
+   :heap_number=&gt;0,
+   :n_owned=&gt;1,
+   :min_rec=&gt;false,
+   :deleted=&gt;false,
+   :length=&gt;5},
+ :next=&gt;126,
+ :data=&gt;&ldquo;infimum\x00&rdquo;,
+ :length=&gt;8}
+{:offset=&gt;112,
+ :header=&gt;
+  {:next=&gt;112,
+   :type=&gt;:supremum,
+   :heap_number=&gt;1,
+   :n_owned=&gt;4,
+   :min_rec=&gt;false,
+   :deleted=&gt;false,
+   :length=&gt;5},
+ :next=&gt;112,
+ :data=&gt;&ldquo;supremum&rdquo;,
+ :length=&gt;8}</p>
+
+<p>garbage records:</p>
+
+<p>records:
+{:format=&gt;:compact,
+ :offset=&gt;126,
+ :header=&gt;
+  {:next=&gt;140,
+   :type=&gt;:node_pointer,
+   :heap_number=&gt;2,
+   :n_owned=&gt;0,
+   :min_rec=&gt;true,
+   :deleted=&gt;false,
+   :nulls=&gt;[],
+   :lengths=&gt;{},
+   :externs=&gt;[],
+   :length=&gt;5},
+ :next=&gt;140,
+ :type=&gt;:clustered,
+ :key=&gt;[{:name=&gt;&ldquo;c1&rdquo;, :type=&gt;&ldquo;INT&rdquo;, :value=&gt;1}],
+ :row=&gt;[],
+ :sys=&gt;[],
+ :child_page_number=&gt;5,
+ :length=&gt;8}</p>
+
+<p>{:format=&gt;:compact,
+ :offset=&gt;140,
+ :header=&gt;
+  {:next=&gt;154,
+   :type=&gt;:node_pointer,
+   :heap_number=&gt;3,
+   :n_owned=&gt;0,
+   :min_rec=&gt;false,
+   :deleted=&gt;false,
+   :nulls=&gt;[],
+   :lengths=&gt;{},
+   :externs=&gt;[],
+   :length=&gt;5},
+ :next=&gt;154,
+ :type=&gt;:clustered,
+ :key=&gt;[{:name=&gt;&ldquo;c1&rdquo;, :type=&gt;&ldquo;INT&rdquo;, :value=&gt;2}],
+ :row=&gt;[],
+ :sys=&gt;[],
+ :child_page_number=&gt;6,
+ :length=&gt;8}</p>
+
+<p>{:format=&gt;:compact,
+ :offset=&gt;154,
+ :header=&gt;
+  {:next=&gt;112,
+   :type=&gt;:node_pointer,
+   :heap_number=&gt;4,
+   :n_owned=&gt;0,
+   :min_rec=&gt;false,
+   :deleted=&gt;false,
+   :nulls=&gt;[],
+   :lengths=&gt;{},
+   :externs=&gt;[],
+   :length=&gt;5},
+ :next=&gt;112,
+ :type=&gt;:clustered,
+ :key=&gt;[{:name=&gt;&ldquo;c1&rdquo;, :type=&gt;&ldquo;INT&rdquo;, :value=&gt;4}],
+ :row=&gt;[],
+ :sys=&gt;[],
+ :child_page_number=&gt;7,
+ :length=&gt;8}
+复制代码</p></li>
+
+<li><p>汇总页面记录</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -p 3 page-records
+Record 126: (c1=1) → #5
+Record 140: (c1=2) → #6
+Record 154: (c1=4) → #7
+复制代码</p></li>
+</ol>
+
+<p>每行代表一页数据，c1=1代表c1的最小值为1，#5代表是第5页。</p>
+
+<ol>
+<li><p>查看页目录记录</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -p 7 page-directory-summary
+slot    offset  type          owned   key
+0       99      infimum       1<br />
+1       112     supremum      5<br />
+复制代码</p></li>
+</ol>
+
+<p>数据太小了，再插点数据吧</p>
+
+<pre><code>mysql&gt; insert into innodb_ruby values(5,500,'eeee'), (6,600,'ffff'), (7, 700, 'gggg'), (8, 800, 'hhhh'), (9, 900, 'iiii'), (10, 1000, 'jjjj'), (11, 1100, 'kkkk'), (12, 1200, 'llll'), (13, 1300, 'mmmm'), (14, 1400, 'nnnn'), (15, 1500, 'oooo'), (16, 1600, 'pppp');
+复制代码
+
+
+root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -p 7 page-directory-summary
+slot    offset  type          owned   key
+0       99      infimum       1       
+1       7220    conventional  4       (c1=7)
+2       7348    conventional  4       (c1=11)
+3       112     supremum      6
+复制代码
+</code></pre>
+
+<p>infimum最小值，supremum最大值，1~8 其他数据为4~8</p>
+
+<ol>
+<li><p>详细说明一个页的内容</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -p 7 page-illustrate
+复制代码</p></li>
+</ol>
+
+<h4 id="索引结构">索引结构</h4>
+
+<ol>
+<li>遍历整个B+树扫描索引</li>
+</ol>
+
+<p>主键索引</p>
+
+<pre><code>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -I PRIMARY index-recurse
+ROOT NODE #3: 3 records, 42 bytes
+  NODE POINTER RECORD ≥ (c1=1) → #5
+  LEAF NODE #5: 1 records, 7029 bytes
+    RECORD: (c1=1) → (c2=1, c3=&quot;aaa...&quot;)
+  NODE POINTER RECORD ≥ (c1=2) → #6
+  LEAF NODE #6: 2 records, 14058 bytes
+    RECORD: (c1=2) → (c2=2, c3=&quot;bbb...&quot;)
+    RECORD: (c1=3) → (c2=3, c3=&quot;ccc...&quot;)
+  NODE POINTER RECORD ≥ (c1=4) → #7
+  LEAF NODE #7: 13 records, 7413 bytes
+    RECORD: (c1=4) → (c2=4, c3=&quot;ddd...&quot;)
+    RECORD: (c1=5) → (c2=500, c3=&quot;eeee&quot;)
+    RECORD: (c1=6) → (c2=600, c3=&quot;ffff&quot;)
+    RECORD: (c1=7) → (c2=700, c3=&quot;gggg&quot;)
+    RECORD: (c1=8) → (c2=800, c3=&quot;hhhh&quot;)
+    RECORD: (c1=9) → (c2=900, c3=&quot;iiii&quot;)
+    RECORD: (c1=10) → (c2=1000, c3=&quot;jjjj&quot;)
+    RECORD: (c1=11) → (c2=1100, c3=&quot;kkkk&quot;)
+    RECORD: (c1=12) → (c2=1200, c3=&quot;llll&quot;)
+    RECORD: (c1=13) → (c2=1300, c3=&quot;mmmm&quot;)
+    RECORD: (c1=14) → (c2=1400, c3=&quot;nnnn&quot;)
+    RECORD: (c1=15) → (c2=1500, c3=&quot;oooo&quot;)
+    RECORD: (c1=16) → (c2=1600, c3=&quot;pppp&quot;)
+复制代码
+</code></pre>
+
+<p>普通索引</p>
+
+<pre><code>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -I idx index-recurse
+ROOT NODE #4: 16 records, 224 bytes
+  RECORD: (c2=1) → (c1=1)
+  RECORD: (c2=2) → (c1=2)
+  RECORD: (c2=3) → (c1=3)
+  RECORD: (c2=4) → (c1=4)
+  RECORD: (c2=500) → (c1=5)
+  RECORD: (c2=600) → (c1=6)
+  RECORD: (c2=700) → (c1=7)
+  RECORD: (c2=800) → (c1=8)
+  RECORD: (c2=900) → (c1=9)
+  RECORD: (c2=1000) → (c1=10)
+  RECORD: (c2=1100) → (c1=11)
+  RECORD: (c2=1200) → (c1=12)
+  RECORD: (c2=1300) → (c1=13)
+  RECORD: (c2=1400) → (c1=14)
+  RECORD: (c2=1500) → (c1=15)
+  RECORD: (c2=1600) → (c1=16)
+复制代码
+</code></pre>
+
+<p>可看出普通索引其实是直接指向了主键索引的</p>
+
+<ol>
+<li><p>在索引页中打印每条记录的偏移量</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -I PRIMARY index-record-offsets
+page_offset         record_offset<br />
+5                   128<br />
+6                   128<br />
+6                   7157<br />
+7                   128<br />
+7                   7156<br />
+7                   7188<br />
+7                   7220<br />
+7                   7252<br />
+7                   7284<br />
+7                   7316<br />
+7                   7348<br />
+7                   7380<br />
+7                   7412<br />
+7                   7444<br />
+7                   7476<br />
+7                   7508<br />
+复制代码</p></li>
+
+<li><p>打印给定级别所有索引页面的摘要信息</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -I PRIMARY -l 0 index-level-summary
+page    index   level   data    free    records min_key
+5       94684   0       7029    9223    1       c1=1
+6       94684   0       14058   2194    2       c1=2
+7       94684   0       7413    8835    13      c1=4
+root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -I PRIMARY -l 1 index-level-summary
+page    index   level   data    free    records min_key
+3       94684   1       42      16210   3       c1=1
+复制代码</p></li>
+</ol>
+
+<h4 id="记录结构">记录结构</h4>
+
+<ol>
+<li><p>给定记录偏移量，打印记录的详细说明及包含的数据</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -p 5 -R 128 record-dump
+Record at offset 128</p>
+
+<p>Header:
+  Next record offset  : 112
+  Heap number         : 2
+  Type                : conventional
+  Deleted             : false
+  Length              : 8</p>
+
+<p>System fields:
+  Transaction ID: 2860579
+  Roll Pointer:
+    Undo Log: page 897, offset 272
+    Rollback Segment ID: 34
+    Insert: true</p>
+
+<p>Key fields:
+  c1: 1</p>
+
+<p>Non-key fields:
+  c2: 1
+  c3: &ldquo;aaaa&hellip;&rdquo;
+复制代码</p></li>
+</ol>
+
+<h4 id="记录历史">记录历史</h4>
+
+<ol>
+<li><p>显示给定偏移量的undo日志</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 -T test/innodb_ruby -p 5 -R 128 record-history
+Transaction   Type                Undo record
+(n/a)         insert              (c1=1) → ()
+复制代码</p></li>
+
+<li><p>显示所有变动过的undo记录</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 undo-history-summary
+Page    Offset  Transaction   Type                Table
+572     10435   2848487       delete<br />
+&hellip;</p>
+
+<p>复制代码</p></li>
+</ol>
+
+<h4 id="额外探索">额外探索</h4>
+
+<ol>
+<li><p>表空间统计信息</p>
+
+<p>root@localhost:/var/lib/mysql$ innodb_space -s ibdata1 space-lists
+name                length      f_page      f_offset    l_page      l_offset<br />
+free                53          0           3318        0           3278<br />
+free_frag           19          0           398         0           1238<br />
+full_frag           3           0           158         0           2238<br />
+full_inodes         1           2           38          2           38<br />
+free_inodes         13          1789        38          595         38
+复制代码</p></li>
+</ol>
+
+<p>参考文章：www.ywnds.com/?p=13677</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本检测服务器存活状态80端口502状态码 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本检测服务器存活状态80端口502状态码 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本检测服务器存活状态80端口502状态码">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E6%A3%80%E6%B5%8B%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%AD%98%E6%B4%BB%E7%8A%B6%E6%80%8180%E7%AB%AF%E5%8F%A3502%E7%8A%B6%E6%80%81%E7%A0%81/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本检测服务器存活状态80端口502状态码</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<pre><code>  * 检测服务器是否宕机
+  * 检测web服务(80端口)是否正常
+  * 检测http502状态码
+</code></pre>
+
+<h3 id="检测服务器是否宕机">检测服务器是否宕机</h3>
+
+<p>需求：ping一台需要被检测的服务器，如果丢包率为100%，则表示机器出问题了，随后发送报警邮件（首先需要一个邮箱账号，并开启smtp服务，报警邮件将由该邮箱发出）</p>
+
+<p>创建发送邮件的Python脚本：</p>
+
+<pre><code>#!/usr/bin/python
+#coding:utf-8
+
+import smtplib
+from email.mime.text import MIMEText
+import sys
+
+#发信地址
+mail_user = 'asnfy2019@163.com'
+#发信地址的SMTP授权密码
+mail_pass = 'xxxxxxxx'
+
+def send_mail(to_list,subject,content):
+    me = &quot;邮件报警&quot;+&quot;+mail_user+&quot;&gt;&quot;
+    msg = MIMEText(content, 'plain', 'utf-8')
+    msg['Subject'] = subject
+    msg['From'] = me
+    msg['to'] = to_list
+
+    try:
+        #定义网易163邮箱提供的SMTP服务地址
+        s = smtplib.SMTP(&quot;smtp.163.com&quot;, 25)
+        s.login(mail_user,mail_pass)
+        s.sendmail(me,to_list,msg.as_string())
+        s.close()
+        return True
+    except Exception,e:
+        print str(e)
+        return False
+
+if __name__ == &quot;__main__&quot;:
+    send_mail(sys.argv[1], sys.argv[2], sys.argv[3])
+</code></pre>
+
+<p>假设被检测机器IP为192.168.234.125，ping该地址：</p>
+
+<pre><code>[root@linux ~]# ping -c5 192.168.234.125
+PING 192.168.234.125 (192.168.234.125) 56(84) bytes of data.
+64 bytes from 192.168.234.125: icmp_seq=1 ttl=64 time=0.304 ms
+64 bytes from 192.168.234.125: icmp_seq=2 ttl=64 time=0.982 ms
+64 bytes from 192.168.234.125: icmp_seq=3 ttl=64 time=0.837 ms
+64 bytes from 192.168.234.125: icmp_seq=4 ttl=64 time=0.863 ms
+64 bytes from 192.168.234.125: icmp_seq=5 ttl=64 time=0.382 ms
+
+--- 192.168.234.125 ping statistics ---
+5 packets transmitted, 5 received, 0% packet loss, time 4002ms
+rtt min/avg/max/mdev = 0.304/0.673/0.982/0.276 ms
+</code></pre>
+
+<p>#关注倒数第二行的丢包率（packet loss）即可</p>
+
+<p>脚本思路：排除丢包率为空或非数字的情况下，当丢包率为100%，即发送报警邮件</p>
+
+<pre><code>#!/bin/bash
+ip=192.168.234.125
+m=asnfy@qq.com
+n=`ping -c5 $ip |grep &quot;packet loss&quot;|awk -F '%' '{print $1}'|awk '{print $NF}'`
+if [ -z $n ]
+then
+    echo &quot;脚本执行出错&quot;
+    /usr/bin/python /data/mail.py $m &quot;检测机器存活脚本:$0错误&quot; &quot;丢包率变量获取不到值&quot;
+    exit
+else
+    n1=`echo $n |sed 's/[0-9]//g'`
+    if [ -n $n1 ]
+    then
+    echo &quot;脚本执行出错&quot;
+        /usr/bin/python /data/mail.py $m &quot;检测机器存活脚本:$0错误&quot; &quot;丢包率变量含非数字的字符&quot;
+    exit
+    fi
+fi
+
+if [ $n -eq 100 ]
+then
+    /usr/bin/python /data/mail.py $m &quot;邮件报警&quot; &quot;$ip丢包率:$n%&quot;
+fi
+</code></pre>
+
+<h3 id="检测web服务-80端口-是否正常">检测web服务(80端口)是否正常</h3>
+
+<p>通过检测web服务的端口是否被监听，判断web服务状态，以nginx的80端口为例</p>
+
+<p>脚本思路：查看80端口是否被监听，如果没有，重启nginx并发送邮件通知，每30秒检测一次</p>
+
+<pre><code>#!/bin/bash
+m=`asnfy@qq.com`
+while :
+do
+    n=`netstat -lntp |grep &quot;:80 &quot;|wc -l`
+    if [ $n -eq 0 ]
+    then
+        /usr/bin/systemctl restart nginx
+        /usr/bin/python mail.py $m &quot;邮件通知&quot; &quot;检测到80端口未监听，已重启nginx&quot;
+    fi 
+    sleep 30
+done
+</code></pre>
+
+<p>#由于使用了循环，执行脚本时需要放到后台运行，也可以不使用循环，通过设置crontab任务计划设定检测间隔时间，检测端口还能使用nmap命令，判断对应端口state列的值是否为closed即可</p>
+
+<h3 id="检测http502状态码">检测http502状态码</h3>
+
+<p>502是nginx最普遍的错误状态码，一般由于php程序将php-fpm服务资源耗尽所导致，这种情况临时解决方法是重启php-
+fpm，事后通过分析日志寻找解决方法</p>
+
+<p>日志示例：（可以发现每条请求的状态码前面都有空格，脚本中利用前后空格来更精准匹配）</p>
+
+<pre><code>192.168.234.1 - - [22/Oct/2019:20:34:07 +0800] &quot;GET / HTTP/1.1&quot; 200 53570 &quot;-&quot; &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36&quot; &quot;-&quot;
+192.168.234.1 - - [22/Oct/2019:20:34:07 +0800] &quot;GET /wp-includes/css/dist/block-library/style.min.css?ver=5.2.3 HTTP/1.1&quot; 301 169 &quot;http://www.blog.com/&quot; &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36&quot; &quot;-&quot;
+192.168.234.1 - - [22/Oct/2019:20:34:07 +0800] &quot;GET /wp-includes/css/dist/block-library/theme.min.css?ver=5.2.3 HTTP/1.1&quot; 301 169 &quot;http://www.blog.com/&quot; &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36&quot; &quot;-&quot;
+192.168.234.1 - - [22/Oct/2019:20:34:07 +0800] &quot;GET /wp-content/themes/twentyseventeen/style.css?ver=5.2.3 HTTP/1.1&quot; 301 169 &quot;http://www.blog.com/&quot; &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36&quot; &quot;-&quot;
+192.168.234.1 - - [22/Oct/2019:20:34:07 +0800] &quot;GET /wp-content/themes/twentyseventeen/assets/js/jquery.scrollTo.js?ver=2.1.2 HTTP/1.1&quot; 301 169 &quot;http://www.blog.com/&quot; &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36&quot; &quot;-&quot;
+</code></pre>
+
+<p>脚本思路：获取访问日志中的http状态码，假设每30秒请求数为100，那么每30秒执行一次脚本，获取日志最后面的100条请求记录，匹配502关键字，当行数大于50时，（502错误码出现频率高于50%）重启php-
+fpm，重启后判断是否成功，如未成功，邮件报警</p>
+
+<pre><code>#!/bin/bash
+log=/data/logs/access.log
+while :
+do
+    n=`tail -n 100 $log|grep -c ' 502 '`
+    if [ -z $n ]
+    then
+        exit
+    fi
+
+    if [ $n -gt 50 ]
+    then
+    /etc/init.d/php-fpm restart &gt;/dev/null 2&gt;/tmp/php-fpm.err
+    php_n=`pgrep -l php-fpm|wc -l`
+    if [ $php_n -eq 0 ]
+    then
+        /usr/bin/pyhton mail.py asnfy@qq.com &quot;php-fpm重启失败&quot; &quot;`head /tmp/php-fpm.err`&quot;
+        exit
+    fi
+    fi
+    sleep 30
+done
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

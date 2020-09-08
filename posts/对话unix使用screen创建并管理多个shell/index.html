@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>对话UNIX使用Screen创建并管理多个shell | 开发者问答集锦</title>
+    <meta property="og:title" content="对话UNIX使用Screen创建并管理多个shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="对话UNIX使用Screen创建并管理多个shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%AF%B9%E8%AF%9Dunix%E4%BD%BF%E7%94%A8screen%E5%88%9B%E5%BB%BA%E5%B9%B6%E7%AE%A1%E7%90%86%E5%A4%9A%E4%B8%AAshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">对话UNIX使用Screen创建并管理多个shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <blockquote>
+<p>命令行是一种强大的工具，但是它有一个严重的缺点：如果 shell 停止了，您的工作也就停止了。要想让 shell
+和您的工作保持活动状态（甚至是跨多个会话和中断的连接），可以使用 GNU Screen 作为控制台的窗口系统。</p>
+</blockquote>
+
+<p>哈利波特有魔杖，雷神托尔有金色的巨锤，Buckethead 有斧子，但是这些武器与 QWERTY
+键盘相比只是小儿科。只需在命令行上敲几下，就可以启动网站、招募军团或击败可怕的火龙。</p>
+
+<p>但是，QWERTY 键盘有一个严重的缺点：它很容易发生连接中断。电话线上的噪音、无线连接中断或者网络超时都可能导致远程 shell
+中断。如果您已经在某个工作（比如调试一个应用程序）上花费了好几小时，而一下子就丢失了所有成果，一定会很沮丧的。</p>
+
+<p>不过这种灾难是可以避免的。使用 GNU Screen 就可以了。Screen 可以在一个控制台（即与主机物理连接的哑终端）、<code>xterm</code> 窗口或
+Secure Shell (SSH) 登录 shell 中创建和管理多个 shell 窗口。可以从一个 shell
+窗口迅速切换到另一个窗口，可以离开正在运行的 shell 并在任何时候重新连接。实际上，Screen 提供许多虚拟化的控制台。</p>
+
+<p>图 1 到图 5 展示 Screen 的特性和操作。看一下 图 1，这里假设用户已经使用 SSH
+登录到一台远程主机。最初，在本地主机（比如您的笔记本或桌面计算机）上有一个本地 shell 和一个远程 shell。通常，使用远程 shell
+在远程主机上运行命令；输出经过加密之后通过 SSH 连接发送到本地 shell。（在各张图中，用蓝色表示当前可见的 shell 输出）。但是，如果本地
+shell 或远程 shell 或它们之间的连接中断了，远程 shell 就会终止，您的工作成果就会丢失。</p>
+
+<p><strong>图 1. 典型的 SSH 连接</strong></p>
+
+<p>图 2 显示在远程主机上启动 Screen 之后的情况。Screen 实用程序启动，进而启动一个新的 shell 窗口 <em>A</em> ，可以在此窗口中运行命令。A
+的输出是可见的（由蓝色表示）；这个 shell 的输出经过 Screen，再经过远程登录 shell，最后通过 SSH 到达本地登录 shell。</p>
+
+<p><strong>图 2. Screen 管理 shell 窗口</strong></p>
+
+<p>Screen 本身并不 “露面”；它是一个代理，其作用是在它管理的正在运行的可用窗口中做出选择。在任何时候，Screen 只能显示一个窗口的输出。可以把
+Screen 看作虚拟的键盘-视频-鼠标 (KVM) 开关。</p>
+
+<p>但是，也可以断开与 Screen 的连接，见 图 3。Screen 代理仍然存在，它控制的所有窗口也还存在，但是与 Screen
+的连接临时切断了，这会让用户返回到远程登录 shell。</p>
+
+<p><strong>图 3. 可以断开与 Screen 的连接，而它管理的窗口仍然存在</strong></p>
+
+<p>图 4 显示一种可能出现的情况。已经重新建立了到 Screen 的连接，还创建了另外两个窗口（ <em>B</em> 和 <em>C</em> ）。窗口 A 和 B 继续运行
+shell 和所有附属作业，但是只有 C 的输出是可见的。当然，可以在窗口之间切换以监视各个作业的状态。</p>
+
+<p><strong>图 4. Screen 可以管理多个窗口</strong></p>
+
+<p>最后，图 5 显示中断与 Screen 的连接并终止远程登录 shell 的情况。Screen 和它的窗口仍然存在。可以重新登录并连接 Screen（并通过
+Screen 代理连接到它的窗口），继续您的工作。</p>
+
+<p><strong>图 5. 可以随意中断与 Screen 的连接和重新连接</strong></p>
+
+<p>如果您常常要访问远程服务器以执行维护或开发软件，那么 GNU Screen 是必不可少的工具。</p>
+
+<p>构建并安装 Screen</p>
+
+<p>Screen 的最初版本早在 10 多年前就发布了，所以您的系统上很可能有这个实用程序（通常名为 <em>/usr/bin/screen</em>
+）。但是，如果系统上没有 Screen，也很容易通过发行版的包管理器安装它。例如，如果您使用 Debian Linux® 的变体（比如
+Ubuntu），那么可以用 <code>apt-get</code> 简便地安装 Screen：</p>
+
+<pre><code>  $ sudo apt-get install screen
+</code></pre>
+
+<hr />
+
+<p>另外，如果您喜欢从源代码构建软件，可以访问 GNU Screen 项目页面（见 参考资料 中的链接）并下载最新的代码包。在撰写本文时，Screen
+的最新版本是 4.0.3，于 2008 年 8 月发布。下载并提取代码，进入生成的源代码目录，然后依次运行 <code>./configure</code> 、<code>make</code> 和
+<code>sudo make install</code> ：</p>
+
+<pre><code>$ wget http://ftp.gnu.org/gnu/screen/screen-4.0.3.tar.gz
+$ tar xzf tar xzf screen-4.0.3.tar.gz 
+$ cd screen-4.0.3
+$ ./configure
+
+
+
+this is screen version 4.0.3
+...
+$ make
+
+
+
+CPP=&quot;gcc -E &quot; srcdir=. sh ./osdef.sh
+...
+$ sudo make install
+
+
+
+...
+You may also want to install ./etc/etcscreenrc in 
+    /usr/etc/screenrc.
+$ sudo cp ./etc/etcscreenrc /usr/etc/screenrc
+</code></pre>
+
+<hr />
+
+<p>Screen 现在就安装好了，可以使用了。输入 **<code>man screen</code> ** 查看 Screen 的手册页。</p>
+
+<hr />
+
+<p>|<br />
+|<br />
+&mdash;|&mdash;</p>
+
+<p>开始使用 Screen</p>
+
+<p>启动 Screen。在出现许可协议消息时，按 <strong>Return</strong> ；现在应该会看到一个新的登录 shell 提示。（在下面的清单中，在每个 shell
+提示前面人为地添加一个昵称，以此区分各个 shell 实例并与图 1 到图 5 联系起来） 。</p>
+
+<pre><code>Local $ ssh remote.example.com
+
+
+
+Last login: Sun Dec 21 17:23:16 2008 from local.example.com
+Remote $ hostname
+
+
+
+remote.example.com
+Remote $ screen
+
+
+
+A $ top
+</code></pre>
+
+<hr />
+
+<p>现在处于 图 2 所示的状态。一个 Screen 会话正在运行（尽管看不到），窗口 A 处于活动状态，它正在运行系统监视器
+top，每隔几秒刷新一次系统性能信息。</p>
+
+<p>为了临时断开与 Screen 会话及其所有窗口的连接，按 <strong>Ctrl-a</strong> ，然后按 <strong>d</strong> （小写的字母 D，代表
+“detach”）。Ctrl-a 是 Screen 命令的前缀，d 是用于断开连接的命令。现在处于 图 3 所示的状态。Screen 会话和窗口 A
+仍然存在。可以通过运行 **<code>screen -list</code> ** 确认这一点：</p>
+
+<pre><code>$ screen -list
+
+
+
+There is a screen on:
+21020.pts-2.remote  (Detached)
+1 Socket in /tmp/screens/S-strike.
+</code></pre>
+
+<hr />
+
+<p><code>screen -list</code> 命令显示所有可用的 Screen 会话。（顺便说一句，可以同时运行多个 Screen 会话，每个会话有一组同时运行的窗口。图
+6 显示这种情况。每个 Screen 实例跟踪它自己的当前窗口。稍后会提供一些关于 Screen 的高级用法的提示）。编号为 <em>21020</em>
+的会话已经断开连接并相应地加上了标志。因为只有一个 Screen 会话，所以可以直接用 <code>screen -r</code> 重新连接它。由于运行了
+Screen，<code>top</code> 会一直运行。</p>
+
+<p><strong>图 6. Screen 提供多个会话，每个会话有多个窗口</strong></p>
+
+<p>为了进入 图 4 所示的状态，重新连接当前会话，然后按 <strong>Ctrl-a</strong> ，然后按 <strong>c</strong> （小写的字母 C，代表
+“create”）创建一个新窗口。接下来，按 <strong>Ctrl-a</strong> ，然后再次按 <strong>c</strong> 。现在，Screen 会话管理三个窗口。</p>
+
+<p>按 <strong>Ctrl-a</strong> ，然后在当前窗口中按双引号键（ **<code>&quot;</code> ** ），就可以看到会话中可用窗口的列表：</p>
+
+<pre><code>Num  Name           Flags
+
+ 0   bash           $
+ 1   bash           $
+ 2   bash           $
+</code></pre>
+
+<hr />
+
+<p>在默认情况下，窗口的名称取自它启动的第一个命令（通常是一个 shell）。因此，在上面的列表中有三个 <em>bash</em>
+窗口。可以用箭头键在窗口列表中上下移动；只需按回车即可选择窗口。</p>
+
+<p>终止当前窗口的方法是，在窗口的 shell 提示上输入 <code>exit</code> ，或者按键盘快捷键 <strong>Ctrl-a</strong> ，然后按 <strong>k</strong> （小写的字母 K，代表
+“kill”）。如果使用后一种方法，那么在窗口底部会出现一个警告，要求您确认要杀死此窗口。按 <strong>y</strong> （小写的字母 Y，代表 “yes”）确认，或按
+<strong>n</strong> （小写的字母 N，代表 “no”）拒绝。如果杀死一个 Screen 会话中运行的所有窗口，屏幕命令就会输出一个消息并终止：</p>
+
+<pre><code>Remote $ screen
+
+
+
+... Create and manipulate windows ...
+... Exit from all windows...
+[screen is terminating]
+Remote $ screen -list
+
+
+
+No Sockets found in /tmp/uscreens/S-supergiantrobot.
+</code></pre>
+
+<hr />
+
+<p>如果杀死了所有打开的窗口，那么 <code>screen -list</code> 命令输出 <code>No sockets...</code> ，表示没有 Screen 会话可用。</p>
+
+<hr />
+
+<p>|<br />
+|<br />
+&mdash;|&mdash;</p>
+
+<p>更智能化的屏幕</p>
+
+<p>到目前为止，已经看到了如何在一个 Screen 会话中创建多个窗口。只需这么做，就足以确保命令行工作不会丢失。</p>
+
+<p>但是坦率地说，由于同时运行多个看起来相同的窗口，管理时可能引起混乱。最好能够轻松地区分窗口，而不需要逐一打开每个窗口。如果在断开连接和重新连接之间间隔的时间比较长的话，这种特性尤其有意义。</p>
+
+<p>实际上，Screen 提供了许多选项和工具来帮助定制您的工作环境。可以给每个窗口指定名称，还可以在每个窗口的底部显示一个状态栏以帮助区分窗口。</p>
+
+<p>指定窗口名称的方法是，激活窗口，按 <strong>Ctrl-a A</strong> （大写的字母 A，代表 “Annotate”），根据需要按 <strong>Backspace</strong>
+删除现有的名称，然后在提示上输入一个有意义的名称：</p>
+
+<pre><code>Num  Name            Flags
+
+ 0   Window A       $
+ 1   Window B       $
+ 2   Window C       $
+</code></pre>
+
+<hr />
+
+<p>在 图 7 中，窗口的标题被设置为 <em>Window A</em> 。窗口的昵称不必是惟一的。</p>
+
+<p><strong>图 7. 可以给每个窗口指定描述性的名称</strong></p>
+
+<p>可以使用状态栏在视觉上进一步区分各个窗口。启动您喜欢的文本编辑器，在主目录中创建包含以下代码的 <em>.screenrc</em> 文件：</p>
+
+<pre><code>hardstatus on
+hardstatus alwayslastline
+hardstatus string &quot;%{.bW}%-w%{.rW}%n %t%{-}%+w %=%{..G} %H %{..Y} %m/%d %C%a &quot;
+</code></pre>
+
+<hr />
+
+<p>创建这样的 .screenrc 配置文件之后，每个新窗口就会显示状态栏，其中包含窗口的名称。图 8 显示一个包含状态栏的窗口。</p>
+
+<p><strong>图 8. 使用状态栏帮助识别每个窗口</strong></p>
+
+<hr />
+
+<p>|<br />
+|<br />
+&mdash;|&mdash;</p>
+
+<p>有帮助的 Screen 提示</p>
+
+<p>Screen 的特性非常多，无法在这里一一介绍。下面给出一些提示并介绍几个比较有用的选项，帮助您更顺畅地使用 Screen：</p>
+
+<ul>
+<li><strong>在任何窗口中输入<code>screen</code> ，不带任何参数，就会打开一个新窗口。</strong> 按 <strong>Ctrl-a</strong> ，然后按 <strong>c</strong> 与输入 <code>screen</code> 的作用相同，差异只是后一种方式通过提供命令行选项立即配置新会话。</li>
+<li><strong>可以使用<code>screen -t _name_</code> 命令在创建窗口时指定窗口名称。</strong> 例如，要想创建一个新窗口并把它命名为 <em>debugger</em> ，只需进入 Screen 管理的一个窗口，然后输入 <code>screen -t debugger</code> 。如果打开窗口列表，其中一个窗口的标签应该是 <em>debugger</em> 。</li>
+
+<li><p><strong>如果已经断开了与 Screen 会话的连接，可以用<code>screen -p _ID_</code> 命令重新连接特定的窗口，其中的 <em>ID</em> 是一个数字或名称。</strong> 我们来试一下：</p>
+
+<pre><code>Local $ ssh remote.example.com
+</code></pre>
+
+<p>Remote $ screen -t ghost
+Ghost $ screen -t new
+New $
+&hellip; Press Control-a d to detach&hellip;
+Remote $ screen -r -p ghost
+Ghost $</p></li>
+</ul>
+
+<hr />
+
+<ul>
+<li><strong>可以用<code>screen -L</code> 命令把每个窗口的输出记录在日志中。</strong> 每个窗口有自己的日志文件，文件名通常是 <em>~/screenlog.</em> n，其中的 <em>n</em> 是窗口列表中显示的窗口编号。这个特性对于记录复杂的步骤（比如重新配置系统）非常有帮助。</li>
+<li><strong>在 Screen 文档中记录了所有快捷键。</strong> 最有用的组合键包括：按 <strong>Ctrl-a</strong> ，然后按 <strong>0</strong> （数字零）到 <strong>9</strong> 立即切换到特定的窗口；按 <strong>Ctrl-a</strong> ，然后按 <strong>C</strong> （大写的字母 C，代表 “Clear”）清除一个窗口的内容；按 <strong>Ctrl-a</strong> ，然后按 <strong>H</strong> 启用或禁用日志记录；按 <strong>Ctrl-a</strong> ，然后按 <strong>Ctrl-a</strong> 在当前窗口和前一个窗口之间来回切换；按 <strong>Ctrl-a</strong> ，然后按 <strong>Ctrl-/</strong> （反斜杠）杀死所有窗口并终止当前的 Screen 会话。
+
+<br />
+<br /></li>
+</ul>
+
+<hr />
+
+<p>|<br />
+|<br />
+&mdash;|&mdash;</p>
+
+<p>Screen 的高级用法</p>
+
+<p>正如前面提到的，可以创建多个同时运行的 Screen 会话，每个会话可以管理一系列窗口。每个会话有一个惟一标识符；使用 <code>screen -list</code>
+列出可用的所有会话。与窗口一样，可以给会话指定名称以便引用它。使用 <code>screen -S _label_</code> 给新会话分配标签。</p>
+
+<p>共享是 Screen
+会话的最佳用法之一。如果允许，可以连接现有的会话并在此会话的任何窗口中与其他用户协作。甚至可以独立地切换到会话中的另一个窗口。如果您与其他用户在同一窗口中，输入或显示的任何内容都会反映给所有伙伴。我们来试一下：</p>
+
+<ol>
+<li>选择一台工作计算机并登录。</li>
+<li>输入 <code>screen -S sharing -t one</code> 创建一个名为 <em>sharing</em> 的 Screen 会话和一个名为 <em>one</em> 的新窗口。</li>
+<li>用 <code>screen -t two</code> 创建另一个窗口。</li>
+<li>如果愿意，检查一下目前的状态：按 <strong>Ctrl-a</strong> ，然后按 <strong>d</strong> ，然后输入 <code>screen -list</code> 和 <code>screen -r sharing</code> ，然后按 <strong>Ctrl-a</strong> ，然后按 <strong>&ldquo;</strong> 。</li>
+<li>在 <em>one</em> 窗口中输入 <code>echo</code> ，在此窗口中产生一些输出。</li>
+<li>在同一台计算机上，打开第二个登录窗口。</li>
+<li>在此窗口中，输入 <code>screen -x -r sharing -p one</code> 。</li>
+</ol>
+
+<p><code>-x</code> 选项指定多用户模式；<code>-p one</code> 直接连接到 <em>one</em> 窗口。应该会马上看到与另一个登录会话相同的输出，见 图 9。</p>
+
+<p><strong>图 9. 可以共享会话</strong></p>
+
+<p>在每个登录窗口中，运行 UNIX® 命令产生输出，按 Screen 快捷键在共享的会话中的窗口之间切换并查看结果。</p>
+
+<hr />
+
+<p>|<br />
+|<br />
+&mdash;|&mdash;</p>
+
+<p>结束语</p>
+
+<p>要想进一步掌握 Screen，可以研究一下多屏幕模式，学习如何用老式的锁防止对各个窗口的访问。</p>
+
+<p>Screen 是一个很实用的工具，它对于在命令行上执行的任何工作都很有价值。实际上，一旦掌握了它，您就会觉得离不开它了。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

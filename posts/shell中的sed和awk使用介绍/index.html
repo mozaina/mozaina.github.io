@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell中的sed和awk使用介绍 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell中的sed和awk使用介绍 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell中的sed和awk使用介绍">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E4%B8%AD%E7%9A%84sed%E5%92%8Cawk%E4%BD%BF%E7%94%A8%E4%BB%8B%E7%BB%8D/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell中的sed和awk使用介绍</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>本文转载自：<a href="https://www.sharpcode.cn/linux/bash/sed-awk-fundmental/">https://www.sharpcode.cn/linux/bash/sed-awk-fundmental/</a></p>
+
+<p>sed和awk是Linux平台下两个强大的文本处理工具。sed名为流编辑器（Stream
+Editor），它以行为单位对文本进行编辑，例如对文本的增删改查；而awk则主要是对文本进行格式化输出，虽然如此，它们之间的作用有部分是重叠的。也就是说，sed侧重点是编辑，而awk侧重点是格式化文本，它们两者往往都是配合工作，再加上正则表达式的加持，它们强大到难以想象。</p>
+
+<h4 id="sed">sed</h4>
+
+<p>语法：</p>
+
+<pre><code>sed script [input-filename]
+</code></pre>
+
+<p>其中script是用于处理后面input-filename的脚本，script由两部分组成：</p>
+
+<p>address 用于指定要处理文本的范围<br />
+command 处理文本的命令</p>
+
+<p>如果没有指定input-filename，那么sed默认从stdin接收数据。另外需要注意，sed的所有操作对原始文件没有任何影响，除非使用-
+i参数，它操作的可以说是文件的一个副本。</p>
+
+<h5 id="使用command-命令">使用command（命令）</h5>
+
+<p>命令是sed的核心，可用的命令有：<code>s（Search and
+replace）、a（Append）、i（Insert）、p（Print）、d（Delete）、c（Change）</code>，这些命令往往都会配合address使用。</p>
+
+<h6 id="打印命令-p">打印命令（p）</h6>
+
+<p>p是最简单的命令，用于输出文本，例如：</p>
+
+<pre><code>[normal@centos7-server tmp]$ echo &quot;Hello Sed&quot; | sed 'p'
+Hello Sed
+Hello Sed
+</code></pre>
+
+<p>输出了两行文本，原因是sed默认输出原始数据，所以我们看到的是原始数据和sed命令所处理的当前数据， <strong>如果不希望输出原始数据</strong> ，可以使用-n参数。</p>
+
+<pre><code>[normal@centos7-server tmp]$ echo &quot;Hello Sed&quot; | sed -n 'p'
+Hello Sed
+</code></pre>
+
+<p>通常我们都是有选择地输出数据，例如指定输出多少行，或者输出第几行。这就要配合address使用，最简单的address就是range address。</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed -n '1,3p' /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+</code></pre>
+
+<p>1,3p，意思是打印第一至第三行。有时候我们要打印最后一行，但是我们不知道这个文件有多少行，那么，就可以使用特殊字符$：</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed -n '$p' /etc/passwd
+dhcpd:x:177:177:DHCP server:/:/sbin/nologin
+</code></pre>
+
+<p>打印命令除了p外，还有其他两个命令：’=’和’l’小写（L），等号除了打印文本还，还输出了行数，而’l’则可打印不可见的字符。</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed '=' test.txt
+1
+This is line one
+2
+This is line two
+3
+This is line three
+</code></pre>
+
+<h6 id="插入-i-和追加-a-命令">插入（i）和追加（a）命令</h6>
+
+<p>插入命令会在指定行前面插入数据，而追加则在指定行后面添加数据。</p>
+
+<pre><code>[normal@centos7-server tmp]$ cat test.txt
+this is line one
+this is line two
+</code></pre>
+
+<p>使用参数i进行插入。</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed '2i\this is insert line' test.txt
+this is line one
+this is insert line
+this is line two
+</code></pre>
+
+<p>追加命令和插入命令相反，是在后面添加数据</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed '2a\this is insert line' test.txt
+this is line one
+this is line two
+this is insert line
+</code></pre>
+
+<h6 id="改变命令-c">改变命令（c）</h6>
+
+<p>改变命令会把匹配的数据行用命令中指定的数据替换掉。</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed '1c\Change line one' test.txt
+Change line one
+this is line two
+</code></pre>
+
+<p>可见，第一行全部内容都改变了。当c命令应用于多个行，则需要注意：</p>
+
+<pre><code>[normal@centos7-server tmp]$ cat test.txt 
+this is line one
+this is line two
+this is line three
+this is line four
+[normal@centos7-server tmp]$ sed '2,3c\two lines become one line' test.txt
+this is line one
+two lines become one line
+this is line four
+</code></pre>
+
+<p>结果是用一行替换了两个的内容。</p>
+
+<h6 id="搜索和替换命令-s">搜索和替换命令（s）</h6>
+
+<p>这个命令类似其他程序中的查找和替换。</p>
+
+<pre><code>[normal@centos7-server tmp]$ cat test.txt 
+I have a cat
+[normal@centos7-server tmp]$ sed 's/cat/hat/' test.txt 
+I have a hat
+</code></pre>
+
+<p>s命令默认（不同的系统默认可能不一样）只对第一次匹配的数据进行替换，如果要匹配所有的，可以使用g（global）标记。</p>
+
+<pre><code>[normal@centos7-server tmp]$ cat test.txt 
+There are a black cat and a white cat
+[normal@centos7-server tmp]$ sed 's/cat/hat/' test.txt
+There are a black hat and a white cat
+</code></pre>
+
+<p>没有开启global标记之前只替换了第一次出现的cat。</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed 's/cat/hat/g' test.txt
+There are a black hat and a white hat
+</code></pre>
+
+<p>开启global标记后，所有的cat都替换成hat。</p>
+
+<p>s命令的默认分隔符是/，由于/的特殊性，在某些地方使用上可能会遇到麻烦。</p>
+
+<pre><code>sed 's/\/bin\/bash/\/bin\/zsh/' /etc/passwd
+</code></pre>
+
+<p>s上面的例子把/etc/passwd文件中的/bin/bash替换成/bin/zsh，/是s的分隔符，具有特殊性，所以文件路径上的所有/都要被转义，这样就使得语法十分乱，幸运的是sed允许使用其他的分隔符，那就是!。</p>
+
+<pre><code>sed -n 's!/bin/bash!/bin/zsh!' /etc/passwd
+</code></pre>
+
+<h6 id="删除命令-d">删除命令（d）</h6>
+
+<p>如果没有指定address，那么d命令会把所有行都删除。</p>
+
+<pre><code>[normal@centos7-server tmp]$ cat test.txt
+This is line one
+This is line two
+This is line three
+[normal@centos7-server tmp]$ sed 'd' test.txt
+[normal@centos7-server tmp]$ 
+</code></pre>
+
+<p>没有使用范围，所有数据删除了。</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed '2d' test.txt
+This is line one
+This is line three
+</code></pre>
+
+<p>通过address指定删除第二行。</p>
+
+<h6 id="多个命令">多个命令</h6>
+
+<p>sed可同时接受多个命令，命令之间使用;分号分隔。</p>
+
+<pre><code>[normal@centos7-server tmp]$ cat test.txt
+This is line one
+This is line two
+This is line three
+[normal@centos7-server tmp]$ sed '1d;2a\This is the append line' test.txt
+This is line two
+This is the append line
+This is line three
+</code></pre>
+
+<p>除了使用分号分隔多个命令之外，还可以把多个命令分别写在不同的行上。</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed '1d
+&gt; 2a\This is the append line' test.txt
+This is line two
+This is the append line
+This is line three
+</code></pre>
+
+<h6 id="使用address">使用Address</h6>
+
+<p>上面已经简单介绍了最基本的Address（range address），除此之外，还有其他类型的Address：</p>
+
+<pre><code>/REGEXP/           基于正则表达式的address
+ADDR1,+N        匹配ADDR1和ADDR1之后的N行
+ADDR1,~N        匹配ADDR1和ADDR1之后的所有是它N倍的行
+</code></pre>
+
+<p>打印具有匹配词的行：</p>
+
+<pre><code>[normal@centos7-server tmp]$ cat test.txt 
+This is line one
+This is line two
+This is line three
+[normal@centos7-server tmp]$ sed -n '/one/p' test.txt
+This is line one
+</code></pre>
+
+<p>如果行中出现one单词，则匹配。</p>
+
+<p>打印指定行和它之后的N行：</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed -n '1,+5p' /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+adm:x:3:4:adm:/var/adm:/sbin/nologin
+lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+sync:x:5:0:sync:/sbin:/bin/sync
+</code></pre>
+
+<p>有些address只对gnu sed生效。</p>
+
+<h6 id="取反">取反（!）</h6>
+
+<p>把感叹号放到address后面，可以对address进行取反操作，例如：</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed -n '2!p' test.txt
+This is line one
+This is line three
+</code></pre>
+
+<p>打印除第二行之外的其他行</p>
+
+<pre><code>[normal@centos7-server tmp]$ sed -n '/one/!p' test.txt
+This is line two
+This is line three
+</code></pre>
+
+<p>打印没有单词one的数据行。</p>
+
+<h6 id="从文件读取数据-r">从文件读取数据（r）</h6>
+
+<pre><code>[normal@centos7-server tmp]$ cat data1.txt 
+The line from data1.txt
+The line from data2.txt
+[normal@centos7-server tmp]$ sed '2r data1.txt' test.txt
+This is line one
+This is line two
+The line from data1.txt
+The line from data2.txt
+This is line three
+</code></pre>
+
+<p>从data1.txt文件中读取数据，并插入到test.txt第2行后面。</p>
+
+<h6 id="把数据保存到文件-w">把数据保存到文件（w）</h6>
+
+<pre><code>[normal@centos7-server tmp]$ sed '/one/w one.txt' test.txt 
+This is line one
+This is line two
+This is line three
+[normal@centos7-server tmp]$ cat one.txt 
+This is line one
+</code></pre>
+
+<p>把有单词one的行保存到one.txt</p>
+
+<h4 id="awk">awk</h4>
+
+<p>awk大部分情况下不会对数据进行修改，它只负责数据的格式化输出。awk的语法和sed差不多：</p>
+
+<pre><code>awk program file
+</code></pre>
+
+<p>program是awk的核心，它由一对单引号和花括号括起来’{ script }’。</p>
+
+<p>我们在program中编写要执行的命令。和sed一样，如果没有指定file，那么默认从stdin接收数据。</p>
+
+<p>awk是基于行和列的，一行代表一条数据，每一行可以被分隔成列，每列由指定的分隔符（FS）分开，默认的列分隔符是空格。</p>
+
+<h6 id="awk基本应用">awk基本应用</h6>
+
+<p>awk中每一行都由一列或多列组成，这些列被保存在相应的内置变量中：</p>
+
+<pre><code>$0         整行数据
+$1         第一列数据
+$2         第二列数据
+$N        第N列数据
+</code></pre>
+
+<p>例如：</p>
+
+<pre><code>[normal@centos7-server tmp]$ echo &quot;hello world&quot; | awk '{print $0}'
+hello world
+</code></pre>
+
+<p>在”hello world”中，中间有一个空格，因此awk可以识别到有两列数据：</p>
+
+<pre><code>[normal@centos7-server tmp]$ echo &quot;hello world&quot; | awk '{print $1}'
+hello
+[normal@centos7-server tmp]$ echo &quot;hello world&quot; | awk '{print $2}'
+world
+</code></pre>
+
+<h6 id="内置变量">内置变量</h6>
+
+<p>awk在读取数据的时候，都是根据特定的内置变量来识别行和列的开始和结束：</p>
+
+<pre><code>FS      输入列分隔符
+RS      输入行分隔符
+OFS     输出列分隔符
+ORS     输出行分隔符
+</code></pre>
+
+<p>awk也是以行为单位读取数据的，也就是说，它的默认RS变量值是’\n’，我们可以改变这个值，让它可以一次读取多行：</p>
+
+<p>现有文件student.txt，它的内容如下：</p>
+
+<pre><code>Name:Jones
+Sex:male
+
+Name:Edwin
+Sex:male
+
+Name:Diana
+Sex:female
+</code></pre>
+
+<p>除了改变OFS分隔符，而不改变其他任何分隔符的前提下，使用awk对它进行打印输出：</p>
+
+<pre><code>[normal@centos7-server tmp]$ awk 'BEGIN{OFS=&quot;--&quot;} {print $1, $2}' student.txt 
+Name:Jones--
+Sex:male--
+--
+Name:Edwin--
+Sex:male--
+--
+Name:Diana--
+Sex:female--
+</code></pre>
+
+<p>由于默认的RS值是’\n’，FS默认值是空格，所以，包括两个空行和6行数据，刚好8行，每一行只有一列。那么，下面改变RS为两个换行符，结果又会怎样：</p>
+
+<pre><code>[normal@centos7-server tmp]$ cat student.txt 
+Name:Jones
+Sex:male
+
+Name:Edwin
+Sex:male
+
+Name:Diana
+Sex:female
+[normal@centos7-server tmp]$ awk 'BEGIN{RS=&quot;\n\n&quot;; OFS=&quot;--&quot;} {print $1, $2}' student.txt 
+Name:Jones--Sex:male
+Name:Edwin--Sex:male
+Name:Diana--Sex:female
+</code></pre>
+
+<p>也就是说，awk每读取到两个换行符才作为一行数据的结束，因此只有3行数据；当RS值非默认值’\n’的时候，awk遇到’\n’，就会把它作为一个列的分隔符（FS），除非另外设置了FS的值
+。</p>
+
+<p>默认的ORS值也是’\n’， 可以设置ORS为其他值：</p>
+
+<pre><code>[normal@centos7-server tmp]$ awk 'BEGIN{RS=&quot;\n\n&quot;; ORS=&quot;&quot;; OFS=&quot;--&quot;}{print $1, $2, $3}' student.txt 
+Name:Jones--Sex:male--Name:Edwin--Sex:male--Name:Diana--Sex:female--
+</code></pre>
+
+<h6 id="begin和end">BEGIN和END</h6>
+
+<p>BEGIN这关键字用于指定命令必须在其他命令之前执行，而END和BEGIN相关，它使命令在最后才执行。BEGIN在上面的例子中已经接触到，
+设置分隔符必须在其他命令执行前进行，否则会出错：</p>
+
+<pre><code>[normal@centos7-server tmp]$ awk '/root/ {FS=&quot;:&quot;; print NF}' /etc/passwd
+1
+7
+</code></pre>
+
+<p>NF是一个内置变量，表示一行数据的总列数。上面的命令用于找出含有root单词的行。正常情况下，两个输出都应该是7，但是第一个输出却是1，很明显是错误的。原因是：在设置FS变量值的时候，它对于第一个匹配行来说还没有生效，即FS值保持默认值空格，所以只识别一列，而第二个匹配行，FS的值已经生效，变成了”:“，因此，正确输出了7。</p>
+
+<p>所以，必须使用BEGIN让它在所有其他命令执行前更改FS的值：</p>
+
+<pre><code>[normal@centos7-server tmp]$ awk 'BEGIN{FS=&quot;:&quot;} /root/ {print NF}' /etc/passwd
+7
+7
+</code></pre>
+
+<p>使用END</p>
+
+<pre><code>[normal@centos7-server tmp]$ awk 'BEGIN{FS=&quot;:&quot;; print &quot;start&quot;} /root/ {print NF} END{print &quot;finish&quot;}' /etc/passwd
+start
+7
+7
+finish
+</code></pre>
+
+<h6 id="使用正则表达式">使用正则表达式</h6>
+
+<p>awk和sed一样可以使用正则表达式。</p>
+
+<pre><code>normal@centos7-server tmp]$ sed -n '/root/p' /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+operator:x:11:0:operator:/root:/sbin/nologin
+[normal@centos7-server tmp]$ awk '/root/ {print $0}' /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+operator:x:11:0:operator:/root:/sbin/nologin
+</code></pre>
+
+<p>awk使用正则表达式和sed一样，也是用/作为分隔符。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

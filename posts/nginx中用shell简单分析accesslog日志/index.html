@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Nginx中用Shell简单分析accesslog日志 | 开发者问答集锦</title>
+    <meta property="og:title" content="Nginx中用Shell简单分析accesslog日志 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Nginx中用Shell简单分析accesslog日志">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/nginx%E4%B8%AD%E7%94%A8shell%E7%AE%80%E5%8D%95%E5%88%86%E6%9E%90accesslog%E6%97%A5%E5%BF%97/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Nginx中用Shell简单分析accesslog日志</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>查找访问频率最高的 URL 和次数：</p>
+
+<pre><code>cat access.log | awk -F ‘^A’ ‘{print $10}’ | sort | uniq -c
+</code></pre>
+
+<p>查找当前日志文件 500 错误的访问：</p>
+
+<pre><code>cat access.log | awk -F ‘^A’ ‘{if($5 == 500) print $0}’
+</code></pre>
+
+<p>查找当前日志文件 500 错误的数量：</p>
+
+<pre><code>cat access.log | awk -F ‘^A’ ‘{if($5 == 500) print $0}’ | wc -l
+</code></pre>
+
+<p>查找某一分钟内 500 错误访问的数量:</p>
+
+<pre><code>cat access.log | awk -F ‘^A’ ‘{if($5 == 500) print $0}’ | grep ’09:00’ | wc-l
+</code></pre>
+
+<p>查找耗时超过 1s 的慢请求：</p>
+
+<pre><code>tail -f access.log | awk -F ‘^A’ ‘{if($6&gt;1) print $0}’
+</code></pre>
+
+<p>假如只想查看某些位：</p>
+
+<pre><code>tail -f access.log | awk -F ‘^A’ ‘{if($6&gt;1) print $3″|”$4}’
+</code></pre>
+
+<p>查找 502 错误最多的 URL：</p>
+
+<pre><code>cat access.log | awk -F ‘^A’ ‘{if($5==502) print $11}’ | sort | uniq -c
+</code></pre>
+
+<p>查找 200 空白页</p>
+
+<pre><code>cat access.log | awk -F ‘^A’ ‘{if($5==200 &amp;&amp; $8 &lt; 100) print $3″|”$4″|”$11″|”$6}’
+</code></pre>
+
+<p><strong>统计IP访问量（独立ip访问数量）</strong></p>
+
+<pre><code>awk '{print $1}' access.log | sort -n | uniq | wc -l
+</code></pre>
+
+<p><strong>查看某一时间段的IP访问量(4-5点)</strong></p>
+
+<pre><code>grep &quot;07/Apr/2017:0[4-5]&quot; access.log | awk '{print $1}' | sort | uniq -c| sort -nr | wc -l  
+</code></pre>
+
+<p><strong>查看访问最频繁的前100个IP</strong></p>
+
+<pre><code>awk '{print $1}' access.log | sort -n |uniq -c | sort -rn | head -n 100
+</code></pre>
+
+<p><strong>查看访问100次以上的IP</strong></p>
+
+<pre><code>awk '{print $1}' access.log | sort -n |uniq -c |awk '{if($1 &gt;100) print $0}'|sort -rn
+</code></pre>
+
+<p><strong>查询某个IP的详细访问情况,按访问频率排序</strong></p>
+
+<pre><code>grep '127.0.01' access.log |awk '{print $7}'|sort |uniq -c |sort -rn |head -n 100
+</code></pre>
+
+<h2 id="页面访问统计">页面访问统计</h2>
+
+<p><strong>查看访问最频的页面(TOP100)</strong></p>
+
+<pre><code>awk '{print $7}' access.log | sort |uniq -c | sort -rn | head -n 100
+</code></pre>
+
+<p><strong>查看访问最频的页面([排除php页面】(TOP100)</strong></p>
+
+<pre><code>grep -v &quot;.php&quot;  access.log | awk '{print $7}' | sort |uniq -c | sort -rn | head -n 100 
+</code></pre>
+
+<p><strong>查看页面访问次数超过100次的页面</strong></p>
+
+<pre><code>cat access.log | cut -d ' ' -f 7 | sort |uniq -c | awk '{if ($1 &gt; 100) print $0}' | less
+</code></pre>
+
+<p><strong>查看最近1000条记录，访问量最高的页面</strong></p>
+
+<pre><code>tail -1000 access.log |awk '{print $7}'|sort|uniq -c|sort -nr|less
+</code></pre>
+
+<h2 id="每秒请求量统计">每秒请求量统计</h2>
+
+<p>统计每秒的请求数,top100的时间点(精确到秒)</p>
+
+<pre><code>awk '{print $4}' access.log |cut -c 14-21|sort|uniq -c|sort -nr|head -n 100
+</code></pre>
+
+<h2 id="每分钟请求量统计">每分钟请求量统计</h2>
+
+<p>统计每分钟的请求数,top100的时间点(精确到分钟)</p>
+
+<pre><code>awk '{print $4}' access.log |cut -c 14-18|sort|uniq -c|sort -nr|head -n 100
+</code></pre>
+
+<h2 id="每小时请求量统计">每小时请求量统计</h2>
+
+<p>统计每小时的请求数,top100的时间点(精确到小时)</p>
+
+<pre><code>awk '{print $4}' access.log |cut -c 14-15|sort|uniq -c|sort -nr|head -n 100
+</code></pre>
+
+<h2 id="性能分析">性能分析</h2>
+
+<p>在nginx log中最后一个字段加入$request_time</p>
+
+<p><strong>列出传输时间超过 3 秒的页面，显示前20条</strong></p>
+
+<pre><code>cat access.log|awk '($NF &gt; 3){print $7}'|sort -n|uniq -c|sort -nr|head -20
+</code></pre>
+
+<p><strong>列出php页面请求时间超过3秒的页面，并统计其出现的次数，显示前100条</strong></p>
+
+<pre><code>cat access.log|awk '($NF &gt; 1 &amp;&amp;  $7~/\.php/){print $7}'|sort -n|uniq -c|sort -nr|head -100
+</code></pre>
+
+<h2 id="蜘蛛抓取统计">蜘蛛抓取统计</h2>
+
+<p><strong>统计蜘蛛抓取次数</strong></p>
+
+<pre><code>grep 'Baiduspider' access.log |wc -l
+</code></pre>
+
+<p><strong>统计蜘蛛抓取404的次数</strong></p>
+
+<pre><code>grep 'Baiduspider' access.log |grep '404' | wc -l
+</code></pre>
+
+<h2 id="tcp连接统计">TCP连接统计</h2>
+
+<p>查看当前TCP连接数</p>
+
+<pre><code>netstat -tan | grep &quot;ESTABLISHED&quot; | grep &quot;:80&quot; | wc -l
+</code></pre>
+
+<p>用tcpdump嗅探80端口的访问看看谁最高</p>
+
+<pre><code>tcpdump -i eth0 -tnn dst port 80 -c 1000 | awk -F&quot;.&quot; '{print $1&quot;.&quot;$2&quot;.&quot;$3&quot;.&quot;$4}' | sort | uniq -c | sort -nr
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

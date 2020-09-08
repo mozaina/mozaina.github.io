@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本字符串操作扩展应用正则表达式 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本字符串操作扩展应用正则表达式 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本字符串操作扩展应用正则表达式">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%93%8D%E4%BD%9C%E6%89%A9%E5%B1%95%E5%BA%94%E7%94%A8%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本字符串操作扩展应用正则表达式</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="目录">目录</h3>
+
+<pre><code>* 字符串处理
+* 字符串备用值设置(初值)。
+* shell扩展 expect预期交互
+* 正则表达式概述
+</code></pre>
+
+<h2 id="字符串处理">字符串处理</h2>
+
+<ol>
+<li><p>字符串截取与切割</p>
+
+<ul>
+<li>三种方法
+
+<ul>
+<li>${变量名：起始位置 ： 长度}</li>
+<li>expr substr “$变量名字” 起始位置 长度</li>
+<li>echo $变量名 | cut -b 起始为位置-结束位置
+
+<br />
+<br /></li>
+</ul></li>
+</ul>
+
+<p>#截取第一种方法
+[root@room13pc37 ~]# a=abcdef
+[root@room13pc37 ~]# echo $a
+abcdef
+[root@room13pc37 ~]# echo ${a:2:2}      #注意：截取的位置是从0(下标)开始计数的
+cd
+[root@room13pc37 ~]# echo ${a: :2}      #中间省略就表示：从第一0位开始截取  可以省略0
+cd
+[root@room13pc37 ~]# echo ${#a}         #  ${#a }中#的作用是：统计字符串的数量,(注意：#是在这里是单独使用的)
+6
+#方法2
+[root@room13pc37 ~]# a=abcdef
+[root@room13pc37 ~]# echo $a
+abcdef[root@room13pc37 ~]# expr substr &ldquo;$a&rdquo; 2 5     #注意区分和方法1的不同    。同时它的位置是从1(下标)开始数的
+#方法3
+[root@room13pc37 ~]# echo $a | cut -b 3-5       #与方法2一样位置是从1开始计数， 但是 “5” 表示 截取到那里。==&gt; 截取3到5之间的字符。(相对灵活)
+cde
+[root@room13pc37 ~]# echo $a | cut -b 3,5   # &ldquo;,&rdquo; 表示：只截取 3，5 这两个位置的字符
+ce
+[root@room13pc37 ~]# echo $a | cut -b -5    #表示截取：1 -5 之间的字符，1可以省略
+abcde
+[root@room13pc37 ~]# echo $a | cut -b 1-5   #同上
+abcde
+[root@room13pc37 ~]# echo $a | cut -b 5 #表示只要第 5 位的字符
+e</p></li>
+</ol>
+
+<ul>
+<li><p>例子1 编写一个随机获取字符的脚本</p>
+
+<p>#!/binb/bash
+#随机生成一个字符
+a=abcdefghijklnmopqrstuvwxyzABCDEFGHIJKLNMOPQRSTUVWXYZ1234567890    #定义变量，一共62字符
+for i in {1..8}
+do
+        x=$[RANDOM%62]      #随机生成，范围是0～61
+        pass=${a:x:1}           #截取1个字符给pass
+        pass1=$pass1$pass       #每次随机生成的数字，赋值给pass
+done</p>
+
+<h2 id="echo-pass1-显示出来">echo $pass1                     #显示出来</h2>
+
+<p>#结果
+[root@room13pc37 shell_test]# bash Random_code_for
+0lkK6ppG</p></li>
+</ul>
+
+<ol>
+<li><p>字符串替换</p>
+
+<ul>
+<li>只替换第一个匹配结果： ${变量名/old/new}</li>
+<li>替换全部匹配结果： ${变量名//old/new}
+
+<br />
+<br /></li>
+</ul>
+
+<p>[root@room13pc37 shell_test]# echo ${b/d/*}     #只替换一个
+1<em>safsafsadfs33515465fsdfads
+[root@room13pc37 shell_test]# echo ${b//d/</em>}    #全部替换
+1*safsafsa*fs33515465fs*fa*s
+[root@room13pc37 shell_test]# echo ${b//d/}     #替换为空，相当delete
+1safsafsafs33515465fsfas</p></li>
+
+<li><p>字符串掐头去为尾</p>
+
+<ul>
+<li>从左向右，最短匹配删除，${变量名#*关键词}</li>
+<li>从左向右，最长匹配删除，${变量名##*关键词}</li>
+<li>从右向左，最短匹配删除，${变量名%*关键词}</li>
+<li>从右向左，最长匹配删除，${变量名%%*关键词}
+
+<br />
+<br /></li>
+</ul>
+
+<p>#左边删除
+[root@room13pc37 shell_test]# a=<code>head -1 /etc/passwd</code>
+[root@room13pc37 shell_test]# echo $a
+root:x:0:0:root:/root:/bin/bash
+[root@room13pc37 shell_test]# echo ${a#root}        #指定删除(掐头)的内容
+:x:0:0:root:/root:/bin/bash
+[root@room13pc37 shell_test]# echo ${a#root:}
+x:0:0:root:/root:/bin/bash
+[root@room13pc37 shell_test]# echo ${a#*:}          #利用<em>来匹配掐头的内容
+x:0:0:root:/root:/bin/bash
+[root@room13pc37 shell_test]# echo ${a##</em>:}         #从左往右边开始其逐个匹配桥头
+/bin/bash</p>
+
+<h2 id="root-room13pc37-shell-test">[root@room13pc37 shell_test]#</h2>
+
+<p>#从右往左删除 = 去尾
+[root@room13pc37 shell_test]# echo $a
+root:x:0:0:root:/root:/bin/bash
+[root@room13pc37 shell_test]# echo ${a%/bin<em>}       #匹配去尾的内容
+root:x:0:0:root:/root:
+[root@room13pc37 shell_test]# echo ${a%/bi</em>}
+root:x:0:0:root:/root:
+[root@room13pc37 shell_test]# echo ${a%/:<em>}
+root:x:0:0:root:/root:/bin/bash
+[root@room13pc37 shell_test]# echo ${a%%:</em>}     #从右往左开始匹配去尾的对象
+root
+[root@room13pc37 shell_test]#</p></li>
+</ol>
+
+<ul>
+<li><p><strong>例子2</strong> 只保留 root: x :0:0:root:/root:/bin/bash ===&gt; 中间的“root”</p>
+
+<p>[root@room13pc37 shell_test]# echo $a
+root:x:0:0:root:/root:/bin/bas
+[root@room13pc37 shell_test]# b=${a%:<em>} #可以用一个变量来存去尾后的值
+[root@room13pc37 shell_test]# echo $b<br />
+root:x:0:0:root:/root
+[root@room13pc37 shell_test]# echo ${b##</em>:/}    #在把掐头去掉变量 B  剩下的值
+root</p></li>
+
+<li><p><strong>例子3</strong> 批量修改文件的后缀 如：把 ”.txt“ 文件修改为 &ldquo; .doc&rdquo;</p>
+
+<p>#!/bin/bash
+#利用字符串删除命令，批量修改文件名字
+[root@room13pc37 test_fileName]# touch {1..20}.txt
+[root@room13pc37 test_fileName]# ls
+10.txt  12.txt  14.txt  &hellip;.
+for i in <code>ls *.txt</code>
+do
+        mv $i ${i%.*}.doc       #我这里使用的是相对路径，大家可以使用绝对路径，更加精准一点； 去尾的部分是：  .txt;
+        [ $? -eq 0 ] &amp;&amp; echo &ldquo;$i 修改成功&rdquo; || echo &ldquo;$i修改失败&rdquo;     #判断是否修修改成功
+done</p>
+
+<p>#结果
+[root@room13pc37 test_fileName]# ls</p>
+
+<h2 id="10-doc-13-doc-16-doc-19-doc">10.doc  13.doc  16.doc  19.doc &hellip;.</h2>
+
+<p>#这个脚本还是有可优化的地方，我们可以把 把位置变量  $1 替换.txt   $2 替换 .doc
+#这样我们可以修改任意的文件名可扩展名阿</p></li>
+</ul>
+
+<h2 id="字符串备用值设置-初值">字符串备用值设置(初值)。</h2>
+
+<ul>
+<li><p>取值： ${var:-word}<br />
+- 若变量var已经存在且非NULL， 则返回$var的值<br />
+- 否则返回子串&rdquo;word&rdquo;,变量var值不变</p></li>
+
+<li><p><strong>例子4</strong> 创建用户，并设置初始化密码。默认123456</p>
+
+<p>#!/bin/bash
+#创建用户，并设置密码，不设置密码，默认123456
+read -p &ldquo;请输入用户名&rdquo; u
+useradd $u
+read -p &ldquo;请输入密码&rdquo; p
+echo ${p:-123456} | passwd &ndash;stdin $u</p>
+
+<p>[root@room13pc37 test_fileName]# bash default_code
+请输入用户名alal
+请输入密码12345
+更改用户 alal 的密码 。
+passwd：所有的身份验证令牌已经成功更新。</p></li>
+
+<li><p><strong>例子5</strong> 从键盘读入一个正整数x，求从1到x的和；当用户未输入值（直接回车）时.为了避免执行出错，应为x赋初值1</p>
+
+<p>#!/bin/bash
+#用来从键盘读入一个正整数x，求从1到x的和；当用户未输入值（直接回车）时，为了避免执行出错，应为x赋初值1
+sum=0
+read -p &ldquo;please input a num: &ldquo; num
+for i in <code>seq ${num:-1}</code>        #设置默认值
+do
+         sum=$[sum + i ]        #求和
+done
+echo $sum</p></li>
+</ul>
+
+<p>测试结果：</p>
+
+<pre><code>[root@room13pc37 test_fileName]# bash sum_x
+please input a num: 10
+55
+[root@room13pc37 test_fileName]# bash sum_x
+please input a num:         
+1
+</code></pre>
+
+<h2 id="shell扩展-expect预期交互">shell扩展 expect预期交互</h2>
+
+<ul>
+<li>基于TCL编写的自动交互式程序
+
+<ul>
+<li>可以用在shell脚本中，为交互式过程自动输送预先主准备的文本或者指令，无需人工干预</li>
+<li>触发的依据式预期出现的特性提示文本<br />
+1.安装expect工具</li>
+</ul></li>
+</ul>
+
+<blockquote>
+<p>我所使用的系统式红帽子 7.4</p>
+</blockquote>
+
+<pre><code>[root@room13pc37 test_fileName]#yum -y install expect
+.....
+[root@room13pc37 test_fileName]#which expect        #确定expect路径
+/usr/bin/expect
+</code></pre>
+
+<ul>
+<li><p><strong>例子6</strong> expect可以为交互式过程（比如FTP、SSH等登录过程）自动输送预先准备的文本或指令，而无需人工干预。触发的依据是预期会出现的特征提示文本</p>
+
+<p>#发邮件的几种方式
+[root@room13pc37 test_fileName]# echo &ldquo;test mail&rdquo; | mail -s test root   #管道
+[root@room13pc37 test_fileName]# mail -s test root &lt; /etc/passwd    #重定向
+[root@room13pc37 test_fileName]# mail -s test root &lt;&lt; EOF   #expect
+test mail
+hell world
+EOF</p></li>
+
+<li><p><strong>例子7</strong> 编写脚本，实现免交互登录</p></li>
+
+<li><p>任务需求及思路分析</p></li>
+</ul>
+
+<blockquote>
+<p>在SSH登录过程中，如果是第一次连接到该目标主机，则首先会被要求接受密钥，然后才提示输入密码：<br />
+ 注意：不要照抄这里的IP地址，需要根据自己的实际IP填写！！！</p>
+</blockquote>
+
+<pre><code># ssh root@192.168.4.5                              //连接目标主机
+The authenticity of host '192.168.4.5 (192.168.4.5)' can't be established.
+RSA key fingerprint is 58:a0:d6:00:c7:f1:34:5d:6c:6d:70:ce:e0:20:f8:f3.
+Are you sure you want to continue connecting (yes/no)? yes          //接受密钥
+Warning: Permanently added '192.168.4.5' (RSA) to the list of known hosts.
+root@192.168.4.5's password:                                   //验证密码
+Last login: Thu May  7 22:05:44 2015 from 192.168.4.5
+[root@room13pc37 test_fileName]# exit                                             //返回客户端
+logout
+Connection to 192.168.4.5 closed.
+</code></pre>
+
+<ul>
+<li>如果SSH登录并不是第一次，则接受密钥的环节就没有了，而是直接进入验证密码的过程：</li>
+</ul>
+
+<blockquote>
+<p>注意：不要照抄这里的IP地址，需要根据自己的实际IP填写！！！</p>
+</blockquote>
+
+<pre><code>[root@room13pc37 test_fileName]# ssh root@192.168.4.5                              //连接目标主机
+root@192.168.4.5's password:                                   //验证密码
+Last login: Mon May 11 12:02:39 2015 from 192.168.4.5
+[root@room13pc37 test_fileName]# exit  
+//返回客户端
+logout
+Connection to 192.168.4.5 closed.
+</code></pre>
+
+<p>*：不要照抄脚本里的IP地址与密码，需要根据自己的实际情况填写！！！</p>
+
+<pre><code>[root@room13pc37 test_fileName]# vim  expect_ssh.sh 
+#!/bin/bash
+expect &lt;&lt; EOF
+spawn ssh 192.168.4.5                               #//创建交互式进程
+expect &quot;password:&quot; { send &quot;123456\r&quot; }              #//自动发送密码
+expect &quot;#&quot;          { send &quot;touch /tmp.txt\r&quot; }     #//发送命令
+expect &quot;#&quot;          { send &quot;exit\r&quot; }
+EOF
+[root@room13pc37 test_fileName]# chmod  +x  expect_ssh.sh 
+</code></pre>
+
+<p>2）根据实现思路编写脚本文件</p>
+
+<h2 id="正则表达式概述">正则表达式概述</h2>
+
+<p><a href="https://img.it610.com/image/info8/42305d2510e843148f21d60af075f03e.jpg"><img src="https://img.it610.com/image/info8/42305d2510e843148f21d60af075f03e.jpg" alt="shell脚本-
+字符串操作，扩展应用，正则表达式_第1张图片" /></a></p>
+
+<ul>
+<li>Regular Express
+
+<ul>
+<li>使用 “一串符号”，来描述有共同属性的数据’</li>
+</ul></li>
+<li>egrep 过滤工具 （可以使用扩展的正则表达式的规则）
+
+<ul>
+<li>文本处理顺序
+
+<ul>
+<li>以为行单位，逐行进行处理</li>
+<li>默认只输出与表达式相匹配的文本行</li>
+</ul></li>
+<li>基本用法
+
+<ul>
+<li>格式1： egrep [选项] ‘正则表达式’ 文件……</li>
+<li>格式2： 前置命令 | egrep [选项] ‘正则表达式</li>
+</ul></li>
+</ul></li>
+</ul>
+
+<blockquote>
+<p>等同于： grep -E ：表示允许使用扩展的正则表达式</p>
+</blockquote>
+
+<pre><code>* 常用命令选项 
+  * -i : 忽略字母的大小写
+  * -v ：条件取反
+  * -c ：统计匹配的行数
+  * -q ： 静默，无任何输出，一般用于检测
+  * -n ： 显示出匹配结果所在的行号
+  * –color : 标红显示匹配子串
+</code></pre>
+
+<table>
+<thead>
+<tr>
+<th>正则符号</th>
+<th>描述</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>$</td>
+<td>匹配行首</td>
+</tr>
+
+<tr>
+<td>[]</td>
+<td>匹配行尾</td>
+</tr>
+
+<tr>
+<td>[^]</td>
+<td>对集合取反</td>
+</tr>
+
+<tr>
+<td>.</td>
+<td>匹配任意单个字符</td>
+</tr>
+
+<tr>
+<td>*</td>
+<td>匹配前一个字符任意次数</td>
+</tr>
+
+<tr>
+<td>\{n,m\}</td>
+<td>匹配前一个字符n到 名次</td>
+</tr>
+
+<tr>
+<td>{n\}</td>
+<td>匹配前一个字符n次</td>
+</tr>
+
+<tr>
+<td>\{n,\}</td>
+<td>匹配前一个字符n次以上</td>
+</tr>
+
+<tr>
+<td>\{\}</td>
+<td>保留</td>
+</tr>
+</tbody>
+</table>
+
+<p>扩展正则列表</p>
+
+<table>
+<thead>
+<tr>
+<th>正则符号</th>
+<th>描述</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>+</td>
+<td>最少匹配一次</td>
+</tr>
+
+<tr>
+<td>？</td>
+<td>最多匹配一次</td>
+</tr>
+
+<tr>
+<td>{n,m}</td>
+<td>匹配n到m次</td>
+</tr>
+
+<tr>
+<td>()</td>
+<td>组合为整体，保留</td>
+</tr>
+
+<tr>
+<td></td>
+<td></td>
+</tr>
+
+<tr>
+<td>\b</td>
+<td>单词边界</td>
+</tr>
+</tbody>
+</table>
+
+<ul>
+<li><p><strong>例子8</strong> 正则表达式示例</p>
+
+<p>#典型的应用场合：grep、egrep检索文本行grep命令不带-E选项时，支持基本正则匹配模式。比如“word”关键词检索、“^word”匹配以word开头的行、“word$”匹配以word结尾的行……等等。
+[root@room13pc37 test_fileName]# grep &lsquo;^r&rsquo; /etc/passwd      #输出以“r”开头的用户记录：
+[root@room13pc37 test_fileName]# grep &lsquo;localhost$&rsquo; /etc/hosts   #输出以“localhost”结尾的行</p>
+
+<p>#若希望在grep检索式同时组合多个条件，比如输出以“root”或者以“daemon”开头的行：
+[root@room13pc37 test_fileName]# grep &lsquo;^root|^daemon&rsquo; /etc/passwd          //搜索无结果
+[root@room13pc37 test_fileName]# grep &lsquo;localhost$&rsquo; /etc/hosts       #而若若使用grep -E或egrep命令，可支持扩展正则匹配模式，能够自动识别 |、{} 等扩展正则表达式中的特殊字符，用起来更加方便，比如：</p>
+
+<p>#而若若使用grep -E或egrep命令，可支持扩展正则匹配模式，能够自动识别 |、{} 等扩展正则表达式中的特殊字符，用起来更加方便，比如：
+[root@room13pc37 test_fileName]# grep -E &lsquo;^(root|daemon)&rsquo; /etc/passwd</p>
+
+<p>#grep、egrep命令的-q选项
+#选项 -q 表示 quiet（静默）的意思，结合此选项可以只做检索而并不输出，通常在脚本内用来识别查找的目标是否存在，通过返回状态 $? 来判断，这样可以忽略无关的文本信息，简化脚本输出。比如，检查/etc/hosts文件内是否存在192.168.4.4的映射记录，如果存在则显示“YES”，否则输出“NO”，一般会执行：
+[root@room13pc37 test_fileName]# grep &lsquo;^192.168.4.4&rsquo; /etc/hosts &amp;&amp; echo &ldquo;YES&rdquo; || echo &ldquo;NO&rdquo;
+[root@room13pc37 test_fileName]# grep -q &lsquo;^192.168.4.4&rsquo; /etc/hosts &amp;&amp; echo &ldquo;YES&rdquo; || echo &ldquo;NO&rdquo;</p>
+
+<h1 id="基本元字符-匹配行首-行尾">基本元字符 ^、$ —— 匹配行首、行尾</h1>
+
+<p>[root@room13pc37 test_fileName]# egrep &lsquo;^#&rsquo; /etc/inittab    #输出注释的配置行（以#开头的行）</p>
+
+<p>#使用 -c 选项可输出匹配行数，这与通过管道再 wc -l的效果是相同的，但是写法更简便。比如，统计使用“/bin/bash”作为登录Shell的正常用户个数，可执行：
+[root@room13pc37 test_fileName]# egrep -c &lsquo;/bin/bash$&rsquo; /etc/passwd</p>
+
+<p>基本元字符 +、?、* —— 目标出现的次数
+[root@room13pc37 test_fileName]# egrep &lsquo;.&rsquo; /etc/rc.local #基本元字符 . —— 匹配任意单个字符
+[root@room13pc37 test_fileName]# egrep &lsquo;f+&rsquo; /etc/rc.local   #输出包括 f、ff、ff、……的行，即“f”至少出现一次：
+[root@room13pc37 test_fileName]# egrep &lsquo;init(ial)?&rsquo; /etc/rc.local   #输出包括init、initial的行，即末尾的“ial”最多出现一次（可能没有）：</p>
+
+<hr />
+
+<p>[root@room13pc37 test_fileName]# vim brace.txt          #先准备一个素材文件
+ab def ghi abdr
+dedef abab ghighi
+abcab CD-ROM
+TARENA IT GROUP
+cdcd ababab
+Hello abababab World
+#元字符 {} —— 限定出现的次数范围
+[root@room13pc37 test_fileName]# egrep &lsquo;(ab){3}&rsquo; brace.txt  #输出包括ababab的行，即“ab”连续出现3次：
+[root@room13pc37 test_fileName]# egrep &lsquo;(ab){2,4}&rsquo; brace.txt    #输出包括abab、ababab、abababab的行，即“ab”连续出现2~4次：
+[root@room13pc37 test_fileName]# egrep &lsquo;(ab){3,}&rsquo; brace.txt #输出包括ababab、abababab、……的行，即“ab”最少连续出现3次：
+[root@room13pc37 test_fileName]# egrep &lsquo;[A-Z]&rsquo; brace.txt        #输出包括大写字母的行，使用[A-Z]匹配连续范围：
+[root@room13pc37 test_fileName]# egrep -i &lsquo;eth|network|bluetooth&rsquo; /var/log/dmesg        #多个条件的组合通过dmesg启动日志查看蓝牙设备、网卡设备相关的信息：</p></li>
+</ul>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

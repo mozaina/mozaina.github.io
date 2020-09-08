@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+	<meta name="generator" content="Hugo 0.59.1" />
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>开发者问答集锦 | </title>
+    <meta property="og:title" content="开发者问答集锦 | ">
+    <meta property="og:type" content="website">
+    <meta name="Keywords" content="">
+    <meta name="description" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <link rel="alternate" type="application/rss+xml+xml" href="https://zaina.newban.cn/index.xml" title="开发者问答集锦" />
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <h1>
+                        <a id="logo" href="https://zaina.newban.cn">
+                            开发者问答集锦
+                        </a>
+                    </h1>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="current" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sqlmap%E7%BB%93%E5%90%88%E5%90%8E%E9%97%A8%E5%B7%A5%E5%85%B7webacoo%E8%8E%B7%E5%8F%96dvwa%E6%8E%A7%E5%88%B6%E6%9D%83shell/" title="sqlmap结合后门工具webacoo获取dvwa控制权shell">sqlmap结合后门工具webacoo获取dvwa控制权shell</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            sqlmap结合后门工具webacoo获取dvwa控制权shell  一、通过sqlmap的–os-shell给dvwa上传后门文件，并获取os- shell。
+
+
+通过sqlmap上传了后门文件tmpulkdf.php。
+通过http://10.10.10.129:80/dvwa/tmpulkdf.php可以打开文件上传界面，可上传后门文件如一句话木马。可自主选择途径，该处选择了/var/www/dvwa/hackable/uploads
+
+注意os-shell的执行条件有三个
+（1）网站目前使用用户必须是root权限
+（2）扫描或其他方法获得网站的绝对路径
+（3）GPC为off，php主动转义的功能关闭
+二、查看当前获取的数据库的权限
+（1）通过python sqlmap.py -u
+‘http://10.10.10.129/dvwa/vulnerabilities/sqli/?id=admin&amp;Submit=Submit’ &ndash;cookie=‘security=low; PHPSESSID=9pkugvc3h1m8t3nkqeuk264ml1’ &ndash;current-db
+查看当前的数据库名：
+
+（2）通过python sqlmap.py -u
+‘http://10.10.10.129/dvwa/vulnerabilities/sqli/?id=admin&amp;Submit=Submit’ &ndash;cookie=‘security=low; PHPSESSID=9pkugvc3h1m8t3nkqeuk264ml1’ &ndash;current- user查看当前的数据库用户：
+
+（3）通过python sqlmap.py -u
+‘http://10.10.10.129/dvwa/vulnerabilities/sqli/?id=admin&amp;Submit=Submit’ &ndash;cookie=‘security=low; PHPSESSID=9pkugvc3h1m8t3nkqeuk264ml1’ &ndash;is-dba查
+看当前用户是否管理员用户（dba）:
+
+通过上述的操作当前用户并不是管理员用户，不能对文件夹进行写权限，不能上传后门文件，不能获取os-shell：
+
+三、对目标网站dvwa进行修改
+（1）修改dvwa用户，即修改dvwa中config.inc.php文件
+
+
+将用户名改为root，密码改为对应root的密码，保存退出，并重启mysql。
+（2）在攻击机kali找到之前进行sqlmap后的文件
+并删除，如果不删除再次进行sqlmap时，得到的结果是之前的结果。
+
+（3）重复二、中的步骤后查看到当前用户，得到当前用户为root@localhost，并且是dba（管理员）权限：
+
+
+到此本以为可以进行–os-shell，上传文件成功，但是发现还是写文件权限问题，上传失败。
+（4）经查阅发现是数据库用户在要上传的文件目录/var/www/dvwa没有写权限，进入目标机dvwa修改/var/www/dvwa的权限
+
+
+修改权限后数据库用户root可对/var/www/dvwa/进行写文件操作，再重复一的步骤即可上传后门文件tmpulkdf.php，并获取os- shell。并获取一个可以上传文件的后门。
+四、通过web后门脚本工具webacoo获取
+webshell常常被称为匿名用户(入侵者)通过WEB服务端口对WEB服务器有某种程度上操作的权限,由于其大多是以网页脚本的形式出现，也有人称之为网站后门工具。
+webacoo(web backdoor cookie)是一个web后门脚本工具包，旨在通过HTTP在客户端和web服务器之间提供类似隐形终端连接。它是一个后渗透利用工具，能够维持对已被拿下的web服务器的权限访问。WeBaCoo的精妙之处在于，Web服务器和客户端之间的通信载体是Cookie。这就意味着多数的杀毒软件、网络入侵检测/防御系统、网络防火墙和应用程序防火墙都无法检测到后门的存在。
+（1）kali中如果没有webacoo工具，可通过apt-get install webacoo下载获取。
+（2）通过webacoo -h查看webacoo查看参数指令。……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sqlmap%E7%BB%93%E5%90%88%E5%90%8E%E9%97%A8%E5%B7%A5%E5%85%B7webacoo%E8%8E%B7%E5%8F%96dvwa%E6%8E%A7%E5%88%B6%E6%9D%83shell/">阅读全文</a></p>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sqlmongoshellcdriver/" title="SQLmongoShellCDriver">SQLmongoShellCDriver</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sqlmongoshellcdriver/">阅读全文</a></p>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sqlplus%E4%B8%8Eshell%E4%BA%92%E7%9B%B8%E4%BC%A0%E5%80%BC%E7%9A%84%E5%87%A0%E7%A7%8D%E6%83%85%E5%86%B5/" title="sqlplus与shell互相传值的几种情况">sqlplus与shell互相传值的几种情况</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            情况一：在shell中最简单的调用sqlplus
+$cat test.sh #!/bin/sh sqlplus oracle/oracle@oracle&gt;file.log &lt; EMPNO EMPNAME SAL DEPTNO ----- ------------- ----- ------ 10002 Frank Naude 500 20 10001 Scott Tiger 1000 40 --省略若干系统提示信息-------  将执行过程重定向入文件file.log，可通过cat file.log查看
+情况二：直接将sqlplus的值赋值给shell变量
+$cat test.sh #!/bin/sh # 将sqlplus的结果输出给变量VALUE # set命令的使用可查询手册 #注意shell中等号两边不能有空格 VALUE=`sqlplus -S /nolog &lt;  显示结果正确，表test共2条记录
+情况三：间接将sqlplus的值赋值给shell变量
+$cat test.sh #!/bin/sh #利用COL column NEW_VALUE variable定义变量 #sqlplus执行完后最后返回值为v_coun #利用$?将最后返回值赋值给VALUE,也即为test的记录数 sqlplus -S /nolog &lt;  脚本执行结果中第一个2为sqlplus返回值，第二个2为VALUE的值
+情况四：将shell变量的值传给sqlplus使用
+$cat test.sh #!/bin/sh #sqlplus引用shell变量TABLENAME的值 #注意赋值时，等号两边不能有空格 TABLENAME=&quot;test&quot; sqlplus -S oracle/oracle@oracle &lt;  脚本执行结果为：select * from test；的结果……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sqlplus%E4%B8%8Eshell%E4%BA%92%E7%9B%B8%E4%BC%A0%E5%80%BC%E7%9A%84%E5%87%A0%E7%A7%8D%E6%83%85%E5%86%B5/">阅读全文</a></p>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sqlplus%E4%B8%8Eshell%E4%BA%A4%E4%BA%92%E7%9A%84%E4%B8%80%E4%BA%9B%E6%8A%80%E5%B7%A7/" title="sqlplus与shell交互的一些技巧">sqlplus与shell交互的一些技巧</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            sqlplus 与shell交互的一些技巧
+linux 下 输入sqlplus 用户名/密码@实例名
+&lt; 可以与shell进行交互，从而不适用@符号去调用sql文件
+例如
+sqlplus / as sysdba &lt;
+startup mount ; alter database open; !  如上命令可以直接在linux下的命令行中输入，从而不进入sqlplus
+windows 下 输入使cmd的变量成为sqlplus 的输入参数可以像如下写
+sqlplus system/tiger@orcl @文件名 参数1 参数2 参数…n
+在.sql文件中 用 &amp;1 代表参数1
+&amp;2 代表参数2
+&amp;3 代表参数3
+&amp;n 代表参数…n 以此类推……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sqlplus%E4%B8%8Eshell%E4%BA%A4%E4%BA%92%E7%9A%84%E4%B8%80%E4%BA%9B%E6%8A%80%E5%B7%A7/">阅读全文</a></p>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sqlplus%E8%BE%93%E5%87%BA%E5%8F%98%E9%87%8F%E5%88%B0shell/" title="sqlplus输出变量到shell">sqlplus输出变量到shell</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sqlplus%E8%BE%93%E5%87%BA%E5%8F%98%E9%87%8F%E5%88%B0shell/">阅读全文</a></p>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sqlplus%E9%87%8C%E5%A6%82%E4%BD%95%E8%B0%83%E7%94%A8shell%E8%84%9A%E6%9C%AC%E5%BE%85%E6%95%B4%E7%90%86/" title="Sqlplus里如何调用Shell脚本待整理">Sqlplus里如何调用Shell脚本待整理</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            自己封装的一个shell脚本，关键是如何调用呢？求助！
+#!/bin/sh function createOracleInstance(){ tableSpace=$1 tempTableSpace=${tableSpace}&quot;_temp&quot; dataTableSpace=${tableSpace}&quot;_data&quot; user=$2 pwd=$3 #临时表空间 create temporary tablespace ${tempTableSpace} tempfile '/u01/datas/${tempTableSpace}.dbf' size 50m autoextend on next 50m maxsize 20480m extent management local; #创建数据表空间 create tablespace ${dataTableSpace} logging datafile '/u01/datas/${dataTableSpace}.dbf' size 50m autoextend on next 50m maxsize 20480m extent management local; #创建用户 create user ${user} identified by &quot;${pwd}&quot; default tablespace ${dataTableSpace} temporary tablespace ${tempTableSpace} profile DEFAULT; grant connect to ${user}; grant dba to ${user}; grant exp_full_database to ${user}; grant imp_full_database to ${user}; grant resource to ${user}; grant unlimited tablespace to ${user}; echo &quot;临时表空间名为${tempTableSpace},数据表空间为 ${dataTableSpace},用户名：${user},密码：${pwd}&quot; } sqlplus / as sysdba createOracleInstance $1 $2 $3  因为有sqlplus / as sysdba等命令，后面调用语句被中断了，是不是有新窗口进入导致的，如果去掉sqlplus / as sysdba，手工执行该命令后进入sql命令行，又该如何调用Shell脚本呢？……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sqlplus%E9%87%8C%E5%A6%82%E4%BD%95%E8%B0%83%E7%94%A8shell%E8%84%9A%E6%9C%AC%E5%BE%85%E6%95%B4%E7%90%86/">阅读全文</a></p>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sqlserverlinux%E7%89%88%E5%AF%B9%E6%88%91%E7%9A%84%E7%9A%84%E6%84%8F%E4%B9%89%E5%A4%87%E4%BB%BD%E8%84%9A%E6%9C%AC%E5%8F%AF%E4%BB%A5%E7%94%A8shell%E5%86%99%E4%BA%86/" title="sqlserverlinux版对我的的意义备份脚本可以用shell写了">sqlserverlinux版对我的的意义备份脚本可以用shell写了</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sqlserverlinux%E7%89%88%E5%AF%B9%E6%88%91%E7%9A%84%E7%9A%84%E6%84%8F%E4%B9%89%E5%A4%87%E4%BB%BD%E8%84%9A%E6%9C%AC%E5%8F%AF%E4%BB%A5%E7%94%A8shell%E5%86%99%E4%BA%86/">阅读全文</a></p>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sqlserver%E8%87%AA%E5%8A%A8%E5%8C%96%E8%BF%90%E7%BB%B4%E7%B3%BB%E5%88%97%E6%89%B9%E9%87%8F%E6%89%A7%E8%A1%8Csql%E8%84%9A%E6%9C%ACpowershell/" title="SQLServer自动化运维系列批量执行SQL脚本PowerShell">SQLServer自动化运维系列批量执行SQL脚本PowerShell</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sqlserver%E8%87%AA%E5%8A%A8%E5%8C%96%E8%BF%90%E7%BB%B4%E7%B3%BB%E5%88%97%E6%89%B9%E9%87%8F%E6%89%A7%E8%A1%8Csql%E8%84%9A%E6%9C%ACpowershell/">阅读全文</a></p>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sqltomongoshelltoc/" title="SQLtoMongoShelltoC">SQLtoMongoShelltoC</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sqltomongoshelltoc/">阅读全文</a></p>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/sql%E4%BA%8C%E9%98%B6%E6%B3%A8%E5%85%A5%E5%86%99shell%E9%97%AE%E9%A2%98joomla382%E6%BC%8F%E6%B4%9E%E4%B8%BA%E4%BE%8B/" title="SQL二阶注入写shell问题Joomla382漏洞为例">SQL二阶注入写shell问题Joomla382漏洞为例</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            开始前的例行叨叨： 参考大佬文章 http://www.sohu.com/a/223945381_354899
+发现仅到报错注入一步就没了下文，记录一下最终写马的姿势。
+复现过程： Joomla官网特别良心，各种历史版本随便下载
+由于复现CVE-2018-6376漏洞，所以下载了3.8.2版本，一路安装好。
+由于注入点在用户后台，改资料时，复现必须允许用户注册，而且能进自己后台。
+所以网站建好先用admin账户进后台/administrator/，左边User面板，右上角options设置一下。
+设置如下：
+
+按我的调整，
+第一项是允许注册新用户；
+第二项设新用户到Manager组中，好进后台。
+之后New User Account Activation选成了None也就是注册后，不需要邮箱和管理员验证。
+记得点左上角的Save保存。
+如果不设置这些，会没有会员注册，而且注册的时候通过不了。
+设置完再去主页注册用户test1，可能报错，但可以尝试登陆成功。
+用test1用户进入后台/administrator/
+在右上角找到编辑个人信息
+
+直接save的时候burp抓包。
+注入点在这行：
+
+在admin_style]后加[0]往其第一个数组中写入一个单引号&rsquo;
+
+提交后，刷新/administrator/index.php页面
+而不是跟着303跳转。
+在主页即可发现报错结果，把单引号处改为payload：
+extractvalue(0x0a,concat(0x0a,(select user())))
+即可发现，报错回显了数据库root账户
+漏洞成因 一直没分析源码漏洞是如何导致的，因为不是本次重点，放个图吧。
+
+可以看出来47行形成sql语句的时候，直接把$adminstyle[0]的值插入了语句。构成了where id = xxx 还是数字型不用补单引号
+如何GetShell？ 参考资料里大神用了sqlmap进行二阶注入
+把Burp的内容保存成txt读取进行注入，获取回显页面设为了/administrator/index.php
+sqlmap -r 1.txt –dbms MySQL –second-order “http://127.0.0.1/CMS/joomla/administrator/index.php” -D “joomla” –dbs
+但我们希望getshell就尝试往其中写小马。
+写小马的那些坑（敲重点！） 正常写小马姿势是 select &lsquo;xxx小马xxxx&rsquo; into outfile &lsquo;绝对路径&rsquo;
+但问题来了：
+【1】回显报错中写select &ldquo;xxxx&rdquo; into outfile &lsquo;C:/xxxx&rsquo;是不行的，必须直接执行。不能在extractvalue函数中写……
+        </div>
+        <p class="readmore"><a href="https://zaina.newban.cn/posts/sql%E4%BA%8C%E9%98%B6%E6%B3%A8%E5%85%A5%E5%86%99shell%E9%97%AE%E9%A2%98joomla382%E6%BC%8F%E6%B4%9E%E4%B8%BA%E4%BE%8B/">阅读全文</a></p>
+    </article>
+    
+    
+
+
+
+<ol class="page-navigator">
+    
+    <li class="prev">
+        <a href="https://zaina.newban.cn/page/1498/">上一页</a>
+    </li>
+    
+
+    
+
+    
+        
+        
+    
+    
+
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/">1</a>
+        </li>
+        
+    
+        
+        <li>
+            <span>...</span>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/page/1497/">1497</a>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/page/1498/">1498</a>
+        </li>
+        
+    
+        
+        
+        <li  class="current">
+            <a href="https://zaina.newban.cn/page/1499/">1499</a>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/page/1500/">1500</a>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/page/1501/">1501</a>
+        </li>
+        
+    
+        
+        <li>
+            <span>...</span>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/page/1960/">1960</a>
+        </li>
+        
+    
+
+    
+    
+
+    <li class="next">
+        <a href="https://zaina.newban.cn/page/1500/">下一页</a>
+    </li>
+    
+</ol>
+
+
+
+
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

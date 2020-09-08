@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>某文件处理shell脚本的优化经历 | 开发者问答集锦</title>
+    <meta property="og:title" content="某文件处理shell脚本的优化经历 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="某文件处理shell脚本的优化经历">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%9F%90%E6%96%87%E4%BB%B6%E5%A4%84%E7%90%86shell%E8%84%9A%E6%9C%AC%E7%9A%84%E4%BC%98%E5%8C%96%E7%BB%8F%E5%8E%86/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">某文件处理shell脚本的优化经历</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>本次修改了一个文件处理的shell脚本，功能是从数据库中读获取到一份文件清单，文件清单个格式是这样的：</p>
+
+<table>
+<thead>
+<tr>
+<th>第一列</th>
+<th>第二列以后</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>文件所在目录</td>
+<td>文件头信息</td>
+</tr>
+
+<tr>
+<td>文件所在目录</td>
+<td>文件清单</td>
+</tr>
+
+<tr>
+<td>文件所在目录</td>
+<td>文件清单</td>
+</tr>
+
+<tr>
+<td>文件所在目录</td>
+<td>文件清单</td>
+</tr>
+
+<tr>
+<td>文件所在目录</td>
+<td>文件清单</td>
+</tr>
+
+<tr>
+<td>……</td>
+<td>……</td>
+</tr>
+
+<tr>
+<td>文件所在目录</td>
+<td>文件头信息</td>
+</tr>
+
+<tr>
+<td>文件所在目录</td>
+<td>文件清单</td>
+</tr>
+
+<tr>
+<td>文件所在目录</td>
+<td>文件清单</td>
+</tr>
+
+<tr>
+<td>文件所在目录</td>
+<td>文件清单</td>
+</tr>
+
+<tr>
+<td>文件所在目录</td>
+<td>文件清单</td>
+</tr>
+</tbody>
+</table>
+
+<p>整个清单实际上是由若干个清单段组成的，各个段的第一列信息（文件所在目录信息）是不同的，每个段的第一行是一些必要的文件头信息，其后是具体的文件清单。程序的目的是将各个分段拆分成数个清单文件，并按照正确的格式要求调整格式。<br />
+从程序上线后发现执行速度远远低于预期值，根据日志发现性能瓶颈位于数据库清单读取完，生成数据文件的地方，具体的代码如下：</p>
+
+<pre><code>ZONE2_NO=
+CUR_DIR=
+CUR_CHK_FILE_NAME=
+CHK_FILE_CONTENT=
+THE_DIR_LIST=
+OUTPUT_FILE=&quot;aaa-#ZONE2_NO#.zip&quot;
+dirlist=&quot;dirlist.lst&quot;
+
+while read LINE
+do
+    if [ &quot;$CUR_DIR&quot;x != &quot;$LINE_DIR&quot;x ]
+    then
+    CUR_DIR=${LINE_DIR}
+    THE_DIR_LIST=&quot;${THE_DIR_LIST} ${CUR_DIR}&quot;
+
+    #首行的逻辑和其他行不一样
+
+    CUR_CHK_FILE_NAME=`echo ${OUTPUT_FILE}|sed &quot;s/#ZONE2_NO#/${ZONE2_NO}/g&quot;|sed &quot;s/.zip/.CHK/g&quot;`
+    CUR_CHK_FILE_NAME=&quot;${CUR_DIR}/&quot;`basename ${CUR_CHK_FILE_NAME}`    #取拼接的CHK文件名
+    rm -f ${CUR_CHK_FILE_NAME}         
+    echo ${LINE} | awk '{printf &quot;%20s%50s%8s%3s%7d%168s\n&quot;, $2, $2, $3, $4, $5, &quot; &quot;}' &gt;&gt; ${CUR_CHK_FILE_NAME}
+    else
+        echo ${LINE} | awk '{printf &quot;%100s%12d%20d%14s%d%109s\n&quot;, $2, $3, $4, $5, 1, &quot; &quot;}' &gt;&gt; ${CUR_CHK_FILE_NAME}
+    fi
+done&lt;$dirlist
+</code></pre>
+
+<p>从逻辑上来看就是读取源数据文件dirlist，然后一行一行判断其是否是文件头，随后调用awk来进行格式调整，输出。<br />
+准备了一个14000行的源数据清单，共计6个段，用time计时得到的结果如下：</p>
+
+<p>real 2m35.54s<br />
+user 1m25.91s<br />
+sys 1m5.58s</p>
+
+<p>这个效率实在是不可接受，和同事讨论后，最初认为瓶颈是由于反复重定向输出到目标文件导致的，于是选择用一个变量在内存中维护数据，得到如下的修改结果：</p>
+
+<pre><code>ZONE2_NO=
+CUR_DIR=
+CUR_CHK_FILE_NAME=
+CHK_FILE_CONTENT=
+THE_DIR_LIST=
+OUTPUT_FILE=&quot;aaa-#ZONE2_NO#.zip&quot;
+
+dirlist=&quot;dirlist.lst&quot;
+
+while read LINE
+do
+    LINE_DIR=`echo $LINE | awk '{print $1}'`  
+    if [ &quot;$CUR_DIR&quot;x != &quot;$LINE_DIR&quot;x ]
+    then
+    if [ &quot;$CUR_CHK_FILE_NAME&quot;x != &quot;&quot;x ]
+        then
+            echo ${CHK_FILE_CONTENT} &gt;&gt; ${CUR_CHK_FILE_NAME}
+    fi
+
+    CUR_DIR=${LINE_DIR}
+    THE_DIR_LIST=&quot;${THE_DIR_LIST} ${CUR_DIR}&quot;
+
+    CUR_CHK_FILE_NAME=`echo ${OUTPUT_FILE}|sed &quot;s/#ZONE2_NO#/${ZONE2_NO}/g&quot;|sed &quot;s/.zip/.CHK/g&quot;`
+    CUR_CHK_FILE_NAME=&quot;${CUR_DIR}/&quot;`basename ${CUR_CHK_FILE_NAME}`    #取拼接的CHK文件名
+    rm -f ${CUR_CHK_FILE_NAME}         
+    CHK_FILE_CONTENT=&quot;${LINE}&quot;
+    else
+        CHK_FILE_CONTENT=&quot;${CHK_FILE_CONTENT}${LINE}&quot;
+    fi
+done&lt;$dirlist
+
+if [ &quot;$CUR_CHK_FILE_NAME&quot;x != &quot;&quot;x ]
+then
+    echo ${CHK_FILE_CONTENT} &gt;&gt; ${CUR_CHK_FILE_NAME}
+fi
+</code></pre>
+
+<p>即将原先的AWK输出换成直接拼接（格式调整由数据库端完成）。然而使用同一组数据，运行后所得的结果更差：<br />
+real 11m39.27s<br />
+user 6m2.13s<br />
+sys 5m32.63s</p>
+
+<p>即使去掉写入文件的消耗后处理的时间仍然高达6~7分钟，尅见使用A=$A”data”这样都简单的变量累加的方式不但没有提高效率，反而加重了系统的负担。</p>
+
+<p>由于C++程序写多了，在编写shell脚本的过程中产生了每执行一句语句的代价都是很小的印象。但对于shell脚本而言，其实每个命令，甚至用管道隔开的两个命令都应该理解成启动一个独立的进程进行处理，代价是很高昂的。<br />
+在这个实例中，while后的read，后面的echo，awk都等于是启动一个进程，有多少行源数据就要启动多少个进程，1W多的数据行，就会导致系统在执行脚本的过程中不得不运行数万个进程，给CPU带来了很大的负担。</p>
+
+<p>实际上由于每段文本的数据头都有一个“业务日期”数据项，且和前后的数据项用空格隔开，我们可以很方便地从dirlist中提取到所有的数据头</p>
+
+<pre><code>BIZ_DATE=&quot;20150713 &quot;
+grep &quot;${BIZ_DATE} &quot; ${dirlist} &gt; ${file_head}
+</code></pre>
+
+<p>然后以文件头为循环项，再次使用grep对“文件所在目录”进行过滤，得到分隔号的每个文件段。</p>
+
+<pre><code>grep ${LINE_DIR} ${dirlist} &gt;${tmp_file}
+</code></pre>
+
+<p>最后调用awk对格式进行调整</p>
+
+<pre><code>    awk '
+    {if (NR==1)
+    {
+        {printf &quot;%20s%50s%8s%3s%7d%168s\n&quot;, $2, $2, $3, $4, $5, &quot; &quot;}
+    }
+    else
+    {
+        {printf &quot;%100s%12d%20d%14s%d%109s\n&quot;, $2, $3, $4, $5, 1, &quot; &quot;}
+    }}' ${tmp_file} &gt; ${CUR_CHK_FILE_NAME}
+</code></pre>
+
+<p>所得的最终程序如下：</p>
+
+<pre><code>dirlist=&quot;dirlist.lst&quot;
+file_head=&quot;file_head.lst&quot;
+BIZ_DATE=&quot;20150713 &quot;
+grep &quot;${BIZ_DATE} &quot; ${dirlist} &gt; ${file_head}
+tmp_file=&quot;tmp_file.lst&quot;
+
+ZONE2_NO=
+CUR_DIR=
+CUR_CHK_FILE_NAME=
+CHK_FILE_CONTENT=
+THE_DIR_LIST=
+OUTPUT_FILE=&quot;aaa-#ZONE2_NO#.zip&quot;
+
+while read LINE
+do
+    LINE_DIR=`echo $LINE | awk '{print $1}'`
+    CUR_DIR=${LINE_DIR}
+    THE_DIR_LIST=&quot;${THE_DIR_LIST} ${CUR_DIR}&quot;
+    ZONE2_NO=`echo ${CUR_DIR}|awk -F'/' '{print $8}'`
+    CUR_CHK_FILE_NAME=`echo ${OUTPUT_FILE}|sed &quot;s/#ZONE2_NO#/${ZONE2_NO}/g&quot;|sed &quot;s/.zip/.CHK/g&quot;`
+    CUR_CHK_FILE_NAME=&quot;${CUR_DIR}/&quot;`basename ${CUR_CHK_FILE_NAME}`    #取拼接的CHK文件名
+    rm -f ${CUR_CHK_FILE_NAME}         
+    grep ${LINE_DIR} ${dirlist} &gt;${tmp_file}
+    awk '
+    {if (NR==1)
+    {
+        {printf &quot;%20s%50s%8s%3s%7d%168s\n&quot;, $2, $2, $3, $4, $5, &quot; &quot;}
+    }
+    else
+    {
+        {printf &quot;%100s%12d%20d%14s%d%109s\n&quot;, $2, $3, $4, $5, 1, &quot; &quot;}
+    }}' ${tmp_file} &gt; ${CUR_CHK_FILE_NAME}
+done&lt;$file_head
+</code></pre>
+
+<p>使用同一组数据，运行后所得的结果是这样的：<br />
+real 0m0.63s<br />
+user 0m0.18s<br />
+sys 0m0.12s<br />
+即使在其后面对百万级的数据规模，运行速度仍然维持在数秒内，运行效率得到了很大的提升。</p>
+
+<p>经验：<br />
+1.
+编写shell脚本和普通程序语言不同，除去shell内置命令外，其余在shell中出现的每个都是命令都是独立的程序，都会调起一个进程。因此shell脚本语句总数要尽可能精简。熟练掌握awk和sed工具会有较大帮助。<br />
+2. 进行性能优化的过程中不能想当然，一定要参照实际运行结果来进行改造。</p>
+
+<p>剩下的疑问：<br />
+1. shell的=好像是一个语句（我们这里用的是ksh），诸如CHK_FILE_CONTENT=” CHKFILECONTENT
+{LINE}”的操作代价并不低。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

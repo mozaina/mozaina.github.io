@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>在Unity3D中运行外部shell脚本的方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="在Unity3D中运行外部shell脚本的方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="在Unity3D中运行外部shell脚本的方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%9C%A8unity3d%E4%B8%AD%E8%BF%90%E8%A1%8C%E5%A4%96%E9%83%A8shell%E8%84%9A%E6%9C%AC%E7%9A%84%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">在Unity3D中运行外部shell脚本的方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h4 id="有时候项目里需要执行一些shell脚本-来完成诸如文件移动-命令行打包-自己转换文件">有时候项目里需要执行一些shell脚本，来完成诸如文件移动，命令行打包，自己转换文件</h4>
+
+<h4 id="格式什么的工作-省去一些手工劳动-然后这时候就需要用shell了">格式什么的工作，省去一些手工劳动，然后这时候就需要用shell了。</h4>
+
+<h4 id="网上也有一些关于调用方法的文章-这里就说一下我自己尝试时遇到的问题">网上也有一些关于调用方法的文章，这里就说一下我自己尝试时遇到的问题。。。</h4>
+
+<hr />
+
+<p>讲到c#里操作进程的方法，那肯定就是<code>System.Diagnostics.Process</code>这个类没跑了</p>
+
+<p>代码如下：</p>
+
+<pre><code>using UnityEngine;
+using UnityEditor;
+using System.Diagnostics;
+using System.Threading;
+using System.IO;
+
+public class TestRunShell : ScriptableObject
+{
+    [MenuItem(&quot;Menu/RunShell&quot;)]
+    public static void RunShell()
+    {
+        // 这里不开线程的话，就会阻塞住unity的主线程，当然如果你需要阻塞的效果的话可以不开
+        Thread newThread = new Thread(new ThreadStart(RunShellThreadStart));
+        newThread.Start();
+    }
+
+    private static void RunShellThreadStart()
+    {
+        string cmdTxt = @&quot;echo test
+notepad C:\Users\pc\Desktop\1.txt
+explorer.exe D:\
+pause&quot;;
+
+        RunCommand(cmdTxt);
+        //RunProcessCommand(&quot;notepad&quot;, @&quot;C:\Users\pc\Desktop\1.txt&quot;);
+        //RunProcessCommand(&quot;explorer.exe&quot;, @&quot;D:\&quot;);
+    }
+
+    private static void RunCommand(string command)
+    {
+        Process process = new Process();
+        process.StartInfo.FileName = &quot;powershell&quot;;
+        process.StartInfo.Arguments = command;
+
+        process.StartInfo.CreateNoWindow = false; // 获取或设置指示是否在新窗口中启动该进程的值（不想弹出powershell窗口看执行过程的话，就=true）
+        process.StartInfo.ErrorDialog = true; // 该值指示不能启动进程时是否向用户显示错误对话框
+        process.StartInfo.UseShellExecute = false;
+        //process.StartInfo.RedirectStandardError = true;
+        //process.StartInfo.RedirectStandardInput = true;
+        //process.StartInfo.RedirectStandardOutput = true;
+
+        process.Start();
+
+        //process.StandardInput.WriteLine(@&quot;explorer.exe D:\&quot;);
+        //process.StandardInput.WriteLine(&quot;pause&quot;);
+
+        process.WaitForExit();
+        process.Close();
+    }
+
+    private static void RunProcessCommand(string command, string argument)
+    {
+        ProcessStartInfo start = new ProcessStartInfo();
+        start.FileName = command;
+        start.Arguments = argument;
+
+        start.CreateNoWindow = false;
+        start.ErrorDialog = true;
+        start.UseShellExecute = false;
+
+        Process p = Process.Start(start);
+        p.WaitForExit();
+        p.Close();
+    }
+}
+</code></pre>
+
+<hr />
+
+<p><strong>用<code>cmd.exe</code> 执行的问题</strong></p>
+
+<p>因为我是windows环境，且搜到的文章里都是</p>
+
+<pre><code>process.StartInfo.FileName = &quot;cmd.exe&quot;;
+</code></pre>
+
+<p>这样的写法，但是经过测试发现，在<code>cmd</code>里能够执行的命令，传不进<code>cmd.exe</code>里面去，怀疑是不是mono的事，.net下可能就传进去了，这里懒得深究了。。。<br />
+但是换成<code>powershell</code>就可以很顺利的传进去执行。</p>
+
+<p><strong>我手上没有mac的环境，但是感觉把<code>powershell</code>换成<code>bash</code>，应该就可以在mac上顺利的执行shell脚本了</strong></p>
+
+<hr />
+
+<p><strong><code>ProcessStartInfo</code>的<code>RedirectStandardError</code>，<code>RedirectStandardInput</code>，<code>RedirectStandardOutput</code>属性的设置问题</strong></p>
+
+<p>msdn上查的<code>UseShellExecute</code>的说明</p>
+
+<blockquote>
+<p>若要在启动进程时使用外壳程序，则为 true；否则，直接从可执行文件创建进程。默认为 true。</p>
+
+<p>将此属性设置为 false 使您能够重定向输入流、输出流和错误流。</p>
+</blockquote>
+
+<p>测试结果：</p>
+
+<p>①，<code>UseShellExecute = false</code>，3个重定向的设置为<code>true</code>时，打开的shell窗口中，我们就看不到<code>echo
+看我！</code>这样命令的输出结果了。</p>
+
+<p>②，<code>UseShellExecute = true</code>，他们3个也是<code>true</code>时，传入的shell脚本不能够运行。</p>
+
+<p>③，3个重定向的属性为<code>true</code>时，我们并不能用截取输入流的方式往里面传入参数<br />
+例如：</p>
+
+<pre><code>process.Start();
+process.StandardInput.WriteLine(@&quot;explorer.exe D:\&quot;);
+process.StandardInput.WriteLine(&quot;pause&quot;);
+process.WaitForExit();
+process.Close();
+</code></pre>
+
+<blockquote>
+<p>所以总结一下就是，那3个重定向属性还是保持默认值就好了，反正往输入流中写参数的方法也不管用，2333</p>
+
+<p>使用的时候，我们就可以先把自己写的<code>.bat</code>文件读成字符串，然后用上面的<code>RunCommand</code>执行整个bat脚本了。<br />
+ 还可以用<code>RunProcessCommand</code>方法去调用指定的<code>.exe</code>，并为其传递参数了（前提是它能接收参数）</p>
+</blockquote>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

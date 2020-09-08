@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell项目实战收集系统信息 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell项目实战收集系统信息 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell项目实战收集系统信息">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E9%A1%B9%E7%9B%AE%E5%AE%9E%E6%88%98%E6%94%B6%E9%9B%86%E7%B3%BB%E7%BB%9F%E4%BF%A1%E6%81%AF/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell项目实战收集系统信息</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="收集系统信息">收集系统信息</h1>
+
+<p>收集系统信息脚本目的：分析系统资源性能瓶颈<br />
+脚本功能</p>
+
+<ol>
+<li>查看CPU利用率与负载(top,vmstat,sar)</li>
+<li>查看磁盘、IO负载(df,iostat,iotop,dstat)</li>
+<li>查看内存利用率(free,vmstat)</li>
+<li>查看tcp连接状态(ss,netsta)</li>
+<li>查看CPU与内存占用最高的10个进程</li>
+<li>查看网络流量(ifconfig,iftop,iptraf)</li>
+<li>退出程序</li>
+</ol>
+
+<h2 id="1-cpu利用率">1.CPU利用率</h2>
+
+<p>我们通过vmstat命令</p>
+
+<pre><code>[klaus@localhost ~]$ man vmstat | grep -C6 'CPU'   
+   System
+       in: The number of interrupts per second, including the clock.
+       cs: The number of context switches per second.
+
+   CPU
+       These are percentages of total CPU time.
+       us: Time spent running non-kernel code. (user time, including nice time)
+       sy: Time spent running kernel code. (system time)
+       id: Time spent idle. Prior to Linux 2.5.41, this includes IO-wait time.
+       wa: Time spent waiting for IO. Prior to Linux 2.5.41, included in idle.
+       st: Time stolen from a virtual machine. Prior to Linux 2.6.11, unknown.
+</code></pre>
+
+<p>根据上面内容就可以完成功能</p>
+
+<pre><code>get_cpu_infor(){
+    local i=1
+    echo &quot;-----------------------------------------------------------&quot;
+    while [[ $i -le 3 ]];do
+        echo -e &quot;\033[32m# Reference ${i}\033[0m&quot;
+        systime=`vmstat | awk '{if (NR==3) print $14&quot;%&quot;}'`
+        used_time=`vmstat | awk '{if (NR==3) print 100-$15&quot;%&quot;}'`
+        IO_wait=`vmstat | awk '{if (NR==3) print $16&quot;%&quot;}'`
+        echo &quot;Time spent running kernel code:$systime&quot;
+        echo &quot;Time spent used:$used_time,Time spent waiting for IO:$IO_wait&quot;
+        sleep 2
+        let i++
+    done
+    echo &quot;-----------------------------------------------------------&quot;
+}
+</code></pre>
+
+<h2 id="2-磁盘负载">2.磁盘负载</h2>
+
+<p>同样，我们看看iostat命令，再通过man iostat查看对照信息</p>
+
+<pre><code>[klaus@localhost ~]$ iostat -x -k
+Linux 2.6.32-754.3.5.el6.x86_64 (localhost.localdomain)         02/11/2020      _x86_64_ (1 CPU)
+
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           0.40    0.00    0.46    0.01    0.00   99.14
+
+
+Device:         rrqm/s   wrqm/s     r/s     w/s    rkB/s    wkB/s avgrq-sz avgqu-sz   await r_await w_await  svctm  %util
+sda               0.12     1.14    0.29    0.59     4.41     6.94    25.80     0.00    0.90    0.46    1.12   0.52   0.05
+</code></pre>
+
+<p>根据上面的解读，可以完成磁盘负载</p>
+
+<pre><code>get_disk_load(){
+    local i=1
+    while [[ $i -le 3 ]];do
+        echo -e &quot;\033[32m# DISK Partition Reference ${i}\033[0m&quot;
+        IO_util=`iostat -x -k | awk '/^[v|s]/{OFS=&quot;: &quot;;print $1,$NF&quot;%&quot;}'`
+        IO_read=`iostat -x -k | awk '/^[v|s]/{OFS=&quot;: &quot;;print $1,$6&quot;KB&quot;}'`
+        IO_write=`iostat -x -k | awk '/^[v|s]/{OFS=&quot;: &quot;;print $1,$7&quot;KB&quot;}'`
+        IO_wait=`vmstat | awk '{if(NR==3) print $16&quot;%&quot;}'`
+        echo -e &quot;bandwidth utilization for the device:${IO_util}&quot;
+        echo -e &quot;Time spent waiting for IO:${IO_wait}&quot;
+        echo -e &quot;Read/s:$IO_read,Write/s:$IO_write&quot;
+        i=$((i+1))
+        sleep 2
+    done
+    echo &quot;-----------------------------------------------------------&quot;
+}
+</code></pre>
+
+<h2 id="3-磁盘分区">3.磁盘分区</h2>
+
+<p>磁盘分区主要用的是iostat，实现细节如下，其中disk_use.log为日志文件</p>
+
+<pre><code>get_disk_part(){
+    DISK_log=/tmp/disk_use.log
+    DISK_total=`sudo fdisk -l|awk '/^Disk.*bytes/ &amp;&amp; /dev/{print $2 $3&quot;GB&quot;}'`
+    DISK_userate=`df -h | awk '/^\/dev/{print int($5)}'`
+    local DISK_Threshold=50
+    if [ -n `cat $DISK_log` ];then
+        rm -rf $DISK_log
+    fi
+    touch $DISK_log
+    for i in $DISK_userate;do
+        if [ $i -gt $DISK_Threshold ];then
+            PART=`df -h |awk '{if(int($5)=='''$i''') print $6}'`
+            echo &quot;$PART=${i}%&quot;&gt;&gt;$DISK_log
+        fi
+    done
+    echo -e &quot;DISK total:${DISK_total}&quot;
+    if [ -f $DISK_log ];then
+        echo &quot;Warning, disk usage exceeds threshold $DISK_Threshold%!&quot;
+        cat $DISK_log
+    fi
+}
+</code></pre>
+
+<h2 id="4-内存使用情况">4.内存使用情况</h2>
+
+<p>内存使用情况具体通过free -m命令，实现细节如下</p>
+
+<pre><code>get_mem_use(){
+    echo &quot;-----------------------------------&quot;
+    MEM_TOTAl=`free -m|awk '{if(NR==2)printf &quot;%.2f&quot;,$2/1024}END{print&quot;G&quot;}'`
+    MEM_USED=`free -m|awk '{if(NR==2)printf &quot;%.2f&quot;,$3/1024}END{print&quot;G&quot;}'`
+    MEM_FREE=`free -m|awk '{if(NR==2)printf &quot;%.2f&quot;,$4/1024}END{print&quot;G&quot;}'`
+    MEM_CACHE=`free -m|awk '{if(NR==2)printf &quot;%.2f&quot;,$NF/1024}END{print&quot;G&quot;}'`
+    echo -e &quot;Total_memory:$MEM_TOTAl&quot;
+    echo -e &quot;Used:$MEM_USED;Free_memory:$MEM_FREE and Cache:$MEM_CACHE&quot;
+}
+</code></pre>
+
+<h2 id="5-tcp连接状态">5.tcp连接状态</h2>
+
+<p>使用netsta或者ss都可以，具体实现细节如下</p>
+
+<pre><code>get_tcp_state(){
+    echo &quot;-----------------------------------&quot;
+    COUNT=`ss -ant|awk '!/state/{status[$1]++}END{for(i in status)print i,status[i]}'`
+    echo -e &quot;TCP Connection status:\n$COUNT&quot;
+    echo &quot;-----------------------------------&quot;
+}
+</code></pre>
+
+<h2 id="6-cpu或者内存top10">6.CPU或者内存TOP10</h2>
+
+<p>查看前10的CPU或者内存使用的命令具体用ps aux就可以了</p>
+
+<pre><code>get_cpu_top10(){
+    echo &quot;-----------------CPU Top10 List-----------------&quot;
+    CPU_LOG=/tmp/cpu_top.log
+    local i=1
+    while [[ $i -le 3 ]];do
+        ps aux | awk '{if($3&gt;=0.1) print &quot;PID:&quot;$2&quot; CPU:&quot;$3&quot;% --&gt;&quot; $11}'|sort -k3 -nr |head -10 &gt;$CPU_LOG
+        if [[ -n `cat $CPU_LOG` ]];then
+            echo -e &quot;\033[32m# CPU TOP10 Reference ${i}\033[0m&quot;&quot;]]&quot;
+            cat $CPU_LOG
+        else
+            echo &quot;No process using the CPU&quot;
+            break
+        fi
+        let i++
+        sleep 2
+    done
+
+    echo &quot;------------------------------------------------&quot;
+}
+get_mem_top10(){
+    echo &quot;-----------------MeM Top10 List-----------------&quot;
+    MEM_LOG=/tmp/mem_top.log
+    local i=1
+    while [[ $i -le 3  ]];do
+        ps aux | awk '{if($4&gt;=0.1) print &quot;PID:&quot;$2&quot; MEM:&quot;$4&quot;% --&gt;&quot; $11}'|sort -k4 -nr |head -10 &gt;$MEM_LOG
+        if [[ -n `cat $MEM_LOG`  ]];then
+            echo -e &quot;\033[32m# MEM TOP10 Reference ${i}\033[0m&quot;&quot;]]&quot;
+            cat $MEM_LOG
+        else
+            echo &quot;No process using the MEMORY&quot;
+            break
+        fi
+        let i++
+        sleep 2
+    done
+    echo &quot;------------------------------------------------&quot;
+}
+</code></pre>
+
+<h2 id="7-网络流量统计">7.网络流量统计</h2>
+
+<p>网络流量统计这里需要针对某张单一网卡，使用的具体命令为ifconfig</p>
+
+<pre><code>get_network_traf(){
+    while true;do
+        read -p &quot;Please enter the network card name(eth[0-9] or em[0-9]):&quot; eth
+        if [ `ifconfig | grep -c &quot;\&lt;$eth\&gt;&quot;` -eq 1 ];then
+            break
+        else
+            echo &quot;Incorrect name entered, the network card could not be found!&quot;
+        fi
+    done
+    echo &quot;------------------------------------------------&quot;
+    local i=1
+    while [[ $i -le 3 ]];do
+        OLD_RX=`ifconfig eth0 |awk -F'[: ]+' '/bytes/{if(NR==8)print $4;else if(NR==5)print $6}'`
+        OLD_TX=`ifconfig eth0 |awk -F'[: ]+' '/bytes/{if(NR==8)print $9;else if(NR==5)print $6}'`
+        sleep 1
+        NEW_RX=`ifconfig eth0 |awk -F'[: ]+' '/bytes/{if(NR==8)print $4;else if(NR==5)print $6}'`
+        NEW_TX=`ifconfig eth0 |awk -F'[: ]+' '/bytes/{if(NR==8)print $9;else if(NR==5)print $6}'`
+        RX=`awk 'BEGIN{printf &quot;%.8f\n&quot;,'$(($NEW_RX-$OLD_RX))'/1024/128}'`
+        TX=`awk 'BEGIN{printf &quot;%.8f\n&quot;,'$(($NEW_TX-$OLD_TX))'/1024/128}'`
+
+        echo &quot;RX:${RX} MB/s TX:${TX} MB/s&quot;
+        let i++
+        sleep 1
+    done
+}
+</code></pre>
+
+<p>8.实现效果</p>
+
+<pre><code>[klaus@localhost project]$ ./sys_info.sh
+Non-root login for current user!
+[sudo] password for klaus:
+1) CPU/Disk_load    3) TCP_status       5) Network_traffic
+2) Disk/Mem_use     4) CPU/Mem_top10    6) quit
+Please input your choice[6 for quit]:1
+-----------------------------------------------------------
+# CPU Reference 1
+Time spent running kernel code:0%
+Time spent used:1%,Time spent waiting for IO:0%
+# CPU Reference 2
+Time spent running kernel code:0%
+Time spent used:1%,Time spent waiting for IO:0%
+# CPU Reference 3
+Time spent running kernel code:0%
+Time spent used:1%,Time spent waiting for IO:0%
+-----------------------------------------------------------
+# DISK Partition Reference 1
+bandwidth utilization for the device:sda: 0.04%
+Time spent waiting for IO:0%
+Read/s:sda: 4.05KB,Write/s:sda: 6.83KB
+# DISK Partition Reference 2
+bandwidth utilization for the device:sda: 0.04%
+Time spent waiting for IO:0%
+Read/s:sda: 4.05KB,Write/s:sda: 6.83KB
+# DISK Partition Reference 3
+bandwidth utilization for the device:sda: 0.04%
+Time spent waiting for IO:0%
+Read/s:sda: 4.05KB,Write/s:sda: 6.83KB
+-----------------------------------------------------------
+Please input your choice[6 for quit]:2
+DISK total:/dev/sda:21.5GB
+Warning, disk usage exceeds threshold 50%!
+/=51%
+-----------------------------------
+Total_memory:0.96G
+Used:0.75G;Free_memory:0.21G and Cache:0.27G
+Please input your choice[6 for quit]:3
+-----------------------------------
+TCP Connection status:
+ESTAB 5
+State 1
+LISTEN 6
+-----------------------------------
+Please input your choice[6 for quit]:4
+-----------------CPU Top10 List-----------------
+# CPU TOP10 Reference 1]]
+PID:93642 CPU:10.0% --&gt;ps
+PID:7 CPU:0.1% --&gt;[events/0]
+PID:2858 CPU:0.1% --&gt;/usr/lib/vmware-tools/sbin64/vmtoolsd
+PID:1501 CPU:0.1% --&gt;/usr/sbin/vmtoolsd
+# CPU TOP10 Reference 2]]
+PID:93649 CPU:1.0% --&gt;ps
+PID:7 CPU:0.1% --&gt;[events/0]
+PID:2858 CPU:0.1% --&gt;/usr/lib/vmware-tools/sbin64/vmtoolsd
+PID:1501 CPU:0.1% --&gt;/usr/sbin/vmtoolsd
+# CPU TOP10 Reference 3]]
+PID:7 CPU:0.1% --&gt;[events/0]
+PID:2858 CPU:0.1% --&gt;/usr/lib/vmware-tools/sbin64/vmtoolsd
+PID:1501 CPU:0.1% --&gt;/usr/sbin/vmtoolsd
+------------------------------------------------
+-----------------MeM Top10 List-----------------
+# MEM TOP10 Reference 1]]
+PID:93670 MEM:0.1% --&gt;awk
+PID:93669 MEM:0.1% --&gt;ps
+PID:93504 MEM:0.1% --&gt;/bin/bash
+PID:93206 MEM:1.7% --&gt;vim
+PID:92323 MEM:0.1% --&gt;-bash
+PID:92322 MEM:0.1% --&gt;sshd:
+PID:92318 MEM:0.4% --&gt;sshd:
+PID:92246 MEM:0.1% --&gt;-bash
+PID:92245 MEM:0.1% --&gt;sshd:
+PID:92241 MEM:0.4% --&gt;sshd:
+# MEM TOP10 Reference 2]]
+PID:93677 MEM:0.1% --&gt;awk
+PID:93676 MEM:0.1% --&gt;ps
+PID:93504 MEM:0.1% --&gt;/bin/bash
+PID:93206 MEM:1.7% --&gt;vim
+PID:92323 MEM:0.1% --&gt;-bash
+PID:92322 MEM:0.1% --&gt;sshd:
+PID:92318 MEM:0.4% --&gt;sshd:
+PID:92246 MEM:0.1% --&gt;-bash
+PID:92245 MEM:0.1% --&gt;sshd:
+PID:92241 MEM:0.4% --&gt;sshd:
+# MEM TOP10 Reference 3]]
+PID:93684 MEM:0.1% --&gt;awk
+PID:93683 MEM:0.1% --&gt;ps
+PID:93504 MEM:0.1% --&gt;/bin/bash
+PID:93206 MEM:1.7% --&gt;vim
+PID:92323 MEM:0.1% --&gt;-bash
+PID:92322 MEM:0.1% --&gt;sshd:
+PID:92318 MEM:0.4% --&gt;sshd:
+PID:92246 MEM:0.1% --&gt;-bash
+PID:92245 MEM:0.1% --&gt;sshd:
+PID:92241 MEM:0.4% --&gt;sshd:
+------------------------------------------------
+Please input your choice[6 for quit]:5
+Please enter the network card name(eth[0-9] or em[0-9]):eth0
+------------------------------------------------
+RX:0.00000000 MB/s TX:0.00000000 MB/s
+RX:0.00000000 MB/s TX:0.00000000 MB/s
+RX:0.00000000 MB/s TX:0.00000000 MB/s
+Please input your choice[6 for quit]:6
+[klaus@localhost project]$
+</code></pre>
+
+<p>具体的完整代码在这里，大家也可以参考学习一下，主要是shell的一些用法</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

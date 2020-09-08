@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>CentOS下编写shell脚本来监控MySQL主从复制的教程MySQL | 开发者问答集锦</title>
+    <meta property="og:title" content="CentOS下编写shell脚本来监控MySQL主从复制的教程MySQL - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="CentOS下编写shell脚本来监控MySQL主从复制的教程MySQL">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/centos%E4%B8%8B%E7%BC%96%E5%86%99shell%E8%84%9A%E6%9C%AC%E6%9D%A5%E7%9B%91%E6%8E%A7mysql%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6%E7%9A%84%E6%95%99%E7%A8%8Bmysql/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">CentOS下编写shell脚本来监控MySQL主从复制的教程MySQL</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>目的：定时监控MySQL主从数据库是否同步，如果不同步，记录故障时间，并执行命令使主从恢复同步状态</p>
+
+<p>1、创建脚本文件</p>
+
+<p>1</p>
+
+<p>|</p>
+
+<p><code>vi</code> <code>/home/crontab/check_mysql_slave</code> <code>.sh</code> <code>#编辑，添加下面代码</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+
+<p>22</p>
+
+<p>23</p>
+
+<p>24</p>
+
+<p>25</p>
+
+<p>26</p>
+
+<p>27</p>
+
+<p>28</p>
+
+<p>29</p>
+
+<p>30</p>
+
+<p>31</p>
+
+<p>32</p>
+
+<p>33</p>
+
+<p>34</p>
+
+<p>35</p>
+
+<p>36</p>
+
+<p>37</p>
+
+<p>38</p>
+
+<p>39</p>
+
+<p>40</p>
+
+<p>41</p>
+
+<p>42</p>
+
+<p>43</p>
+
+<p>44</p>
+
+<p>|</p>
+
+<p><code>#!/bin/sh</code></p>
+
+<p><code># check_mysql_slave status</code></p>
+
+<p><code>ip=eth0 #网卡名称</code></p>
+
+<p><code>mysql_binfile=/usr/local/mysql/bin/mysql</code></p>
+
+<p><code>mysql_user=root #MySQL数据库账号</code></p>
+
+<p><code>mysql_pass=123456 #密码</code></p>
+
+<p><code>mysql_sockfile=/tmp/mysql.sock</code></p>
+
+<p><code>datetime=</code>date +&ldquo;%Y-%m-%d/%H:%M:%S&rdquo;<code>#获取当前时间</code></p>
+
+<p><code>mysql_slave_logfile=/home/logs/check_mysql_slave.log #日志文件路径，必须提前创建好</code></p>
+
+<p><code>slave_ip=</code>ifconfig $ip|grep &ldquo;inet addr&rdquo; | awk -F[:&rdquo; &ldquo;]+ &lsquo;{print $4}&rsquo;``</p>
+
+<p><code>status=$($mysql_binfile -u$mysql_user -p$mysql_pass -S</code></p>
+
+<p><code>$mysql_sockfile -e &quot;show slave status\G&quot; | grep -i &quot;running&quot;)</code></p>
+
+<p><code>Slave_IO_Running=</code>echo $status | grep Slave_IO_Running | awk &lsquo; {print $2}&rsquo;``</p>
+
+<p><code>Slave_SQL_Running=</code>echo $status | grep Slave_SQL_Running | awk &lsquo;{print $2}&rsquo;``</p>
+
+<p><code>if [ &quot;$Slave_IO_Running&quot; = &quot;Yes&quot; -a &quot;$Slave_SQL_Running&quot; = &quot;Yes&quot; ]</code></p>
+
+<p><code>then echo &quot;Slave is Running!&quot;</code></p>
+
+<p><code>else</code></p>
+
+<p><code>echo &quot; $datetime $slave_ip Slave is not running!&quot; &gt;&gt; $mysql_slave_logfile</code></p>
+
+<p><code>$mysql_binfile -u$mysql_user -p$mysql_pass -S $mysql_sockfile -e &quot;SLAVE
+STOP;&quot;</code></p>
+
+<p><code>$mysql_binfile -u$mysql_user -p$mysql_pass -S $mysql_sockfile -e &quot;SET GLOBAL
+SQL_SLAVE_SKIP_COUNTER=1;&quot;</code></p>
+
+<p><code>$mysql_binfile -u$mysql_user -p$mysql_pass -S $mysql_sockfile -e &quot;SLAVE
+START;&quot;</code></p>
+
+<p><code>$mysql_binfile -u$mysql_user -p$mysql_pass -S $mysql_sockfile -e &quot;EXIT&quot;</code></p>
+
+<p><code>fi</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>|</p>
+
+<p><code>:wq!</code> <code>#保存退出</code></p>
+
+<p><code>chmod</code> <code>+x</code> <code>/home/crontab/check_mysql_slave</code> <code>.sh</code> <code>#添加脚本执行权限</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>2、添加任务计划，修改/etc/crontab</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>|</p>
+
+<p><code>vi</code> <code>/etc/crontab</code> <code>#在最后一行添加</code></p>
+
+<p><code>*</code> <code>/10</code> <code>* * * * root</code> <code>/home/crontab/check_mysql_slave</code> <code>.sh</code>
+<code>#表示每10分钟执行一次</code></p>
+
+<p><code>:wq!</code> <code>#保存退出</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>3、重新启动crond使设置生效</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>|</p>
+
+<p><code>/etc/rc</code> <code>.d</code> <code>/init</code> <code>.d</code> <code>/crond</code> <code>restart</code> <code>#yum install -y vixie-
+cron安装计划任务，某些系统上可能没有预装</code></p>
+
+<p><code>chkconfig crond on</code> <code>#设为开机启动</code></p>
+
+<p><code>service crond start</code> <code>#启动</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>可以根据日志文件/home/logs/check_mysql_slave.log查看MySQL主从同步状态</p>
+
+<p><strong>PS：</strong> 接下来这个脚本增加了“当发现同步出现无法同步的时候”会自动提取主库的file号，以及pos,进行同步主库，脚本内容如下：</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+
+<p>22</p>
+
+<p>23</p>
+
+<p>24</p>
+
+<p>25</p>
+
+<p>26</p>
+
+<p>27</p>
+
+<p>28</p>
+
+<p>29</p>
+
+<p>30</p>
+
+<p>31</p>
+
+<p>32</p>
+
+<p>33</p>
+
+<p>34</p>
+
+<p>|</p>
+
+<p><code>#!/bin/sh</code></p>
+
+<p><code>#set -x</code></p>
+
+<p><code>#file is slave_repl.sh</code></p>
+
+<p><code>#Author by Kevin</code></p>
+
+<p><code>#date is 2011-11-13</code></p>
+
+<p><code>mstool=</code> <code>&quot;/usr/local/mysql-3307/bin/mysql -h 192.168.1.106 -uroot
+-pw!zl7POg27 -P 3307&quot;</code></p>
+
+<p><code>sltool=</code> <code>&quot;/usr/local/mysql-3307/bin/mysql -h 192.168.1.107 -uroot
+-pw!zl7POg27 -P 3307&quot;</code></p>
+
+<p><code>declare</code> <code>-a slave_stat</code></p>
+
+<p><code>slave_stat=($($sltool -e</code> <code>&quot;show slave status\G&quot;</code> <code>|</code> <code>grep</code> <code>Running |</code>
+<code>awk</code> <code>'{print $2}'</code> <code>))</code></p>
+
+<p><code>if</code> <code>[</code> <code>&quot;${slave_stat[0]}&quot;</code> <code>=</code> <code>&quot;Yes&quot;</code> <code>-a</code> <code>&quot;${slave_stat[1]}&quot;</code> <code>=</code>
+<code>&quot;Yes&quot;</code> <code>]</code></p>
+
+<p> <code>then</code></p>
+
+<p> <code>echo</code> <code>&quot;OK slave is running&quot;</code></p>
+
+<p> <code>exit</code> <code>0</code></p>
+
+<p><code>else</code></p>
+
+<p> <code>echo</code> <code>&quot;Critical slave is error&quot;</code></p>
+
+<p> <code>echo</code></p>
+
+<p> <code>echo</code> <code>&quot;*********************************************************&quot;</code></p>
+
+<p> <code>echo</code> <code>&quot;Now Starting replication with Master Mysql!&quot;</code></p>
+
+<p> <code>file</code> <code>=</code>$mstool -e &ldquo;show master status\G&rdquo;|grep&ldquo;File&rdquo;|<code>
+</code>awk&rsquo;{print $2}&rsquo;``</p>
+
+<p> <code>pos=</code>$mstool -e &ldquo;show master status\G&rdquo;|grep&ldquo;Pos&rdquo;|awk<code>
+</code>&rsquo;{print $2}&rsquo;``</p>
+
+<p> <code>$sltool -e &quot;slave stop;change master to master_host=</code> <code>'192.168.1.106'</code>
+<code>,</code></p>
+
+<p> <code>master_port=3307,master_user=</code> <code>'repl'</code> <code>,</code></p>
+
+<p> <code>master_password=</code> <code>'w!zl7POg27'</code> <code>,</code></p>
+
+<p> <code>master_log_file=</code> <code>'$file'</code> <code>,</code></p>
+
+<p> <code>master_log_pos=$pos;slave start;&quot;</code></p>
+
+<p> <code>sleep</code> <code>3</code></p>
+
+<p> <code>$sltool -e</code> <code>&quot;show slave status\G;&quot;</code> <code>|</code> <code>grep</code> <code>Running</code></p>
+
+<p> <code>echo</code></p>
+
+<p> <code>echo</code> <code>&quot;Now Replication is Finished!&quot;</code></p>
+
+<p> <code>echo</code></p>
+
+<p> <code>echo</code> <code>&quot;**********************************************************&quot;</code></p>
+
+<p> <code>exit</code> <code>2</code></p>
+
+<p><code>fi</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>运行后效果，如下：</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>|</p>
+
+<p><code># ./slave_stop3307.sh</code></p>
+
+<p><code>*******************************</code></p>
+
+<p><code>Now stop Slave Replication!</code></p>
+
+<p> <code>Slave_IO_Running: No</code></p>
+
+<p> <code>Slave_SQL_Running: No</code></p>
+
+<p><code>*******************************</code></p>
+
+<p><code># ./slave_repl3307.sh</code></p>
+
+<p><code>Critical slave is error</code></p>
+
+<p><code>*********************************************************</code></p>
+
+<p><code>Now Starting replication with Master Mysql!</code></p>
+
+<p> <code>Slave_IO_Running: Yes</code></p>
+
+<p> <code>Slave_SQL_Running: Yes</code></p>
+
+<p><code>Now Replication is Finished!</code></p>
+
+<p><code>**********************************************************</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>以上就是CentOS下编写shell脚本来监控MySQL主从复制的教程_MySQL的内容，更多相关内容请关注PHP中文网（www.php.cn）！</p>
+
+<p>文章来源：<a href="http://www.php.cn/mysql-tutorials-50235.html">http://www.php.cn/mysql-tutorials-50235.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

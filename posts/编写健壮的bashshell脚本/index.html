@@ -1,0 +1,1270 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>编写健壮的Bashshell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="编写健壮的Bashshell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="编写健壮的Bashshell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%BC%96%E5%86%99%E5%81%A5%E5%A3%AE%E7%9A%84bashshell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">编写健壮的Bashshell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>使用set -u</p>
+
+<p>使用set -e</p>
+
+<p>防御型编程 – 未雨绸缪</p>
+
+<p>注意文件名中的空格</p>
+
+<p>设置trap（Setting traps）</p>
+
+<p>保持原子性（Be atomic）</p>
+
+<p>延伸阅读</p>
+
+<hr />
+
+<p>许多人都能很快的码出一些shell代码来完成简单的任务，而且这种写法将会一直持续下去。问题是编写的shell脚本经常会包含着许多足以导致脚本运行失败的细小的缺陷（subtle
+effects）。本文中我就将解释编写一个健壮的Bash脚本所需要的一些技术，告诉你是能做到将这些问题减少到最小的。</p>
+
+<h2 id="使用set-u">使用set -u</h2>
+
+<p>你是否会经常遇到因为变量没有赋值而导致脚本无法成功运行的情况呢？反正我是经常的遇到。</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>chroot=$1</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>...</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>rm</code> <code>-rf $chroot/usr/share/doc</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>如果你在运行上述脚本的时候忘记了提供一个参数的话，最后的结果是你会把所有系统文档都删掉，而不是仅仅删除$chroot下指定的文档。那你该怎么办呢？还好，Bash提供了一个选项set
+-u，使用这个选项可以使脚本在使用未初始化的变量时直接退出。这个选项的另一个可读性更强点的写法是set -o nounset。</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>david%</code><code>bash</code> <code>/tmp/shrink-chroot.sh</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>$chroot=</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>david%</code><code>bash</code> <code>-u /tmp/shrink-chroot.sh</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>4</code></th>
+<th><code>/tmp/shrink-chroot.sh: line 3: $1: unbound variable</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>5</code></th>
+<th><code>david%</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<h2 id="使用set-e">使用set -e</h2>
+
+<p>你应该在你编写的每个脚本上方都加上set -e选项，打开这个选项之后，脚本在运行时碰到返回值不为0的语句之后会直接退出。使用-
+e选项的好处是使你能及早的发现问题，而不是让错误越滚越大。同样这个选项也有另外一种可读性更强点的写法set -o errexit。</p>
+
+<p>-e选项可以为你做免费的错误检查，如果你忘了检查的话，它会替你完成。不过不好的是你无法在使用$?来进行检查了，因为如果返回值不为0的话语句根本就执行不到检查$?的那一步的。解决方法是重写下代码：</p>
+
+<p>用</p>
+
+<p><code>1</code> | <code>command</code> <code>|| {</code><code>echo</code> <code>&quot;command failed&quot;</code><code>;</code><code>exit</code> <code>1; }</code><br />
+&mdash;|&mdash;</p>
+
+<p>或</p>
+
+<p><code>1</code> | <code>**if**</code> <code>!</code><code>command</code><code>;</code><code>**then**</code> <code>echo</code> <code>&quot;command failed&quot;</code><code>;</code><code>exit</code>
+<code>1;</code><code>**fi**</code><br />
+&mdash;|&mdash;</p>
+
+<p>替代</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>command</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p><code>2</code> | <code>**if**</code> <code>[</code><code>&quot;$?&quot;</code><code>-</code><code>**ne**</code> <code>0];</code><code>**then**</code> <code>echo</code> <code>&quot;command
+failed&quot;</code><code>;</code><code>exit</code> <code>1;</code><code>**fi**</code><br />
+&mdash;|&mdash;</p>
+
+<p>如果你有一个命令它就是返回0或者是你根本就不关心返回值那怎么办呢？你可以使用command ||
+true，或者假如你要对很长的一段代码都如此处理的话，你可以暂时关闭错误处理，不过我的建议是尽量少用。</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>set</code> <code>+e</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>command1</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>command2</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>4</code></th>
+<th><code>set</code> <code>-e</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>另外有个和这个有点相关的说明：默认情况下Bash返回最后一个管道命令的执行结果，你可能不希望是这样，例如false |
+true执行返回值为是0，成功；如果你想它是失败的话，执行set -o pipefail就可以了。</p>
+
+<h2 id="防御型编程-未雨绸缪">防御型编程 – 未雨绸缪</h2>
+
+<p>你的脚本应该要考虑到应对一些比如文件不存在或者无法创建目录之类的异常情况，采取一些措施避免在碰到这些情况时发生错误。比如说如果在创建一个目录时，如果上级目录不存在，mkdir就会返回错误，如果你在使用mkdir是加上-
+p选项的话就能一并创建所有不存在的上级目录了。另一个例子就是rm，如果你要rm一个不存在的文件，那rm就会报错，脚本也会退出（应该在用-
+e选项了吧，对不？）你可以通过加上-f参数来解决这个，这个参数会保证在文件不存在时安静的执行下一步。</p>
+
+<h2 id="注意文件名中的空格">注意文件名中的空格</h2>
+
+<p>有人总喜欢在文件名或者是命令行参数中使用空格，所以你在写脚本时一定要注意这点，特别注意要在变量上加上引号。</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>**if**</code> <code>[ $filename =</code><code>&quot;foo&quot;</code> <code>];</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>上述代码在$filename中包含空格时会失败，可以这样修正：</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>**if**</code> <code>[</code><code>&quot;$filename&quot;</code> <code>=</code><code>&quot;foo&quot;</code> <code>];</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>在使用$@变量时，总要记得使用双引号，这样才能保证当参数值中存在空格时不会被解析成单独的词。</p>
+
+<p><code>1</code> | <code>david% foo() {</code><code>**for**</code> <code>i</code><code>**in**</code> <code>$@;</code><code>**do**</code> <code>echo</code> <code>$i;
+</code><code>**done**</code> <code>}; foo bar</code><code>&quot;baz quux&quot;</code><br />
+&mdash;|&mdash;</p>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>bar</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>baz</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>4</code></th>
+<th><code>quux</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p><code>5</code> | <code>david% foo() {</code><code>**for**</code> <code>i</code><code>**in**</code> <code>&quot;$@&quot;</code><code>;</code><code>**do**</code> <code>echo</code> <code>$i;
+</code><code>**done**</code> <code>}; foo bar</code><code>&quot;baz quux&quot;</code><br />
+&mdash;|&mdash;</p>
+
+<table>
+<thead>
+<tr>
+<th><code>6</code></th>
+<th><code>bar</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>7</code></th>
+<th><code>baz quux</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>我想不出有什么时候是需要你用$@代替”$@”的，所以当你存疑时，就加上双引号吧。</p>
+
+<h2 id="设置trap-setting-traps">设置trap（Setting traps）</h2>
+
+<p>脚本在运行之中意外的退出经常会让文件系统处于一种不一致的状态，就像锁文件（lock
+file）、临时文件或者是你更新了一个文件却在更新另外一个文件的时候发生了错误，如果我们能有什么方法能解决这个问题好了，使得我们的程序运行出现问题的时候能够删除掉锁文件或是回滚到一个已知的正常的状态。好在Bash提供了trap命令，这个命令能让运行中的脚本接受到unix信号的时候执行指定的命令或是函数。</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>trap</code> <code>command</code> <code>signal [signal ...]</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>trap命令能捕获很多的unix信号（可以通过kill -l来得到unix信号的清单），不过只为了清理的话只需要关注3个信号量就行了，这3个就是：INT,
+TERM和EXIT。你也可以使用-作为trap命令中的command参数重置trap的状态。</p>
+
+<table>
+<thead>
+<tr>
+<th>信号量</th>
+<th>描述</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>INT</td>
+<td>中断 – 使用CTRL+C组合键时会向脚本发送这个信号</td>
+</tr>
+
+<tr>
+<td>TERM</td>
+<td>终止 – kill命令使用这个信号来终止进程</td>
+</tr>
+
+<tr>
+<td>EXIT</td>
+<td>退出 – 这是个伪信号量(pseudo-signal)，在脚本运行结束或者是使用exit命令退出脚本时都会被触发。</td>
+</tr>
+</tbody>
+</table>
+
+<p>通常你可能会写出如下使用锁文件的脚本：</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>**if**</code> <code>[ ! -e $lockfile ];</code><code>**then**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>touch</code> <code>$lockfile</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>critical-section</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>4</code></th>
+<th><code>rm</code> <code>$lockfile</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>5</code></th>
+<th><code>**else**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>6</code></th>
+<th><code>echo</code> <code>&quot;critical-section is already running&quot;</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>7</code></th>
+<th><code>**fi**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>当脚本还在critical-section阶段运行时被别人杀掉会发生什么呢？锁文件会一直留在那里，而你的程序也无法再运行了，解决方法就是</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>**if**</code> <code>[ ! -e $lockfile ];</code><code>**then**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>trap</code> <code>&quot;rm -f $lockfile; exit&quot;</code> <code>INT TERM EXIT</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>touch</code> <code>$lockfile</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>4</code></th>
+<th><code>critical-section</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>5</code></th>
+<th><code>rm</code> <code>$lockfile</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>6</code></th>
+<th><code>trap</code> <code>- INT TERM EXIT</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>7</code></th>
+<th><code>**else**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>8</code></th>
+<th><code>echo</code> <code>&quot;critical-section is already running&quot;</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>9</code></th>
+<th><code>**fi**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>现在即使脚本运行中被杀掉，锁文件也能被正常的删除。注意我们要在trap命令执行之后使用exit退出，要不然程序将会从接收到信号量的那个地方恢复执行。</p>
+
+<p><strong>竞争条件</strong></p>
+
+<pre><code> 这里要指出来一下上面那个例子由于创建锁文件和检查锁文件的时间不一样会存在小的竞争条件的问题，一个可行的解决方案就是使用IO重定向加上使用Bash的noclobber模式，noclobber模式不允许重定向到一个存在的文件上，代码如下所示： 
+</code></pre>
+
+<p><code>1</code> | <code>**if**</code> <code>(</code><code>set</code> <code>-o noclobber;</code><code>echo</code> <code>&quot;$$&quot;</code> <code>&gt;</code><code>&quot;$lockfile&quot;</code><code>) 2&gt;
+/dev/null;</code><br />
+&mdash;|&mdash;</p>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>**then**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>trap</code> <code>'rm -f &quot;$lockfile&quot;; exit $?'</code> <code>INT TERM EXIT</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>4</code></th>
+<th></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>5</code></th>
+<th><code>critical-section</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>6</code></th>
+<th></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>7</code></th>
+<th><code>rm</code> <code>-f</code><code>&quot;$lockfile&quot;</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>8</code></th>
+<th><code>trap</code> <code>- INT TERM EXIT</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>9</code></th>
+<th><code>**else**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>10</code></th>
+<th><code>echo</code> <code>&quot;Failed to acquire lockfile: $lockfile.&quot;</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>11</code></th>
+<th><code>echo</code> <code>&quot;Held by $(cat $lockfile)&quot;</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>12</code></th>
+<th><code>**fi**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>另一个更复杂点的问题就是当需要一次更新多个文件的时候，如果程序中途退出，你得让它退出的更加优雅些，就是要做到要改变的东西被正确的改变，或是做到像什么都没有发生一样。假设你用下面的脚本增加用户：</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>add_to_passwd $user</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>cp</code> <code>-a /etc/skel /home/$user</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>chown</code> <code>$user /home/$user -R</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>当磁盘空间不足或是进程中途被杀的话就会有问题了，这种情况下你可能就希望这个用户以及相应的文件都清理掉：</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>rollback() {</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>del_from_passwd $user</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>**if**</code> <code>[ -e /home/$user ];</code><code>**then**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>4</code></th>
+<th><code>rm</code> <code>-rf /home/$user</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>5</code></th>
+<th><code>**fi**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>6</code></th>
+<th><code>exit</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>7</code></th>
+<th><code>}</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>8</code></th>
+<th></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>9</code></th>
+<th><code>trap</code> <code>rollback INT TERM EXIT</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>10</code></th>
+<th><code>add_to_passwd $user</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>11</code></th>
+<th><code>cp</code> <code>-a /etc/skel /home/$user</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>12</code></th>
+<th><code>chown</code> <code>$user /home/$user -R</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>13</code></th>
+<th><code>trap</code> <code>- INT TERM EXIT</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>这里必须在脚本的最后重置trap状态为默认值，要不然在脚本退出的时候rollback函数也会被执行的，然后所有的辛苦工作都白费了。</p>
+
+<h2 id="保持原子性-be-atomic">保持原子性（Be atomic）</h2>
+
+<p>有时你需要更新一个文件夹下面的多个文件，比如说你需要将网站的url从一个主机重写为另一个主机，你可能会写下如下脚本：</p>
+
+<p><code>1</code> | <code>**for**</code> <code>file</code> <code>**in**</code> <code>$(</code><code>find</code> <code>/var/www -</code><code>type</code> <code>f -name
+</code><code>&quot;*.html&quot;</code><code>);</code><code>**do**</code><br />
+&mdash;|&mdash;</p>
+
+<table>
+<thead>
+<tr>
+<th><code>2</code></th>
+<th><code>perl -pi -e</code><code>'s/www.example.net/www.example.com/'</code> <code>$</code><code>file</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>**done**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>现在如果脚本运行途中出现问题退出的话，很可能就会造成网站的一部分已经换成了www.example.com而另一部分还是指向www.example.net，你可以通过恢复备份或者是使用trap来修复这个问题，但是在替换的过程中还是会有不一致的问题的。</p>
+
+<p>解决方法就是将整个更改当成一个（接近于）原子操作来执行。就是先将数据备份一份，然后在备份文件上面做变更，变更完以后接着将原文件移走，用变更后的文件替换到原来位置上。在此过程中要确保新旧文件都存在于同一个分区上，这样就可以利用unix文件系统的快速移动文件夹的特性，因为这样需要更改的只是目录的inode。</p>
+
+<table>
+<thead>
+<tr>
+<th><code>1</code></th>
+<th><code>cp</code> <code>-a /var/www /var/www-tmp</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p><code>2</code> | <code>**for**</code> <code>file</code> <code>**in**</code> <code>$(</code><code>find</code> <code>/var/www-tmp -</code><code>type</code> <code>f -name
+</code><code>&quot;*.html&quot;</code><code>);</code><code>**do**</code><br />
+&mdash;|&mdash;</p>
+
+<table>
+<thead>
+<tr>
+<th><code>3</code></th>
+<th><code>perl -pi -e</code><code>'s/www.example.net/www.example.com/'</code> <code>$</code><code>file</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>4</code></th>
+<th><code>**done**</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>5</code></th>
+<th><code>mv</code> <code>/var/www /var/www-old</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr>
+<th><code>6</code></th>
+<th><code>mv</code> <code>/var/www-tmp /var/www</code></th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>这样做就可以保证一旦更改出现问题，当前运行的系统不会受到影响，同时受影响的时间也就是两个mv操作所花费的时间了，这个通常是非常快的，因为只需要更改目录的inode，不需要移动任何的文件。</p>
+
+<p>这种做法的缺点一个是你需要两倍的磁盘空间，再一个是如果有的进程需要一直打开文件的话那么变换目录之后这些进程打开的还是旧文件，而非新文件，在这种情况下你就需要重启这些进程了。如果使用apache的话这不会有问题，因为它在每次请求的时候都会重新打开文件，你也可以使用lsof命令来检查那些文件正在被打开。好处就是你现在有一个变更前系统文件的备份了，这样一旦你后悔了还有回来的机会。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

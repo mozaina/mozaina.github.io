@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>busybox启动流程简单解析从init到shelllogin | 开发者问答集锦</title>
+    <meta property="og:title" content="busybox启动流程简单解析从init到shelllogin - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="busybox启动流程简单解析从init到shelllogin">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/busybox%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B%E7%AE%80%E5%8D%95%E8%A7%A3%E6%9E%90%E4%BB%8Einit%E5%88%B0shelllogin/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">busybox启动流程简单解析从init到shelllogin</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="https-www-cnblogs-com-arnoldlu-p-10868354-html"><a href="https://www.cnblogs.com/arnoldlu/p/10868354.html">https://www.cnblogs.com/arnoldlu/p/10868354.html</a></h2>
+
+<h2 id="busybox启动流程简单解析-从init到shell-login">busybox启动流程简单解析：从init到shell login</h2>
+
+<p>关键词：kernel_init()、init、inittab、wait/waitpid、fork/vfork、setsid()、execvp/execlp、dup2等等。</p>
+
+<p>由于遇到一系列定制，从init开始加载不同服务，对服务异常等需要特殊处理。</p>
+
+<p>如何在恰当的时机加载恰当的服务？如何对不同异常进行特殊处理？</p>
+
+<p>这就有必要分析内核是如何加载init进程的？init进程是按照何种顺序启动各种服务的？init是如何管理这些服务的？系统开机后各种进程都是在哪里创立的？</p>
+
+<p>带着这些问题来分析一下kernel-&gt;init、init进程本身、inittab配置文件、rcS、/etc/profile等等。</p>
+
+<h1 id="1-从kernel到init">1. 从kernel到init</h1>
+
+<p>在内核启动的最后阶段start_kernel()-&gt;reset_init()创建第一个进程，即pid=0的idle进程，运行在内核态，也是唯一一个没有通过fork()或者kernel_thread()创建的进程。</p>
+
+<p>这个进程最终进入start_kernel()-&gt;reset_init()-&gt;cpu_startup_entry()-&gt;cpu_idle_loop()。</p>
+
+<p>在进程0中生成两个进程：一个是所有用户空间进程的祖先的init进程，一个是所有内核线程祖先的kthreadd。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>static noinline void __ref rest_init(void)
+{
+...
+    kernel_thread(kernel_init, NULL, CLONE_FS);
+    numa_default_policy();
+    pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
+...
+    cpu_startup_entry(CPUHP_ONLINE);
+}
+
+static int __ref kernel_init(void *unused)
+{...
+    if (ramdisk_execute_command) {--------------------------------可以在command line通过&quot;rdinit=/sbin/init&quot;来指定，如果指定则启动ramdisk。
+        ret = run_init_process(ramdisk_execute_command);
+        if (!ret)
+            return 0;
+        pr_err(&quot;Failed to execute %s (error %d)\n&quot;,
+               ramdisk_execute_command, ret);
+    }
+
+    if (execute_command) {----------------------------------------在command line中通过&quot;init=/sbin/init&quot;来指定，包括启动参数argv_init[]。
+        ret = run_init_process(execute_command);
+        if (!ret)
+            return 0;
+        panic(&quot;Requested init %s failed (error %d).&quot;,
+              execute_command, ret);
+    }
+    if (!try_to_run_init_process(&quot;/sbin/init&quot;) ||-----------------如果没有指定rdinit和init，那么依次尝试下面几个固定路径init程序。
+        !try_to_run_init_process(&quot;/etc/init&quot;) ||
+        !try_to_run_init_process(&quot;/bin/init&quot;) ||
+        !try_to_run_init_process(&quot;/bin/sh&quot;))
+        return 0;
+...
+}
+
+int kthreadd(void *unused)
+{
+    struct task_struct *tsk = current;
+
+    /* Setup a clean context for our children to inherit. */
+    set_task_comm(tsk, &quot;kthreadd&quot;);--------------------------------修改内核线程名为kthreadd。
+    ignore_signals(tsk);
+    set_cpus_allowed_ptr(tsk, cpu_all_mask);
+    set_mems_allowed(node_states[N_MEMORY]);
+
+    current-&gt;flags |= PF_NOFREEZE;
+    cgroup_init_kthreadd();
+
+    for (;;) {
+        set_current_state(TASK_INTERRUPTIBLE);
+        if (list_empty(&amp;kthread_create_list))
+            schedule();
+        __set_current_state(TASK_RUNNING);
+
+        spin_lock(&amp;kthread_create_lock);
+        while (!list_empty(&amp;kthread_create_list)) {----------------内核线程的创建是由kthreadd遍历kthread_create_list列表，然后取出成员，通过create_kthread()创建内核线程。
+            struct kthread_create_info *create;
+
+            create = list_entry(kthread_create_list.next,
+                        struct kthread_create_info, list);
+            list_del_init(&amp;create-&gt;list);
+            spin_unlock(&amp;kthread_create_lock);
+
+            create_kthread(create);
+
+            spin_lock(&amp;kthread_create_lock);
+        }
+        spin_unlock(&amp;kthread_create_lock);
+    }
+
+    return 0;
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>经过上面的分析可以知道pid-0是所有进程/线程的祖先，init负责所有用户空间进程创建，kthreadd是所有内核线程的祖先。</p>
+
+<p>简单看一个系统的进程执行snap如下：</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>  PID USER      PR  NI    VIRT    RES %CPU %MEM     TIME+ S COMMAND
+    1 root      20   0    2.3m   1.7m  0.0  0.2   0:01.75 S init------------------------------所有用户空间进程的祖先。
+  135 root      20   0    2.3m   1.9m  0.0  0.3   0:00.02 S  `- syslogd
+  138 root      20   0    2.3m   1.8m  0.0  0.2   0:00.03 S  `- klogd
+  143 root      20   0    4.1m   3.1m  0.0  0.4   0:00.00 S  `- sshd
+  155 root      20   0    2.3m   1.6m  0.0  0.2   0:00.04 S  `- autologin
+  156 root      20   0    2.3m   1.9m  0.0  0.3   0:00.10 S      `- sh
+  161 root      20   0    2.3m   1.6m  0.0  0.2   0:00.28 S          `- monito+
+  629 root      20   0    2.2m   1.3m  0.5  0.2   0:00.01 S              `- sl+
+  623 root      20   0    2.7m   1.7m  2.1  0.2   0:00.14 R          `- top
+    2 root      20   0    0.0m   0.0m  0.0  0.0   0:00.00 S kthreadd---------------------------所有内核线程的祖先。
+    3 root      20   0    0.0m   0.0m  0.0  0.0   0:00.27 S  `- ksoftirqd/0
+    4 root      20   0    0.0m   0.0m  0.0  0.0   0:00.04 S  `- kworker/0:0
+    5 root       0 -20    0.0m   0.0m  0.0  0.0   0:00.00 S  `- kworker/0:0H
+    6 root      20   0    0.0m   0.0m  0.0  0.0   0:00.04 S  `- kworker/u2:0
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<h1 id="2-init-of-busybox-分析">2. init(of busybox)分析</h1>
+
+<p>init_main()也即busybox中的init进程入口。init上承kernel，下起用户空间进程，配置了整个用户空间工作环境。</p>
+
+<p>首先初始化串口、环境变量等；解析/etc/inittab文件；初始化信号处理函数；然后依次执行SYSINIT、WAIT、ONCE选项；最后在while(1)中监控RESPAWN|ASKFIRST选项。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>int init_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;
+int init_main(int argc UNUSED_PARAM, char **argv)
+{
+    if (argv[1] &amp;&amp; strcmp(argv[1], &quot;-q&quot;) == 0) {
+        return kill(1, SIGHUP);
+    }
+...
+    die_func = sleep_much;
+
+    console_init();
+    set_sane_term();
+    xchdir(&quot;/&quot;);
+    setsid();
+
+    /* Make sure environs is set to something sane */----------------------设置环境变量，SHELL指向/bin/sh。
+    putenv((char *) &quot;HOME=/&quot;);
+    putenv((char *) bb_PATH_root_path);
+    putenv((char *) &quot;SHELL=/bin/sh&quot;);
+    putenv((char *) &quot;USER=root&quot;); /* needed? why? */
+
+    if (argv[1])
+        xsetenv(&quot;RUNLEVEL&quot;, argv[1]);
+
+#if !ENABLE_FEATURE_INIT_QUIET
+    message(L_CONSOLE | L_LOG, &quot;init started: %s&quot;, bb_banner);
+#endif
+
+    /* Check if we are supposed to be in single user mode */
+    if (argv[1]
+     &amp;&amp; (strcmp(argv[1], &quot;single&quot;) == 0 || strcmp(argv[1], &quot;-s&quot;) == 0 || LONE_CHAR(argv[1], '1'))
+    ) {
+        new_init_action(RESPAWN, bb_default_login_shell, &quot;&quot;);
+    } else {
+        parse_inittab();---------------------------------------------------解析/etc/inittab文件，下面按照SYSINIT-&gt;WAIT-&gt;ONCE-&gt;RESPAWN|ASKFIRST顺序执行inittab内容。
+    }
+...
+    if (ENABLE_FEATURE_INIT_MODIFY_CMDLINE) {
+        strncpy(argv[0], &quot;init&quot;, strlen(argv[0]));
+        while (*++argv)
+            nuke_str(*argv);
+    }
+
+    if (!DEBUG_INIT) {-----------------------------------------------------初始化信号处理。
+        struct sigaction sa;
+
+        memset(&amp;sa, 0, sizeof(sa));
+        sigfillset(&amp;sa.sa_mask);
+        sigdelset(&amp;sa.sa_mask, SIGCONT);
+        sa.sa_handler = stop_handler;
+        sigaction_set(SIGTSTP, &amp;sa); /* pause */
+        sigaction_set(SIGSTOP, &amp;sa); /* pause */
+        bb_signals_recursive_norestart(0
+            + (1 &lt;&lt; SIGINT)  /* Ctrl-Alt-Del */
+            + (1 &lt;&lt; SIGQUIT) /* re-exec another init */
+#ifdef SIGPWR
+            + (1 &lt;&lt; SIGPWR)  /* halt */
+#endif
+            + (1 &lt;&lt; SIGUSR1) /* halt */
+            + (1 &lt;&lt; SIGTERM) /* reboot */
+            + (1 &lt;&lt; SIGUSR2) /* poweroff */
+#if ENABLE_FEATURE_USE_INITTAB
+            + (1 &lt;&lt; SIGHUP)  /* reread /etc/inittab */
+#endif
+            , record_signo);
+    }
+
+    /* Now run everything that needs to be run */
+    /* First run the sysinit command */
+    run_actions(SYSINIT);---------------------------------------------------首先运行SYSINIT，其次是WAIT和ONCE，这里也体现了/etc/inittab中不同优先级。
+    check_delayed_sigs();---------------------------------------------------检查是否收到SIGHUP、SIGINT、SIGQUIT、SIGPWR、SIGTERM等信号，并进行处理。
+    /* Next run anything that wants to block */
+    run_actions(WAIT);
+    check_delayed_sigs();
+    /* Next run anything to be run only once */
+    run_actions(ONCE);
+
+    while (1) {
+        int maybe_WNOHANG;
+
+        maybe_WNOHANG = check_delayed_sigs();--------------------------------返回1表示有信号被check_delayed_sigs()检测到；0表示没有信号。
+
+        run_actions(RESPAWN | ASKFIRST);-------------------------------------这里也是RESPAWN|ASKFIRST能起作用的地方，在init中循环处理。进入run_action()一看究竟。
+        maybe_WNOHANG |= check_delayed_sigs();
+
+        sleep(1);
+        maybe_WNOHANG |= check_delayed_sigs();
+
+        if (maybe_WNOHANG)
+            maybe_WNOHANG = WNOHANG;
+        while (1) {
+            pid_t wpid;
+            struct init_action *a;
+
+            wpid = waitpid(-1, NULL, maybe_WNOHANG);-------------------------- -1表示等待任一子进程。若成功则返回状态改变的子进程ID，若出错则返回-1，若指定了WNOHANG选项且pid指定的子进程状态没有发生改变则返回0。
+            if (wpid &lt;= 0)
+                break;
+
+            a = mark_terminated(wpid);----------------------------------------将进程的init_action-&gt;pid改成0.
+            if (a) {
+                message(L_LOG, &quot;process '%s' (pid %d) exited. &quot;
+                        &quot;Scheduling for restart.&quot;,
+                        a-&gt;command, wpid);
+            }
+            maybe_WNOHANG = WNOHANG;
+        }
+    } /* while (1) */
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<h2 id="2-1-console设置">2.1 console设置</h2>
+
+<p>console_init()获取console文件相关环境变量，然后打开并将STDIN_FILENO和STDOUT_FILENO重定向到console。最后设置终端配置。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>static void console_init(void)
+{
+#ifdef VT_OPENQRY
+    int vtno;
+#endif
+    char *s;
+
+    s = getenv(&quot;CONSOLE&quot;);
+    if (!s)
+        s = getenv(&quot;console&quot;);
+#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+    if (!s)
+        s = (char*)&quot;/dev/console&quot;;
+#endif
+    if (s) {
+        int fd = open(s, O_RDWR | O_NONBLOCK | O_NOCTTY);
+        if (fd &gt;= 0) {
+            dup2(fd, STDIN_FILENO);
+            dup2(fd, STDOUT_FILENO);
+            xmove_fd(fd, STDERR_FILENO);
+        }
+        dbg_message(L_LOG, &quot;console='%s'&quot;, s);
+    } else {
+        bb_sanitize_stdio();
+    }
+
+    s = getenv(&quot;TERM&quot;);
+#ifdef VT_OPENQRY
+    if (ioctl(STDIN_FILENO, VT_OPENQRY, &amp;vtno) != 0) {
+        if (!s || strcmp(s, &quot;linux&quot;) == 0)
+            putenv((char*)&quot;TERM=vt102&quot;);
+# if !ENABLE_FEATURE_INIT_SYSLOG
+        log_console = NULL;
+# endif
+    } else
+#endif
+    if (!s)
+        putenv((char*)&quot;TERM=&quot; CONFIG_INIT_TERMINAL_TYPE);
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<h2 id="2-2-inittab解析">2.2 inittab解析</h2>
+
+<p>parse_inittab()用于解析/etc/inittab文件，并将解析结果通过new_init_action()插入到init_action_list链表中。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>static void parse_inittab(void)
+{
+    char *token[4];
+    parser_t *parser = config_open2(&quot;/etc/inittab&quot;, fopen_for_read);-------------打开/etc/inittab文件，句柄在parser-&gt;fd中。
+...
+    while (config_read(parser, token, 4, 0, &quot;#:&quot;,
+                PARSE_NORMAL &amp; ~(PARSE_TRIM | PARSE_COLLAPSE))) {----------------分隔符是“#”或者“:”，解析的结果放在token[]中。按照optional_tty:ignored_runlevel:action:command顺序排布。
+        /* order must correspond to SYSINIT..RESTART constants */
+        static const char actions[] ALIGN1 =
+            &quot;sysinit\0&quot;&quot;wait\0&quot;&quot;once\0&quot;&quot;respawn\0&quot;&quot;askfirst\0&quot;
+            &quot;ctrlaltdel\0&quot;&quot;shutdown\0&quot;&quot;restart\0&quot;;
+        int action;
+        char *tty = token[0];
+
+        if (!token[3]) /* less than 4 tokens */
+            goto bad_entry;
+        action = index_in_strings(actions, token[2]);----------------------------token[2]对应action类型，通过actions转化成数值，通过左移对应位数后即是new_init_action()是别的类型。
+        if (action &lt; 0 || !token[3][0]) /* token[3]: command */
+            goto bad_entry;
+        /* turn .*TTY -&gt; /dev/TTY */
+        if (tty[0]) {
+            tty = concat_path_file(&quot;/dev/&quot;, skip_dev_pfx(tty));------------------token[0]对应tty设备序号。
+        }
+        new_init_action(1 &lt;&lt; action, token[3], tty);-----------------------------token[3]是应用的路径。
+        if (tty[0])
+            free(tty);
+        continue;
+ bad_entry:
+        message(L_LOG | L_CONSOLE, &quot;Bad inittab entry at line %d&quot;,
+                parser-&gt;lineno);
+    }
+    config_close(parser);
+}
+
+static void new_init_action(uint8_t action_type, const char *command, const char *cons)
+{
+    struct init_action *a, **nextp;
+
+    nextp = &amp;init_action_list;
+    while ((a = *nextp) != NULL) {-----------------------------------------------遍历init_action_list，目的是避免重复action。如果发现已有action，则删除，然后重新加入init_action_list中。
+        if (strcmp(a-&gt;command, command) == 0
+         &amp;&amp; strcmp(a-&gt;terminal, cons) == 0
+        ) {
+            /* Remove from list */
+            *nextp = a-&gt;next;
+            /* Find the end of the list */
+            while (*nextp != NULL)
+                nextp = &amp;(*nextp)-&gt;next;------------------------------------------直到尾部
+            a-&gt;next = NULL;
+            goto append;
+        }
+        nextp = &amp;a-&gt;next;---------------------------------------------------------直到尾部
+    }
+
+    a = xzalloc(sizeof(*a) + strlen(command));------------------------------------重新申请action，并重新复制。
+
+    /* Append to the end of the list */
+ append:
+    *nextp = a;
+    a-&gt;action_type = action_type;
+    strcpy(a-&gt;command, command);
+    safe_strncpy(a-&gt;terminal, cons, sizeof(a-&gt;terminal));
+    dbg_message(L_LOG | L_CONSOLE, &quot;command='%s' action=%x tty='%s'\n&quot;,
+        a-&gt;command, a-&gt;action_type, a-&gt;terminal);
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<h2 id="2-3-各种类型action">2.3 各种类型action</h2>
+
+<p>/etc/inittab中不同action类型有着先后顺序：SYSINIT &gt; WAIT &gt; ONCE &gt; RESPAWN | ASKFIRST。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>#define SYSINIT     0x01-----------------最先开始启动，并且执行完毕后才会进入WAIT。
+#define WAIT        0x02-----------------在SYSINIT之后启动，并且执行完毕后才会启动ONCE。
+#define ONCE        0x04-----------------在WAIT之后启动，但是后面的并不需要等待执行完毕。
+#define RESPAWN     0x08-----------------在ONCE之后启动，退出后会重新启动。
+#define ASKFIRST    0x10-----------------类似RESPAWN，但是需要确认。
+#define CTRLALTDEL  0x20-----------------收到SIGINIT后执行，并且执行完毕后开始执行RESPAWN和ASKFIRST。
+#define SHUTDOWN    0x40-----------------在kill所有进程之后启动SHUTDOWN。这是为RESTART或者底层halt/reboot/poweroff做准备。
+#define RESTART     0x80-----------------收到SIGQUIT后执行RESTART。
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>run_actions()运行统一action类型的所有命令。但是对于RESPAWN|ASKFIRST特殊处理。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>static void run_actions(int action_type)
+{
+    struct init_action *a;
+
+    for (a = init_action_list; a; a = a-&gt;next) {
+        if (!(a-&gt;action_type &amp; action_type))------------------------------------根据action_type进行过滤。
+            continue;
+
+        if (a-&gt;action_type &amp; (SYSINIT | WAIT | ONCE | CTRLALTDEL | SHUTDOWN)) {-对于SYSINIT | WAIT | ONCE | CTRLALTDEL | SHUTDOWN类型action，都是无条件运行。
+            pid_t pid = run(a);
+            if (a-&gt;action_type &amp; (SYSINIT | WAIT | CTRLALTDEL | SHUTDOWN))------这里的waitfor()是等待进程执行结束，说明SYSINIT | WAIT | CTRLALTDEL | SHUTDOWN几种类型的action是不允许并行的，即使同一类型action。
+                waitfor(pid);
+        }
+        if (a-&gt;action_type &amp; (RESPAWN | ASKFIRST)) {
+            if (a-&gt;pid == 0)----------------------------------------------------pid为0是一个特殊标记，这样避免造成重复运行。不为0表示对应命令已经运行中。
+                a-&gt;pid = run(a);
+        }
+    }
+}
+
+static pid_t run(const struct init_action *a)
+{
+    pid_t pid;
+
+    sigprocmask_allsigs(SIG_BLOCK);
+    if (BB_MMU &amp;&amp; (a-&gt;action_type &amp; ASKFIRST))
+        pid = fork();
+    else
+        pid = vfork();--------------------------------------------------fork()下面父进程和子进程执行同样代码，但是可以通过pid进行区分。fork()调用一次返回两次：pid小于0表示错误；pid=0表示子进程；pid大于0位父进程中返回的子进程pid。
+    if (pid &lt; 0)
+        message(L_LOG | L_CONSOLE, &quot;can't fork&quot;);
+    if (pid) {----------------------------------------------------------pid不为0，说明是在父进程环境中，返还pid给调用者。
+        sigprocmask_allsigs(SIG_UNBLOCK);
+        return pid; /* Parent or error */
+    }
+
+    /* Child */----------------------------------------------------------执行到这里说明是出于子进程中，因为pid&gt;0。
+
+    /* Reset signal handlers that were set by the parent process */
+    reset_sighandlers_and_unblock_sigs();--------------------------------对init中设置的各种signal进行复位。
+
+    setsid();------------------------------------------------------------
+
+    if (!open_stdio_to_tty(a-&gt;terminal))
+        _exit(EXIT_FAILURE);
+
+    if (BB_MMU &amp;&amp; (a-&gt;action_type &amp; ASKFIRST)) {-------------------------对于ASKFIRST类型action，需要等待输入。
+        static const char press_enter[] ALIGN1 =
+#ifdef CUSTOMIZED_BANNER
+#include CUSTOMIZED_BANNER
+#endif
+            &quot;\nPlease press Enter to activate this console. &quot;;
+        char c;
+        dbg_message(L_LOG, &quot;waiting for enter to start '%s'&quot;
+                    &quot;(pid %d, tty '%s')\n&quot;,
+                a-&gt;command, getpid(), a-&gt;terminal);
+        full_write(STDOUT_FILENO, press_enter, sizeof(press_enter) - 1);
+        while (safe_read(STDIN_FILENO, &amp;c, 1) == 1 &amp;&amp; c != '\n')
+            continue;
+    }
+...
+    message(L_LOG, &quot;starting pid %u, tty '%s': '%s'&quot;,
+            (int)getpid(), a-&gt;terminal, a-&gt;command);
+
+    init_exec(a-&gt;command);-----------------------------------------------执行对应命令。
+    /* We're still here?  Some error happened. */
+    _exit(-1);
+}
+
+static void init_exec(const char *command)
+{
+    /* +8 allows to write VLA sizes below more efficiently: */
+    unsigned command_size = strlen(command) + 8;
+    /* strlen(command) + strlen(&quot;exec &quot;)+1: */
+    char buf[command_size];
+    /* strlen(command) / 2 + 4: */
+    char *cmd[command_size / 2];
+    int dash;
+
+    dash = (command[0] == '-' /* maybe? &amp;&amp; command[1] == '/' */);
+    command += dash;
+...
+    if (ENABLE_FEATURE_INIT_SCTTY &amp;&amp; dash) {
+        /* _Attempt_ to make stdin a controlling tty. */
+        ioctl(STDIN_FILENO, TIOCSCTTY, 0 /*only try, don't steal*/);
+    }
+    /* Here command never contains the dash, cmd[0] might */
+    BB_EXECVP(command, cmd);---------------------------------------------fork()创建子进程，execvp()把当前今晨替换为一个新锦成，且新锦成与元进程有相同的pid。fork()和execvp()联用将进程创建和应用加载分离。
+    message(L_LOG | L_CONSOLE, &quot;can't run '%s': %s&quot;, command, strerror(errno));
+    /* returns if execvp fails */
+}
+
+#define BB_EXECVP(prog,cmd)     execvp(prog,cmd)
+#define BB_EXECLP(prog,cmd,...) execlp(prog,cmd,__VA_ARGS__)
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<h2 id="2-4-异常信号处理">2.4 异常信号处理</h2>
+
+<p>check_delayed_sigs()对接收到的各种异常信号进行处理，包括SIGHUP、SIGINT、SIGQUIT、SIGPWR、SIGTERM等。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>static int check_delayed_sigs(void)
+{
+    int sigs_seen = 0;
+
+    while (1) {
+        smallint sig = bb_got_signal;
+
+        if (!sig)
+            return sigs_seen;
+        bb_got_signal = 0;
+        sigs_seen = 1;
+#if ENABLE_FEATURE_USE_INITTAB
+        if (sig == SIGHUP)------------------------重新执行/etc/inittab中的选项。
+            reload_inittab();
+#endif
+        if (sig == SIGINT)
+            run_actions(CTRLALTDEL);--------------执行CTRLALTDEL选项。
+        if (sig == SIGQUIT) {
+            exec_restart_action();
+        }
+        if ((1 &lt;&lt; sig) &amp; (0
+#ifdef SIGPWR
+            + (1 &lt;&lt; SIGPWR)
+#endif
+            + (1 &lt;&lt; SIGUSR1)
+            + (1 &lt;&lt; SIGUSR2)
+            + (1 &lt;&lt; SIGTERM)
+        )) {
+            halt_reboot_pwoff(sig);
+        }
+    }
+}
+static void reload_inittab(void)
+{
+    struct init_action *a, **nextp;
+
+    message(L_LOG, &quot;reloading /etc/inittab&quot;);
+
+    for (a = init_action_list; a; a = a-&gt;next)
+        a-&gt;action_type = 0;-------------------------------将init_action_list链表上所有选项清除。
+    parse_inittab();
+
+#if ENABLE_FEATURE_KILL_REMOVED
+    for (a = init_action_list; a; a = a-&gt;next)
+        if (a-&gt;action_type == 0 &amp;&amp; a-&gt;pid != 0)-----------对pid不为0，action_type为0的进程发送SIGTERM信号。
+            kill(a-&gt;pid, SIGTERM);
+    if (CONFIG_FEATURE_KILL_DELAY) {----------------------对于定义了CONFIG_FEATURE_KILL_DELAY，延迟然后发送SIGKILL信号。
+        /* NB: parent will wait in NOMMU case */
+        if ((BB_MMU ? fork() : vfork()) == 0) { /* child */
+            sleep(CONFIG_FEATURE_KILL_DELAY);
+            for (a = init_action_list; a; a = a-&gt;next)
+                if (a-&gt;action_type == 0 &amp;&amp; a-&gt;pid != 0)
+                    kill(a-&gt;pid, SIGKILL);
+            _exit(EXIT_SUCCESS);
+        }
+    }
+#endif
+    nextp = &amp;init_action_list;
+    while ((a = *nextp) != NULL) {
+        if ((a-&gt;action_type &amp; ~SYSINIT) == 0 &amp;&amp; a-&gt;pid == 0) {---忽略SYSINIT类型action，并且对pid为0的特殊情况交给init去处理。
+            *nextp = a-&gt;next;
+            free(a);
+        } else {
+            nextp = &amp;a-&gt;next;
+        }
+    }
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>SIGQUIT信号调用exec_restart_action()来执行restart操作。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>/* Handler for QUIT - exec &quot;restart&quot; action,
+ * else (no such action defined) do nothing */
+static void exec_restart_action(void)
+{
+    struct init_action *a;
+
+    for (a = init_action_list; a; a = a-&gt;next) {
+        if (!(a-&gt;action_type &amp; RESTART))-----------------------只执行RESTART类型action，如果没有定义RESTART类型action则不会执行以下操作。
+            continue;
+        reset_sighandlers_and_unblock_sigs();
+
+        run_shutdown_and_kill_processes();---------------------执行SHUTDOWN类型action，并且kill所有除init之外的进程。
+
+#ifdef RB_ENABLE_CAD
+        reboot(RB_ENABLE_CAD); /* misnomer */------------------CAD的意思是Ctrl-Alt_del，这里表示按下Ctrl-Alt-Del立即重启。
+#endif
+
+        if (open_stdio_to_tty(a-&gt;terminal)) {
+            dbg_message(L_CONSOLE, &quot;Trying to re-exec %s&quot;, a-&gt;command);
+
+            init_exec(a-&gt;command);------------------------------执行RESTART类型action。
+        }
+        /* Open or exec failed */
+        pause_and_low_level_reboot(RB_HALT_SYSTEM);-------------重启一个子进程执行RB_HALT_SYSTEM类型重启。
+        /* not reached */
+    }
+}
+
+static void run_shutdown_and_kill_processes(void)
+{
+    run_actions(SHUTDOWN);--------------------------------------首先执行SHUTDOWN类型action。
+
+    message(L_CONSOLE | L_LOG, &quot;The system is going down NOW!&quot;);
+
+    /* Send signals to every process _except_ pid 1 */
+    kill(-1, SIGTERM);----------------------------------------然后分别对init进程之外的所有进程发送SIGTERM和SIGKILL信号。
+    message(L_CONSOLE, &quot;Sent SIG%s to all processes&quot;, &quot;TERM&quot;);
+    sync();
+    sleep(1);
+
+    kill(-1, SIGKILL);
+    message(L_CONSOLE, &quot;Sent SIG%s to all processes&quot;, &quot;KILL&quot;);
+    sync();
+    /*sleep(1); - callers take care about making a pause */
+}
+
+static void pause_and_low_level_reboot(unsigned magic)
+{
+    pid_t pid;
+
+    /* Allow time for last message to reach serial console, etc */
+    sleep(1);
+
+    pid = vfork();
+    if (pid == 0) { /* child */------------------------------创建一个子进程执行reboot命令。
+        reboot(magic);
+        _exit(EXIT_SUCCESS);
+    }
+    while (1)
+        sleep(1);
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>不同信号对应不同重启操作，SIGTERM对应RB_AUTOBOOT；SIGUSR2对应RB_POWER_OFF；其余对应RB_HALT_SYSTEM。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>/* The SIGPWR/SIGUSR[12]/SIGTERM handler */
+static void halt_reboot_pwoff(int sig)
+{
+    const char *m;
+    unsigned rb;
+
+    reset_sighandlers_and_unblock_sigs();
+
+    run_shutdown_and_kill_processes();
+
+    m = &quot;halt&quot;;
+    rb = RB_HALT_SYSTEM;
+    if (sig == SIGTERM) {
+        m = &quot;reboot&quot;;
+        rb = RB_AUTOBOOT;
+    } else if (sig == SIGUSR2) {
+        m = &quot;poweroff&quot;;
+        rb = RB_POWER_OFF;
+    }
+    message(L_CONSOLE, &quot;Requesting system %s&quot;, m);
+    pause_and_low_level_reboot(rb);
+    /* not reached */
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>上面这些操作对应的reboot系统调用，不同的magic表示不同的做操，具体看看内核中都做了哪些动作。</p>
+
+<p>看看libc的sys/reboot.h中的定义：</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>/* Perform a hard reset now.  */
+#define RB_AUTOBOOT    0x01234567
+/* Halt the system.  */
+#define RB_HALT_SYSTEM    0xcdef0123
+/* Enable reboot using Ctrl-Alt-Delete keystroke.  */
+#define RB_ENABLE_CAD    0x89abcdef
+/* Disable reboot using Ctrl-Alt-Delete keystroke.  */
+#define RB_DISABLE_CAD    0
+/* Stop system and switch power off if possible.  */
+#define RB_POWER_OFF    0x4321fedc
+/* Suspend system using software suspend.  */
+#define RB_SW_SUSPEND    0xd000fce2
+/* Reboot system into new kernel.  */
+#define RB_KEXEC    0x45584543
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>内核中命令定义如下：</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>#define    LINUX_REBOOT_CMD_RESTART    0x01234567------------------------重启系统，使用kernel_restart()。
+#define    LINUX_REBOOT_CMD_HALT        0xCDEF0123-----------------------挂起系统，使用kernel_halt()。
+#define    LINUX_REBOOT_CMD_CAD_ON        0x89ABCDEF---------------------内核变量C_A_D置位，如果为1则ctrl_alt_del()中将调用deffered_cad()函数。里面执行kernel_restart()。
+#define    LINUX_REBOOT_CMD_CAD_OFF    0x00000000
+#define    LINUX_REBOOT_CMD_POWER_OFF    0x4321FEDC----------------------关闭系统，移除所有供电。调用kernel_power_off()。
+#define    LINUX_REBOOT_CMD_RESTART2    0xA1B2C3D4-----------------------从用户空间传入字符串，然后重启系统调用kernel_restart()。
+#define    LINUX_REBOOT_CMD_SW_SUSPEND    0xD000FCE2---------------------进入休眠，调用hibernate()。
+#define    LINUX_REBOOT_CMD_KEXEC        0x45584543----------------------暂停当前系统，重启一个新内核。
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<h1 id="3-etc-inittab解析">3. /etc/inittab解析</h1>
+
+<p>inittab文件中一行表示一个action。</p>
+
+<p>每一行有4个组成部分，分别是：id、runlevels、action、process。</p>
+
+<p>id表示process使用的tty设备；runlevels在busybox中不支持；action是sysinit、wait、once、respawn、askfirst中的一种；process是命令及其参数。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code># /etc/inittab
+#
+# Copyright (C) 2001 Erik Andersen 
+#
+# Note: BusyBox init doesn't support runlevels.  The runlevels field is
+# completely ignored by BusyBox init. If you want runlevels, use
+# sysvinit.
+#
+# Format for each entry: :::
+#
+# id        == tty to run on, or empty for /dev/console
+# runlevels == ignored
+# action    == one of sysinit, respawn, askfirst, wait, and once
+# process   == program to run
+
+# Startup the system
+::sysinit:/bin/mount -t proc proc /proc
+::sysinit:/bin/mount -o remount,rw /
+::sysinit:/bin/mkdir -p /dev/pts
+::sysinit:/bin/mkdir -p /dev/shm
+::sysinit:/bin/mount -a
+::sysinit:/bin/hostname -F /etc/hostname
+# now run any rc scripts
+::sysinit:/etc/init.d/rcS----------------------------------------------------------------sysinit的最后一个是调用rcS。
+
+# Put a getty on the serial port
+console::respawn:/sbin/getty -L -n -l /etc/autologin console 0 vt100 # GENERIC_SERIAL----login启动的console。
+
+# Stuff to do for the 3-finger salute
+#::ctrlaltdel:/sbin/reboot
+
+# Stuff to do before rebooting
+::shutdown:/etc/init.d/rcK---------------------------------------------------------------SHUTDOWN最先执行rcK。
+::shutdown:/sbin/swapoff -a
+::shutdown:/bin/umount -a -r
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>下面看看一个rcS示例，结合上面init进程树。</p>
+
+<p>init通过/etc/inittab调用/etc/init.d/rcS，调用了S01logging和S50sshd，创建了syslogd、klogd、sshd几个进程。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>#!/bin/sh
+
+# To start mdev
+echo &quot;Starting mdev...&quot;
+echo /sbin/mdev &gt; /proc/sys/kernel/hotplug
+mdev -s
+mount -t debugfs none /sys/kernel/debug
+
+# To enable watchdog
+#watchdog -t 14 -T 44 /dev/watchdog
+
+# To start network
+printf &quot;Starting network: &quot;
+/sbin/ifup -a
+[ $? = 0 ] &amp;&amp; echo &quot;OK&quot; || echo &quot;FAIL&quot;
+
+#To start syslog
+/etc/init.d/S01logging start
+
+#
+# To start sshd
+#
+/etc/init.d/S50sshd start
+...
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>init还创建了login进程，getty打开tty设备，然后调用/bin/autologin。</p>
+
+<p>/bin/autologin中调用/bin/login，通过-f跳过验证。</p>
+
+<pre><code>#!/bin/sh
+
+/bin/login -f root----------------------选项-f表示不对root用户验证。
+</code></pre>
+
+<p>从开机到login的路径为，init -&gt; /etc/inittab -&gt; /sbin/getty -&gt; /etc/autologin -&gt;
+/bin/login。</p>
+
+<h1 id="4-login进程">4. login进程</h1>
+
+<p>login进程主要工作是处理用户验证，验证通过后设置新用户环境，并启动shell。</p>
+
+<p>如果没有设置ENABLE_LOGIN_SESSION_AS_CHILD的情况下，shell进程会替代loging进程。</p>
+
+<p>用户就得到一个新的shell环境，进行各种业务处理。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>int login_main(int argc UNUSED_PARAM, char **argv)
+{
+    enum {
+        LOGIN_OPT_f = (1&lt;&lt;0),
+        LOGIN_OPT_h = (1&lt;&lt;1),
+        LOGIN_OPT_p = (1&lt;&lt;2),
+    };
+    char *fromhost;
+...
+    openlog(applet_name, LOG_PID | LOG_CONS, LOG_AUTH);
+
+    while (1) {
+        /* flush away any type-ahead (as getty does) */
+        tcflush(0, TCIFLUSH);
+
+        if (!username[0])
+            get_username_or_die(username, sizeof(username));
+
+#if ENABLE_PAM...
+#else /* not PAM */
+        pw = getpwnam(username);
+        if (!pw) {
+            strcpy(username, &quot;UNKNOWN&quot;);
+            goto fake_it;
+        }
+
+        if (pw-&gt;pw_passwd[0] == '!' || pw-&gt;pw_passwd[0] == '*')
+            goto auth_failed;
+
+        if (opt &amp; LOGIN_OPT_f)
+            break; /* -f USER: success without asking passwd */
+
+        if (pw-&gt;pw_uid == 0 &amp;&amp; !is_tty_secure(short_tty))
+            goto auth_failed;
+
+        /* Don't check the password if password entry is empty (!) */
+        if (!pw-&gt;pw_passwd[0])
+            break;
+ fake_it:
+        if (ask_and_check_password(pw) &gt; 0)
+            break;
+#endif /* ENABLE_PAM */...
+    } /* while (1) */
+
+    alarm(0);
+
+    if (pw-&gt;pw_uid != 0)
+        die_if_nologin();
+
+#if ENABLE_LOGIN_SESSION_AS_CHILD-----------------------------------------------------没有定义此宏的情况下，新建的shell进程就会替代当前/bin/login进程。
+    child_pid = vfork();
+    if (child_pid != 0) {
+        if (child_pid &lt; 0)
+            bb_perror_msg(&quot;vfork&quot;);
+        else {
+            if (safe_waitpid(child_pid, NULL, 0) == -1)
+                bb_perror_msg(&quot;waitpid&quot;);
+            update_utmp_DEAD_PROCESS(child_pid);
+        }
+        IF_PAM(login_pam_end(pamh);)
+        return 0;
+    }
+#endif
+
+    IF_SELINUX(initselinux(username, full_tty, &amp;user_sid);)
+
+    fchown(0, pw-&gt;pw_uid, pw-&gt;pw_gid);-------------------------------------------------将当前用户切换到登录用户id和用户组id。
+    fchmod(0, 0600);
+
+    update_utmp(getpid(), USER_PROCESS, short_tty, username, run_by_root ? opt_host : NULL);
+
+    /* We trust environment only if we run by root */
+    if (ENABLE_LOGIN_SCRIPTS &amp;&amp; run_by_root)
+        run_login_script(pw, full_tty);
+
+    change_identity(pw);
+    setup_environment(pw-&gt;pw_shell,
+            (!(opt &amp; LOGIN_OPT_p) * SETUP_ENV_CLEARENV) + SETUP_ENV_CHANGEENV,
+            pw);
+...
+    if (access(&quot;.hushlogin&quot;, F_OK) != 0)
+        motd();
+
+    if (pw-&gt;pw_uid == 0)
+        syslog(LOG_INFO, &quot;root login%s&quot;, fromhost);
+
+    if (ENABLE_FEATURE_CLEAN_UP)
+        free(fromhost);
+
+    IF_SELINUX(set_current_security_context(user_sid);)
+
+    signal(SIGINT, SIG_DFL);
+
+    /* Exec login shell with no additional parameters */
+    run_shell(pw-&gt;pw_shell, 1, NULL);--------------------------------------------------运行shell程序，比如这里指定/bin/sh。
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>run_shell()根据shell指定的路径，additional_args附加参数到shell。</p>
+
+<p>然后调用execv()来替换当前进程。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>void FAST_FUNC run_shell(const char *shell, int loginshell, const char **additional_args)
+{
+    const char **args;
+
+    args = additional_args;
+    while (args &amp;&amp; *args)
+        args++;
+
+    args = xmalloc(sizeof(char*) * (2 + (args - additional_args)));
+
+    if (!shell || !shell[0])
+        shell = DEFAULT_SHELL;------------------------------------------------------------shell参数可以通过pw-&gt;pw_shell指定，否则使用默认的DEFAULT_SHELL，指向/bin/sh。
+
+    args[0] = bb_get_last_path_component_nostrip(shell);
+    if (loginshell)
+        args[0] = xasprintf(&quot;-%s&quot;, args[0]);
+    args[1] = NULL;
+    if (additional_args) {
+        int cnt = 1;
+        for (;;)
+            if ((args[cnt++] = *additional_args++) == NULL)
+                break;
+    }
+...
+    execv(shell, (char **) args);
+    bb_perror_msg_and_die(&quot;can't execute '%s'&quot;, shell);
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<h1 id="5-ash-shell">5. ash shell</h1>
+
+<p>具体shell使用哪一种实现，是根据.config中的&rdquo;Shells&rdquo;设置。</p>
+
+<p>结合上面的shell指向/bin/sh，所以最终使用的实现是ash。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>CONFIG_SH_IS_ASH=y
+# CONFIG_SH_IS_HUSH is not set
+# CONFIG_SH_IS_NONE is not set
+# CONFIG_BASH_IS_ASH is not set
+# CONFIG_BASH_IS_HUSH is not set
+CONFIG_BASH_IS_NONE=y
+CONFIG_ASH=y
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>下面看看ash shell的处理流程，主要有初始化各种全局数据、解析参数，解析/etc/profile、/HOME/.profile并执行其中命令。</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>int ash_main(int argc UNUSED_PARAM, char **argv)
+{
+    volatile smallint state;
+    struct jmploc jmploc;
+    struct stackmark smark;
+
+    /* Initialize global data */
+    INIT_G_misc();---------------------------------------------------------------全局变量设置。
+    INIT_G_memstack();
+    INIT_G_var();
+#if ENABLE_ASH_ALIAS
+    INIT_G_alias();
+#endif
+    INIT_G_cmdtable();
+
+#if PROFILE
+    monitor(4, etext, profile_buf, sizeof(profile_buf), 50);
+#endif
+...
+    if (argv[0] &amp;&amp; argv[0][0] == '-')--------------------------------------------如果argv[0]以‘-’开头，则表示在login上下文中。
+        isloginsh = 1;
+    if (isloginsh) {-------------------------------------------------------------如果当前状态时在login中，那么需要解析/etc/profile、$HOME/.profile、或者ENV变量，并执行其中内容。
+        const char *hp;
+
+        state = 1;
+        read_profile(&quot;/etc/profile&quot;);--------------------------------------------解析/etc/profile，并执行其中的命令。
+ state1:
+        state = 2;
+        hp = lookupvar(&quot;HOME&quot;);
+        if (hp)
+            read_profile(&quot;$HOME/.profile&quot;);
+    }
+ state2:
+    state = 3;
+    if (
+#ifndef linux
+     getuid() == geteuid() &amp;&amp; getgid() == getegid() &amp;&amp;
+#endif
+     iflag
+    ) {
+        const char *shinit = lookupvar(&quot;ENV&quot;);
+        if (shinit != NULL &amp;&amp; *shinit != '\0')
+            read_profile(shinit);
+    }
+    popstackmark(&amp;smark);
+ state3:
+    state = 4;
+    if (minusc) {
+        evalstring(minusc, 0);
+    }
+
+    if (sflag || minusc == NULL) {
+#if MAX_HISTORY &gt; 0 &amp;&amp; ENABLE_FEATURE_EDITING_SAVEHISTORY
+        if (iflag) {
+            const char *hp = lookupvar(&quot;HISTFILE&quot;);
+            if (!hp) {
+                hp = lookupvar(&quot;HOME&quot;);
+                if (hp) {
+                    INT_OFF;
+                    hp = concat_path_file(hp, &quot;.ash_history&quot;);
+                    setvar0(&quot;HISTFILE&quot;, hp);
+                    free((char*)hp);
+                    INT_ON;
+                    hp = lookupvar(&quot;HISTFILE&quot;);
+                }
+            }
+            if (hp)
+                line_input_state-&gt;hist_file = hp;
+# if ENABLE_FEATURE_SH_HISTFILESIZE
+            hp = lookupvar(&quot;HISTFILESIZE&quot;);
+            line_input_state-&gt;max_history = size_from_HISTFILESIZE(hp);
+# endif
+        }
+#endif
+ state4: /* XXX ??? - why isn't this before the &quot;if&quot; statement */
+        cmdloop(1);
+    }
+#if PROFILE
+    monitor(0);
+#endif
+#ifdef GPROF
+    {
+        extern void _mcleanup(void);
+        _mcleanup();
+    }
+#endif
+    TRACE((&quot;End of main reached\n&quot;));
+    exitshell();
+}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>再来看看上面提到的/etc/profile：</p>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<pre><code>export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+
+if [ &quot;$PS1&quot; ]; then
+    if [ &quot;`id -u`&quot; -eq 0 ]; then
+        export PS1='# '
+    else
+        export PS1='$ '
+    fi
+fi
+
+export PAGER='/bin/more '
+export EDITOR='/bin/vi'
+
+# Source configuration files from /etc/profile.d
+for i in /etc/profile.d/*.sh ; do--------------------------------遍历/etc/profile.d目录下的所有*.sh文件，并且执行。
+    if [ -r &quot;$i&quot; ]; then
+        . $i
+    fi
+    unset i
+done
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/e49cf30004be490ea64cb96633d3f282.gif" alt="复制代码" /></p>
+
+<p>至此大概对从init到/etc/inittab，在从/etc/inittab启动各种服务，直至进入shell的流程有了大概的了解。</p>
+
+<p>这里没有对ash shell、login等做详细分析。</p>
+
+<p>联系方式:arnoldlu@qq.com</p>
+
+<p>分类: Linux相关学习总结</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

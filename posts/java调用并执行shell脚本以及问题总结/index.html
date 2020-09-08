@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>java调用并执行shell脚本以及问题总结 | 开发者问答集锦</title>
+    <meta property="og:title" content="java调用并执行shell脚本以及问题总结 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="java调用并执行shell脚本以及问题总结">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/java%E8%B0%83%E7%94%A8%E5%B9%B6%E6%89%A7%E8%A1%8Cshell%E8%84%9A%E6%9C%AC%E4%BB%A5%E5%8F%8A%E9%97%AE%E9%A2%98%E6%80%BB%E7%BB%93/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">java调用并执行shell脚本以及问题总结</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="背景">背景</h2>
+
+<p>我们在开发过程中，大部分是java开发， 而在文本处理过程中，主要就是脚本进行开发。 java开发的特点就是我们可以很早地进行TDDL， METAQ
+等等地对接； 而脚本开发的特点就是在进行批处理的时候非常方便。 前阵子我遇到这么一个需求场景： 对抓取的数据进行打包，
+后来又遇到我要通过脚本进行抓取，比如nodejs下基于phantomjs的casperjs爬虫。</p>
+
+<h2 id="解决方法">解决方法</h2>
+
+<p>对于第一个问题：java抓取，并且把结果打包。那么比较直接的做法就是，java接收各种消息（db，metaq等等），然后借助于jstorm集群进行调度和抓取。
+最后把抓取的结果保存到一个文件中，并且通过调用shell打包， 回传。 也许有同学会问，
+为什么不直接把java调用odps直接保存文件，答案是，我们的集群不是hz集群，直接上传odps速度很有问题，因此先打包比较合适。（这里不纠结设计了，我们回到正题）</p>
+
+<h2 id="java调用shell的方法">java调用shell的方法</h2>
+
+<h3 id="通过processbuilder进行调度">通过ProcessBuilder进行调度</h3>
+
+<p>这种方法比较直观，而且参数的设置也比较方便， 比如我在实践中的代码(我隐藏了部分业务代码)：</p>
+
+<pre><code>ProcessBuilderpb = new ProcessBuilder(&quot;./&quot; + RUNNING_SHELL_FILE, param1,
+                                              param2, param3);
+        pb.directory(new File(SHELL_FILE_DIR));
+        int runningStatus = 0;
+        String s = null;
+        try {
+            Process p = pb.start();
+            try {
+                runningStatus = p.waitFor();
+            } catch (InterruptedException e) {
+            }
+ 
+        } catch (IOException e) {
+        }
+        if (runningStatus != 0) {
+        }
+        return;
+</code></pre>
+
+<p>这里有必要解释一下几个参数：</p>
+
+<p>RUNNING_SHELL_FILE：要运行的脚本</p>
+
+<p>SHELL_FILE_DIR：要运行的脚本所在的目录； 当然你也可以把要运行的脚本写成全路径。</p>
+
+<p>runningStatus：运行状态，0标识正常。 详细可以看java文档。</p>
+
+<p>param1, param2, param3：可以在RUNNING_SHELL_FILE脚本中直接通过1,2,$3分别拿到的参数。</p>
+
+<h3 id="直接通过系统runtime执行shell">直接通过系统Runtime执行shell</h3>
+
+<p>这个方法比较暴力，也比较常用， 代码如下：</p>
+
+<pre><code>p = Runtime.getRuntime().exec(SHELL_FILE_DIR + RUNNING_SHELL_FILE + &quot; &quot;+param1+&quot; &quot;+param2+&quot; &quot;+param3);
+p.waitFor();
+</code></pre>
+
+<p>我们发现，通过Runtime的方式并没有builder那么方便，特别是参数方面，必须自己加空格分开，因为exec会把整个字符串作为shell运行。</p>
+
+<h2 id="可能存在的问题以及解决方法">可能存在的问题以及解决方法</h2>
+
+<p>如果你觉得通过上面就能满足你的需求，那么可能是要碰壁了。你会遇到以下情况。</p>
+
+<h3 id="没权限运行">没权限运行</h3>
+
+<p>这个情况我们团队的朱东方就遇到了， 在做DTS迁移的过程中，要执行包里面的shell脚本， 解压出来了之后，发现执行不了。 那么就按照上面的方法授权吧</p>
+
+<h3 id="java进行一直等待shell返回">java进行一直等待shell返回</h3>
+
+<p>这个问题估计更加经常遇到。 原因是， shell脚本中有echo或者print输出， 导致缓冲区被用完了! 为了避免这种情况， 一定要把缓冲区读一下，
+好处就是，可以对shell的具体运行状态进行log出来。 比如上面我的例子中我会变成：</p>
+
+<pre><code>ProcessBuilderpb = new ProcessBuilder(&quot;./&quot; + RUNNING_SHELL_FILE, keyword.trim(),
+                                              taskId.toString(), fileName);
+        pb.directory(new File(CASPERJS_FILE_DIR));
+        int runningStatus = 0;
+        String s = null;
+        try {
+            Process p = pb.start();
+            BufferedReaderstdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            BufferedReaderstdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+            while ((s = stdInput.readLine()) != null) {
+                LOG.error(s);
+            }
+            while ((s = stdError.readLine()) != null) {
+                LOG.error(s);
+            }
+            try {
+                runningStatus = p.waitFor();
+            } catch (InterruptedException e) {
+            }
+</code></pre>
+
+<p>记得在start()之后， waitFor（）之前把缓冲区读出来打log， 就可以看到你的shell为什么会没有按照预期运行。
+这个还有一个好处是，可以读shell里面输出的结果， 方便java代码进一步操作。</p>
+
+<p>也许你还会遇到这个问题，明明手工可以运行的命令，java调用的shell中某一些命令居然不能执行，报错：命令不存在！</p>
+
+<p>比如我在使用casperjs的时候，手工去执行shell明明是可以执行的，但是java调用的时候，发现总是出错。 通过读取缓冲区就能发现错误日志了。
+我发现即便自己把安装的casperjs的bin已经加入了path中（/etc/profile, 各种bashrc中）还不够。 比如：</p>
+
+<pre><code>exportNODE_HOME=&quot;/home/admin/node&quot;
+exportCASPERJS_HOME=&quot;/home/admin/casperjs&quot;
+exportPHANTOMJS_HOME=&quot;/home/admin/phantomjs&quot;
+exportPATH=$PATH:$JAVA_HOME/bin:/root/bin:$NODE_HOME/bin:$CASPERJS_HOME/bin:$PHANTOMJS_HOME/bin
+</code></pre>
+
+<p>原来是因为java在调用shell的时候，默认用的是系统的/bin/下的指令。特别是你用root权限运行的时候。
+这时候，你要在/bin下加软链了。针对我上面的例子，就要在/bin下加软链：</p>
+
+<pre><code>ln -s /home/admin/casperjs/bin/casperjscasperjs;
+ln -s /home/admin/node/bin/nodenode;
+ln -s /home/admin/phantomjs/bin/phantomjsphantomjs;
+</code></pre>
+
+<p>这样，问题就可以解决了。</p>
+
+<h3 id="如果是通过java调用shell进行打包-那么要注意路径的问题了">如果是通过java调用shell进行打包，那么要注意路径的问题了</h3>
+
+<p>因为shell里面tar的压缩和解压可不能直接写：</p>
+
+<p>tar -zcf /home/admin/data/result.tar.gz /home/admin/data/result</p>
+
+<p>直接给你报错，因为tar的压缩源必须到路径下面， 因此可以写成</p>
+
+<p>tar -zcf /home/admin/data/result.tar.gz -C /home/admin/data/ result</p>
+
+<h3 id="如果我的shell是在jar包中怎么办">如果我的shell是在jar包中怎么办？</h3>
+
+<p>答案是：解压出来。再按照上面指示进行操作。（1）找到路径</p>
+
+<pre><code>String jarPath = findClassJarPath(ClassLoaderUtil.class);
+        JarFiletopLevelJarFile = null;
+        try {
+            topLevelJarFile = new JarFile(jarPath);
+            Enumeration entries = topLevelJarFile.entries();
+            while (entries.hasMoreElements()) {
+                JarEntryentry = entries.nextElement();
+                if (!entry.isDirectory() &amp;&amp; entry.getName().endsWith(&quot;.sh&quot;)) {
+                    对你的shell文件进行处理
+                }
+            }
+</code></pre>
+
+<p>对文件处理的方法就简单了，直接touch一个临时文件，然后把数据流写入，代码：</p>
+
+<pre><code>FileUtils.touch(tempjline);
+tempjline.deleteOnExit();
+FileOutputStreamfos = new FileOutputStream(tempjline);
+IOUtils.copy(ClassLoaderUtil.class.getResourceAsStream(r), fos);
+fos.close();
+</code></pre>
+
+<p>有这个这个东东，相信大家会减少踩坑，而且大胆地使用java和脚本之间的交互吧。 java可以调用shell，那么shell再调用其他就方便了。 记得一点，
+不要过度地依赖缓冲区进行线程之间的通信。原因自己去学习吧。</p>
+
+<p>via: <a href="https://yq.aliyun.com/articles/2362">https://yq.aliyun.com/articles/2362</a></p>
+
+<p>转载地址：<a href="http://www.tuicool.com/articles/quIVvaB">http://www.tuicool.com/articles/quIVvaB</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

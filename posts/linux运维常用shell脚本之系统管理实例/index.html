@@ -1,0 +1,1058 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux运维常用shell脚本之系统管理实例 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux运维常用shell脚本之系统管理实例 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux运维常用shell脚本之系统管理实例">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E8%BF%90%E7%BB%B4%E5%B8%B8%E7%94%A8shell%E8%84%9A%E6%9C%AC%E4%B9%8B%E7%B3%BB%E7%BB%9F%E7%AE%A1%E7%90%86%E5%AE%9E%E4%BE%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux运维常用shell脚本之系统管理实例</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="1-选择ssh连接主机">1、选择SSH连接主机</h1>
+
+<p>写一个配置文件保存被监控主机SSH连接信息，文件内容格式：主机名 IP User Port</p>
+
+<pre><code>#!/bin/bash
+PS3=&quot;Please input number: &quot;
+HOST_FILE=host
+while true; do
+    select NAME in $(awk '{print $1}' $HOST_FILE) quit; do
+        [ ${NAME:=empty} == &quot;quit&quot; ] &amp;&amp; exit 0
+        IP=$(awk -v NAME=${NAME} '$1==NAME{print $2}' $HOST_FILE)
+        USER=$(awk -v NAME=${NAME} '$1==NAME{print $3}' $HOST_FILE)
+        PORT=$(awk -v NAME=${NAME} '$1==NAME{print $4}' $HOST_FILE)
+        if [ $IP ]; then
+            echo &quot;Name: $NAME, IP: $IP&quot;
+            ssh -o StrictHostKeyChecking=no -p $PORT -i id_rsa $USER@$IP  # 密钥登录
+            break
+        else
+            echo &quot;Input error, Please enter again!&quot;
+            break
+        fi
+    done
+done
+</code></pre>
+
+<h1 id="2-屏蔽每分钟ssh暴力破解超过10次的ip">2、屏蔽每分钟SSH暴力破解超过10次的IP</h1>
+
+<p>方法1：通过lastb获取登录状态:</p>
+
+<pre><code>DATE=$(date +&quot;%a %b %e %H:%M&quot;) #星期月天时分  %e单数字时显示7，而%d显示07
+ABNORMAL_IP=$(lastb |grep &quot;$DATE&quot; |awk '{a[$3]++}END{for(i in a)if(a[i]&gt;10)print i}')
+for IP in $ABNORMAL_IP; do
+    if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then
+        iptables -I INPUT -s $IP -j DROP
+    fi
+done
+</code></pre>
+
+<p>方法2：通过日志获取登录状态</p>
+
+<pre><code>DATE=$(date +&quot;%b %d %H&quot;)
+ABNORMAL_IP=&quot;$(tail -n10000 /var/log/auth.log |grep &quot;$DATE&quot; |awk '/Failed/{a[$(NF-3)]++}END{for(i in a)if(a[i]&gt;5)print i}')&quot;
+for IP in $ABNORMAL_IP; do
+    if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then
+        iptables -A INPUT -s $IP -j DROP
+        echo &quot;$(date +&quot;%F %T&quot;) - iptables -A INPUT -s $IP -j DROP&quot; &gt;&gt;~/ssh-login-limit.log
+    fi
+done
+</code></pre>
+
+<h1 id="3-expect实现ssh免交互执行命令">3、Expect实现SSH免交互执行命令</h1>
+
+<p>需要先安装expect工具。</p>
+
+<p><strong>expect涉及用法说明：</strong></p>
+
+<p>命令描述</p>
+
+<p>set可以设置超时，也可以设置变量</p>
+
+<p>timeout超时等待时间，默认10s</p>
+
+<p>spawn执行一个命令</p>
+
+<p>expect &ldquo;&ldquo;匹配输出的内容</p>
+
+<p>exp_continue继续执行下面匹配</p>
+
+<p>\r回车</p>
+
+<p>$argc统计位置参数数量</p>
+
+<p>[lindex $argv 0]位置参数</p>
+
+<p>puts打印字符串，类似于echo</p>
+
+<p>expect{&hellip;}输入多行记录</p>
+
+<p>方法1：EOF标准输出作为expect标准输入</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>|</p>
+
+<p><code>#!/bin/bash</code></p>
+
+<p><code>USER=root</code></p>
+
+<p><code>PASS=123.com</code></p>
+
+<p><code>IP=192.168.1.120</code></p>
+
+<p><code>expect &lt;</code></p>
+
+<p><code>set</code> <code>timeout 30</code></p>
+
+<p><code>spawn</code><code>ssh</code> <code>$USER@$IP</code></p>
+
+<p><code>expect {</code></p>
+
+<p><code>&quot;(yes/no)&quot;</code> <code>{send</code><code>&quot;yes\r&quot;</code><code>; exp_continue}</code></p>
+
+<p><code>&quot;password:&quot;</code> <code>{send</code><code>&quot;$PASS\r&quot;</code><code>}</code></p>
+
+<p><code>}</code></p>
+
+<p><code>expect</code><code>&quot;$USER@*&quot;</code> <code>{send</code><code>&quot;$1\r&quot;</code><code>}</code></p>
+
+<p><code>expect</code><code>&quot;$USER@*&quot;</code> <code>{send</code><code>&quot;exit\r&quot;</code><code>}</code></p>
+
+<p><code>expect eof</code></p>
+
+<p><code>EOF</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>方法2：</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>|</p>
+
+<p><code>#!/bin/bash</code></p>
+
+<p><code>USER=root</code></p>
+
+<p><code>PASS=123.com</code></p>
+
+<p><code>IP=192.168.1.120</code></p>
+
+<p><code>expect -c &quot;</code></p>
+
+<p><code>spawn</code><code>ssh</code> <code>$USER@$IP</code></p>
+
+<p><code>expect {</code></p>
+
+<p><code>\&quot;(</code><code>yes</code><code>/no</code><code>)\&quot; {send \&quot;</code><code>yes</code><code>\r\&quot;; exp_continue}</code></p>
+
+<p><code>\&quot;password:\&quot; {send \&quot;$PASS\r\&quot;; exp_continue}</code></p>
+
+<p><code>\&quot;$USER@*\&quot; {send \&quot;</code><code>df</code> <code>-h\r</code><code>exit</code><code>\r\&quot;; exp_continue}</code></p>
+
+<p><code>}&quot;</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>方法3：将expect脚本独立出来</p>
+
+<p>login.exp登录文件：</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>|</p>
+
+<p><code>#!/usr/bin/expect</code></p>
+
+<p><code>set</code> <code>ip [lindex $argv 0]</code></p>
+
+<p><code>set</code> <code>user [lindex $argv 1]</code></p>
+
+<p><code>set</code> <code>passwd</code> <code>[lindex $argv 2]</code></p>
+
+<p><code>set</code> <code>cmd [lindex $argv 3]</code></p>
+
+<p><code>if</code> <code>{ $argc != 4 } {</code></p>
+
+<p><code>puts</code><code>&quot;Usage: expect login.exp ip user passwd&quot;</code></p>
+
+<p><code>exit</code> <code>1</code></p>
+
+<p><code>}</code></p>
+
+<p><code>set</code> <code>timeout 30</code></p>
+
+<p><code>spawn</code><code>ssh</code> <code>$user@$ip</code></p>
+
+<p><code>expect {</code></p>
+
+<p><code>&quot;(yes/no)&quot;</code> <code>{send</code><code>&quot;yes\r&quot;</code><code>; exp_continue}</code></p>
+
+<p><code>&quot;password:&quot;</code> <code>{send</code><code>&quot;$passwd\r&quot;</code><code>}</code></p>
+
+<p><code>}</code></p>
+
+<p><code>expect</code><code>&quot;$user@*&quot;</code> <code>{send</code><code>&quot;$cmd\r&quot;</code><code>}</code></p>
+
+<p><code>expect</code><code>&quot;$user@*&quot;</code> <code>{send</code><code>&quot;exit\r&quot;</code><code>}</code></p>
+
+<p><code>expect eof</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>执行命令脚本：</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>|</p>
+
+<p><code>#!/bin/bash</code></p>
+
+<p><code>HOST_INFO=user_info</code></p>
+
+<p><code>for</code> <code>ip</code><code>in</code> <code>$(</code><code>awk</code> <code>'{print $1}'</code> <code>$HOST_INFO)</code></p>
+
+<p><code>do</code></p>
+
+<p><code>user=$(</code><code>awk</code> <code>-</code><code>v</code> <code>I=</code><code>&quot;$ip&quot;</code> <code>'I==$1{print $2}'</code> <code>$HOST_INFO)</code></p>
+
+<p><code>pass=$(</code><code>awk</code> <code>-</code><code>v</code> <code>I=</code><code>&quot;$ip&quot;</code> <code>'I==$1{print $3}'</code> <code>$HOST_INFO)</code></p>
+
+<p><code>expect login.exp $ip $user $pass $1</code></p>
+
+<p><code>done</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>SSH连接信息文件：</p>
+
+<h1 id="cat-user-info">cat user_info</h1>
+
+<p>192.168.1.120 root 123456</p>
+
+<h1 id="4-监控cpu利用率">4、监控CPU利用率</h1>
+
+<p>借助vmstat工具来分析CPU统计信息。</p>
+
+<pre><code>#!/bin/bash
+DATE=$(date +%F&quot; &quot;%H:%M)
+IP=$(ifconfig eth0 |awk -F '[ :]+' '/inet addr/{print $4}')  # 只支持CentOS6
+MAIL=&quot;example@mail.com&quot;
+if ! which vmstat &amp;&gt;/dev/null; then
+    echo &quot;vmstat command no found, Please install procps package.&quot; 
+    exit 1
+fi
+US=$(vmstat |awk 'NR==3{print $13}')
+SY=$(vmstat |awk 'NR==3{print $14}')
+IDLE=$(vmstat |awk 'NR==3{print $15}')
+WAIT=$(vmstat |awk 'NR==3{print $16}')
+USE=$(($US+$SY))
+if [ $USE -ge 50 ]; then
+    echo &quot;
+    Date: $DATE
+    Host: $IP
+    Problem: CPU utilization $USE
+    &quot; | mail -s &quot;CPU Monitor&quot; $MAIL
+fi
+</code></pre>
+
+<h1 id="5-监控内存利用率">5、监控内存利用率</h1>
+
+<pre><code>#!/bin/bash
+DATE=$(date +%F&quot; &quot;%H:%M)
+IP=$(ifconfig eth0 |awk -F '[ :]+' '/inet addr/{print $4}')  
+MAIL=&quot;example@mail.com&quot;
+TOTAL=$(free -m |awk '/Mem/{print $2}')
+USE=$(free -m |awk '/Mem/{print $3-$6-$7}')
+FREE=$(($TOTAL-$USE))
+# 内存小于1G发送报警邮件
+if [ $FREE -lt 1024 ]; then
+    echo &quot;
+    Date: $DATE
+    Host: $IP
+    Problem: Total=$TOTAL,Use=$USE,Free=$FREE
+    &quot; | mail -s &quot;Memory Monitor&quot; $MAIL
+fi
+</code></pre>
+
+<h1 id="6-监控硬盘利用率">6、监控硬盘利用率</h1>
+
+<pre><code>#!/bin/bash
+DATE=$(date +%F&quot; &quot;%H:%M)
+IP=$(ifconfig eth0 |awk -F '[ :]+' '/inet addr/{print $4}')  
+MAIL=&quot;example@mail.com&quot;
+TOTAL=$(fdisk -l |awk -F'[: ]+' 'BEGIN{OFS=&quot;=&quot;}/^Disk \/dev/{printf &quot;%s=%sG,&quot;,$2,$3}')
+PART_USE=$(df -h |awk 'BEGIN{OFS=&quot;=&quot;}/^\/dev/{print $1,int($5),$6}')
+for i in $PART_USE; do
+    PART=$(echo $i |cut -d&quot;=&quot; -f1)
+    USE=$(echo $i |cut -d&quot;=&quot; -f2)
+    MOUNT=$(echo $i |cut -d&quot;=&quot; -f3)
+    if [ $USE -gt 80 ]; then
+        echo &quot;
+        Date: $DATE
+        Host: $IP
+        Total: $TOTAL
+        Problem: $PART=$USE($MOUNT)
+        &quot; | mail -s &quot;Disk Monitor&quot; $MAIL
+    fi
+done
+</code></pre>
+
+<h1 id="7-监控主机分区">7、监控主机分区</h1>
+
+<p>监控主机分区使用率大于80%，就发告警邮件。放到crontab里面，每10分钟执行一次。<br />
+a、 首先两台机器要建立服务器间的信任关系。<br />
+b、脚本：</p>
+
+<pre><code> #！/bin/bash
+                FSMAX=&quot;80&quot;
+                remote_user='root'
+                remote_ip=(IP地址列表)
+                 ip_num='0'
+                while [ &quot;$ip_num&quot; -le &quot;$(expr ${#remote_ip[@]} -l)&quot;]
+                do
+                        read_num='1'
+                        ssh &quot;$remote_user&quot;@&quot;${remote_ip[$ip_num]}&quot;  df -h &gt; /tmp/diskcheck_tmp
+                        grep '^/dev/*'  /tmp/diskcheck_tmp | awk '{print $5}'|sed 's/\%//g'  &gt; /tmp/diskcheck_num_tmp
+                          while [ &quot;$read_num&quot; -le $(wc -l &lt; /tmp/diskcheck_num_tmp) ]
+                            do
+                                    size=$(sed -n &quot;$read_num&quot; 'p'  /tmp/diskcheck_num_tmp)
+                                            if [ &quot;size&quot; -gt &quot;$FSMAX&quot; ]
+                                            then
+                                                    $(grep '^/dev/*'  /tmp/diskcheck_tmp |sed -n $read_num'p'  &gt; /tmp/disk_check_mail)
+                                                    $(echo ${remote_ip[$ip_num]}) &gt;&gt; /tmp/disk_check_mail)
+                                                    $(mail  -s &quot;diskcheck_alert&quot;  admin  &lt;  /tmp/disk_check_mail)
+                                            fi
+                                    read_num=$(expr  $read_num + 1)
+                            done
+                        ip_num=$(expr  $ip_num + 1)
+              done
+</code></pre>
+
+<p>===================写入crontab=====================<br />
+0/10 * * * * /home/diskcheck.sh 2&amp;&gt;1</p>
+
+<h1 id="8-监控主机磁盘空间">8、监控主机磁盘空间</h1>
+
+<p>监控主机的磁盘空间,当使用空间超过90％就通过发mail来发警告</p>
+
+<pre><code>#!/bin/bash
+#monitor available disk space
+#提取本服务器的IP地址信息  
+IP=`ifconfig eth0 | grep &quot;inet addr&quot; | cut -f 2 -d &quot;:&quot; | cut -f 1 -d &quot; &quot;`    
+SPACE=` df -hP | awk '{print int($5)}'`
+if [ $SPACE -ge 90 ]
+then
+  echo &quot;$IP 服务器 磁盘空间 使用率已经超过90%，请及时处理。&quot;|mail -s &quot;$IP 服务器硬盘告警&quot;   fty89@163.com
+fi
+</code></pre>
+
+<h1 id="9-批量主机磁盘利用率监控">9、批量主机磁盘利用率监控</h1>
+
+<p>前提监控端和被监控端SSH免交互登录或者密钥登录。</p>
+
+<p>写一个配置文件保存被监控主机SSH连接信息，文件内容格式：IP User Port</p>
+
+<pre><code>#!/bin/bash
+HOST_INFO=host.info
+for IP in $(awk '/^[^#]/{print $1}' $HOST_INFO); do
+    USER=$(awk -v ip=$IP 'ip==$1{print $2}' $HOST_INFO)
+    PORT=$(awk -v ip=$IP 'ip==$1{print $3}' $HOST_INFO)
+    TMP_FILE=/tmp/disk.tmp
+    ssh -p $PORT $USER@$IP 'df -h' &gt; $TMP_FILE
+    USE_RATE_LIST=$(awk 'BEGIN{OFS=&quot;=&quot;}/^\/dev/{print $1,int($5)}' $TMP_FILE)
+    for USE_RATE in $USE_RATE_LIST; do
+        PART_NAME=${USE_RATE%=*}
+        USE_RATE=${USE_RATE#*=}
+        if [ $USE_RATE -ge 80 ]; then
+            echo &quot;Warning: $PART_NAME Partition usage $USE_RATE%!&quot;
+        fi
+    done
+done
+</code></pre>
+
+<h1 id="10-检查主机是否存活">10、检查主机是否存活</h1>
+
+<pre><code>#!/bin/bash
+if ping -c 1 192.168.1.1 &gt;/dev/null;then 
+        echo &quot;OK.&quot;
+else 
+        echo &quot;NO!&quot;
+fi
+</code></pre>
+
+<p>方法1：将错误IP放到数组里面判断是否ping失败三次</p>
+
+<pre><code>#!/bin/bash  
+
+IP_LIST=&quot;192.168.18.1 192.168.1.1 192.168.18.2&quot;
+
+for IP in $IP_LIST; do
+
+    NUM=1
+
+    while [ $NUM -le 3 ]; do
+
+        if ping -c 1 $IP &gt; /dev/null; then
+
+            echo &quot;$IP Ping is successful.&quot;
+
+            break
+
+        else
+
+            # echo &quot;$IP Ping is failure $NUM&quot;
+
+            FAIL_COUNT[$NUM]=$IP
+
+            let NUM++
+
+        fi
+
+    done
+
+    if [ ${#FAIL_COUNT[*]} -eq 3 ];then
+
+        echo &quot;${FAIL_COUNT[1]} Ping is failure!&quot;
+
+        unset FAIL_COUNT[*]
+
+    fi
+
+done
+</code></pre>
+
+<p>方法2：将错误次数放到FAIL_COUNT变量里面判断是否ping失败三次</p>
+
+<pre><code>#!/bin/bash  
+
+IP_LIST=&quot;192.168.18.1 192.168.1.1 192.168.18.2&quot;
+
+for IP in $IP_LIST; do
+
+    FAIL_COUNT=0
+
+    for ((i=1;i&lt;=3;i++)); do
+
+        if ping -c 1 $IP &gt;/dev/null; then
+
+            echo &quot;$IP Ping is successful.&quot;
+
+            break
+
+        else
+
+            # echo &quot;$IP Ping is failure $i&quot;
+
+            let FAIL_COUNT++
+
+        fi
+
+    done
+
+    if [ $FAIL_COUNT -eq 3 ]; then
+
+        echo &quot;$IP Ping is failure!&quot;
+
+    fi
+
+done
+</code></pre>
+
+<p>方法3：利用for循环将ping通就跳出循环继续，如果不跳出就会走到打印ping失败</p>
+
+<pre><code>#!/bin/bash
+
+ping_success_status() {
+
+    if ping -c 1 $IP &gt;/dev/null; then
+
+        echo &quot;$IP Ping is successful.&quot;
+
+        continue
+
+    fi
+
+}
+
+IP_LIST=&quot;192.168.18.1 192.168.1.1 192.168.18.2&quot;
+
+for IP in $IP_LIST; do
+
+    ping_success_status
+
+    ping_success_status
+
+    ping_success_status
+
+    echo &quot;$IP Ping is failure!&quot;
+
+done
+</code></pre>
+
+<h1 id="11-检查多个主机是否存活">11、检查多个主机是否存活</h1>
+
+<pre><code>#!/bin/bash
+if ping -c 1 192.168.1.1 &gt;/dev/null;then 
+        echo &quot;OK.&quot;
+else
+        echo &quot;NO!&quot;
+fi
+</code></pre>
+
+<h1 id="11-getopts工具完善脚本命令行参数">11、getopts工具完善脚本命令行参数</h1>
+
+<p>getopts是一个解析脚本选项参数的工具。</p>
+
+<p>命令格式：getopts optstring name [arg]</p>
+
+<p>初次使用你要注意这几点：</p>
+
+<p>1）脚本位置参数会与optstring中的单个字母逐个匹配，如果匹配到就赋值给name，否则赋值name为问号；</p>
+
+<p>2）optstring中单个字母是一个选项，如果字母后面加冒号，表示该选项后面带参数，参数值并会赋值给OPTARG变量；</p>
+
+<p>3）optstring中第一个是冒号，表示屏蔽系统错误（test.sh: illegal option &ndash; h）；</p>
+
+<p>4）允许把选项放一起，例如-ab</p>
+
+<p>下面写一个打印文件指定行的简单例子，用于引导你思路，扩展你的脚本选项功能：</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>|</p>
+
+<p><code>#!/bin/bash</code></p>
+
+<p><code>while</code> <code>getopts</code> <code>:f:n: option;</code><code>do</code></p>
+
+<p><code>case</code> <code>$option</code><code>in</code></p>
+
+<p><code>f)</code></p>
+
+<p><code>FILE=$OPTARG</code></p>
+
+<p><code>[ ! -f $FILE ] &amp;&amp;</code><code>echo</code> <code>&quot;$FILE File not exist!&quot;</code> <code>&amp;&amp;</code><code>exit</code></p>
+
+<p><code>;;</code></p>
+
+<p><code>n)</code></p>
+
+<p><code>sed</code> <code>-n</code><code>&quot;${OPTARG}p&quot;</code> <code>$FILE</code></p>
+
+<p><code>;;</code></p>
+
+<p><code>?)</code></p>
+
+<p><code>echo</code> <code>&quot;Usage: $0 -f  -n &quot;</code></p>
+
+<p><code>echo</code> <code>&quot;-f, --file specified file&quot;</code></p>
+
+<p><code>echo</code> <code>&quot;-n, --line-number print specified line&quot;</code></p>
+
+<p><code>exit</code> <code>1</code></p>
+
+<p><code>;;</code></p>
+
+<p><code>esac</code></p>
+
+<p><code>done</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<pre><code>#!/bin/bash
+# 获取要监控的本地服务器IP地址
+IP=`ifconfig eth0 | grep &quot;inet addr&quot; | cut -f 2 -d &quot;:&quot; | cut -f 1 -d &quot; &quot;`
+echo &quot;IP地址：&quot;$IP
+
+# 获取cpu总核数
+cpu_num=`grep -c &quot;model name&quot; /proc/cpuinfo`
+echo &quot;cpu总核数：&quot;$cpu_num
+
+# 1、获取CPU利用率
+# 获取用户空间占用CPU百分比
+cpu_user=`top -b -n 1 | grep Cpu | awk '{print $2}' | cut -f 1 -d &quot;%&quot;`
+echo &quot;用户空间占用CPU百分比：&quot;$cpu_user
+
+# 获取内核空间占用CPU百分比
+cpu_system=`top -b -n 1 | grep Cpu | awk '{print $3}' | cut -f 1 -d &quot;%&quot;`
+echo &quot;内核空间占用CPU百分比：&quot;$cpu_system
+
+# 获取空闲CPU百分比
+cpu_idle=`top -b -n 1 | grep Cpu | awk '{print $5}' | cut -f 1 -d &quot;%&quot;`
+echo &quot;空闲CPU百分比：&quot;$cpu_idle
+
+# 获取等待输入输出占CPU百分比
+cpu_iowait=`top -b -n 1 | grep Cpu | awk '{print $3}' | cut -f 1 -d &quot;%&quot;`
+echo &quot;等待输入输出占CPU百分比：&quot;$cpu_iowait
+
+#2、获取CPU上下文切换和中断次数
+# 获取CPU中断次数
+cpu_interrupt=`vmstat -n 1 1 | sed -n 3p | awk '{print $11}'`
+echo &quot;CPU中断次数：&quot;$cpu_interrupt
+
+# 获取CPU上下文切换次数
+cpu_context_switch=`vmstat -n 1 1 | sed -n 3p | awk '{print $12}'`
+echo &quot;CPU上下文切换次数：&quot;$cpu_context_switch
+
+#3、获取CPU负载信息
+# 获取CPU15分钟前到现在的负载平均值
+cpu_load_15min=`uptime | awk '{print $11}' | cut -f 1 -d ','`
+echo &quot;CPU 15分钟前到现在的负载平均值：&quot;$cpu_load_15min
+
+# 获取CPU5分钟前到现在的负载平均值
+cpu_load_5min=`uptime | awk '{print $10}' | cut -f 1 -d ','`
+echo &quot;CPU 5分钟前到现在的负载平均值：&quot;$cpu_load_5min
+
+# 获取CPU1分钟前到现在的负载平均值
+cpu_load_1min=`uptime | awk '{print $9}' | cut -f 1 -d ','`
+echo &quot;CPU 1分钟前到现在的负载平均值：&quot;$cpu_load_1min
+
+# 获取任务队列(就绪状态等待的进程数)
+cpu_task_length=`vmstat -n 1 1 | sed -n 3p | awk '{print $1}'`
+echo &quot;CPU任务队列长度：&quot;$cpu_task_length
+
+#4、获取内存信息
+# 获取物理内存总量
+mem_total=`free | grep Mem | awk '{print $2}'`
+echo &quot;物理内存总量：&quot;$mem_total
+
+# 获取操作系统已使用内存总量
+mem_sys_used=`free | grep Mem | awk '{print $3}'`
+echo &quot;已使用内存总量(操作系统)：&quot;$mem_sys_used
+
+# 获取操作系统未使用内存总量
+mem_sys_free=`free | grep Mem | awk '{print $4}'`
+echo &quot;剩余内存总量(操作系统)：&quot;$mem_sys_free
+
+# 获取应用程序已使用的内存总量
+mem_user_used=`free | sed -n 3p | awk '{print $3}'`
+echo &quot;已使用内存总量(应用程序)：&quot;$mem_user_used
+
+# 获取应用程序未使用内存总量
+mem_user_free=`free | sed -n 3p | awk '{print $4}'`
+echo &quot;剩余内存总量(应用程序)：&quot;$mem_user_free
+
+
+# 获取交换分区总大小
+mem_swap_total=`free | grep Swap | awk '{print $2}'`
+echo &quot;交换分区总大小：&quot;$mem_swap_total
+
+# 获取已使用交换分区大小
+mem_swap_used=`free | grep Swap | awk '{print $3}'`
+echo &quot;已使用交换分区大小：&quot;$mem_swap_used
+
+# 获取剩余交换分区大小
+mem_swap_free=`free | grep Swap | awk '{print $4}'`
+echo &quot;剩余交换分区大小：&quot;$mem_swap_free
+
+#5、获取磁盘I/O统计信息
+echo &quot;指定设备(/dev/sda)的统计信息&quot;
+# 每秒向设备发起的读请求次数
+disk_sda_rs=`iostat -kx | grep sda| awk '{print $4}'`
+echo &quot;每秒向设备发起的读请求次数：&quot;$disk_sda_rs
+
+# 每秒向设备发起的写请求次数
+disk_sda_ws=`iostat -kx | grep sda| awk '{print $5}'`
+echo &quot;每秒向设备发起的写请求次数：&quot;$disk_sda_ws
+
+# 向设备发起的I/O请求队列长度平均值
+disk_sda_avgqu_sz=`iostat -kx | grep sda| awk '{print $9}'`
+echo &quot;向设备发起的I/O请求队列长度平均值&quot;$disk_sda_avgqu_sz
+
+# 每次向设备发起的I/O请求平均时间
+disk_sda_await=`iostat -kx | grep sda| awk '{print $10}'`
+echo &quot;每次向设备发起的I/O请求平均时间：&quot;$disk_sda_await
+
+# 向设备发起的I/O服务时间均值
+disk_sda_svctm=`iostat -kx | grep sda| awk '{print $11}'`
+echo &quot;向设备发起的I/O服务时间均值：&quot;$disk_sda_svctm
+
+# 向设备发起I/O请求的CPU时间百分占比
+disk_sda_util=`iostat -kx | grep sda| awk '{print $12}'`
+echo &quot;向设备发起I/O请求的CPU时间百分占比：&quot;$disk_sda_util
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

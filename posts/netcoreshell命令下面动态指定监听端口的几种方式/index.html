@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>NetCoreshell命令下面动态指定监听端口的几种方式 | 开发者问答集锦</title>
+    <meta property="og:title" content="NetCoreshell命令下面动态指定监听端口的几种方式 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="NetCoreshell命令下面动态指定监听端口的几种方式">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/netcoreshell%E5%91%BD%E4%BB%A4%E4%B8%8B%E9%9D%A2%E5%8A%A8%E6%80%81%E6%8C%87%E5%AE%9A%E7%9B%91%E5%90%AC%E7%AB%AF%E5%8F%A3%E7%9A%84%E5%87%A0%E7%A7%8D%E6%96%B9%E5%BC%8F/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">NetCoreshell命令下面动态指定监听端口的几种方式</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>Netcore 就是为了容器化而生的一个开源框架，在使用过程中除开传统的通过 IIS 挂载非托管方式来跑 Netcore 的项目。</p>
+
+<p>我们后面就会运用容器化来进行项目的部署操作，在这个过程中我们是如何基于配置文件或者命令来配置我们的应用监听端口的呢？同时该如何进行 SSL 证书的绑定呢?</p>
+
+<h3 id="配置文件的处理方式">配置文件的处理方式</h3>
+
+<h4 id="通过编写对应的-json-配置文件如下">通过编写对应的 json 配置文件如下：</h4>
+
+<pre><code>    hostsettings.json(名字随便取)    {        &quot;server.urls&quot;:&quot;http://*:5000;http://*:5001&quot;    }
+</code></pre>
+
+<p>配置完成后可以执行脚本命令:</p>
+
+<p>对应的应用程序入口需要增加 json 文件的引用,具体的代码如下</p>
+
+<pre><code>    ///     /// 程序启动    /// 程序命令行指定使用什么的配置文件进行打开：    /// 命令：dotnet run --launch-profile Test --project projectName      /// 命令：dotnet 程序组件.DLL  --environment 环境   使用什么环境进行打开程序 --server.urls &quot;绑定端口 1;绑定端口 2&quot;    /// 该命令 windows 和 Linux 均可以。    ///     public static class Program    {        ///         /// 程序主入口        ///         ///         public static void Main(string[] args)        {            CreateWebHostBuilder(args).Build().Run();        }        ///         ///  构建 web 主机        ///         ///         ///         public static IWebHostBuilder CreateWebHostBuilder(string[] args)        {            //添加配置文件            var config = new ConfigurationBuilder()                .SetBasePath(Path.GetDirectoryName(typeof(Program).Assembly.Location))                .AddJsonFile(&quot;hostsettings.json&quot;, optional: true)//命令行启动的时候会从该配置文件进行获取,使用 ide 工具启动会根据 launchSettings 里面设置好的主机配置信息进行使用                .AddCommandLine(args)                .Build();            return WebHost.CreateDefaultBuilder(args)                  .UseConfiguration(config)                  .UseContentRoot(Path.GetDirectoryName(typeof(Program).Assembly.Location))                  .UseKestrel(options =&gt;                  {                      options.AddServerHeader = false;                      //是否允许请求同步操作                      options.AllowSynchronousIO = true;                      options.ApplicationSchedulingMode = SchedulingMode.ThreadPool;                  })                  //.UseUrls($&quot;http://*:{port}&quot;,)                  .UseStartup();        }    }
+</code></pre>
+
+<h4 id="通过直接在命令行下面进行配置处理">通过直接在命令行下面进行配置处理：</h4>
+
+<pre><code>dotnet application.dll --environment 环境 --server.url &quot;绑定地址&quot;
+</code></pre>
+
+<p>运用配置的优先级顺序 : 命令行 &gt; 配置文件</p>
+
+<p>项目的 nuget 引用,具体的程序集会抽空在后面一一为大家讲解.</p>
+
+<pre><code>项目:csproj 文件                                                                              
+</code></pre>
+
+<h3 id="配置-ssl-的证书处理">配置 ssl 的证书处理</h3>
+
+<p>首先我们需要一个 pfx 的个人证书.同时将证书丢到应用程序的运行文件夹中。</p>
+
+<pre><code>hostsettings.json(名字随便取) {  &quot;server.urls&quot;: &quot;http://*:5000;http://*:5001&quot;,  &quot;pfxfile&quot;: &quot;*.domain.com&quot;,  &quot;sslpwd&quot;: &quot;pfx 证书的密码&quot;}
+</code></pre>
+
+<p>配置完成后我们通过在应用程序的启动中将证书进行加载</p>
+
+<pre><code>///     /// 程序启动    /// 程序命令行指定使用什么的配置文件进行打开：    /// 命令：dotnet run --launch-profile Test --project projectName      /// 命令：dotnet 程序组件.DLL  --environment 环境   使用什么环境进行打开程序 --server.urls &quot;绑定端口 1;绑定端口 2&quot;    /// 该命令 windows 和 Linux 均可以。    ///     public static class Program    {        ///         /// 程序主入口        ///         ///         public static void Main(string[] args)        {            CreateWebHostBuilder(args).Build().Run();        }        ///         ///  构建 web 主机        ///         ///         ///         public static IWebHostBuilder CreateWebHostBuilder(string[] args)        {            var approotpath = Path.GetDirectoryName(typeof(Program).Assembly.Location);            //添加配置文件            var config = new ConfigurationBuilder()                .SetBasePath(approotpath)                .AddJsonFile(&quot;hostsettings.json&quot;, optional: true)//命令行启动的时候会从该配置文件进行获取,使用 ide 工具启动会根据 launchSettings 里面设置好的主机配置信息进行使用                .AddCommandLine(args)                .Build();            return WebHost.CreateDefaultBuilder(args)                  .UseConfiguration(config)                  .UseContentRoot(approotpath)                  .UseKestrel(options =&gt;                  {                      options.AddServerHeader = false;                      //是否允许请求同步操作                      options.AllowSynchronousIO = true;                      options.ApplicationSchedulingMode = SchedulingMode.ThreadPool;                      //配置 https,将 pfx 证书丢到 bin 目录下面,同时针对配置文件进行密码处理                      options.ConfigureHttpsDefaults(s =&gt;                      {                          var pfxPwd = config.GetSection(&quot;sslpwd&quot;).Value;                          var pfxFile = Path.Combine(approotpath, config.GetSection(&quot;pfxfile&quot;).Value);                          if (File.Exists(pfxFile))                          {                              s.ServerCertificate = new X509Certificate2(pfxFile, pfxPwd);                              s.SslProtocols =                              SslProtocols.Tls |                              SslProtocols.Tls11 |                              SslProtocols.Tls12;                          }                      });                  })                  //.UseUrls($&quot;http://*:{port}&quot;,)                  .UseStartup();        }    }
+</code></pre>
+
+<p>配置完成后可以进行命令行启动绑定了</p>
+
+<pre><code>dotnet application.dll --environment 环境 --server.url &quot;https://www.domain.com&quot;
+</code></pre>
+
+<p>有说的不明白的地方环境私信我,很乐意为大家解答.</p>
+
+<hr />
+
+<p>本文首发于 GitChat，未经授权不得转载，转载需与 GitChat 联系。</p>
+
+<p>阅读全文: <a href="http://gitbook.cn/gitchat/activity/5d687e9c1e6dd75f4f42ff00">http://gitbook.cn/gitchat/activity/5d687e9c1e6dd75f4f42ff00</a></p>
+
+<p>您还可以下载 CSDN 旗下精品原创内容社区 GitChat App ，阅读更多 GitChat 专享技术内容哦。</p>
+
+<p><img src="https://img.it610.com/image/info8/382cd505ef4f4a85af8e22c9e12856fe.jpg" alt="FtooAtPSkEJwnW-9xkCLqSTRpBKX" /></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

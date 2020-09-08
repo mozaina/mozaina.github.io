@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>必须学会的Linux下一键部署项目的shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="必须学会的Linux下一键部署项目的shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="必须学会的Linux下一键部署项目的shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%BF%85%E9%A1%BB%E5%AD%A6%E4%BC%9A%E7%9A%84linux%E4%B8%8B%E4%B8%80%E9%94%AE%E9%83%A8%E7%BD%B2%E9%A1%B9%E7%9B%AE%E7%9A%84shell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">必须学会的Linux下一键部署项目的shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="必须学会的linux下一键部署项目的shell脚本">必须学会的Linux下一键部署项目的shell脚本</h1>
+
+<blockquote>
+<p>在公司也经历了几次项目更新，往服务器上部署上线。然鹅每次都是用的服务器上已经存在的脚本文件，类似这个样子：</p>
+
+<p><a href="https://img.it610.com/image/info8/8922a70e188a40699e590761d16090c7.jpg"><img src="https://img.it610.com/image/info8/8922a70e188a40699e590761d16090c7.jpg" alt="必须学会的Linux下一键部署项目的shell脚本_第1张图片" /></a></p>
+
+<p>每次我就上传个jar包，然后执行<code>./restart</code>就结束所谓的 <strong>发包</strong> ，太无聊了， 于是想着为什么要用别人的脚本文件呢？ 于是有了本篇博客。</p>
+</blockquote>
+
+<h2 id="基础知识">基础知识</h2>
+
+<ul>
+<li>需要用到linux基本命令
+
+<ul>
+<li>怎么执行shell脚本</li>
+<li>使用nohup启动jar包</li>
+<li>dirname命令</li>
+<li>readlink命令</li>
+<li>基本shell语法，如方法，返回值，if 判断</li>
+</ul></li>
+</ul>
+
+<h2 id="开始编写脚本">开始编写脚本</h2>
+
+<h3 id="application-sh-程序控制相关脚本">application.sh 程序控制相关脚本</h3>
+
+<blockquote>
+<p>application.sh作为基本模块，里面包含了控制程序的 <strong>启动</strong> ， <strong>暂停</strong> ， <strong>获取程序状态</strong> ，
+<strong>以及程序运行的进程id</strong> ， application.sh将被导入其它的脚本中，使得其它脚本可以执行 <strong>application.sh</strong>
+里的方法。</p>
+
+<p><code>readlink -f $0</code>是取得脚本的相关描述信息，<code>$0</code>表示正在执行脚本名称。在这里<code>$0</code>的值就是<code>application.sh</code>,
+<code>app_name</code>表示应用名称，部署不同的jar包时，只需更改<code>app_name</code>的值即可。</p>
+
+<p>我写了注释，应该能看明白。</p>
+
+<p><em>注意：application.sh里面没有入口函数，只是提供方法供其它模块使用。</em></p>
+</blockquote>
+
+<pre><code>#!/bin/bash
+#name: application.sh
+#desc: 应用相关信息
+#dete: 2020/1/9
+#author: uwei
+
+#当前脚本所在文件夹路径
+current_path=dirname $(readlink -f $0)
+
+#应用名称
+app_name=&quot;demo.jar&quot;
+
+#应用位置
+app_path=$current_path/project/$app_name
+
+#应用运行的pid
+pid=''
+
+#判断jar包是否在运行
+#jar如果在运行返回1，否则返回0
+function is_running(){
+    pid=`ps aux|grep ${app_name}|grep -v grep|awk '{print $2}'` #获取jar包运行的pid
+    if [ -z $pid ] ;then  #如果pid的长度为空，说明没有在运行
+            return 0
+    else
+            return 1
+    fi
+}
+
+#启动jar包,启动成功返回1，否则返回0
+function start(){
+    #先判断jar有没有在运行
+    is_running
+    if [ $? -eq &quot;0&quot; ]; then #没有运行，就使用nohup命令启动
+        nohup java -jar $app_path &gt; /dev/null 2&gt;&amp;1 &amp;
+        return 1
+    else
+        return 0
+    fi
+}
+
+#停止jar包，停止成功返回1，否则返回0
+function stop(){
+    #先判断jar是否在运行
+    is_running
+    if [ $? -eq '0' ]; then
+        return 0  #jar没有运行，停止失败
+    else
+        kill -9 $pid  #jar在运行，使用kill命令停止
+        return 1
+    fi
+}
+</code></pre>
+
+<h3 id="start-sh-启动脚本">start.sh 启动脚本</h3>
+
+<blockquote>
+<p>这里需要注意一下<code>start.sh</code>就是导入<code>application.sh</code>, 因此可以直接调用<code>application.sh</code>里面的方法，
+也可以访问里面的变量。</p>
+</blockquote>
+
+<pre><code>#!/bin/bash
+#name: start.sh
+#desc: 启动jar包
+#date：2020/1/9
+#author：uwei
+
+#当前脚本所在目录的路径
+current_path=dirname $(readlink -f $0)
+
+#导入application.sh
+. $current_path/application.sh
+
+
+#启动程序
+function start_app(){
+    start
+    is_running               #更新pid
+    if [ $? -eq '1' ]; then  #如果启动成功
+        echo &quot;${app_name} is started at pid: ${pid}&quot;
+    else                     #启动失败
+        if [ -z $pid ]；then         #如果pid为空，说明启动失败
+            echo &quot;${app_name} started failed&quot;
+        else
+            echo &quot;${app_name} is already running at pid: ${pid}&quot;  #程序已经在运行
+        fi
+    fi
+}
+
+##############脚本程序入口############
+start_app
+</code></pre>
+
+<h3 id="stop-sh-停止脚本">stop.sh 停止脚本</h3>
+
+<pre><code>#!/bin/bash
+#name: stop.sh
+#desc: 程序暂停脚本
+#date: 2020/1/9
+#author: uwei
+
+#当前脚本所在目录的路径
+current_path=dirname $(readlink -f $0)
+
+#导入application.sh
+. $current_path/application.sh
+
+
+#暂定方法
+function stop_app(){
+    stop
+    if [ $? -eq '0' ]; then                                 #如果暂停失败
+        echo &quot;${app_name} is NOT running&quot;     #程序没有在运行
+    else
+        echo &quot;${app_name} has benn stopped&quot;。 #成功停止
+    fi
+}
+
+
+#############程序入口###############
+stop_app
+</code></pre>
+
+<h3 id="restart-sh-重启脚本">restart.sh 重启脚本</h3>
+
+<pre><code>#!/bin/bash
+#name: restart.sh
+#desc: 重启脚本
+#date: 2020/1/9
+#author: uwei
+
+#当前脚本所在目录的路径
+current_path=dirname $(readlink -f $0)
+
+#导入application.sh
+. $current_path/application.sh
+
+
+#重启方法
+function restart(){
+    is_running           #先获取pid
+    if [ $? -eq ''0 ]    #返回0，表示没有运行，那么我就直接启动
+        echo &quot;${app_name} is not running, and now it will be started&quot;
+        start              #调用启动方法
+        is_running         #更新pid
+        echo &quot;${app_name} is running at pid: ${pid}&quot;   #提示启动成功
+    else
+        stop               #程序在运行，先stop，再start
+        start
+        is_running               #更新pid
+        echo &quot;${app_name} has benn restarted running at pid: ${pid}&quot;
+    fi
+}
+
+
+####################程序入口##################
+restart
+</code></pre>
+
+<h3 id="status-sh-获取状态脚本">status.sh 获取状态脚本</h3>
+
+<pre><code>#!/bin/bash
+#name: status.sh
+#desc: 获取程序运行状态
+#date: 2020/1/9
+#author: uwei
+
+#当前脚本所在目录的路径
+current_path=dirname $(readlink -f $0)
+
+#导入application.sh
+. $current_path/application.sh
+
+
+#获取程序运行状态方法
+function status(){
+    is_running          #获取pid
+    if [ $? -eq '0' ]    #返回0，表示没有运行
+        echo &quot;${app_name} is not running&quot;
+    else
+        echo &quot;${app_name} is running at pid: ${pid}&quot;   #返回1，表示在运行
+    fi
+}
+
+
+################程序入口#################
+status
+</code></pre>
+
+<h3 id="目录结构">目录结构</h3>
+
+<p><a href="https://img.it610.com/image/info8/1dfb35a9def5400194d85d947b2ff26e.jpg"><img src="https://img.it610.com/image/info8/1dfb35a9def5400194d85d947b2ff26e.jpg" alt="" /></a></p>
+
+<blockquote>
+<p><code>scripts</code>目录里面就是那些<code>.sh</code>脚本文件， <code>project</code>目录下放的jar包应用程序：</p>
+
+<p><a href="https://img.it610.com/image/info8/1771077e9524434ca1a75435f8b80a24.jpg"><img src="https://img.it610.com/image/info8/1771077e9524434ca1a75435f8b80a24.jpg" alt="" /></a></p>
+
+<p>由于<code>脚本文件</code>在<code>scripts</code>下，而<code>jar</code>在<code>project</code>下，所以在<code>application.sh</code>中，是通过这样来定位<code>jar包的：</code></p>
+</blockquote>
+
+<pre><code>app_path=$current_path/project/$app_name
+</code></pre>
+
+<h3 id="尝试一键部署">尝试一键部署</h3>
+
+<blockquote>
+<p>在<code>script</code>目录下，</p>
+
+<p>执行<code>./start.sh</code>即可启动应用程序</p>
+
+<p>执行<code>./stop.sh</code>即可关闭应用程序</p>
+
+<p>执行<code>./restart.sh</code>可以对应用重启</p>
+
+<p>执行<code>./status.sh</code>查看运行状态</p>
+</blockquote>
+
+<h3 id="如何用在你的项目上">如何用在你的项目上？</h3>
+
+<blockquote>
+<p>按照我的目录结构：</p>
+
+<ul>
+<li>拷贝<code>project目录</code>和<code>script</code>目录</li>
+<li>将你的jar包如<code>xxx.jar</code>复制到<code>project目录下</code></li>
+<li>更改<code>application.sh</code>，将里面的<code>app_name='demo.jar'</code> 改成 <code>app_name='xxx.jar'</code></li>
+</ul>
+
+<p>然后就可以一键部署啦···</p>
+
+<p>我将此脚本放在了GitHub上了：<a href="https://github.com/uweii/deploy-scripts.git">https://github.com/uweii/deploy-scripts.git</a></p>
+</blockquote>
+
+<p><strong>Over</strong></p>
+
+<p>如果觉得需要更多技术干货, 来我的CSDN 和 GitHub哦</p>
+
+<blockquote>
+<p>CSDN: <a href="https://blog.csdn.net/dummyo">https://blog.csdn.net/dummyo</a></p>
+
+<p>Github: <a href="https://github.com/uweii">https://github.com/uweii</a></p>
+</blockquote>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

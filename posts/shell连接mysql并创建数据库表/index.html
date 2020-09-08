@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell连接mysql并创建数据库表 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell连接mysql并创建数据库表 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell连接mysql并创建数据库表">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%BF%9E%E6%8E%A5mysql%E5%B9%B6%E5%88%9B%E5%BB%BA%E6%95%B0%E6%8D%AE%E5%BA%93%E8%A1%A8/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell连接mysql并创建数据库表</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>#</p>
+
+<h1 id="shell脚本连接-读写-操作mysql数据库实例">shell脚本连接、读写、操作mysql数据库实例</h1>
+
+<p>本文介绍了如何在shell中读写mysql数据库。主要介绍了如何在shell
+中连接mysql数据库，如何在shell中创建数据库，创建表，插入csv文件，读取mysql数据库，导出mysql数据库为xml或html文件，
+并分析了核心语句。本文介绍的方法适用于PostgreSQL ，相对mysql而言，shell 中读写PostgreSQL会更简单些。</p>
+
+<h2 id="1-连接mysql-数据库"><strong>1. 连接mysql 数据库</strong></h2>
+
+<p>mysql 数据库使用$HOME/.my.cnf 文件来读取特殊的启动命令和设置。其中一项设置是由该用户账户发起的mysql
+会话的默认密码。要在这个文件中设置默认密码，可以加入下面的内容：我的目录是/etc/my.cn</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>[client]<br />
+password = 1234<br />
+<a href="https://img.it610.com/image/info8/1f5e351666c04018ba04b18d693373ee.png"><img src="https://img.it610.com/image/info8/1f5e351666c04018ba04b18d693373ee.png" alt="shell连接mysql并创建数据库表_第1张图片" /></a><br />
+这样就可以通过脚本访问mysql数据库了，如下所示：<br />
+#!/bin/bash<br />
+MYSQL=<code>which mysql</code><br />
+$MYSQL test -u root &lt;&lt; EOF<br />
+show databases;<br />
+show tables;<br />
+select * from employees where salary &gt; 4000;<br />
+EOF</p>
+
+<p>其中test是之前在mysql中已经有的数据库了，并且在数据库中有一个employees 的表。</p>
+
+<p>Shell中通常将EOF与 &lt;</p>
+
+<p>回顾一下</p>
+
+<h2 id="2-创建数据库"><strong>2. 创建数据库</strong></h2>
+
+<p>通过上面的方法连接数据库，再通过重定向输入mysql语句，shell中读写mysql基本就介绍完了。只要把sql语句写对了，通过重定向执行即可，下面来看一个实例：</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>#!/bin/bash<br />
+USER=&ldquo;root&rdquo;<br />
+DATABASE=&ldquo;students&rdquo;<br />
+TABLE=&ldquo;students&rdquo;<br />
+######################<br />
+#crate database<br />
+mysql -u $USER &lt;&lt; EOF 2&gt;/dev/null<br />
+CREATE DATABASE $DATABASE<br />
+EOF<br />
+[ $? -eq 0 ] &amp;&amp; echo &ldquo;created DB&rdquo; || echo DB already exists<br />
+######################<br />
+#create table<br />
+mysql -u $USER $DATABASE &lt;&lt; EOF 2&gt;/dev/null<br />
+CREATE TABLE $TABLE(<br />
+id int,<br />
+name varchar(100),<br />
+mark int,<br />
+dept varchar(4)<br />
+);<br />
+EOF<br />
+[ $? -eq 0 ] &amp;&amp; echo &ldquo;Created table students&rdquo; || echo &ldquo;Table students already
+exist&rdquo;<br />
+######################<br />
+#delete data<br />
+mysql -u $USER $DATABASE &lt;&lt; EOF 2&gt;/dev/null<br />
+DELETE FROM $TABLE;<br />
+EOF</p>
+
+<pre><code>$# 是传给脚本的参数个数
+$0 是脚本本身的名字
+$1 是传递给该shell脚本的第一个参数
+$2 是传递给该shell脚本的第二个参数
+$@ 是传给脚本的所有参数的列表
+$* 是以一个单字符串显示所有向脚本传递的参数，与位置变量不同，参数可超过9个
+$$ 是脚本运行的当前进程ID号
+$? 是显示最后命令的退出状态，0表示没有错误，其他表示有错误
+
+
+0:表示键盘输入(stdin)
+1:表示标准输出(stdout),系统默认是1 
+2:表示错误输出(stderr)
+command &gt;/dev/null 2&gt;&amp;1 &amp;  == command 1&gt;/dev/null 2&gt;&amp;1 &amp;
+1)command:表示shell命令或者为一个可执行程序
+2)&gt;:表示重定向到哪里 
+3)/dev/null:表示Linux的空设备文件 
+4)2:表示标准错误输出
+5)&amp;1:&amp;表示等同于的意思,2&gt;&amp;1,表示2的输出重定向等于于1
+6)&amp;:表示后台执行,即这条指令执行在后台运行
+1&gt;/dev/null:表示标准输出重定向到空设备文件,也就是不输出任何信息到终端,不显示任何信息。
+2&gt;&amp;1:表示标准错误输出重定向等同于标准输出,因为之前标准输出已经重定向到了空设备文件,所以标准错误输出也重定向到空设备文件。
+
+
+
+
+
+
+
+#!/bin/bash
+USER=&quot;root&quot;
+DATABASE=&quot;ttt&quot;
+TABLE=&quot;students&quot;
+mysql -u $USER &lt;&lt; EOF
+CREATE DATABASE $DATABASE
+EOF
+[ $? -eq 0 ] &amp;&amp; echo &quot;created DB&quot; || echo DB already exists
+mysql -u $USER $DATABASE &lt;&lt; EOF 
+CREATE TABLE $TABLE(
+id int,
+name varchar(100),
+mark int,
+dept varchar(4)
+);
+EOF
+[ $? -eq 0 ] &amp;&amp; echo &quot;Created table students&quot; || echo &quot;Table students already exist&quot;
+</code></pre>
+
+<p>第一次：</p>
+
+<p>created DB<br />
+Created table students</p>
+
+<p>第二次：</p>
+
+<p>DB already exists<br />
+Table students already exist</p>
+
+<p>这个脚本比较简单，就是几条SQL语句，没什么好解释的，下面来看一下，如何读入txt 文件，然后插入到mysql数据库中。</p>
+
+<h2 id="3-插入txt-文件"><strong>3. 插入txt 文件</strong></h2>
+
+<p>上面创建了一个学生表，表中有学生的学号，姓名，成绩，系别，假设有一个txt文件，内容如下：</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>$cat data<br />
+1,Navin M,98,CS<br />
+2,Kavya N,70,CS<br />
+3,Nawaz O,80,CS<br />
+4,Hari S,80,EC<br />
+5,Alex M,50,EC<br />
+6,Neenu J,70,EC<br />
+7,Bob A,30,EC<br />
+8,Anu M,90,AE<br />
+9,Sruthi,89,AE<br />
+10,Andrew,89,AE</p>
+
+<p>为了将txt 文件插入到数据库，我们需要逐行读入，然后给字符串加上双引号，最后生成语句如下：</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>insert into students VALUES(1, &ldquo;Navin M&rdquo;, 98, &ldquo;CS&rdquo;);</p>
+
+<p>要解析txt
+文件，最好的工具莫过于awk了，将域的分隔符指定为逗号-F,，awk就自动将各个域拆分出来了，然后在需要双引号的地方打印输出一个双引号，就能够轻松得到下面这样的数据：</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>1, &ldquo;Navin M&rdquo;, 98, &ldquo;CS&rdquo; awk 代码如下：<br />
+query=<code>echo $line | awk -F, '{ printf(&quot;%s,\&quot;%s\&quot;,%s,\&quot;%s\&quot;&quot;, $1, $2, $3,
+$4)}'</code><br />
+statement=<code>echo &quot;INSERT INTO $TABLE VALUES($query);&quot;</code><br />
+echo $statement</p>
+
+<pre><code>[root@bgs-5p173-wangwenting wyl]# awk -F[,] '{ printf(&quot;%s,\&quot;%s\&quot;,%s,\&quot;%s\&quot;\n&quot;, $1, $2, $3, $4)}' tt.txt 
+1,&quot;Navin M&quot;,98,&quot;CS&quot;
+2,&quot;Kavya N&quot;,70,&quot;CS&quot;
+3,&quot;Nawaz O&quot;,80,&quot;CS&quot;
+4,&quot;Hari S&quot;,80,&quot;EC&quot;
+5,&quot;Alex M&quot;,50,&quot;EC&quot;
+6,&quot;Neenu J&quot;,70,&quot;EC&quot;
+7,&quot;Bob A&quot;,30,&quot;EC&quot;
+8,&quot;Anu M&quot;,90,&quot;AE&quot;
+9,&quot;Sruthi&quot;,89,&quot;AE&quot;
+10,&quot;Andrew&quot;,89,&quot;AE&quot;
+
+
+[root@bgs-5p173-wangwenting wyl]# awk -F ',' '{printf(&quot;%s %8s %8s %8s\n&quot;, $1,$2,$3,$4)}' tt.txt 
+1    Navin       98       CS
+2    Kavya       70       CS
+3    Nawaz       80       CS
+4     Hari       80       EC
+5     Alex       50       EC
+6    Neenu       70       EC
+7    Bob          30       EC
+8    Anu          90       AE
+9    Sruthi       89       AE
+10   Andrew       89       AE
+</code></pre>
+
+<p>完整的插入数据的程序如下：</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>#!/bin/bash</p>
+
+<p>#要插入的表的名字<br />
+TABLE=student<br />
+#mysql的命令<br />
+mysql=<code>which mysql</code><br />
+#要插入的数据库<br />
+DATBABASE=hyn<br />
+#将txt文件中的内容以(1,&ldquo;Navin M&rdquo;,98,&ldquo;CS&rdquo;),(2,&ldquo;Navin M&rdquo;,98,&ldquo;CS&rdquo;)的格式<br />
+query=<code>echo $line | awk -F, '{ printf(&quot;'\\('%s,\&quot;%s\&quot;,%s,\&quot;%s\&quot;'\\)''\,'&quot;, $1,
+$2, $3, $4)}' tt.txt</code><br />
+#将最后一个,逗号删除。<br />
+query1=${query%?}<br />
+statement=<code>echo &quot;INSERT INTO $TABLE VALUES $query1;&quot;</code><br />
+$mysql hyn -uroot &lt;&lt; EOF<br />
+insert into $TABLE values $query1;<br />
+EOF<br />
+#如果上述执行没有问题，则打印下面的一句话。等于0表示执行的是正确的<br />
+if [ $? -eq 0 ];<br />
+then echo &ldquo;Insert Data Into $TABLE Success.&rdquo;<br />
+fi</p>
+
+<p><a href="https://img.it610.com/image/info8/073565ec31454b58808ba07062a5c9ed.jpg"><img src="https://img.it610.com/image/info8/073565ec31454b58808ba07062a5c9ed.jpg" alt="shell连接mysql并创建数据库表_第2张图片" /></a></p>
+
+<p>执行完我们去看看结果如何：</p>
+
+<p>**<a href="https://img.it610.com/image/info8/f873421944c944ab8b865848d70ac1ed.png"><img src="https://img.it610.com/image/info8/f873421944c944ab8b865848d70ac1ed.png" alt="shell连接mysql并创建数据库表_第3张图片" /></a><br />
+**</p>
+
+<h2 id="4-读取数据"><strong>4. 读取数据</strong></h2>
+
+<p>知道怎么在shell 中连接mysql ，也知道了怎么在shell中批量执行sql 语句，读取数据，就没有任何难度了。</p>
+
+<p><em>复制代码</em> 代码如下:</p>
+
+<p>#!/bin/bash</p>
+
+<p>USER=&ldquo;root&rdquo;<br />
+DATABASE=&ldquo;hyn&rdquo;<br />
+TABLE=&ldquo;people&rdquo;</p>
+
+<p>#!/bin/bash<br />
+MYSQL=<code>which mysql</code><br />
+$MYSQL $DATABASE -u root &lt;&lt; EOF<br />
+show databases;<br />
+show tables;<br />
+select * from $TABLE;<br />
+EOF</p>
+
+<p><a href="https://img.it610.com/image/info8/cb58185c74c34a008f6aa719936337bf.jpg"><img src="https://img.it610.com/image/info8/cb58185c74c34a008f6aa719936337bf.jpg" alt="shell连接mysql并创建数据库表_第4张图片" /></a></p>
+
+<p>![]()</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

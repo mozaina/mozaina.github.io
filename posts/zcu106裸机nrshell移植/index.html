@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>ZCU106裸机NRSHELL移植 | 开发者问答集锦</title>
+    <meta property="og:title" content="ZCU106裸机NRSHELL移植 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="ZCU106裸机NRSHELL移植">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/zcu106%E8%A3%B8%E6%9C%BAnrshell%E7%A7%BB%E6%A4%8D/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">ZCU106裸机NRSHELL移植</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="zcu106-裸机nr-shell移植">ZCU106 裸机NR SHELL移植</h1>
+
+<p>许久没更了，画了一个月的板子，终于初版画完了，剩下的和师兄对一下接口、然后细节问题就可以投板了，接下来就继续我的裸机VCU了~<br />
+裸机（用RTOS了其实）没有shell的情况就感觉很别扭，每次下程序又比较麻烦，所以这里便用一个shell去控制，网上有开源了的，所以这里移植一个在我的ZCU106板子上方便后续开发<br />
+源码github：<a href="https://codeload.github.com/Nrusher/nr_micro_shell/zip/master">https://codeload.github.com/Nrusher/nr_micro_shell/zip/master</a><br />
+开源的魅力就在于不必再去重复造轮子~哈哈</p>
+
+<h2 id="添加源码到自己的工程下">添加源码到自己的工程下</h2>
+
+<p>inc是头、src目录是c文件位置、nr_xxx_commands.c用于添加自己的指令、shell_thread.c是我们的shell线程，这里优先级给最低<br />
+<a href="https://img.it610.com/image/info8/b498dabf5fc94495950b45dae857153f.jpg"><img src="https://img.it610.com/image/info8/b498dabf5fc94495950b45dae857153f.jpg" alt="ZCU106 裸机NR
+SHELL移植_第1张图片" /></a><br />
+此外直接之一会报错因为##拼接符号在gcc下面会认为不安全，所以改成</p>
+
+<pre><code>#define NR_ANSI_CLR_R_MV_L_NCHAR(cmd) ((const char *)&quot;\033[&quot;## #cmd##&quot;P&quot;)
+修改后：
+#define NR_ANSI_CLR_R_MV_L_NCHAR_M(cmd) ((const char *)&quot;\033[1P&quot;)
+</code></pre>
+
+<p>然后将shell_printf修改成自己的xil_printf:</p>
+
+<pre><code>/* If you use RTOS, you may need to do some special processing for printf(). */
+#define shell_printf(fmt, args...) xil_printf(fmt, ##args)
+#define ansi_show_char(x) outbyte(x)
+</code></pre>
+
+<p>此外修改名字、配置都在shell_config.h下修改：</p>
+
+<pre><code>/* ANSI command line buffer size. */
+#define NR_ANSI_LINE_SIZE 100
+
+/* Maximum user name length. */
+#define NR_SHELL_USER_NAME_MAX_LENGTH 30
+
+/* Maximum command name length. */
+#define NR_SHELL_CMD_NAME_MAX_LENGTH 10
+
+/* Command line buffer size. */
+#define NR_SHELL_CMD_LINE_MAX_LENGTH NR_ANSI_LINE_SIZE
+
+/* The maximum number of parameters in the command. */
+#define NR_SHELL_CMD_PARAS_MAX_NUM 10
+
+/* Command stores the most history commands (the maximum number here refers to the maximum number of commands that can be stored. When the history command line cache is full, it will automatically release the earliest command record) */
+#define NR_SHELL_MAX_CMD_HISTORY_NUM 3
+
+/* History command cache length */
+#define NR_SHELL_CMD_HISTORY_BUF_LENGTH 253
+
+/* The user's name. */
+#define NR_SHELL_USER_NAME &quot;nr@root:&quot;
+
+/*
+0: \n
+1: \r
+2: \r\n
+*/
+#define NR_SHELL_END_OF_LINE 1
+</code></pre>
+
+<p>这里的shell end of line根据自己用的软件回车发送的是啥来修改，我是只有\r所以1<br />
+这里的shell_tread在freeRtos下运行，代码如下：</p>
+
+<pre><code>static char nr_shell_getchar(void)
+{
+    char ch = 0;
+
+    if(xSemaphoreTake(shell_semaphore, SH_WAIT_MAX_TIME)){
+        ch = recv_buf[0];
+    }
+
+    return ch;
+}
+
+
+void nr_shell_thread_entry(void *parameter)
+{
+    char ch;
+
+    shell_semaphore= xSemaphoreCreateBinary();
+    if(shell_semaphore== NULL) {
+            printf(&quot;ERR Cretae Shell Sem!\n&quot;);
+            vTaskDelete(NULL);
+    }
+
+    shell_init();
+    open_stdio_uart();
+
+    while (1)
+    {
+        ch = nr_shell_getchar();
+        shell(ch);
+    }
+}
+</code></pre>
+
+<p>上面的open_uart是我们自己的配置uart的函数，主要配置中断等，这里注意把fifo阈值修改为1：</p>
+
+<pre><code>    XUartPs_SetFifoThreshold(uart_inst_ptr, 1);
+</code></pre>
+
+<p>然后开机打印：<br />
+<a href="https://img.it610.com/image/info8/279edb7439c84a6f8440bb34d81b8cda.jpg"><img src="https://img.it610.com/image/info8/279edb7439c84a6f8440bb34d81b8cda.jpg" alt="ZCU106 裸机NR
+SHELL移植_第2张图片" /></a></p>
+
+<h2 id="end">END</h2>
+
+<p>继续搬砖了</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

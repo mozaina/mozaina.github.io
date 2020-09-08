@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Qt下编码调用Linux的Shell脚本命令 | 开发者问答集锦</title>
+    <meta property="og:title" content="Qt下编码调用Linux的Shell脚本命令 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Qt下编码调用Linux的Shell脚本命令">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/qt%E4%B8%8B%E7%BC%96%E7%A0%81%E8%B0%83%E7%94%A8linux%E7%9A%84shell%E8%84%9A%E6%9C%AC%E5%91%BD%E4%BB%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Qt下编码调用Linux的Shell脚本命令</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="引言">引言</h1>
+
+<p>Linux下编写Qt程序，常会碰到需要执行Shell脚本命令的时候。因为简单调用的一个脚本命令，可以大大简化功能实现的复杂度。<br />
+调用Shell脚本命令，Qt环境下常用两种方式：<br />
+1）使用QProcess开启一个进程，把脚本命令作为参数传递进去。<br />
+2）使用Linux系统函数。<br />
+不推荐使用系统函数，一是复杂度比较高；二是常常会阻塞进程；三是控制和数据交互不方便。所以本文以下内容都是讲述使用QProcess调用脚本命令的方法。</p>
+
+<h1 id="单条指令调用">单条指令调用</h1>
+
+<p>用QProcess执行单条脚本指令的代码真的非常简洁，但要理解清楚，应至少掌握三点内容：阻塞与非阻塞、进程与线程、QProcess参数传递。<br />
+一、阻塞与非阻塞<br />
+但凡熟悉QProcess类的读者应该清楚，QProcess调用外部进程分为阻塞和非阻塞两类方式。</p>
+
+<pre><code>1）QProcess::execute(&quot;xxx&quot;); //阻塞方式
+2）QProcess process;
+   process.start(&quot;xxx&quot;); //非阻塞方式
+</code></pre>
+
+<p>阻塞方式下，新开启的QProcess不执行完毕或中途退出，主进程就会一直等待，卡在那里而不做任何处理。<br />
+而在非阻塞方式下，新开启的QProcess不会影响主进程中其它线程的运行。</p>
+
+<p>二、进程与线程<br />
+进程比较好理解，一个应用程序就是一个进程，对应控制面板显示的内容。<br />
+一个进程可以开启多个线程，通常在一个单独开启的线程中调用QProcess来开启一个新的进程，这样可以最大程度的使新开启的进程不影响主进程中的其它线程（包括主线程）。</p>
+
+<p>三、QProcess参数传递<br />
+这里主要还是QProcess的用法。大致分为三步：1）生成一个进程；2）设置环境变量、运行参数；3）启动进程，等待执行。</p>
+
+<p>一个调用QProcess执行压缩文件的例子如下：</p>
+
+<pre><code>bool SysResource::compressDir(const QString srcPath, const QString workPath, const QString zipfile)
+{
+    QProcess process; //生成进程
+    //设置环境变量、运行参数
+    process.setWorkingDirectory(workPath);
+    QStringList args;
+    args &lt;&lt; &quot;-mr&quot; &lt;&lt; zipfile &lt;&lt; srcPath;
+    //启动进程，等待执行
+    process.start(&quot;zip&quot;, args);
+    if (!process.waitForFinished())
+    {
+        process.close();
+        return false;
+    }
+    process.close();
+    return true;
+}
+</code></pre>
+
+<p>为了不阻塞当前调用的线程，需要把这个函数放在一个线程中。Qt下把函数放在线程的方法如下：</p>
+
+<pre><code>QtConcurrent::run(this, &amp;SysResource::Fuctionname);
+</code></pre>
+
+<h1 id="多条指令的调用">多条指令的调用</h1>
+
+<p>多条指令调用有两种方法，一是用一个循环，等前一条指令执行完，发出finished()信号后执行下一条；二是把多条指令写在一个Shell
+Script中，调用这个脚本即可。这里强烈推荐使用第二种方法，因为QProcess无法识别Linux的管道命令等多种命令，而第二种方法完美规避这个问题。可以在QProcess启动后，使用qDebug()显示QProcess.arguments()和QProcess.errorString()来判断指令是否被QProcess识别正确。<br />
+1)循环执行指令代码demo如下：</p>
+
+<pre><code>//构造函数中
+QProcess *process = new QProcess;
+connect(process, SIGNAL(finished(int)), this, SLOT(doNextCommand()));
+
+//槽函数
+void SysResource::doNextCommand()
+{
+    ipRank++;
+    if (ipRank &lt; 4)  //定义了Command[4]数组存放了4条指令
+    {
+        process-&gt;start(Command[ipRank]);
+    }
+    else
+    {
+        process-&gt;close();
+    }
+}
+</code></pre>
+
+<p>2）调用外部脚本代码和单条指令类似，如下：</p>
+
+<pre><code>QProcess process;
+QStringList args;
+args &lt;&lt; &quot;/home/LM/xxx.sh&quot;;
+process.start(&quot;sh&quot;, args);
+if (!process.waitForFinished())
+{
+    process.close();
+    return;
+}
+process.close();
+</code></pre>
+
+<h1 id="总结">总结</h1>
+
+<p>文中几种方法都是从编写的工程文件中节选而来，在发行版和ARM版的Linux系统中都得到了验证。欢迎和我交流讨论~</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

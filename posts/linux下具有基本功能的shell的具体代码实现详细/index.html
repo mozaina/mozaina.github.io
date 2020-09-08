@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux下具有基本功能的shell的具体代码实现详细 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux下具有基本功能的shell的具体代码实现详细 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux下具有基本功能的shell的具体代码实现详细">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E4%B8%8B%E5%85%B7%E6%9C%89%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD%E7%9A%84shell%E7%9A%84%E5%85%B7%E4%BD%93%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0%E8%AF%A6%E7%BB%86/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux下具有基本功能的shell的具体代码实现详细</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>在前几个月对Linux的学习过程中，一直在与shell进行交互，感觉shell充满了神秘感。偶然看到一篇文章讲解了shell的实现，感觉也不是很难的样子，于是自己也开始开发自己的minishell，顺便也巩固了前一段时间学习的linux系统编程的知识。</p>
+
+<p>先来展示一下我的这个minishell实现的功能：</p>
+
+<p><strong>1. 支持ls,touch,wc 等外部命令<br />
+2. 支持输入输出重定向符</strong></p>
+
+<p><strong>3. 支持管道命令</strong></p>
+
+<p><strong>4 .支持后台作业</strong></p>
+
+<p><strong>5. 支持cd,jobs,kill,exit等内部命令（自己还写了一个about 命令 ^ _ ^）</strong></p>
+
+<p><strong>6. 支持对ctrl+c 和ctrl +z 信号的处理</strong></p>
+
+<p>接下来我们按照编写的步骤一一来分析：</p>
+
+<p><strong>（一）命令的解析</strong></p>
+
+<p>输入命令的解析在本程序中占到了很大的比重，虽然像这种解析普通命令的程序（正则表达式太难了。。）的解释器难度不大，但是健壮性和全面性还是需要周全考虑的。<br />
+这里采用了分段解析，先除去起始空格，制表符等，并以此和一些‘|’，‘</p>
+
+<pre><code>/*
+ * 解析命令
+ * 成功返回解析到的命令个数，失败返回-1
+ */
+int parse_command(void)
+{
+    /* cat &lt; test.txt | grep -n public &gt; test2.txt &amp; */
+    if (check(&quot;\n&quot;))
+        return 0;
+
+    /* 判断是否内部命令并执行它 */
+    if (builtin())
+        return 0;
+
+
+    /* 1、解析第一条简单命令 */
+
+    get_command(0);
+    /* 2、判定是否有输入重定向符 */
+    if (check(&quot;&quot;))
+    {
+        if (check(&quot;&gt;&quot;))
+            append = 1;
+        getname(outfile);
+    }
+    /* 5、判定是否后台作业 */
+    if (check(&quot;&amp;&quot;))
+        backgnd = 1;
+    /* 6、判定命令结束‘\n’*/
+    if (check(&quot;\n&quot;))
+    {
+        cmd_count = i;
+        return cmd_count;
+    }
+    else
+    {
+        fprintf(stderr, &quot;Command line syntax error\n&quot;);
+        return -1;
+    }
+}
+
+/*
+ * 解析简单命令至cmd[i]
+ * 提取cmdline中的命令参数到avline数组中，
+ * 并且将COMMAND结构中的args[]中的每个指针指向这些字符串
+ */
+void get_command(int i)
+{
+    /*   cat &lt; test.txt | grep -n public &gt; test2.txt &amp; */
+
+    int j = 0;
+    int inword;
+    while (*lineptr != '\0')
+    {
+        /* 去除空格 */
+        while (*lineptr == ' ' || *lineptr == '\t')
+            lineptr++;
+
+        /* 将第i条命令第j个参数指向avptr */
+        cmd[i].args[j] = avptr;
+        /* 提取参数 */
+        while (*lineptr != '\0'
+            &amp;&amp; *lineptr != ' '
+            &amp;&amp; *lineptr != '\t'
+            &amp;&amp; *lineptr != '&gt;'
+            &amp;&amp; *lineptr != '':
+        case '|':
+        case '&amp;':
+        case '\n':
+            if (inword == 0)
+                cmd[i].args[j] = NULL;
+            return;
+        default: /* for '\0' */
+            return;
+        }
+    }
+}
+
+/*
+ * 将lineptr中的字符串与str进行匹配
+ * 成功返回1，lineptr移过所匹配的字符串
+ * 失败返回0，lineptr保持不变
+ */
+int check(const char *str)
+{
+    char *p;
+    while (*lineptr == ' ' || *lineptr == '\t')
+        lineptr++;
+
+    p = lineptr;
+    while (*str != '\0' &amp;&amp; *str == *p)
+    {
+        str++;
+        p++;
+    }
+
+    if (*str == '\0')
+    {
+        lineptr = p;    /* lineptr移过所匹配的字符串 */
+        return 1;
+    }
+
+    /* lineptr保持不变 */
+    return 0;
+}
+
+void getname(char *name)
+{
+    while (*lineptr == ' ' || *lineptr == '\t')
+        lineptr++;
+
+    while (*lineptr != '\0'
+            &amp;&amp; *lineptr != ' '
+            &amp;&amp; *lineptr != '\t'
+            &amp;&amp; *lineptr != '&gt;'
+            &amp;&amp; *lineptr != '
+</code></pre>
+
+<p><strong>（二）命令的执行和实现</strong></p>
+
+<p><strong>1、程序框架：</strong></p>
+
+<p>在对命令的解析完毕后，我们先考虑两个大的方向，即是外部命令还是内部命令？</p>
+
+<p>外部命令的话，我们只需要fork一个子进程，用execvp()来执行就可以了；对于内部命令则需要自己去实现。</p>
+
+<p>提出两个问题：第一个，为什么要使用execvp() ？第二个，为什么要fork一个子进程来实现，直接while循环不可以吗？</p>
+
+<p>解答：</p>
+
+<p>（1）我们之所以使用execvp(),是因为函数的原型是 int execvp(const char *file ,char * const argv
+[]); 第一个参数是命令文件名，第二个是参数，执行命令非 常的方便。</p>
+
+<p>（2）一旦执行execvp()，当前进程就会被execvp的进程所替代，执行完后就会结束程序，所以while循环是不可以的，必须要fork一个子进程来执行。</p>
+
+<pre><code>while(1) {　　　　　　　　　　　　　　　　　 /* repeat forever */
+　　type_prompt();　　　　　　　　　　　　　/* display prompt on the screen */
+　　read_command(command,parameters);　　　 /* read input from terminal */
+　　if(fork()!=0) {　　　　　　　　　　　　　  /* fork off child process */
+　　　　/* Parent code */
+　　　　waitpid(-1,&amp;status,0);　　　　　　　  /* wait for child to exit */
+ 　　} else {
+　　　　/* Child code */
+　　　　execvp(command,parameters);　　　　/* execute command */
+　　}
+
+}
+</code></pre>
+
+<p>利用这个框架，外部命令（可执行文件）的功能基本实现(vi ,top ,ps等均可使用)。</p>
+
+<p><a href="https://img.it610.com/image/info8/847d2488267d41549c880534bd38df35.jpg"><img src="https://img.it610.com/image/info8/847d2488267d41549c880534bd38df35.jpg" alt="Linux下具有基本功能的shell的具体代码实现（详细）_第1张图片" /></a></p>
+
+<p><strong>2、输入输出重定向</strong></p>
+
+<p>当分析出来有输入输出重定向的符号时，我们要使用dup()函数来实现。函数详解请参考 我的博客</p>
+
+<p>对于输入的句法分析结果，我们使用一个结构体来保存：</p>
+
+<pre><code>typedef struct command
+{
+    char *args[MAXARG+1];   /* 解析出的命令参数列表 */
+    int infd;
+    int outfd;
+} COMMAND;
+</code></pre>
+
+<p>基本流程：</p>
+
+<pre><code>    /* 子进程 */
+        if (cmd[i].infd != 0)
+        {
+            close(0);
+            dup(cmd[i].infd);
+        }
+        if (cmd[i].outfd != 1)
+        {
+            close(1);
+            dup(cmd[i].outfd);
+        }
+
+
+        int j;
+        for (j=3; j
+</code></pre>
+
+<p>其中cmd[i].infd和cmd[i].outfd是解析出来的重定向位置的全局变量。</p>
+
+<p><a href="https://img.it610.com/image/info8/d2cd1fe93c5c4e5dac42a1216964c87f.jpg"><img src="https://img.it610.com/image/info8/d2cd1fe93c5c4e5dac42a1216964c87f.jpg" alt="Linux下具有基本功能的shell的具体代码实现（详细）_第2张图片" /></a></p>
+
+<p><strong>3、管道命令</strong></p>
+
+<p>管道命令是使用pipe()函数实现的。关于管道的详解请参考 我的博客</p>
+
+<p>假如我们有 a | b | c 这样一个形式的命令，那么是需要创建两条管道的，依次类推。</p>
+
+<pre><code>    int i;
+    int fd;
+    int fds[2];
+    for (i=0; i
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/5d6cad94a61949daab63a7552aac650b.jpg"><img src="https://img.it610.com/image/info8/5d6cad94a61949daab63a7552aac650b.jpg" alt="Linux下具有基本功能的shell的具体代码实现（详细）_第3张图片" /></a></p>
+
+<p><strong>4.后台作业和信号处理</strong></p>
+
+<p>判断后台，我们只需要解析命令看是否存在 “&amp;”，若存在则backgnd =
+1，不再对后台进程进行wait。为了避免僵尸进程，我们可是选择使用signal()处理SIGCHLD，将其忽略，同时忽略SIGINT和SIGQUIT信号（后台不响应ctrl+c,ctrl+z）。但是注意backgnd=0的时候要将这两个信号再设置成默认处理，否则前台也不能响应信号了。</p>
+
+<p><a href="https://img.it610.com/image/info8/fb5e4a2d921b4e09810c04babc00fe50.jpg"><img src="https://img.it610.com/image/info8/fb5e4a2d921b4e09810c04babc00fe50.jpg" alt="Linux下具有基本功能的shell的具体代码实现（详细）_第4张图片" /></a><br />
+<strong>5.内部命令</strong></p>
+
+<p>1、 cd命令的实现<br />
+cd命令的实现主要依赖于系统调用chdir()。我们通过将第一个参数传入chdir就可以进行一次成功的cd调用。通过判断chdir()不同的返回值可以判断出更改目录成功与否，并能输出错误原因。</p>
+
+<pre><code>void do_cd(void)
+{
+    get_command(0);
+    int fd;
+    fd=open(*(cmd[0].args),O_RDONLY);
+    fchdir(fd);
+    close(fd);
+}
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/1b92eb6b310645c58756f7c0773efb68.jpg"><img src="https://img.it610.com/image/info8/1b92eb6b310645c58756f7c0773efb68.jpg" alt="Linux下具有基本功能的shell的具体代码实现（详细）_第5张图片" /></a></p>
+
+<p>2、 jobs命令的实现<br />
+jobs命令我们维护一个链表，每次当有一个后台进程运行的时候，都要向这个链表中添加一个数据。并当子进程结束的时候会向父进程发送SIGCHLD信号，父进程也就是Shell要处理这个信号，并且将后台进程链表中相应的进程进行处理，也就是将其移除。</p>
+
+<pre><code>    /* 父进程 */
+        if (backgnd == 1)
+        {
+           /*添加入jobs的链表*/
+               NODE *p=(NODE*)malloc(sizeof(NODE));
+               p-&gt;npid=pid;
+               printf(&quot;%s&quot;,cmd[0].args[0]);
+               strcpy(p-&gt;backcn,cmd[0].args[0]);
+               // printf(&quot;%s&quot;,p-&gt;backcn);
+
+               NODE* tmp=head-&gt;next;
+               head-&gt;next=p;
+               p-&gt;next=tmp;
+        }
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/7fe016359c6042739308fb5830128cb2.jpg"><img src="https://img.it610.com/image/info8/7fe016359c6042739308fb5830128cb2.jpg" alt="Linux下具有基本功能的shell的具体代码实现（详细）_第6张图片" /></a><br />
+3、 exit命令的实现<br />
+exit命令分两部分实现。第一，当词法分析到exit的时候直接调用系统调用exit（）就可以了。第二，退出之前要判断一下后台进程链表中是否还有未执行完的任务，如果有未执行完的任务，要提示用户，等待用户选择。</p>
+
+<pre><code>void do_exit(void)
+{
+    int Pgnum=0;
+    NODE* tmp=head-&gt;next;
+    while(tmp!=NULL)
+    {
+        Pgnum++;
+        tmp=tmp-&gt;next;
+    }
+    if(Pgnum!=0)
+    {
+       printf(&quot;There are programs in the background,are you sure to exit?y/N\n&quot;);
+       char c= getchar();
+       if(c=='N')
+           return ;
+       else
+           goto loop;
+    }
+   loop:
+    printf(&quot;exit\n&quot;);
+    exit(EXIT_SUCCESS);
+}
+</code></pre>
+
+<p>4、 kill命令的实现<br />
+kill命令的实现是通过信号来实现的，我们使用kill -9
++pid来强制结束后台进程，用kill系统调用向相应的进程发送SIGQUIT信号来使进程强制退出。</p>
+
+<pre><code>void do_kill(void)
+{
+    get_command(0);
+    int num=atoi(cmd[0].args[1]);
+    signal(SIGQUIT,SIG_DFL);
+    kill(num,SIGQUIT);
+    signal(SIGQUIT,SIG_IGN);
+    NODE *bng=head-&gt;next;
+    NODE *pre=head;
+    while(bng!=NULL)
+    {
+        if(bng-&gt;npid==num)
+        {
+            NODE* nxt=bng-&gt;next;
+            pre-&gt;next=nxt;
+            break;
+        }
+        pre=bng;
+        bng=bng-&gt;next;
+    }
+}
+</code></pre>
+
+<p>到这里，本程序的功能已经基本实现，效果还算不错。</p>
+
+<p><strong>注：本程序的具体源码托管至 Github ，欢迎大家关注！</strong></p>
+
+<p>然而依然存在一些不足之处：</p>
+
+<p>1.因为时间和测试不足的关系，肯定存在着bug</p>
+
+<p>2.没能支持正则表达式等复杂的命令解析</p>
+
+<p>3.不能执行shell脚本。</p>
+
+<p>4.没有实现上下键查看历史命令的功能。</p>
+
+<p>总的来说，自己收获很大，也希望可以帮助到大家！</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

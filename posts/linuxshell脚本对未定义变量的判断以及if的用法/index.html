@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linuxshell脚本对未定义变量的判断以及if的用法 | 开发者问答集锦</title>
+    <meta property="og:title" content="linuxshell脚本对未定义变量的判断以及if的用法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linuxshell脚本对未定义变量的判断以及if的用法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E8%84%9A%E6%9C%AC%E5%AF%B9%E6%9C%AA%E5%AE%9A%E4%B9%89%E5%8F%98%E9%87%8F%E7%9A%84%E5%88%A4%E6%96%AD%E4%BB%A5%E5%8F%8Aif%E7%9A%84%E7%94%A8%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linuxshell脚本对未定义变量的判断以及if的用法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="环境">环境</h1>
+
+<p>操作系统：win10<br />
+虚拟机：centos7</p>
+
+<h1 id="需求">需求</h1>
+
+<p>因为公司有个脚本，是用于启动程序的，但是每次启动都要手动做如下两个操作：<br />
+①先查询之前的进程ID<br />
+②杀死之前的，在启动新了</p>
+
+<p>时间长了弄得我很烦躁，所以就琢磨下，把上面的的操作一起整合到启动脚本里去。<br />
+最开始我是这么写的：</p>
+
+<pre><code>#!/bin/bash
+echo &quot;ggjob-search...&quot;
+pid=`ps -ef|grep -w ggjob-search|grep -v grep|grep -v ggjob-search.sh|awk '{printf $2}'`
+echo &quot;having kill pid:$pid&quot;
+kill -9 $pid
+nohup java -Djava.ext.dirs=lib -Xms500m -Xmx500m -Dlog4j.configuration=file:/home/webuser/gogoal_platform/ggjob/config/log4j.properties -jar ggjob-search.jar config/config.properties 2&gt;&amp;1 &gt;&gt;/dev/null &amp;
+echo &quot;new pid:$!&quot;
+</code></pre>
+
+<p>执行了一下，OK<br />
+结果：</p>
+
+<pre><code>ggjob-search...
+having kill pid:7018
+new pid:7209
+</code></pre>
+
+<p>假设进程早已手动杀死，在执行上面的脚本：<br />
+结果提示：</p>
+
+<pre><code>kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]
+</code></pre>
+
+<p>虽然不影响后面的命令，依然启动了程序。但是总是报这个也不好看。</p>
+
+<p>所以我打算加上if判断</p>
+
+<h2 id="shell-if写法">shell if写法</h2>
+
+<p>if空格[空格判断表达式空格];then<br />
+else<br />
+fi</p>
+
+<h3 id="对未定义变量的判断">对未定义变量的判断</h3>
+
+<p>举个例子：</p>
+
+<pre><code>if [ &quot;x${pid}&quot; != &quot;x&quot; ];then
+echo &quot;说明pid变量不为空&quot;
+else
+echo &quot;变量pid为空或未定义&quot;
+fi
+</code></pre>
+
+<p>特别注意上面<code>if</code>那一行是没有一个多余的空格；也就是说，空格是必须的，否则会报语法错误。</p>
+
+<hr />
+
+<p>最后我调整后的脚本为：</p>
+
+<pre><code>#!/bin/bash
+echo &quot;ggjob-search...&quot;
+pid=`ps -ef|grep -w ggjob-search|grep -v grep|grep -v ggjob-search.sh|awk '{printf $2}'`
+if [ &quot;X${pid}&quot; != &quot;X&quot; ];then
+echo &quot;having kill pid:$pid&quot;
+kill -9 $pid
+fi
+nohup java -Djava.ext.dirs=lib -Xms500m -Xmx500m -Dlog4j.configuration=file:/home/webuser/gogoal_platform/ggjob/config/log4j.properties -jar ggjob-search.jar config/config.properties 2&gt;&amp;1 &gt;&gt;/dev/null &amp;
+echo &quot;new pid:$!&quot;
+</code></pre>
+
+<p>简单讲解：<br />
+①先执行<code>ps -ef|grep -w ggjob-search|grep -v grep|grep -v ggjob-search.sh|awk
+'{printf $2}'</code>，找到我们要杀死的进程<code>ID</code>并赋值给变量<code>pid</code>。<br />
+②进行判断，要是进程没有被杀死，就执行<code>kill -9</code>，进行强制杀死进程操作。<br />
+③后台启动程序（我这里是启动jar包），最后打印启动的新<code>ID</code>。</p>
+
+<p>注意：由于我的脚本名和查询进程名类似，所以<code>grep</code>取反时，也要把脚本本身临时启动的进程<code>ID</code>过滤掉。</p>
+
+<hr />
+
+<p>这里也贴出网上收集的一些小技巧：</p>
+
+<pre><code>判断变量a为空最好的方法是：[  -z string ]  [  -n  string  ]
+# 这种方式
+if [ -z $a  ];then
+echo &quot;${LINENO} a is null&quot;
+fi
+# -z 如果string长度为零，则为真
+# -n 如果string长度非零，则为真
+</code></pre>
+
+<p>经过我大量测试：<br />
+上面的对未定义变量的判断也可以这么写：</p>
+
+<pre><code># 经过我的测试使用-n 不能判断未定义变量
+if [ ! -z ${pid} ];then
+echo &quot;说明pid变量不为空&quot;
+else
+echo &quot;变量pid为空或未定义&quot;
+fi
+</code></pre>
+
+<p><strong>这是不是说明：未定义变量，使用<code>-n</code>判断时，其string长度不为空，使用<code>-z</code>做判断时，其string长度为空。（我也不确定）</strong></p>
+
+<table>
+<thead>
+<tr>
+<th>运算符</th>
+<th>描述</th>
+<th>示例</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>-e filename</td>
+<td>如果filename存在，则为真</td>
+<td>[ -e /etc/profile ]</td>
+</tr>
+
+<tr>
+<td>-d filename</td>
+<td>如果filename为目录，则为真</td>
+<td>[ -d /tmp/mydir ]</td>
+</tr>
+
+<tr>
+<td>-f filename</td>
+<td>如果filename为常规文件，则为真</td>
+<td>[ -f /usr/bin/grep ]</td>
+</tr>
+</tbody>
+</table>
+
+<p>不一一列举了</p>
+
+<h2 id="参考链接">参考链接</h2>
+
+<p>Shell常用招式大全之入门篇：<a href="http://www.imooc.com/article/1788">http://www.imooc.com/article/1788</a></p>
+
+<p>shell 变量未定义或空值导致test语句报错解决办法</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>一个简单的linuxshell程序示例及其说明 | 开发者问答集锦</title>
+    <meta property="og:title" content="一个简单的linuxshell程序示例及其说明 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="一个简单的linuxshell程序示例及其说明">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84linuxshell%E7%A8%8B%E5%BA%8F%E7%A4%BA%E4%BE%8B%E5%8F%8A%E5%85%B6%E8%AF%B4%E6%98%8E/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">一个简单的linuxshell程序示例及其说明</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>写一个一般的多项选择的小程序，该程序从一个数据文件中读入问题，显示这些问题给用户，程序还能识别正确选项的编号和错误选项的编号。用户可以随时提交答案并计算得分，然后退出程序。</p>
+
+<p>-&mdash;  每个主题都在测验的主目录中对应着一个子目录。主目录的名字存放在环境变量  QUIZDIR  中，该变量的默认值为  ~/games/quiz
+。这里给出测试的例子中主目录下含有  art  、  politics  、  engineer  三个子目录  (  对应于三个主题  )  。</p>
+
+<p>-&mdash;  每个主题下包含一系列问题，每个问题在子目录中以文件的形式存在。</p>
+
+<p>-&mdash;  每个问题的第  1  行是提问文字。如果这段文字占有多行，那么在新行前必须加一个反斜杠。第  2
+行是一个整数，用来表示该问题对应的选项个数。接下去的若干行就是各种选项。最后给出正确答案。</p>
+
+<p>-&mdash;  程序在一个主题目录中显示出所有的问题，无论何时用户都可以通过按下  CONTROL+C
+组合键退出检测，退出的同时程序将计算测验的结果。在回答完所有问题后程序将计算结果并退出。</p>
+
+<p>-&mdash;  程序每次显示一个主题的所有问题之前将打乱显示的顺序。</p>
+
+<p>写在前面的说明：</p>
+
+<p>games  主目录下不仅含有  3  个子目录作为供选择的主题，还含有文件名为  quiz  的  shell  脚本程序，该脚本是考试小程序运行程序。</p>
+
+<p>在  art  主题目录下含有文件  mod  和脚本文件  setques.sh  ，这两个文件用来在该主题下生成测试用的问题文件，运行
+setques.sh  传入的参数是需要生成的问题文件数。</p>
+
+<p>给出完整的测试流程和  shell  代码本身：</p>
+
+<blockquote>
+<p>cd ~</p>
+
+<p>mkdir -p games/quiz</p>
+
+<p>cd quiz</p>
+
+<p>mkdir engineer art politics</p>
+
+<p>cat -n <strong>quiz</strong></p>
+</blockquote>
+
+<p>1 #!/bin/bash</p>
+
+<p>2</p>
+
+<p>3 # remove the #on the following line to turn on debugging</p>
+
+<p>4 #set -o xtrace</p>
+
+<p>5</p>
+
+<p>6 #==============</p>
+
+<p>7 function initialize()</p>
+
+<p>8 {</p>
+
+<p>9 <strong>trap &lsquo;summarize ; exit 0&rsquo; INT</strong></p>
+
+<p>10 num_ques=0</p>
+
+<p>11 num_correct=0</p>
+
+<p>12 first_time=true</p>
+
+<p>13 cd <strong>${QUIZDIR:=~/games/quiz}</strong> || exit 2</p>
+
+<p>14 }</p>
+
+<p>初始化，将变量  QUIZDIR  的值设置为脚本程序的工作目录，如果没有设置该变量，那么默认就为  ~/games/quiz  ；设置捕获
+CONTROL+C  信号的信号捕捉命令，即响应  CONTROL+C  信号的处理命令是  &lsquo;summarize;exit 0&rsquo;  。</p>
+
+<p>15</p>
+
+<p>16 #=============</p>
+
+<p>17 function choose_subj()</p>
+
+<p>18 {</p>
+
+<p>19 <strong>subjects=($(ls))</strong></p>
+
+<p>20 PS3=&ldquo;Choose a subject for the quiz from the preceding list:&rdquo;</p>
+
+<p>21 <strong>select Subject in ${subjects[*]}</strong> ;do</p>
+
+<p>22 if [[ -z &ldquo;$Subject&rdquo; ]]</p>
+
+<p>23 then</p>
+
+<p>24 echo &ldquo;No subject chosen.Bye&rdquo; ?&gt;2</p>
+
+<p>25 exit 1</p>
+
+<p>26 fi</p>
+
+<p>27 <strong>echo $Subject</strong></p>
+
+<p>28 return 0</p>
+
+<p>29 done</p>
+
+<p>30 }</p>
+
+<p>选择主题，利用命令  &lsquo;ls&rsquo;  和命令替换  $(ls)  ，的输出作为元素  --($(ls))&ndash;  对数组  subjects  赋值；利用
+select  结构给用户显示主题名字，并把结果保存到变量  Subject  中，并把主题目录名字写到标准输出上  (
+<strong>注意主程序将利用命令替换来使用该输出，作为赋值表达式的右值</strong> )  。命令替换：利用其中命令的输出来代替整条命令。</p>
+
+<p>31</p>
+
+<p>32 #============</p>
+
+<p>33 function exchange()</p>
+
+<p>34 {</p>
+
+<p>35 temp_value=${questions[$1]}</p>
+
+<p>36 <strong>questions[$1]=${questions[$2]}</strong></p>
+
+<p>37 questions[$2]=$temp_value</p>
+
+<p>38 }</p>
+
+<p>39</p>
+
+<p>40 #===========</p>
+
+<p>41 function scramble()</p>
+
+<p>42 {</p>
+
+<p>43 typeset -i index quescount</p>
+
+<p>44 <strong>questions=($(ls))</strong></p>
+
+<p>45 <strong>quescount=${#questions[*]}</strong></p>
+
+<p>46 ((index=quescount-1))</p>
+
+<p>47 while [[ $index &gt;0 ]];do</p>
+
+<p>48 ((target= <strong>RANDOM % index</strong> ))</p>
+
+<p>49 exchange $target $index</p>
+
+<p>50 <strong>((index -= 1))</strong></p>
+
+<p>51 done</p>
+
+<p>52 }</p>
+
+<p>数组变量  questions  保存所有问题的名字，注意函数中定义的变量具有全局性，除非利用  typeset  声明为局部变量，所以在
+exchange  函数中可以对  questions  中的数组元素进行交换操作。同样对  questions  的赋值也是利用命令替换来完成的；
+quescount  保存了数组元素的个数；函数让索引变量  index  从  quescount  开始向下计数。对索引的每个值，函数选择一个介于
+0~index  之间的随机值  (  取模操作将随机数对应到  0  ～  index  范围  )
+，然后将索引值和选择的随机值所对应数组位置的元素进行对换。运行  scramble  函数的结果会得到两个全局性的变量  questions(
+数组，元素为主题目录下的所有文件名，元素与文件名的对应关系被随机排列，注意一个文件对应着一个问题  )  和  quescount(
+数组元素的个数也就是问题的个数  )  。 <strong>由于函数运行环境通常与被其调用的环境相同，所以其中的变量是显示被函数和调用它的</strong> <strong>shell</strong>
+<strong>共享。</strong></p>
+
+<p>53</p>
+
+<p>54 #===========</p>
+
+<p>55 function ask()</p>
+
+<p>56 {</p>
+
+<p>57 <strong>exec 3</strong></p>
+
+<p>58 <strong>read -u3 ques || exit 2</strong></p>
+
+<p>59 read -u3 num_opts || exit 2</p>
+
+<p>60 index=0</p>
+
+<p>61 choices=()</p>
+
+<p>62 while (( index &lt; num_opts));do</p>
+
+<p>63 read -u3 next_choice || exit 2</p>
+
+<p>64 <strong>choices=(&ldquo;${choices[@]}&rdquo; &ldquo;$next_choice&rdquo;)</strong></p>
+
+<p>65 ((index += 1))</p>
+
+<p>66 done</p>
+
+<p>67 read -u3 correct_answer || exit 2</p>
+
+<p>68 <strong>exec 3</strong></p>
+
+<p>69</p>
+
+<p>70 if [[ $first_time = true ]];then</p>
+
+<p>71 first_time=false</p>
+
+<p>72 echo -e &ldquo;You may press the interrupt key at any time to quit./n&rdquo;</p>
+
+<p>73 fi</p>
+
+<p>74</p>
+
+<p>75 <strong>PS3=&ldquo;$ques&rdquo;</strong></p>
+
+<p>76</p>
+
+<p>77 <strong>select answer in &ldquo;${choices[@]}&rdquo;</strong> ;do</p>
+
+<p>78 if [[ -z &ldquo;$answer&rdquo; ]];then</p>
+
+<p>79 echo Not a valid choice.Please choose again.</p>
+
+<p>80 elif [[ &ldquo;$answer&rdquo; = &ldquo;$correct_answer&rdquo; ]];then</p>
+
+<p>81 echo &ldquo;Correct!&rdquo;</p>
+
+<p>82 return 1</p>
+
+<p>83 else</p>
+
+<p>84 echo &ldquo;No,the answer is $correct_answer.&rdquo;</p>
+
+<p>85 return 0</p>
+
+<p>86 fi</p>
+
+<p>87 done</p>
+
+<p>88 }</p>
+
+<p>ask  函数从参数中读入问题文件，并使用文件的内容显示问题，接受用户输入的答案，同时还要判断答案的正确性，函数参数为问题文件的文件名。</p>
+
+<p>利用文件描述符  3  打开参数  ($1-  问题文件文件名  )  文件；从其中读入相应问题到变量  ques  中，读入选项到数组  choices
+中，利用  select  结构显示选项并接受问题答案到变量  answer  中，利用  select  结构的显示提示符  PS3  显示问题
+ques  。</p>
+
+<p>89</p>
+
+<p>90 #===========</p>
+
+<p>91 function summarize()</p>
+
+<p>92 {</p>
+
+<p>93 echo</p>
+
+<p>94 if (( num_ques == 0 ));then</p>
+
+<p>95 echo &ldquo;You did not answer any questions&rdquo;</p>
+
+<p>96 exit 0</p>
+
+<p>97 fi</p>
+
+<p>98</p>
+
+<p>99 ((percent=num_correct*100/num_ques))</p>
+
+<p>100 echo &ldquo;You answered $num_correct questions correctly,out of /</p>
+
+<p>101 $num_ques total questions.&rdquo;</p>
+
+<p>102 echo &ldquo;Your score is $percent percent.&rdquo;</p>
+
+<p>103 }</p>
+
+<p>summarize  函数为最后统计结果函数。注意在用户测试的过程中利用  CONTROL+C  退出程序时也将调用该函数，因为初始化利用  trap
+命令将其信号处理命令定义为了  &lsquo;summarize;exit 0&rsquo;  ；注意函数定义变量的全局性  (  在定义这些函数的  shell  环境中全局有效
+)  ，正是因为如此才可顺利的显示测验结果。</p>
+
+<p>104</p>
+
+<p>105 #==========</p>
+
+<p>106 initialize</p>
+
+<p>107</p>
+
+<p>108 <strong>subject=$(choose_subj)</strong></p>
+
+<p>109 [[ $? -eq 0 ]] || exit 2</p>
+
+<p>110</p>
+
+<p>111 <strong>cd $subject</strong> || exit 2</p>
+
+<p>112 echo</p>
+
+<p>113 scramble</p>
+
+<p>114</p>
+
+<p>115 for ques in ${questions[*]};do</p>
+
+<p>116 ask $ques</p>
+
+<p>117 <strong>result=$?</strong></p>
+
+<p>118 (( num_ques=num_ques+1 ))</p>
+
+<p>119 if [[ $result == 1 ]];then</p>
+
+<p>120 (( num_correct += 1 ))</p>
+
+<p>121 fi</p>
+
+<p>122 echo</p>
+
+<p>123 <strong>sleep ${QUIZDELAY:=1}</strong></p>
+
+<p>124 done</p>
+
+<p>125</p>
+
+<p>126 summarize</p>
+
+<p>127 exit 0</p>
+
+<p>128</p>
+
+<p>quiz  主程序，初始化定义一些变量并设置  INT  信号处理命令；运行 choose_subj  命令替换，导致其输出赋值给 subject
+，也即是选择的主题目录；利用 cd 命令进入所选择的主题目录；利用函数  scramble 得到主题目录下所有问题文件名的数组 (questions)
+和问题文件数 (quescount)( 一个问题文件对应一个问题，利用函数变量的全局性在主程序中使用这两个变量 ) ；利用 for
+结构遍历问题文件名数组中的每个文件名，利用函数 ask( 参数为问题文件的文件名 ) 显示问题并得到答案， ask 函数的运行结果 ( 返回值 )
+保存到变量 result 中以便统计测验结果。</p>
+
+<blockquote>
+<p>cd art</p>
+
+<p>cat -n mod</p>
+</blockquote>
+
+<p>1 4</p>
+
+<p>2 0</p>
+
+<p>3 1</p>
+
+<p>4 2</p>
+
+<p>5 3</p>
+
+<blockquote>
+<p>cat -n setques.sh</p>
+</blockquote>
+
+<p>1 #!/bin/bash</p>
+
+<p>2</p>
+
+<p>3 index=0</p>
+
+<p>4 answer=</p>
+
+<p>5 while [ $index -lt $1 ]</p>
+
+<p>6 do</p>
+
+<p>7 <strong>echo &ldquo;The question is $index:&rdquo; &gt;temp</strong></p>
+
+<p>8 # echo -e &ldquo;The question is $index:/n&rdquo;&gt;temp</p>
+
+<p>9 <strong>cat temp mod &gt;</strong> **$$.$index **</p>
+
+<p>10 # echo -e &ldquo;/n&rdquo; &gt;&gt;$$.$index</p>
+
+<p>11 <strong>answer=$(( $index &amp; 3))</strong></p>
+
+<p>12 echo $answer &gt;&gt;$$.$index</p>
+
+<p>13 (( index+=1))</p>
+
+<p>14 done</p>
+
+<p>15 rm temp</p>
+
+<p>脚本  setques.sh  用来产生测试用问题文件。问题名，选项，答案！下面是运行后的一个问题文件示例：</p>
+
+<blockquote>
+<p>./setques.sh 10</p>
+
+<p>ls</p>
+
+<p>cat -n 2868.6</p>
+</blockquote>
+
+<p>1 The question is 6:</p>
+
+<p>2 4</p>
+
+<p>3 0</p>
+
+<p>4 1</p>
+
+<p>5 2</p>
+
+<p>6 3</p>
+
+<p>7 2</p>
+
+<blockquote>
+<p>cd ..</p>
+
+<p>./quiz</p>
+</blockquote>
+
+<p>对  setques.sh  可以完善，例如加入对信号的捕捉，使其利用中断键等形式退出时也能够删除  temp  文件。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

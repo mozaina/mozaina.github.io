@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell批量远程MySQL执行命令工作总结 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell批量远程MySQL执行命令工作总结 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell批量远程MySQL执行命令工作总结">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E6%89%B9%E9%87%8F%E8%BF%9C%E7%A8%8Bmysql%E6%89%A7%E8%A1%8C%E5%91%BD%E4%BB%A4%E5%B7%A5%E4%BD%9C%E6%80%BB%E7%BB%93/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell批量远程MySQL执行命令工作总结</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>昨天下班前，老板给了一批LOG数据库IP地址，需要统计LOG表里Message字段top 10的结果，并输出到一个excel文件里。<br />
+抽查看了下，有两种格式的以当天日期结尾的表名。由于数量太多，时间紧迫，只好写批量脚本解决问题。<br />
+并以此扩展，解析其中的几个常用shell程序，主体脚本写在文章后半部分。<br />
+学习shell重在灵活运用命令，形成自己的思维方式，和书写习惯，脚本参考即可。</p>
+
+<p>解题过程步骤：<br />
+1.梳理IP地址及对应表名<br />
+2.确定查询SQL<br />
+3.批量查询数据</p>
+
+<p><strong>完整脚本附在文章最后</strong></p>
+
+<p>解析下常用到的知识点:</p>
+
+<p><strong>1.日期：关于日期结尾的表，表中涉及日期时间的表字段</strong><br />
+注意：shell中养成给日期定义变量的习惯。<br />
+<1>.当前日期时间及格式<br />
+DATE_MARK=<code>date +'%Y%m%d'</code> 结果：20161214<br />
+DATE_MARK=<code>date + '%Y-%m-%d %H:%M:%S'</code> 结果：2016-12-14 18:20:11</p>
+
+<p>过去日期时间及格式<br />
+DATE_MARK=<code>date -d'1 day ago' +'%Y%m%d'</code> 结果：一天之前：20161213<br />
+DATE_MARK=<code>date -d'1 hour ago' +'%Y-%m-%d %H:%M:%S'</code> 结果：2016-12-14 17:20:11</p>
+
+<p>修改-d&rsquo; &lsquo; ：7天之前：7 days ago 7小时之前：7 hours ago</p>
+
+<p>表名：TB<em>NAME=&ldquo;LOG</em>${DATE_MARK}&rdquo;</p>
+
+<p><strong>2.遍历思想和循环及行的处理</strong><br />
+<1>.批量远程执行命令，批量Telnet端口，批量ping主机<br />
+<2>.遍历文件中每一行，进行添加，截取，输出操作。<br />
+主体思想：先读取ip或行，再处理ip或行，再利用ip或行<br />
+实例：<br />
+1.依次输出文件中的每一行<br />
+命令行while循环遍历: cat ip.txt | while read line; do echo $line;done<br />
+命令行for 循环遍历：for line in <code>cat ip.txt</code>;do echo $line;done<br />
+脚本中调用：ip.txt，然后循环遍历. ip文件作为脚本的执行参数<br />
+#!/bin/sh<br />
+ipfile=$1<br />
+cat ${ipfile}|while read line<br />
+do<br />
+echo ${line}<br />
+done<br />
+脚本执行：./xx.sh ip.txt<br />
+2.对行的处理，一行有多个分割字段时需要处理<br />
+格式：172.21.1.1,3306<br />
+截取一行的第一列IP：<br />
+IP=<code>echo ${line}|awk -F',' '{print $1}'</code><br />
+PORT=<code>echo ${line}|awk -F',' '{print $2}'</code><br />
+awk -F&rsquo;,&rsquo; &lsquo;{print $1}&rsquo; 等同于 cut -f1 -d&rsquo;,&rsquo;<br />
+添加内容：<br />
+echo &ldquo;${IP}_${PORT}:OK&rdquo; 结果：172.21.1.1_3306：OK</p>
+
+<p><strong>3.关于自定义函数</strong><br />
+<1>.不传参函数：<br />
+fun_name()<br />
+{<br />
+name=&lsquo;Kata&rsquo;<br />
+echo &ldquo;My name is ${name}.&rdquo;<br />
+}<br />
+fun_name #调用方式，直接将：My name is Kata.输出到屏幕<br />
+<2>.传参函数<br />
+fun_name()<br />
+{<br />
+name=$1<br />
+echo &ldquo;My name is ${name}.&rdquo;<br />
+}</p>
+
+<p>fun_name &ldquo;Alias&rdquo; #调用方式，直接将：My name is Alias.输出到屏幕<br />
+<3>.多参函数</p>
+
+<p>fun_name()<br />
+{<br />
+name=$1<br />
+age=$2<br />
+echo &ldquo;My name is ${name} and My age is ${age}.&rdquo;<br />
+}</p>
+
+<p>fun_name &ldquo;Sunny&rdquo; &ldquo;18&rdquo; #调用方式，直接将：My name is Sunny and My age is 18.输出到屏幕</p>
+
+<p><4>.将函数结果赋值给变量<br />
+status=<code>fun_name &quot;Alias&quot;</code> #变量status的内容就是：My name is Alias.
+此时再将status变量应用到其它程序调用<br />
+<5>.自定义函数事例：统计IP数据库里对应的表格式是哪种？<br />
+思路：选一种格式表作为判断，存在做标记，不存在就是另一种。前提条件：每个ip上只存在一种表,避免意外两种表都试试</p>
+
+<p>FUN_CHECK()<br />
+{<br />
+ip=$1 #自定义函数传参<br />
+tb_like=$2<br />
+MYSQL_CMD=&ldquo;/usr/local/mysql/bin/mysql -uadmin -padmin -h${ip} -P3306&rdquo;
+#变量只有IP，端口也可定义变量<br />
+SQL=&ldquo;SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=&lsquo;LogDB&rsquo;
+AND TABLE_NAME<br />
+= &lsquo;${tb<em>like}</em>${DATE_MARK}&lsquo;;&rdquo;<br />
+STATUS=<code>${MYSQL_CMD} -NBe&quot;${SQL}&quot;</code> #查询数据库表结果赋值给变量<br />
+if [ ${STATUS} == &lsquo;1&rsquo; ];then<br />
+echo ${ip}<br />
+else<br />
+echo #此处输出空行或者去掉else，可方便将屏幕ip列表复制。甚至不要if判断，直接：echo &ldquo;${ip}:${STATUS}&rdquo; 再筛选。<br />
+fi<br />
+}<br />
+在while循环中调用函数：<br />
+#!/bin/sh<br />
+.<br />
+.<br />
+.<br />
+cat $IP_FILE1|while read line<br />
+do<br />
+IP=<code>echo $line|cur -f1 -d' '</code><br />
+FUN_CHECK &ldquo;${IP}&rdquo; &ldquo;HA_Logging&rdquo; #手动修改下第二个参数,另一个表也测试下，别遗漏ip。<br />
+done<br />
+ <strong>4.关于输出文件</strong><br />
+将n个ip上表的查询数据追加到一个excel里。SQL的查询结果不要带表头。否则文件里会出现多个表头行。<br />
+通过mysql命令指定NBe参数，只输出数据结果，不显示字段名。<br />
+mysql -u -p -h -P -NBe&rdquo;${sql}&rdquo;</p>
+
+<p><strong>5.脚本传参和函数传参</strong><br />
+脚本的开头定义：xxx=$1 xxx=$2<br />
+函数的开头定义：xxx=$1 xxx=$2<br />
+脚本执行：./x.sh 参数1 参数2<br />
+函数调用：fun_name &ldquo;参数1&rdquo; &ldquo;参数2&rdquo;</p>
+
+<p>附件见下面：</p>
+
+<p><strong>附件脚本1：</strong> 梳理ip列表，及对应哪种表格式<br />
+说明：<br />
+脚本执行：执行两次<br />
+./check_ip.sh ip.txt &lsquo;HA_Logging&rsquo;<br />
+./check_ip.sh ip.txt &lsquo;LOG&rsquo;<br />
+脚本第二个参数：作为表格式模糊查询的变量传参</p>
+
+<p>cat check_ip.sh<br />
+#!/bin/sh<br />
+IPFILE=$1<br />
+TB_LIKE=$2<br />
+DATE_MARK=<code>date -d'1 day ago' +'%Y%m%d'</code><br />
+FUN_CHECK()<br />
+{<br />
+ip=$1 #自定义函数传参:ip<br />
+tb_like=$2 #自定义函数传参：HA_Logging或者LOG<br />
+MYSQL_CMD=&ldquo;/usr/local/mysql/bin/mysql -uadmin -padmin -h${ip} -P3306&rdquo;
+#变量只有IP，端口也可定义变量<br />
+SQL=&ldquo;SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=&lsquo;LogDB&rsquo;
+AND TABLE_NAME<br />
+= &lsquo;${tb<em>like}</em>${DATE_MARK}&lsquo;;&rdquo;<br />
+STATUS=<code>${MYSQL_CMD} -NBe&quot;${SQL}&quot;</code> #查询数据库表结果赋值给变量<br />
+if [ ${STATUS} == &lsquo;1&rsquo; ];then<br />
+echo ${ip}<br />
+fi #此处定义 如果存在直接输出ip,不存在，就不管。<br />
+}<br />
+cat ${IPFILE}|while read line<br />
+do<br />
+IP=<code>echo ${line}|cut -f1 -d' '</code><br />
+FUN_CHECK &ldquo;${IP}&rdquo; &ldquo;${TB_LIKE}&rdquo;<br />
+done</p>
+
+<p><strong>附件脚本3：</strong> 查询表数据导入Excel<br />
+说明：为了一次性执行，将两个ip列表文件作为脚本参数<br />
+脚本执行：./check_loginfo.sh ha_ip.txt log_ip.txt<br />
+cat check_loginfo.sh<br />
+#!/bin/sh<br />
+IP_FILE1=$1<br />
+IP_fILE2=$2</p>
+
+<h1 id="定义日期标志-20161214-此处是昨天日期">定义日期标志 : 20161214 （此处是昨天日期）</h1>
+
+<p>TIME_MARK=<code>date -d'1 day ago' +'%Y%m%d'</code></p>
+
+<h1 id="定义表的名字-以日期结尾的表名">定义表的名字：以日期结尾的表名</h1>
+
+<p>HA_TB=&ldquo;LogDB.HA<em>Logging</em>${TIME_MARK}&rdquo;<br />
+LO<em>TB=&ldquo;LogDB.LOG</em>${TIME_MARK}&rdquo;</p>
+
+<h1 id="对表查询结果输出到excel文件-out-file">对表查询结果输出到Excel文件：OUT FILE</h1>
+
+<p>OUT_FILE=&ldquo;/data/${TIME_MARK}_log.xls&rdquo;</p>
+
+<h1 id="定义通用函数-从表里查询数据结果">定义通用函数，从表里查询数据结果</h1>
+
+<p>GET_INFO()<br />
+{<br />
+ipfile=$1<br />
+tbname=$2</p>
+
+<p>cat $ipfile|while read line<br />
+do<br />
+IP=<code>echo $line|awk -F' ' '{print $1}'</code><br />
+MYSQL_CMD=&ldquo;/usr/local/mysql/bin/mysql -uadmin -padmin -h${IP} -P9306&rdquo;<br />
+SQL=&ldquo;SELECT ServiceName,LoggerName,COUNT(LoggerName) AS count_num FROM
+${tbname} GROUP BY LoggerName ORDER BY count_num DESC LIMIT 10;&rdquo;<br />
+$MYSQL_CMD -NBe&rdquo;${SQL}&rdquo; &gt;&gt;${OUT_FILE}<br />
+echo &ldquo;$IP:ok&rdquo;<br />
+done<br />
+}</p>
+
+<h1 id="执行调用">执行调用</h1>
+
+<p>GET_INFO &ldquo;${IP_FILE1}&rdquo; &ldquo;${HA_TB}&rdquo;<br />
+GET_INFO &ldquo;${IP_fILE2}&rdquo; &ldquo;${LO_TB}&rdquo;</p>
+
+<p>完结！</p>
+
+<p>转载于:<a href="https://www.cnblogs.com/cuisi/p/6184391.html">https://www.cnblogs.com/cuisi/p/6184391.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

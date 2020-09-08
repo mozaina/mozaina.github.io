@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Ruby元编程Week4 | 开发者问答集锦</title>
+    <meta property="og:title" content="Ruby元编程Week4 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Ruby元编程Week4">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/ruby%E5%85%83%E7%BC%96%E7%A8%8Bweek4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Ruby元编程Week4</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<blockquote>
+<p>更多文章欢迎来沈小黑的菜园转转啦啦啦~~</p>
+</blockquote>
+
+<h1 id="类定义">类定义</h1>
+
+<p>即将走进”Ruby对象模型最深暗的角落”…和Java不同，在Ruby中，定义类实际上就是在运行代码，这种思想催生了1、可以修改类的类宏
+2、可以在其他方法前后封装额外代码的环绕别名。当然，因为类不过是增强的模块，所以这些知识也可以应用于模块。</p>
+
+<h2 id="当前类">当前类</h2>
+
+<p>方法所属判断是依靠定义方法的所在self判断的，所以对于父类定义的方法，即使在子类中运行使得m2定义语句得到运行，m2依然属于父类。</p>
+
+<pre><code>class C
+  def m1
+    def m2
+
+    end
+  end
+end
+
+p C.instance_methods(false) # =&gt; [:m1]
+
+class D&lt;C
+
+end
+
+D.new.m1
+
+p C.instance_methods(false) # =&gt; [:m1, :m2]
+
+p D.instance_methods(false) # =&gt; []
+</code></pre>
+
+<h3 id="class-eval-v-s-class关键字">class_eval V.S class关键字</h3>
+
+<p>使用class关键字修改类需要指定类名才可以，那假如想要将类名作为参数来动态修改某个类呢？这时候可以用到Module#class_eval(别名为module_eval)方法。</p>
+
+<pre><code>def add_method_to(a_class)
+  a_class.class_eval do
+    def m
+      'Hello!'
+    end
+  end
+end
+
+add_method_to String
+p &quot;abc&quot;.m           # =&gt; &quot;Hello!&quot;
+</code></pre>
+
+<p>另外，class是一个作用域门，类外的变量对类里面来说是不可见的。而class_eval则使用扁平作用域，因为它归根结底只是一个方法调用。</p>
+
+<p>可以发现class_eval和instance_eval很相似，class_eval也有带参数版本class_exec。instance_eval的重点在于修改对象中变量的当前self，使其在调用处可见，而class_eval的重点在于修改类。</p>
+
+<h2 id="类的实例变量">类的实例变量</h2>
+
+<p>Ruby的实例变量属于当前self,所以在类中的方法外定义的实例变量属于类这个对象而不是类的实例。</p>
+
+<pre><code>class A
+  @var = 1
+  def read; @var; end
+  def write; @var = 2; end
+  def self.read; @var; end
+end
+
+class B&lt;A
+  def self.read; @var; end
+end
+
+obj = A.new
+p obj.read      # =&gt; nil
+p B.read            # =&gt; nil
+obj.write
+p obj.read      # =&gt; 2
+p A.read        # =&gt; 1
+</code></pre>
+
+<p>正因为实例变量的归属根据当前self判断，所以子类、实例都不能访问类实例变量，因为这个变量属于“类”这个对象的self。</p>
+
+<p>注意和@@开头的类变量区别开来，它是可以被当前类和子类或实例访问的。正是因为这样，在顶级作用域定义类变量时，所有类都可以访问到它，因为它们都在顶级作用域的覆盖下。</p>
+
+<pre><code>@@var = 1
+
+class A
+    @@var = 2
+end
+
+@@var = 2
+</code></pre>
+
+<p>为了避免这样的情况，可以的话最好避免使用类变量，转而使用类的实例变量。</p>
+
+<h2 id="单件方法">单件方法</h2>
+
+<p>Ruby支持给单个对象添加方法：</p>
+
+<pre><code>str = &quot;this is a string&quot;
+
+def str.title?
+    self.upcase == self
+end
+
+str.singleton_methods       # =&gt; [:title?]
+</code></pre>
+
+<p>和Java中singleton类只允许生成同一个对象的概念有所不同，这里的singleton方法是说这个方法只属于定义它的对象。</p>
+
+<p>实际上，联想到定义类方法时的方法名前的self，类方法其实就是Class对象的单件方法罢了。</p>
+
+<h2 id="类宏">类宏</h2>
+
+<p>Ruby对象没有属性，所以需要写类似Java的getter和setter才能访问或修改属性。</p>
+
+<pre><code>class MyClass
+  def my_attribute=(value)
+    @my_attribute = value
+  end
+
+  def my_attribue
+    @my_attribute
+  end
+end
+
+obj = MyClass.new
+obj.my_attribute = 1
+obj.my_attribute     # =&gt; 1
+</code></pre>
+
+<p>但是这样写很烦，一点也不酷~
+所以Ruby提供了Module#attr_reader、Module#attr_writer和Module#attr_accessor</p>
+
+<pre><code>class MyClass
+  attr_accessor :my_attribute
+end
+
+obj = MyClass.new
+obj.my_attribute = 1
+obj.my_attribute     # =&gt; 1
+</code></pre>
+
+<p>类似attr_accessor这样的方法就叫做类宏，他们看起来像是关键字，实际上只是可以用在类里的方法。</p>
+
+<p>假设需要更新API，将旧的方法声明为deprecated，并且自动转到新方法，那么可以使用像下面这样的代码：</p>
+
+<pre><code>class MyClass
+  def self.deprecate(old_method, new_method)
+    define_method(old_method) do |*args, &amp;block|
+      warn &quot;Warinig, #{old_method} is deprecated, use #{new_method} now!&quot;
+      send(new_method,*args,&amp;block)
+    end
+  end
+
+  def old_m
+    p &quot;old&quot;
+  end
+
+  def new_m
+    p &quot;new&quot;
+  end
+
+  deprecate :old_m, :new_m
+end
+
+
+obj = MyClass.new
+obj.old_m
+</code></pre>
+
+<h2 id="单件类">单件类</h2>
+
+<p>Ruby查找方法时先进入接收者的类，然后再向上查找。比如一个MyClass类实例obj调用方法，就会进入obj的类MyClass来查找方法。但是单件方法肯定不在类里，否则所有对象都有这个方法了。而对象本身又不是一个类，所以也不在obj里。那么这个方法在哪里呢？</p>
+
+<h3 id="什么是单件类">什么是单件类</h3>
+
+<p>当询问对象的类时，Ruby返回的其实不是看到的类，而是对象特有的隐藏类。这个类被称为这个对象的单件类，或者叫元类。</p>
+
+<pre><code>obj = Object.new
+singleton_class = class &lt;&lt; obj
+                    self      # =&gt; #&gt;
+end
+
+p singleton_class
+</code></pre>
+
+<p>这样我们就可以看到这个单件类的引用(.class方法会包装隐藏单件类)，现在Ruby也提供.singleton_class方法返回单件类。每个对象都有自己的单件类，单件类也只有一个实例(有实例说明它的实例也有自己的单件类~循环往复……只是这个单件类的单件类的用途还没有被开发过)。对象的单件方法就放在对应的单件类中。</p>
+
+<p>现在需要更新一下在星期一学习的继承模型了：obj所在的类是obj的单件类，单件类的父类才是MyClass,MyClass类对象的父类是Object。</p>
+
+<h3 id="单件类和继承">单件类和继承</h3>
+
+<p>假设有如下的类关系，我们可以通过观察继承树输出来了解他们的结构关系</p>
+
+<pre><code>class C
+  def self.claz_method
+
+  end
+end
+
+class D&lt;C
+
+end
+
+obj = D.new
+
+def obj.singleton_mtd
+
+end
+
+
+p C.singleton_class       # =&gt; #
+p D.singleton_class       # =&gt; #
+p D.singleton_class.superclass  # =&gt; #
+p C.singleton_class.superclass  # =&gt; #
+p BasicObject.singleton_class.superclass  # =&gt; Class   
+</code></pre>
+
+<h3 id="instance-eval和单件类的关系">instance_eval和单件类的关系</h3>
+
+<p>instance_eval方法会把当前类修改为接收者的单件类。</p>
+
+<pre><code>s1 = 'abc'
+
+s1.instance_eval do
+    def swoosh!; reverse; end
+end
+</code></pre>
+
+<p>很少会这样用，但这样是可以的。instance_eval的标准含义还是：修改self作用域内容。</p>
+
+<h3 id="类属性">类属性</h3>
+
+<p>如果想给类创建属性的话，可以使用下面这样的形式：</p>
+
+<pre><code>class MyClass
+    class &lt;&lt; self
+        attr_accessor :c
+    end
+end
+</code></pre>
+
+<p>因为如果在单件类中定义了方法，这些方法实际上就会成为类方法。而属性其实就是一对方法，所以这样就达到了类属性的效果。</p>
+
+<h3 id="类扩展-对象扩展">类扩展/对象扩展</h3>
+
+<p>如果想要从一个Module中导入一个方法到类/对象中，可以打开这个类/对象，然后通过include模块来扩展方法。</p>
+
+<pre><code>module MyModule
+    def my_method; 'hello'; end
+end
+
+class MyClass
+    class &lt;&lt; self
+        include MyModule
+    end
+end
+
+MyClass.my_method       #完成了类方法的扩展
+
+obj = Object.new
+class &lt;&lt; obj
+    include MyModule
+end
+
+obj.my_method               #完成了对象方法的扩展
+obj.singleton_methods   # =&gt; [:my_method]
+</code></pre>
+
+<p>除了使用打开类/对象，还可以使用简单的Object#extend方法。</p>
+
+<pre><code>module MyModule
+    def my_method; 'hello'; end
+end
+
+obj = Object.new
+obj.extend MyModule
+obj.my_method       # =&gt; 'hello'
+
+class MyClass
+    extend MyModule
+end
+
+MyClass.my_method   # =&gt; 'hello'
+</code></pre>
+
+<h2 id="方法包装器">方法包装器</h2>
+
+<p>如果一个不能修改的接口(比如在库中)有很多地方都被使用，而又想要在所有使用这个接口的地方增加新功能，那找到所有使用接口的地方逐条修改就会变成一件痛苦的事情。Ruby为我们提供了方法包装器的技巧来解决这个问题。</p>
+
+<h3 id="方法别名">方法别名</h3>
+
+<p>使用alias可以为Ruby方法起别名，只要不在顶级作用域里面，可以使用Module#alias_method方法，而在顶级作用域里面，只能使用alias关键字。</p>
+
+<pre><code>class MyClass
+    def my_method; 'my_method()'; end
+    alias_method :m, :my_method
+end
+
+obj = MyClass.new
+obj.my_method       # =&gt; 'my_method()'
+obj.m               # =&gt; 'my_method'
+
+def my_method2
+  'hello'
+end
+
+alias :m2 :my_method2
+
+m2                  # =&gt; 'hello'
+</code></pre>
+
+<p>如果原方法在设置了别名之后又被修改了，那么别名指向的还是未被修改时的代码。</p>
+
+<pre><code>class String
+    alias_method :real_length, :length
+
+    def length
+        real_length &gt; 5 ? 'long' : 'short'
+    end
+end
+
+&quot;War and Peace&quot;.length      # =&gt; &quot;long&quot;
+&quot;War and Peace&quot;.real_length     # =&gt; 13
+</code></pre>
+
+<h3 id="不同的方法包装器">不同的方法包装器</h3>
+
+<h4 id="环绕别名">环绕别名</h4>
+
+<p>我们可以通过为A方法设置一个别名B，然后重新定义A方法，插入新添加的功能，最后在A中调用B方法(别名了的原A方法，利用了上面说到的“指向未被修改时的代码”的特性)。<br />
+但是这种方法有猴子补丁的问题：所有地方的这个方法都被改变了，但是也许我们只需要在某些地方包装这个方法。</p>
+
+<h3 id="细化">细化</h3>
+
+<p>refinements
+提供一种方法让类的修改只影响某个作用域，而可以避免猴子补丁那样影响全局的问题。看下面的代码，我添加一个camelize方法到String类中，但它只能被Foo使用。</p>
+
+<pre><code>module Camelize
+  refine String do
+    def camelize
+      dup.gsub(/_([a-z])/) { $1.upcase }
+    end
+  end
+end
+
+class Foo
+  using Camelize
+
+  def camelize_string(str)
+    str.camelize
+  end
+end
+
+Foo.new.camelize_string('blah_blah_blah')   # =&gt; &quot;blahBlahBlah&quot;
+'blah_blah_blah'.camelize   # =&gt; NoMethodError
+</code></pre>
+
+<p>当Foo中声明了 refinement 时，我们可以看出它可以使用直接camelize了，但在Foo外却无法使用它。</p>
+
+<p>在refine中使用super可以向方法中包装额外的功能。</p>
+
+<pre><code>module StringRefinement
+    refine String do
+        def length
+            super &gt; 5 ? 'long' : 'short'
+        end
+    end
+end
+
+using StringRefinement
+
+&quot;War and Peace&quot;.length          # =&gt; &quot;long&quot;
+</code></pre>
+
+<p>这样可以确保只在需要这个特性的时候才用到，不会在任何地方都曲解String#length的意思导致混乱。</p>
+
+<h3 id="module-prepend包装">Module#prepend包装</h3>
+
+<p>Module#prepend的作用和include类似，只是它把包含的模块插在祖先链的下方，这样的话寻找方法时会先找到被包含的模块中的方法，同时可以通过super调用该类中的原始方法。</p>
+
+<pre><code>module ExplicitString
+    def length
+        super &gt; 5 ? 'long' : 'short'
+    end
+end
+
+String class_eval do
+    prepend ExplicitString
+end
+
+&quot;War and Peace&quot;.length      # =&gt; 'long'
+</code></pre>
+
+<p>这一种方法最为清晰，既避免了猴子补丁，也不用考虑细化的问题。细化会导致很多问题，具体可以看这篇文章，大意是原来的方法调用可以做到缓存来静态查找，但是现在refine让方法查找必须动态。更糟糕的是，任何一个块被调用的时候都有可能被refine了，这是很恐怖的。</p>
+
+<p>这章就到这里吧~~</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

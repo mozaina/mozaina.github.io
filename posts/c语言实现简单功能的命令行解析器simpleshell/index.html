@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>C语言实现简单功能的命令行解析器simpleshell | 开发者问答集锦</title>
+    <meta property="og:title" content="C语言实现简单功能的命令行解析器simpleshell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="C语言实现简单功能的命令行解析器simpleshell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/c%E8%AF%AD%E8%A8%80%E5%AE%9E%E7%8E%B0%E7%AE%80%E5%8D%95%E5%8A%9F%E8%83%BD%E7%9A%84%E5%91%BD%E4%BB%A4%E8%A1%8C%E8%A7%A3%E6%9E%90%E5%99%A8simpleshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">C语言实现简单功能的命令行解析器simpleshell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>用C语言实现简单的命令行解析器，支持用户输入命令行并运行在其他的进程中。该命令行解析器可以运行在任何Linux或Mac系统。</p>
+
+<p>每行命令有osh&gt; 开始，然后由用户输入命令行，例如cat prog.c，该命令将prog.c文件展示于终端上。</p>
+
+<p>osh&gt; cat prog.c</p>
+
+<p>同时也支持&amp;修饰命令行，使命令进入后台运行。本质上就是使命令行在子进程运行于后台，或者子进程和父进程同时运行。</p>
+
+<p>这个project主要分成两部分，一部分是解析用户命令并使其在子进程运行，另一部分是支持我们自己命令行终端特有的history功能。即：当用户输入history命令，系统将展示最近使用的10条命令。</p>
+
+<p>例如：当前history里面存储了6条输入过的命令（从最近使用的到最远使用的顺序排列）</p>
+
+<p>ps -l, ls -l, top, date, cal, whoami</p>
+
+<p>当输入history命令后，系统将会输出</p>
+
+<p>6 ps -l</p>
+
+<p>5 ls -l</p>
+
+<p>4 top</p>
+
+<p>3 date</p>
+
+<p>2 cal</p>
+
+<p>1 whoami</p>
+
+<p>当用户输入!!命令，就运行最近运行的命令，在当前环境下也就是ps -l，</p>
+
+<p>当用户输入!N命令，N代表数字，就运行第N个命令在history中，!2就运行cal.</p>
+
+<p>如果输入!!命令时没有命令在history中，就输出No command in history.</p>
+
+<p>如股票输入!N命令没有对应第N个命令在history中，就输出No such command in history.</p>
+
+<p>用户输入exit将退出当前命令行解析器。</p>
+
+<p><strong>实现</strong></p>
+
+<p>我在实现这个命令行解析器，基本上分为两部分，一部分是解析用户输入的命令，然后在子进程中调用</p>
+
+<p>execvp(char* command, char* params[]).</p>
+
+<p>例如：当用户输入ps -ael命令，系统将会把命令解析到args[]字符串数组中，args[] = {&ldquo;ps&rdquo;, &ldquo;-ael&rdquo;, NULL}</p>
+
+<p>运行时就调用execvp(args[0], args); 另外要注意解析命令里是否有&amp;在最后，如果有&amp;在命令最后，那么父进程就要wait子进程exit。</p>
+
+<p>代码如下：</p>
+
+<pre><code>//
+//  main.c
+//  Comp322 lab3
+//
+//  Created by 王栋 on 2019/9/26.
+//  Copyright © 2019 CSUN. All rights reserved.
+//
+
+#include 
+#include 
+#include 
+#include 
+#define MAX_LINE 80 /* The maximum length command */
+#define MAX_HISTORY 10  /* The maximum number of commands in history */
+#define TRUE 1
+#define FALSE 0
+
+int parseInput(char * command, const char* delim, char* args[]) {
+    char *s = strdup(command);
+    char *token;
+    int n = 0;
+    for(token = strsep(&amp;s, delim); token != NULL; token = strsep(&amp;s, delim)) {
+        if(strlen(token) &gt; 0) {
+            args[n] = (char*) malloc(strlen(token) * sizeof(char));
+            strcpy(args[n++], token);
+        }
+    }
+    args[n] = NULL;
+    free(s);
+    return n;
+}
+
+int contain(char * str, int length, char c) {
+    for(int i = 0; i &lt; length; i++) {
+        if(*(str + i) == c) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+void freeMemory(char * args[], int length) {
+    for(int i = 0; i &lt; length; i++) {
+        if(args[i] != NULL) {
+            free(args[i]);
+            args[i] = NULL;
+        }
+    }
+}
+
+void freeHistory(char * history[], int size) {
+    for(int i = 0; i &lt; size; i++) {
+        if(history[i] != NULL) {
+            free(history[i]);
+            history[i] = NULL;
+        }
+    }
+}
+
+int insertInHistory(char* history[], int size, char * command) {
+    if(strcmp(command, &quot;&quot;) != 0) {
+        char * s = strdup(command);
+        if(size &lt; MAX_HISTORY) {
+            history[size] = strdup(s);
+            free(s);
+            return size + 1;
+        } else {
+            for(int i = 0; i &lt; MAX_HISTORY - 1; i++) {
+                free(history[i]);
+                history[i] = strdup(history[i + 1]);
+            }
+            free(history[MAX_HISTORY - 1]);
+            history[MAX_HISTORY - 1] = strdup(s);
+            free(s);
+            return MAX_HISTORY;
+        }
+    }
+    return size;
+}
+
+void printHistoryCommand(char* history[], int size) {
+    for(int i = size - 1; i &gt;= 0; i--) {
+        printf(&quot;%d %s&quot;, i + 1, history[i]);
+    }
+}
+
+void execute(char* args[], int index, char* history[], int size, char* command) {
+    pid_t pid;
+    /* fork a child process */
+    pid = fork();
+    if (pid &lt; 0) { /* error occurred */
+        fprintf(stderr, &quot;Fork Failed&quot;);
+        freeMemory(args, index);
+        freeHistory(history, size);
+        return;
+    }
+    else if (pid == 0) { /* child process */
+        if (execvp(*args, args) &lt; 0) {     /* execute the command  */
+            printf(&quot;*** ERROR: exec failed\n&quot;);
+            freeMemory(args, index);
+            freeHistory(history, size);
+            exit(1);
+        }
+    }
+    else { /* parent process */
+          /* parent will wait for the child to complete */
+        if(contain(command, (int)strlen(command), '&amp;') == FALSE) {
+            while (wait(NULL) != pid);       /* wait for completion  */
+        }
+    }
+}
+
+int main(void) {
+    char *args[MAX_LINE/2 + 1]; /* command line arguments */
+    int should_run = 1; /* flag to determine when to exit program */
+    int index = 0;
+    int sizeInHistory = 0;
+    char command[MAX_LINE];
+    char *commandInHistory[MAX_HISTORY];
+    while (should_run) {
+        printf(&quot;osh&gt; &quot;);
+        fflush(stdout);
+        fgets(command, MAX_LINE, stdin);
+        index = parseInput(command, &quot; !&amp;\n&quot;, args);
+        if(args[0] != NULL &amp;&amp; strcmp(args[0], &quot;exit&quot;) == 0) {
+            should_run = 0;
+        } else if(args[0] != NULL &amp;&amp; strcmp(args[0], &quot;history&quot;) == 0){
+            printHistoryCommand(commandInHistory, sizeInHistory);
+        } else if(command[0] == '!') {
+            if(strcmp(command, &quot;!!\n&quot;) == 0) {
+                if(sizeInHistory &gt; 0) {
+                    freeMemory(args, index);
+                    index = parseInput(commandInHistory[sizeInHistory - 1], &quot; !&amp;\n&quot;, args);
+                    sizeInHistory = insertInHistory(commandInHistory, sizeInHistory, commandInHistory[sizeInHistory - 1]);
+                    execute(args, index, commandInHistory, sizeInHistory, command);
+                } else {
+                    printf(&quot;No commands in history.\n&quot;);
+                }
+            } else if(atoi(args[0]) != 0) {
+                int num = atoi(args[0]);
+                if(num &gt; 0 &amp;&amp; num &lt;= sizeInHistory) {
+                    freeMemory(args, index);
+                    index = parseInput(commandInHistory[num - 1], &quot; !&amp;\n&quot;, args);
+                    sizeInHistory = insertInHistory(commandInHistory, sizeInHistory, commandInHistory[num - 1]);
+                    execute(args, index, commandInHistory, sizeInHistory, command);
+                } else {
+                    printf(&quot;No such command in history.\n&quot;);
+                }
+            } else {
+                printf(&quot;No such command in history.\n&quot;);
+            }
+        } else {
+            execute(args, index, commandInHistory, sizeInHistory, command);
+            sizeInHistory = insertInHistory(commandInHistory, sizeInHistory, command);
+        }
+        memset(command, 0, strlen(command) * sizeof(char));
+        freeMemory(args, index);
+    }
+    freeHistory(commandInHistory, sizeInHistory);
+
+    return 0;
+}
+</code></pre>
+
+<p>运行效果图：</p>
+
+<p><a href="https://img.it610.com/image/info8/75dfa7ef63de42c2925d3da2e84310cd.jpg"><img src="https://img.it610.com/image/info8/75dfa7ef63de42c2925d3da2e84310cd.jpg" alt="C语言实现简单功能的命令行解析器（simple
+shell）_第1张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/de2131193454491698cd5c205986388e.jpg"><img src="https://img.it610.com/image/info8/de2131193454491698cd5c205986388e.jpg" alt="C语言实现简单功能的命令行解析器（simple
+shell）_第2张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

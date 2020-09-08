@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本调试nxc | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本调试nxc - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本调试nxc">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E8%B0%83%E8%AF%95nxc/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本调试nxc</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>我们在前面介绍的调试手段是通过修改shell脚本的源代码，从其输出相关的调试信息来定位错误的，那有没有不修改源代码来调试shell脚本的方法呢？有的，那就是使用shell的执行选项，下面将介绍一些常用选项的用法：</p>
+
+<p>-n 只读取shell脚本，但不实际执行<br />
+-x 进入跟踪方式，显示所执行的每一条命令<br />
+-c &ldquo;string&rdquo; 从strings中读取命令</p>
+
+<p>&rdquo;-n&rdquo;可用于测试shell脚本是否存在语法错误，但不会实际执行命令。在shell脚本编写完成之后，实际执行之前，首先使用&rdquo;-n&rdquo;选项来测试脚本是否存在语法错误是一个很好的习惯。因为某些shell脚本在执行时会对系统环境产生影响，比如生成或移动文件等，如果在实际执行才发现语法错误，您不得不手工做一些系统环境的恢复工作才能继续测试这个脚本。</p>
+
+<p>&rdquo;-c&rdquo;选项使shell解释器从一个字符串中而不是从一个文件中读取并执行shell命令。当需要临时测试一小段脚本的执行结果时，可以使用这个选项，如下所示：<br />
+sh -c &lsquo;a=1;b=2;let c=$a+$b;echo &ldquo;c=$c&rdquo;&rsquo;</p>
+
+<p>&rdquo;-x&rdquo;选项可用来跟踪脚本的执行，是调试shell脚本的强有力工具。&rdquo;-x&rdquo;选项使shell在执行脚本的过程中把它实际执行的每一个命令行显示出来，并且在行首显示一个&rdquo;+&ldquo;号。
+&ldquo;+&ldquo;号后面显示的是经过了变量替换之后的命令行的内容，有助于分析实际执行的是什么命令。
+&ldquo;-x&rdquo;选项使用起来简单方便，可以轻松对付大多数的shell调试任务,应把其当作首选的调试手段。</p>
+
+<p>如果把本文前面所述的 <strong>trap ‘command’ DEBUG 机制与“-x”</strong> <strong>选项结合</strong>
+起来，我们就可以既输出实际执行的每一条命令，又逐行跟踪相关变量的值，对调试相当有帮助。</p>
+
+<p>我们以debug.sh脚本为例：</p>
+
+<h1 id="cat-n-debug-sh">cat -n debug.sh</h1>
+
+<pre><code>     1  #!/bin/sh
+     2  trap 'echo &quot;before execute line:$LINENO,a=$a,b=$b,c=$c&quot;' DEBUG
+     3  a=1
+     4  if [ &quot;$a&quot; -eq 1 ]
+     5  then 
+     6      b=2
+     7  else 
+     8      b=1
+     9  fi
+    10  c=3
+    11  echo end
+</code></pre>
+
+<p>现在对该脚本加上“-x”选项来执行它：</p>
+
+<table>
+<thead>
+<tr>
+<th>当第2行被注释掉</th>
+<th>当第2行没有被注释掉（即代码中有trap命令）</th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p><a href="https://img.it610.com/image/info8/72f3d1d592c946a499c06db081e5a2c9.png"><img src="https://img.it610.com/image/info8/72f3d1d592c946a499c06db081e5a2c9.png" alt="shell脚本——调试（-n / -x
+/-c）_第1张图片" /></a>
+| <a href="https://img.it610.com/image/info8/6bce647483ac4c4db9890845623034cc.png"><img src="https://img.it610.com/image/info8/6bce647483ac4c4db9890845623034cc.png" alt="shell脚本——调试（-n / -x
+/-c）_第2张图片" /></a></p>
+
+<p>在上面的结果中，前面有“+”号的行是shell脚本实际执行的命令，前面有“++”号的行是执行trap机制中指定的命令，其它的行则是输出信息。</p>
+
+<p>shell的执行选项除了可以在启动shell时指定外，亦可在脚本中用set命令来指定。 &ldquo;set - 参数&rdquo;表示启用某选项，&rdquo;set
++参数&rdquo;表示关闭某选项。有时候我们并不需要在 ** <em>启动</em>**
+时用&rdquo;-x&rdquo;选项来跟踪所有的命令行，这时我们可以在脚本中使用set命令，如以下脚本片段所示：</p>
+
+<p>set -x#启动&rdquo;-x&rdquo;选项<br />
+要跟踪的程序段<br />
+set +x#关闭&rdquo;-x&rdquo;选项</p>
+
+<p>set命令同样可以使用前面介绍的调试钩子—DEBUG函数来调用，下面是DEBUG函数代码:<br />
+#cat –n debugOth.sh</p>
+
+<pre><code>#!/bin/sh
+DEBUG()
+{
+    if [ &quot;DEBUG&quot;=&quot;true&quot; ];then
+        $@
+    fi
+}
+a=1
+DEBUG echo &quot;a=$a&quot;
+if [ &quot;$a&quot; -eq 1 ]
+then 
+    b=2
+else 
+    b=1
+fi
+DEBUG echo &quot;b=$b&quot;
+c=3
+DEBUG echo &quot;c=$c&quot;
+</code></pre>
+
+<p>$@ | 与$*相同，但是使用时加引号，并在引号中返回每个参数。<br />
+如&rdquo;$@&ldquo;用「&rdquo;」括起来的情况、以&rdquo;$1&rdquo; &ldquo;$2&rdquo; … &ldquo;$n&rdquo; 的形式输出所有参数。<br />
+&mdash;|&mdash;<br />
+这样可以避免脚本交付使用时删除这些调试语句的麻烦，如以下脚本片段所示：</p>
+
+<p>DEBUG set -x#启动&rdquo;-x&rdquo;选项<br />
+要跟踪的程序段</p>
+
+<p>DEBUG set +x#关闭&rdquo;-x&rdquo;选项</p>
+
+<h1 id="sh-debugoth-sh-sh-x-debugoth-sh">sh debugOth.sh | # sh -x debugOth.sh</h1>
+
+<p>&mdash;|&mdash;<br />
+<a href="https://img.it610.com/image/info8/ccb620f198d74015918be986ba1ea037.png"><img src="https://img.it610.com/image/info8/ccb620f198d74015918be986ba1ea037.png" alt="" /></a>
+| <a href="https://img.it610.com/image/info8/7fb589c846d947c3a6248873473023e2.png"><img src="https://img.it610.com/image/info8/7fb589c846d947c3a6248873473023e2.png" alt="shell脚本——调试（-n / -x
+/-c）_第3张图片" /></a></p>
+
+<p><strong>四. 对&rdquo;-x&rdquo;选项的增强</strong></p>
+
+<p>&rdquo;-x&rdquo;执行选项是目前最常用的跟踪和调试shell脚本的手段，但其输出的调试信息仅限于进行变量替换之后的每一条实际执行的命令以及行首的一个&rdquo;+&rdquo;
+号提示符，居然连行号这样的重要信息都没有，对于复杂的shell脚本的调试来说，还是非常的不方便。幸运的是，我们可以巧妙地利用shell内置的一些环境变量来增强&rdquo;-x&rdquo;选项的输出信息，下面先介绍几个shell内置的环境变量：</p>
+
+<p>$LINENO<br />
+代表shell脚本的当前行号，类似于C语言中的内置宏<strong>LINE</strong></p>
+
+<p>$FUNCNAME<br />
+函数的名字，类似于C语言中的内置宏<strong>func</strong>,但宏<strong>func</strong>只能代表当前所在的函数名，而$
+FUNCNAME的功能更强大，它是一个数组变量，其中包含了整个调用链上所有的函数的名字，故变量${FUNCNAME[0]}代表shell脚本当前正在执行的函数的名字，而变量${FUNCNAME[1]}则代表调用函数${FUNCNAME[0]}的函数的名字，余者可以依此类推。</p>
+
+<p>$PS4<br />
+主提示符变量$PS1和第二级提示符变量$PS2比较常见，但很少有人注意到第四级提示符变量$PS4的作用。我们知道使用“-
+x”执行选项将会显示shell脚本中每一条实际执行过的命令，而$PS4的值将被显示在“-x”选项输出的每一条命令的前面。在 ** <em>Bash</em>**
+Shell中，缺省的$PS4的值是&rdquo;+&ldquo;号。(现在知道为什么使用&rdquo;-x&rdquo;选项时，输出的命令前面有一个&rdquo;+&ldquo;号了吧？)。</p>
+
+<p>利用$PS4这一特性，通过使用一些内置变量来重定义$PS4的值，我们就可以增强&rdquo;-x&rdquo;选项的输出信息。例如先执行export
+PS4=&lsquo;+{$LINENO:${FUNCNAME[0]}} &lsquo;,
+然后再使用“-x”选项来执行脚本，就能在每一条实际执行的命令前面显示其行号以及所属的函数名。</p>
+
+<p>以下是一个存在bug的shell脚本的示例，本文将用此脚本来示范如何用“-n”以及增强的“-x”执行选项来调试shell脚本。这个脚本中定义了一个函数isRoot(),用于判断当前用户是不是
+** <em>root</em>** 用户，如果不是，则中止脚本的执行。</p>
+
+<h1 id="cat-n-debugotho-sh">cat -n debugOthO.sh</h1>
+
+<pre><code>     1  #!/bin/sh
+     2  isRoot()
+     3  {
+     4  if [ &quot;$UID&quot; -ne 0 ]
+     5      return 1
+     6  else
+     7      return 0
+     8  fi
+     9  }
+    10  isRoot
+    11  if [&quot;$?&quot; -ne 0]
+    12  then
+    13      echo &quot;Must be root to run this script&quot;
+    14      exit 1
+    15  else
+    16      echo &quot;welcome root user&quot;
+    17      #do something
+    18  fi
+</code></pre>
+
+<p>首先执行# sh -n debugOthO.sh来进行语法检查，输出如下：</p>
+
+<h1 id="sh-n-debugotho-sh">sh -n debugOthO.sh</h1>
+
+<p>exp4.sh: line 6: syntax error near unexpected token <code>else'  
+exp4.sh: line 6:</code> else&rsquo;</p>
+
+<p>发现了一个语法错误，通过仔细检查第6行前后的命令，我们发现是第4行的if语句缺少then关键字引起的(写惯了C程序的人很容易犯这个错误)。我们可以把第4行修改为if
+[ &ldquo;$UID&rdquo; -ne 0 ]; then来修正这个错误。再次运行# sh -n
+debugOthO.sh来进行语法检查，没有再报告错误。接下来就可以实际执行这个脚本了，执行结果如下：</p>
+
+<h1 id="sh-n-debugotho-sh-1">sh -n debugOthO.sh</h1>
+
+<p>exp2.sh: line 11: [1: command not found<br />
+welcome root user</p>
+
+<p>尽管脚本没有语法错误了，在执行时却又报告了错误。错误信息还非常奇怪“[1: command not
+found”。现在我们可以试试定制$PS4的值，并使用“-x”选项来跟踪：</p>
+
+<p><strong>$ export PS4=&lsquo;+{$LINENO:${FUNCNAME[0]}} &lsquo;<br />
+$ sh –x debugOthO.sh</strong><br />
++{10:} isRoot<br />
++{4:isRoot} &lsquo;[&rsquo; 503 -ne 0 &lsquo;]&rsquo;<br />
++{5:isRoot} return 1<br />
++{11:} &lsquo;[1&rsquo; -ne 0 &lsquo;]&rsquo;<br />
+exp4.sh: line 11: [1: command not found<br />
++{16:} echo &lsquo;welcome root user&rsquo;<br />
+welcome root user</p>
+
+<p>从输出结果中，我们可以看到脚本实际被执行的语句，该语句的行号以及所属的函数名也被打印出来，从中可以清楚的分析出脚本的执行轨迹以及所调用的函数的内部执行情况。由于执行时是第11行报错，这是一个if语句，我们对比分析一下同为if语句的第4行的跟踪结果：</p>
+
+<p>+{4:isRoot} &lsquo;[&rsquo; 503 -ne 0 &lsquo;]&rsquo;<br />
++{11:} &lsquo;[1&rsquo; -ne 0 &lsquo;]&rsquo;</p>
+
+<p>到这里我们就知道由于第11行的[号后面缺少了一个空格，导致[号与紧挨它的变量$?的值1被shell解释器看作了一个整体，并试着把这个整体视为一个命令来执行，故有“[1:
+command not found”这样的错误提示。只需在[号后面插入一个空格就一切正常了。</p>
+
+<p>shell中还有其它一些对调试有帮助的内置变量，比如在Bash Shell中还有BASH_SOURCE,
+BASH_SUBSHELL等一批对调试有帮助的内置变量，您可以通过man sh或man
+bash来查看，然后根据您的调试目的,使用这些内置变量来定制$PS4，从而达到增强“-x”选项的输出信息的目的。</p>
+
+<p><strong>五. 总结</strong></p>
+
+<p>现在让我们来总结一下调试shell脚本的过程：<br />
+首先使用“-n”选项检查语法错误，然后使用“-x”选项跟踪脚本的执行，使用“-x”选项之前，别忘了先定制PS4变量的值来增强“-x”选项的输出信息，至少应该令其输出行号信息(先执行export
+PS4=&lsquo;+[$LINENO]&lsquo;，更一劳永逸的办法是将这条语句加到您用户主目录的.bash_profile文件中去)，这将使你的调试之旅更轻松。也可以利用trap,调试钩子等手段输出关键调试信息，快速缩小排查错误的范围，并在脚本中使用“set
+-x”及“set +x”对某些代码块进行重点跟踪。这样多种手段齐下，相信您已经可以 ** <em>比较</em>** 轻松地抓出您的shell脚本中的臭虫了。<br />
+如果您的脚本足够复杂，还需要更强的调试能力，可以使用shell调试器bashdb，这是一个类似于GDB的调试工具，可以完成对shell脚本的断点设置，单步执行，变量观察等许多功能，使用bashdb对阅读和理解复杂的shell脚本也会大有裨益。关于bashdb的
+** <em>安装</em>** 和使用，不属于本文范围，您可参阅<a href="http://bashdb.sourceforge.net/上的文档并">http://bashdb.sourceforge.net/上的文档并</a> ** <em>下载</em>** 试用</p>
+
+<p>参考链接：</p>
+
+<p>_<a href="http://www.360doc.com/content/17/0706/19/33093582_669392362.shtml_">http://www.360doc.com/content/17/0706/19/33093582_669392362.shtml_</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

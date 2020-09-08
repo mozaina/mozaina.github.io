@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>原Linux环境下Shell调用MySQL并实现定时任务 | 开发者问答集锦</title>
+    <meta property="og:title" content="原Linux环境下Shell调用MySQL并实现定时任务 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="原Linux环境下Shell调用MySQL并实现定时任务">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%8E%9Flinux%E7%8E%AF%E5%A2%83%E4%B8%8Bshell%E8%B0%83%E7%94%A8mysql%E5%B9%B6%E5%AE%9E%E7%8E%B0%E5%AE%9A%E6%97%B6%E4%BB%BB%E5%8A%A1/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">原Linux环境下Shell调用MySQL并实现定时任务</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>对于一些周期性事务，我们可以在Linux下，使用shell脚本调用mysql数据库存储过程，并设置定时任务。</p>
+
+<p>本来是要mysql数据库中创建事件任务来，定时执行存储过程，做数据传输的。。。使用crontab来定时执行，调用存储过程。</p>
+
+<p>实现这个数据传输分为两步：</p>
+
+<p>第一步：编写shell脚本调用mysql数据库存储过程，如下：</p>
+
+<pre><code>#!/bin/bash
+# 50 8 * * * sh /home/bgop/hao/detector_task.sh &gt; /dev/null 2&gt;&amp;1 &amp;
+
+host1=127.0.0.1
+user=root
+passwd=HaoChuangMysql\@2018
+port=23306
+mysql -h${host1} -u${user} -p${passwd} -P${port} -e &quot;use bg-biz;call test_insert;&quot; ;
+</code></pre>
+
+<p>这样就可以，调用执行库data的过程pro了。</p>
+
+<p>注意，不同主机有可能需要写出mysql的绝对路径，如/usr/bin/mysql，否则不执行库过程。。。</p>
+
+<p>这里有几个要点，我加上详细的备注说明：</p>
+
+<pre><code>!/bin/bash　　
+
+#数据库信息，也可以写 HOSTNAME=&quot;localhost&quot;，端口号 PORT可以不设定 
+HOSTNAME=&quot;192.168.0.100&quot;                                           
+
+# 端口
+PORT=&quot;3306&quot;
+
+# 用户名
+USERNAME=&quot;root&quot;
+
+# 密码，注意如果有特殊字符的话，记得使用\转义
+PASSWORD=&quot;haochuangMySQL\@2018&quot;
+
+#数据库名称
+DBNAME=&quot;test_db_test&quot;                                                       
+
+#数据库中表的名称
+TABLENAME=&quot;test_table_test&quot;                                            
+
+# 带上上面参数，调用存储过程
+mysql -h${host1} -u${user} -p${passwd} -P${port} -e &quot;call  库名data.过程名pro&quot; ;
+</code></pre>
+
+<p>第二步：创建crontab定时任务，设置在凌晨1点执行脚本/home/bgop/hao/detector_task.sh</p>
+
+<p>#vi /var/spool/cron/root</p>
+
+<p>添加语句 0 1 * * * sh /home/bgop/hao/detector_task.sh</p>
+
+<pre><code>0 1 * * * sh /home/bgop/hao/detector_task.sh &gt; /dev/null 2&gt;&amp;1 &amp;
+</code></pre>
+
+<p>设置完成之后保存，重启一下crontab，并查看crontab的状态是否正常</p>
+
+<pre><code>[root@VM_0_16_centos hao]# service crond restart
+Redirecting to /bin/systemctl restart  crond.service
+[root@VM_0_16_centos hao]# service crond status 
+Redirecting to /bin/systemctl status  crond.service
+● crond.service - Command Scheduler
+   Loaded: loaded (/usr/lib/systemd/system/crond.service; enabled; vendor preset: enabled)
+   Active: active (running) since Wed 2018-12-05 09:39:25 CST; 2s ago
+ Main PID: 25636 (crond)
+   CGroup: /system.slice/crond.service
+           └─25636 /usr/sbin/crond -n
+
+Dec 05 09:39:25 VM_0_16_centos systemd[1]: Started Command Scheduler.
+Dec 05 09:39:25 VM_0_16_centos crond[25636]: (CRON) INFO (RANDOM_DELAY will be scaled with factor 20% if used.)
+Dec 05 09:39:25 VM_0_16_centos systemd[1]: Starting Command Scheduler...
+Dec 05 09:39:25 VM_0_16_centos crond[25636]: (CRON) bad minute (/etc/cron.d/cron.allow)
+Dec 05 09:39:25 VM_0_16_centos crond[25636]: (CRON) bad minute (/etc/cron.d/cron.allow)
+Dec 05 09:39:25 VM_0_16_centos crond[25636]: (CRON) INFO (running with inotify support)
+Dec 05 09:39:25 VM_0_16_centos crond[25636]: (CRON) INFO (@reboot jobs will be run at computer's startup.)
+</code></pre>
+
+<p>经过这两个步骤，就可以实现使用shell脚本调用mysql数据库存储过程，并设置定时任务。</p>
+
+<p>附录</p>
+
+<p>-&mdash;-另外，补充几条常用的Linux与MySQL等操作命令，如下：</p>
+
+<pre><code># 定时导入
+mysql -uroot  -h192.168.0.100  -P23306 -pHaoMySQL\@2018 &lt; /hao/software/localCon.sql  
+</code></pre>
+
+<p>#创建数据库<br />
+create_db_sql=&ldquo;create database IF NOT EXISTS ${DBNAME}&rdquo;<br />
+mysql -h${HOSTNAME} -P${PORT} -u${USERNAME} -p${PASSWORD} -e
+&ldquo;${create_db_sql}&rdquo;</p>
+
+<p>注意：-p${PASSWORD}中间不能有空格</p>
+
+<p>#创建表<br />
+create_table_sql=&ldquo;create table IF NOT EXISTS ${TABLENAME} ( name varchar(20),
+id int(11) default 0 )&rdquo;<br />
+mysql -h${HOSTNAME} -P${PORT} -u${USERNAME} -p${PASSWORD} -D ${DBNAME} -e
+&ldquo;${create_db_sql}&rdquo;</p>
+
+<p>#插入数据<br />
+insert_sql=&ldquo;insert into ${TABLENAME} values(&lsquo;billchen&rsquo;,2)&rdquo;<br />
+mysql -h${HOSTNAME} -P${PORT} -u${USERNAME} -p${PASSWORD} ${DBNAME} -e
+&ldquo;${insert_sql}&rdquo;</p>
+
+<p>#查询<br />
+select_sql=&ldquo;select * from ${TABLENAME}&rdquo;<br />
+mysql -h${HOSTNAME} -P${PORT} -u${USERNAME} -p${PASSWORD} ${DBNAME} -e
+&ldquo;${select_sql}&rdquo;</p>
+
+<p>#更新数据<br />
+update_sql=&ldquo;update ${TABLENAME} set id=3&rdquo;<br />
+mysql -h${HOSTNAME} -P${PORT} -u${USERNAME} -p${PASSWORD} ${DBNAME} -e
+&ldquo;${update_sql}&rdquo;<br />
+mysql -h${HOSTNAME} -P${PORT} -u${USERNAME} -p${PASSWORD} ${DBNAME} -e
+&ldquo;${select_sql}&rdquo;</p>
+
+<p>#删除数据<br />
+delete_sql=&ldquo;delete from ${TABLENAME}&rdquo;<br />
+mysql -h${HOSTNAME} -P${PORT} -u${USERNAME} -p${PASSWORD} ${DBNAME} -e
+&ldquo;${delete_sql}&rdquo;<br />
+mysql -h${HOSTNAME} -P${PORT} -u${USERNAME} -p${PASSWORD} ${DBNAME} -e
+&ldquo;${select_sql}&rdquo;</p>
+
+<p>-&mdash;补充一些crontab相关的命令</p>
+
+<p>crontab文件的含义：</p>
+
+<p>用户所建立的crontab文件中，每一行都代表一项任务，每行的每个字段代表一项设置，它的格式共分为六个字段，前五段是时间设定段，第六段是要执行的命令段，格式如下：</p>
+
+<p>minute hour day month week command</p>
+
+<p>其中：</p>
+
+<p>minute： 表示分钟，可以是从0到59之间的任何整数。</p>
+
+<p>hour：表示小时，可以是从0到23之间的任何整数。</p>
+
+<p>day：表示日期，可以是从1到31之间的任何整数。</p>
+
+<p>month：表示月份，可以是从1到12之间的任何整数。</p>
+
+<p>week：表示星期几，可以是从0到7之间的任何整数，这里的0或7代表星期日。</p>
+
+<p>command：要执行的命令，可以是系统命令，也可以是自己编写的脚本文件。</p>
+
+<p><img src="https://img.it610.com/image/info8/7931d087284c4e83854bf489feb5e724.png" alt="《crontab命令详解
+含启动/重启/停止》" /></p>
+
+<p>在以上各个字段中，还可以使用以下特殊字符：</p>
+
+<p>星号（*）：代表所有可能的值，例如month字段如果是星号，则表示在满足其它字段的制约条件后每月都执行该命令操作。</p>
+
+<p>逗号（,）：可以用逗号隔开的值指定一个列表范围，例如，“1,2,5,7,8,9”</p>
+
+<p>中杠（-）：可以用整数之间的中杠表示一个整数范围，例如“2-6”表示“2,3,4,5,6”</p>
+
+<p>正斜线（/）：可以用正斜线指定时间的间隔频率，例如“0-23/2”表示每两小时执行一次。同时正斜线可以和星号一起使用，例如*/10，如果用在minute字段，表示每十分钟执行一次。</p>
+
+<p>二、crond服务</p>
+
+<p>安装crontab：</p>
+
+<p>yum install crontabs</p>
+
+<p>服务操作说明：</p>
+
+<p>/sbin/service crond start //启动服务</p>
+
+<p>/sbin/service crond stop //关闭服务</p>
+
+<p>/sbin/service crond restart //重启服务</p>
+
+<p>/sbin/service crond reload //重新载入配置</p>
+
+<p>查看crontab服务状态：</p>
+
+<p>service crond status</p>
+
+<p>手动启动crontab服务：</p>
+
+<p>service crond start</p>
+
+<p>加入开机自动启动：</p>
+
+<p>chkconfig –level 35 crond on</p>
+
+<p>使用实例</p>
+
+<p>实例1：每1分钟执行一次command</p>
+
+<p>命令：</p>
+
+<ul>
+<li>* * * * command</li>
+</ul>
+
+<p>实例2：每小时的第3和第15分钟执行</p>
+
+<p>命令：</p>
+
+<p>3,15 * * * * command</p>
+
+<p>实例3：在上午8点到11点的第3和第15分钟执行</p>
+
+<p>命令：</p>
+
+<p>3,15 8-11 * * * command</p>
+
+<p>实例4：每隔两天的上午8点到11点的第3和第15分钟执行</p>
+
+<p>命令：</p>
+
+<p>3,15 8-11 */2 * * command</p>
+
+<p>实例5：每个星期一的上午8点到11点的第3和第15分钟执行</p>
+
+<p>命令：</p>
+
+<p>3,15 8-11 * * 1 command</p>
+
+<p>实例6：每晚的21:30重启smb</p>
+
+<p>命令：</p>
+
+<p>30 21 * * * /etc/init.d/smb restart</p>
+
+<p>实例7：每月1、10、22日的4 : 45重启smb</p>
+
+<p>命令：</p>
+
+<p>45 4 1,10,22 * * /etc/init.d/smb restart</p>
+
+<p>实例8：每周六、周日的1 : 10重启smb</p>
+
+<p>命令：</p>
+
+<p>10 1 * * 6,0 /etc/init.d/smb restart</p>
+
+<p>实例9：每天18 : 00至23 : 00之间每隔30分钟重启smb</p>
+
+<p>命令：</p>
+
+<p>0,30 18-23 * * * /etc/init.d/smb restart</p>
+
+<p>实例10：每星期六的晚上11 : 00 pm重启smb</p>
+
+<p>命令：</p>
+
+<p>0 23 * * 6 /etc/init.d/smb restart</p>
+
+<p>实例11：每一小时重启smb</p>
+
+<p>命令：</p>
+
+<ul>
+<li>*/1 * * * /etc/init.d/smb restart</li>
+</ul>
+
+<p>实例12：晚上11点到早上7点之间，每隔一小时重启smb</p>
+
+<p>命令：</p>
+
+<ul>
+<li>23-<sup>7</sup>&frasl;<sub>1</sub> * * * /etc/init.d/smb restart</li>
+</ul>
+
+<p>实例13：每月的4号与每周一到周三的11点重启smb</p>
+
+<p>命令：</p>
+
+<p>0 11 4 * mon-wed /etc/init.d/smb restart</p>
+
+<p>实例14：一月一号的4点重启smb</p>
+
+<p>命令：</p>
+
+<p>0 4 1 jan * /etc/init.d/smb restart</p>
+
+<p>实例15：每小时执行/etc/cron.hourly目录内的脚本</p>
+
+<p>命令：</p>
+
+<p>01 * * * * root run-parts /etc/cron.hourly</p>
+
+<p>待完善。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

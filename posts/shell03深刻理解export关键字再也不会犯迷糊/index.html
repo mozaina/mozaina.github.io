@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell03深刻理解export关键字再也不会犯迷糊 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell03深刻理解export关键字再也不会犯迷糊 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell03深刻理解export关键字再也不会犯迷糊">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell03%E6%B7%B1%E5%88%BB%E7%90%86%E8%A7%A3export%E5%85%B3%E9%94%AE%E5%AD%97%E5%86%8D%E4%B9%9F%E4%B8%8D%E4%BC%9A%E7%8A%AF%E8%BF%B7%E7%B3%8A/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell03深刻理解export关键字再也不会犯迷糊</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>最近在被Shell脚本中的<code>export</code>关键字所困！记录一下，谈谈自己的理解。</p>
+
+<p><strong>目录：</strong></p>
+
+<p>0、预热：粗略了解Linux父、子进程</p>
+
+<p>1、Shell执行脚本的几种方式</p>
+
+<p>-&mdash;1.0 <code>source [script_file_name]</code> 执行</p>
+
+<p>-&mdash;1.1 <code>. [script_file_name]</code>点符号执行</p>
+
+<p>-&mdash;1.2 指定某个shell来执行</p>
+
+<p>-&mdash;1.3 <code>相对或绝对路径/script_file_name</code>执行</p>
+
+<p>-&mdash;1.4 实例</p>
+
+<p>2、export关键字终出场</p>
+
+<p>-&mdash;2.0 Linux中变量类型知多少</p>
+
+<p>-&mdash; 2.1 export实践</p>
+
+<h1 id="0-对linux父进程-子进程一点点粗略了解">0、对Linux父进程、子进程一点点粗略了解</h1>
+
+<p>这里仅做我自己的简要理解，因为每一个深究都是一门大学问，没必要，但再次深深感觉到计算机基本组成原理知识的重要性。在此只是为了有助于利于<code>export</code>。</p>
+
+<p>Linux是一个多用户多任务的操作系统，必须要支持多个用户同时登录同一个操作系统的操作。当一个用户登录一次时，操作系统就为这个用户创建一个新会话（比如Shell（就是我们常说的【终端】））。<br />
+<a href="https://img.it610.com/image/info8/4bcba142420043a4a5e2c705dcc87f60.jpg"><img src="https://img.it610.com/image/info8/4bcba142420043a4a5e2c705dcc87f60.jpg" alt="Shell - 03
+深刻理解export关键字：再也不会犯迷糊_第1张图片" /></a><br />
+Linux系统中，进程之间有一个明显的继承关系，所有进程都是 <code>PID 为1的 init 进程</code>的 <strong>后代</strong> 。内核在系统启动的最后阶段启动 <code>init
+进程</code>。该进程读取系统的<code>初始化脚本（initscript）</code>并执行其他的相关程序，最终完成系统启动的整个过程。</p>
+
+<p>用户登陆Linux，就获得一个bash（Shell），之后你的bash（Shell）就是一个独立的进程（ <strong>Shell 父进程</strong>
+）。之后你在bash（Shell）下面执行的任何命令都是由这个bash所衍生的，那些被执行的命令被称为子进程（ <strong>Shell子进程</strong> ）。<br />
+子进程只会继承父进程的环境变量，子进程不会继承父进程的自定义变量。那么你原本bash中的自定义变量在进入子进程后就会消失不见，一直到你离开子进程并回到原本的父进程后，这个变量才会出现。除非把自定义变量设置为环境变量
+<code>export name</code></p>
+
+<p>Linux中的进程及进程控制</p>
+
+<h1 id="1-shell执行脚本的几种方式">1、Shell执行脚本的几种方式</h1>
+
+<p>分为两大类，4小类。本质上都得指明脚本文件所在路径，即怎么找到它。</p>
+
+<pre><code>1、在当前shell中执行【相对或绝对路径下都行】，这两个本质是一样的
+        source script_file_name
+        . script_file_name 中间有1个空格
+2、在当前shell（父进程）开启一个【子shell（子进程）】中执行，
+   脚本一旦执行完后子shell环境将随即关闭，然后又回到父shell中，而无法再访问脚本中的变量的（不管有没有export）。
+   【无论脚本中是否有#!/bin/bash这行，都会开启子shell去执行】
+        sh script_file_name
+        相对或绝对路径/script_file_name【若脚本无#!/bin/bash，则会选择系统默认shell执行它】
+</code></pre>
+
+<p>一个规范的Shell脚本在第一行指出由哪个程序（解释器）来执行脚本的内容，而这一行内容在Linux bash一般为：</p>
+
+<pre><code>#!/bin/bash
+
+#或
+
+#!/bin/sh
+
+#sh为bash的软链接。更规范的写法是bash。
+</code></pre>
+
+<p>创建一个<code>hello.sh</code>脚本</p>
+
+<pre><code>[root@master Cshell]# pwd
+/usr/local/src/Cshell
+[root@master Cshell]# vim hello.sh
+#!/bin/bash
+
+a=&quot;hello&quot;
+export MY_VAR=&quot;MY_VAR&quot;
+
+echo &quot;Hello World!&quot;
+</code></pre>
+
+<h2 id="1-0-source-script-file-name-执行">1.0 <code>source [script_file_name]</code> 执行</h2>
+
+<pre><code>[root@master Cshell]# pwd
+/usr/local/src/Cshell
+[cyg@master Cshell]$ source hello.sh #当前工作路径下
+Hello World!
+[cyg@master Cshell]$ cd ..
+[cyg@master src]$ pwd
+/usr/local/src
+[cyg@master src]$ source /usr/local/src/Cshell/hello.sh #绝对路径下
+Hello World!
+[cyg@master src]$ source ./Cshell/hello.sh #相对路径下
+Hello World!
+</code></pre>
+
+<p>常见例子：<code>source /etc/profile</code>，作用是使【 _设置的针对
+所有用户(不只是root)登录时都会运行的系统级别的环境变量的配置文件<code>/etc/profile</code>_】立即生效，而不必注销并重新登录。</p>
+
+<h2 id="1-1-script-file-name-点符号执行">1.1 <code>. [script_file_name]</code>点符号执行</h2>
+
+<pre><code>[root@master Cshell]# pwd
+/usr/local/src/Cshell
+[cyg@master Cshell]$ . hello.sh
+Hello World!
+[cyg@master Cshell]$ cd ..
+[cyg@master src]$ pwd
+/usr/local/src
+[cyg@master src]$ . /usr/local/src/Cshell/hello.sh     
+Hello World!
+[cyg@master src]$ . ./Cshell/hello.sh     
+Hello World!
+</code></pre>
+
+<p>小结：<code>source</code> 或 <code>.</code>（点符号）功能是：读入脚本并执行脚本</p>
+
+<ul>
+<li>在当前Shell中执行加载并执行的相关脚本文件的命令及语句，而不是产生一个子Shell来执行。所以，在执行脚本后，当前shell可访问脚本中任一变量，即 这些变量成为了当前shell的一部分（都在一个进程里了）</li>
+<li>都不需要当前用户有对脚本文件的可执行权限。因为都将脚本文件看作1个参数</li>
+
+<li><p>两者唯一区别：<code>source</code>是bash内置命令；点符号是<code>source</code>另一名称</p>
+
+<p>[root@master Cshell]# echo $a # a是hello.sh中的一个普通变量</p>
+
+<p>[root@master Cshell]# source hello.sh
+Hello World!
+[root@master Cshell]# echo $a<br />
+hello</p></li>
+</ul>
+
+<h2 id="1-2-指定某个shell来执行">1.2 指定某个shell来执行</h2>
+
+<pre><code>[root@master Cshell]# ll
+-rw-r--r-- 1 root root  67 May 31 16:08 hello.sh
+[root@master Cshell]# sh hello.sh
+Hello World!
+</code></pre>
+
+<ul>
+<li>shell有很多种解释器：bash、sh、ash、bsh、csh、ksh、tcsh等；</li>
+<li>运行格式：<code>[bash] [file_name.sh]</code>。由这里指定的shell运行这个脚本，与Linux登录的哪个用户也无关（如root、或其他用户）；</li>
+<li>上述实例：是将 <em>hello.sh</em> 文件名作为一个参数传递给<code>sh命令</code>来执行。即 此时不是<code>hello.sh</code>自己来执行，而是被<code>sh</code>所调用来执行，所以甚至可以不要：
+
+<ul>
+<li>文件执行权限（无需当前用户有对它的可执行权限）</li>
+<li>第一行<code>#!/bin/bash</code>，指定bash路径</li>
+</ul></li>
+</ul>
+
+<h2 id="1-3-相对或绝对路径-script-file-name-执行">1.3 <code>相对或绝对路径/script_file_name</code>执行</h2>
+
+<ul>
+<li><strong>当前用户</strong> 需要有对该文件的可执行权限：这种方式执行脚本文件，就意味着该文件本身是个具备可执行权限的文件，即 它自己就是个可执行文件。否则是执行不了。</li>
+
+<li><p>加上相对或绝对路径的目的是为了让bash找到脚本文件在哪里。因为当前工作目录（pwd）可能不在执行程序默认的搜索路径之列，即 不在环境变量<code>PATH</code>的内容之中（<code>echo $PATH</code>可查看）。</p>
+
+<p>[cyg@master src]$ pwd
+/usr/local/src
+[cyg@master src]$ ./Cshell/hello.sh #相对路径
+bash: ./Cshell/hello.sh: Permission denied
+[cyg@master src]$ /usr/local/src/Cshell/hello.sh #绝对路径
+bash: /usr/local/src/Cshell/hello.sh: Permission denied
+[cyg@master src]$ cd Cshell
+[cyg@master Cshell]$ ./hello.sh #当前路径
+bash: ./hello.sh: Permission denied</p></li>
+</ul>
+
+<p>都提示<code>Permission denied</code>，没有执行权限，无法执行。</p>
+
+<pre><code>[cyg@master Cshell]$ ll #可看到该文件拥有者是root，只有它才有能力修改权限
+-rw-r--r-- 1 root root  67 May 31 16:08 hello.sh
+[cyg@master Cshell]$ su
+Password: 
+[root@master Cshell]# chmod a+x hello.sh
+[root@master Cshell]# /usr/local/src/Cshell/hello.sh
+Hello World!
+[root@master Cshell]# ./hello.sh #这里的点 是指当前路径，不要点符号搞混了！
+Hello World!
+[root@master Cshell]# cd ..
+[root@master src]# ./Cshell/hello.sh
+Hello World!
+</code></pre>
+
+<h2 id="1-4-实例">1.4 实例</h2>
+
+<ul>
+<li>在 <strong>当前shell</strong> 执行的脚本文件（如：<code>source 或. /script_file_name</code>），对于脚本中的变量，变量不管是否有<code>export</code>，一旦执行脚本完毕，是还可以在当前shell中访问脚本中的变量的。</li>
+<li>在 <strong>子shell（子进程）</strong> 中执行脚本（如：用<code>相对或绝对路径/script_file_name</code>或 <code>[bash] [file_name.sh]</code>执行），一旦执行完毕，随即返回父shell，脚本中的变量将无法访问。</li>
+</ul>
+
+<p><strong>实例</strong></p>
+
+<pre><code>[root@master Cshell]# pwd
+/usr/local/src/Cshell
+[root@master Cshell]# vim w.sh
+h=&quot;hello&quot;
+export w=&quot;world&quot;
+echo $h
+[root@master Cshell]# chmod +x w.sh
+[root@master Cshell]# ./w.sh       
+hello
+[root@master Cshell]# echo $h #不管有无export，都将无法再访问这两个变量了。
+
+[root@master Cshell]# echo $w
+
+[root@master Cshell]# . ./w.sh
+hello
+[root@master Cshell]# echo $h
+hello
+[root@master Cshell]# echo $w
+world 
+</code></pre>
+
+<h1 id="2-export关键字终出场">2、export关键字终出场</h1>
+
+<p>到目前为止，<code>export</code>还没真正登场，只有预热。前面的预热都是为了更好地掌握<code>export</code>。</p>
+
+<h2 id="2-0-linux中变量类型知多少">2.0 Linux中变量类型知多少</h2>
+
+<p>这里只说下个人理解的人为分类。</p>
+
+<p>再次回到一句话：Linux是多用户多任务操作系统。在一个Linxu系统上，用户一般情况下一定有两类：</p>
+
+<ul>
+<li>root</li>
+<li>普通用户，可能有多个以上。</li>
+</ul>
+
+<p><strong>为了更好地理解<code>export</code>，在此仅将变量分为两大类：</strong></p>
+
+<ul>
+<li><strong>1 环境变量</strong>
+
+<ul>
+<li>系统级环境变量：每个登录到Linux系统的用户都能够读取到的环境变量；</li>
+<li>用户级环境变量：每个登录到Linux系统的用户只能够读取到属于自己的用户级的环境变量。这样用户登录后，将由自己专用的运行环境。</li>
+</ul></li>
+<li><strong>2 非环境变量</strong> 一般是用户自定义，比如某个用户（包括root）自己写的某个程序中的自定义变量。</li>
+</ul>
+
+<p>所以，为了方便管理和持久化，会将环境变量写入一些配置文件中。相应地也分成了系统级、用户级配置文件：</p>
+
+<ul>
+<li>系统级：<code>/etc/profile</code>、<code>/etc/bashrc</code>、等，对其的修改将影响到每一个用户。</li>
+<li>用户级：<code>~/.profile</code>、<code>~/.bashrc</code>等，对其的修改只对该用户有影响。</li>
+</ul>
+
+<p>常见环境变量有<code>PATH</code>、<code>HOME</code>、<code>HISTSIZE</code>、<code>SHELL</code>、<code>PS1</code>、<code>LANG</code>、<code>RANDOM</code>等等。</p>
+
+<p>在执行时，对于环境变量（包括不同级别的配置文件）、普通变量，是有顺序的。</p>
+
+<p>环境变量、自定义变量两者之间可以相互转换：<br />
+<a href="https://img.it610.com/image/info8/fd9a69e16c284f06a66e031cb6134df9.png"><img src="https://img.it610.com/image/info8/fd9a69e16c284f06a66e031cb6134df9.png" alt="Shell - 03
+深刻理解export关键字：再也不会犯迷糊_第2张图片" /></a></p>
+
+<p>Linux环境变量文件介绍<br />
+Shell变量之自定义变量、环境变量</p>
+
+<h2 id="2-1-export实践">2.1 export实践</h2>
+
+<p>import 译作：进口、输入、引进、导入<br />
+export 译作：出口、输出、调出、导出</p>
+
+<p>在python、scala语言中，经常看到<code>import</code>关键字，但没有<code>export</code>关键字。而export出现在了<code>shell</code>这个脚本语言中。为什么？</p>
+
+<p>个人理解，因为环境变量在Linux中大部分都存于配置文件中，要访问某个环境变量时，就需要将它导出、读出（<code>export</code>）。从而Shell或Linux没有
+<code>import</code>一说了。</p>
+
+<p><strong>实例：</strong></p>
+
+<pre><code>[root@master Cshell]# t1=&quot;t1_no_export&quot;
+[root@master Cshell]# export t2=&quot;t2_yes_export&quot;
+[root@master Cshell]# vim test_export.sh
+#!/bin/bash
+
+echo &quot;TERM = $TERM&quot;
+
+export TERM
+echo &quot;TERM = $TERM&quot;
+
+echo &quot;t1 = ${t1}&quot;
+echo &quot;t2 = ${t2}&quot;
+[root@master Cshell]# sh test_export.sh  
+TERM = linux
+TERM = linux
+t1 = 
+t2 = t2_yes_export
+[root@master Cshell]# 
+</code></pre>
+
+<p>小结：</p>
+
+<ul>
+<li>_对于一个【非环境变量】，不加<code>export</code>在子shell中运行的脚本中取不到数据（如<code>t1</code>）；而<code>t2</code>这个【非环境变量】加了<code>export</code>（在此变成了环境变量，不过未持久化），在子shell中运行的脚本中能取到它的数据。_说明子进程（子shell）在继承父进程（父shell）时，“拷贝”了一份<code>t2</code>给自己（子shell也可以修改它，不过父shell看不到修改），而<code>t1</code>是父shell独有的。</li>
+<li>对于一个【环境变量】，放在一个脚本中，加不加<code>export</code>都无区别。</li>
+</ul>
+
+<p>还可参考【菜鸟教程：Linux export命令】</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

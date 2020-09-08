@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>一部Web应用自动化部署的进化史AWS使用shell实现CodeDeploy | 开发者问答集锦</title>
+    <meta property="og:title" content="一部Web应用自动化部署的进化史AWS使用shell实现CodeDeploy - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="一部Web应用自动化部署的进化史AWS使用shell实现CodeDeploy">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%B8%80%E9%83%A8web%E5%BA%94%E7%94%A8%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2%E7%9A%84%E8%BF%9B%E5%8C%96%E5%8F%B2aws%E4%BD%BF%E7%94%A8shell%E5%AE%9E%E7%8E%B0codedeploy/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">一部Web应用自动化部署的进化史AWS使用shell实现CodeDeploy</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>前段时间，本人参与了某项目的从“零”开始的开发与运维。真的是从零开始啊……从项目设计到开发，再到发布、运维，说多了都是泪……还好现在有好多现成的工具可以使用，省了很多时间和精力。</p>
+
+<p>此项目使用AWS，Web 端架构采用 ELB + AutoScalling
+group，数据库使用RDS，文件存储使用了S3。使用这个架构可以节省很多的运维时间和精力，可以拿更多的时间关注项目的开发。但是这个架构并不包括代码部署的方面，本文主要介绍在代码部署方面自动化运维道路上的各种进化。</p>
+
+<p>项目主要软件环境： Java EE, Spring 4 MVC, maven, tomcat8, gitlab</p>
+
+<p>项目分测试环境和生产环境，生产环境采用ELB+AutoScalling，测试环境只有一台服务器跑tomcat，虽然不是很严谨，但是在前期还是能省(qian)则省了……</p>
+
+<p>在代码部署方面大体经历了以下几个阶段。</p>
+
+<h3 id="石器时代">石器时代</h3>
+
+<p>最开始时在本地开发测试，然后idea 打包上传到服务器上，然后ssh
+登陆服务器手动部署代码。每次代码部署都要执行n多操作和命令。有段时间网络不是很好，光上传war
+包就耗费十几分钟，对耐心是一场很大的考验。实在受不了这种繁琐的操作时候开始了一步步简化操作。</p>
+
+<p>服务器上部署war 时需要先停止tomcat，然后删除tomcat webapps 目录下ROOT.war 文件和ROOT
+目录，然后移动新的ROOT.war 到webapps 下，最后启动tomcat 服务。首先对这个步骤写了个shell 脚本：</p>
+
+<h5 id="石头锤子-deploywar-sh">“石头锤子” deployWar.sh</h5>
+
+<pre><code>#! /bin/bash
+
+if [[ $# -eq 0 ]]; then
+        warFile=&quot;/home/ec2-user/target/hs-0.1-SNAPSHOT.war&quot;
+elif [[ $# -eq 1 ]]; then
+        warFile=&quot;$1&quot;
+else 
+        echo &quot;Parameter Error!&quot;
+        exit 1
+fi
+
+if [[ -f &quot;$warFile&quot; ]]; then
+        service tomcat8 stop
+        rm -f &quot;/usr/share/tomcat8/webapps/ROOT.war&quot;
+        rm -rf &quot;/usr/share/tomcat8/webapps/ROOT&quot;
+        cp &quot;$warFile&quot; &quot;/usr/share/tomcat8/webapps/ROOT.war&quot;
+        service tomcat8 start
+        mv &quot;$warFile&quot; &quot;${warFile%'.war'}_`date +'%Y-%m-%d_%H:%M:%S'`.war&quot;
+        echo
+        echo Done!
+else
+    echo &quot;No file: $warFile!&quot;
+fi
+</code></pre>
+
+<p>此“石头锤子”能实现上述war包的部署步骤，并对当前部署的war包进行备份。</p>
+
+<p>然后又出现一个问题，如果改动只有一个或几个文件，完整部署太麻烦，这时可以只上传改动的文件，然后部署就可以了。</p>
+
+<h5 id="石头镰刀1-updateclasses-sh">“石头镰刀1” updateClasses.sh</h5>
+
+<pre><code>#! /bin/bash
+
+service tomcat8 stop
+cp -R /home/ec2-user/target/classes/ /home/ec2-user/webapps/ROOT/WEB-INF/
+service tomcat8 start
+echo Done!
+</code></pre>
+
+<p>tomcat 的class 文件更新后需要重启tomcat 才能生效，而静态文件如js、css 文件等直接覆盖即可。所以针对静态文件有：</p>
+
+<h5 id="石头镰刀2-updatestatic-sh">“石头镰刀2” updateStatic.sh</h5>
+
+<pre><code>#! /bin/bash
+
+cp -R /home/ec2-user/src/main/webapp/WEB-INF/ /home/ec2-user/webapps/ROOT/
+echo Done!
+</code></pre>
+
+<h3 id="铁器时代">“铁器时代”</h3>
+
+<p>当测试情况良好需要部署到生产坏境时，就涉及到从原来的单点部署到集群部署了。原来的脚本和架构也不太适合了，幸好我们有还有铸就“金刚”之身的原料&ndash;
+S3。首先我们将需要部署的war包上传的到S3 的指定目录，登陆需要部署的服务器，下载该war 包并部署。流程很简单，但是需要执行的命令也是繁杂和重复。</p>
+
+<h5 id="小铁铲-cpwartos3-sh">“小铁铲” cpWarToS3.sh</h5>
+
+<pre><code>#! /bin/bash
+
+if [[ $# -eq 0 ]]; then
+        warFile=&quot;/home/ec2-user/target/hs-0.1-SNAPSHOT.war&quot;
+elif [[ $# -eq 1 ]]; then
+        warFile=&quot;$1&quot;
+else 
+        echo &quot;Parameter Error!&quot;
+        exit 1
+fi
+
+if [[ -f &quot;$warFile&quot; ]]; then
+        echo Copy $warFile to S3...
+        aws s3 cp &quot;$warFile&quot; &quot;s3://config.ziyoufang.cn/war/ROOT.war&quot;
+        echo Done!
+else
+    echo &quot;No file: $warFile!&quot;
+fi
+</code></pre>
+
+<h5 id="大铁锤-deployfroms3-sh">“大铁锤” deployFromS3.sh</h5>
+
+<pre><code>#! /bin/bash
+if [[ $# -eq 0 ]]; then
+    WAR=ROOT.war
+elif [[ $# -eq 1 ]]; then
+    WAR=$1
+else 
+    echo &quot;Parameter Error!&quot;
+    exit 1
+fi
+
+WAR=`echo $WAR | awk -F '.' '{print $1}'`
+
+service tomcat8 stop
+rm -f &quot;/usr/share/tomcat8/webapps/ROOT.war&quot;
+rm -rf &quot;/usr/share/tomcat8/webapps/ROOT&quot;
+aws s3 cp s3://config.ziyoufang.cn/war/&quot;$WAR&quot;.war &quot;/usr/share/tomcat8/webapps/ROOT.war&quot;
+service tomcat8 start
+log=&quot;`date +'%Y-%m-%d %H:%M:%S'` Deploy war from s3. done!&quot;
+echo $log &gt; deploy.log
+echo
+echo Done!
+</code></pre>
+
+<p>从文件名上就可以看出这两个脚本一个是用来将war 上传到S3，一个是从S3 下载war包并部署的。</p>
+
+<h3 id="工业时代">“工业时代”</h3>
+
+<p>上面还面临着一个重要的问题，就是每次部署都要打包上传完整的war
+包到S3，这也是一个比较耗时耗力的过程，对于一个能坐就不站，能躺就不坐的”懒货“来说是一种巨大的折磨。</p>
+
+<h5 id="烈火-gitlab-鼓风-maven">“烈火” gitlab +“鼓风” maven</h5>
+
+<p>gitlab 作为一款优秀的git server 系统，maven
+作为一款最常用的包管理软件之一，各位前辈已经提供的了丰富的工具我们就得充分利用。在开发时使用git 做版本控制，gitlab 部署在AWS
+上，开发只需要和gitlab 进行sync 即可。然后在服务器上使用mvn clean install 进行打包，并上传到S3上。</p>
+
+<h5 id="小卡车-updatewartos3-sh">“小卡车” updateWarToS3.sh</h5>
+
+<pre><code>#! /bin/bash
+
+if [[ $# -eq 0 ]]; then
+    BRANCH=master
+elif [[ $# -eq 1 ]]; then
+    BRANCH=$1
+    TARGET=ROOT.war
+elif [[ $# -eq 2 ]]; then
+    BRANCH=$1
+    TARGET=$2
+else 
+    echo &quot;Parameter Error!&quot;
+    exit 1
+fi
+TARGET=`echo $TARGET | awk -F '.' '{print $1}'`
+
+cd /home/ec2-user/Web_server
+git checkout $BRANCH
+git pull
+mvn clean install
+
+S3_Prefix=&quot;s3://config.ziyoufang.cn/war/&quot;
+S3_War=$S3_Prefix&quot;$TARGET&quot;.war
+S3_WarBack=$S3_Prefix&quot;$TARGET&quot;&quot;_`date +'%Y-%m-%d_%H:%M:%S'`.war&quot;
+warFile=&quot;/home/ec2-user/Web_server/target/hs-0.1-SNAPSHOT.war&quot;
+
+echo Backup &quot;$TARGET&quot;.war on S3...
+aws s3 mv $S3_War $S3_WarBack
+
+echo upload new &quot;$TARGET&quot;.war...
+aws s3 cp $warFile $S3_War
+
+echo &quot;upload done.&quot;
+</code></pre>
+
+<p>此时部署时只需先执行 <strong>updateWarToS3.sh</strong> ，然后登陆需要部署的服务器执行 <strong>deployFromS3.sh</strong>
+即可。这下干感觉就是从原始社会走出来了<del>爽啊</del>~</p>
+
+<p>可是……（哎……就怕有可是……）在部署生产环境时，每次都需要执行多个流程：</p>
+
+<p>从ELB 中移除一台EC2 -&gt; 等待connection draining -&gt; 登陆该EC2 -&gt; 执行deployFromS3.sh -&gt;
+等待tomcat启动起来 -&gt; 添加该EC2 回ELB -&gt; 等待监控状态检查到InService -&gt; 下一台EC2……</p>
+
+<p>在压力小的情况下执行该操作ELB
+后端实例较少，部署几次之后我烦了，交给了另外一个人去部署，（嗯，以邻为壑的感觉挺爽~~）结果他部署了几次之后他也烦了，威胁说撂挑子不干了……无奈只好继续利用我大shell
+铸造大杀器了……</p>
+
+<h5 id="巨型铲车-deployintoelbbackendinstance-sh">“巨型铲车” deployIntoELBBackendInstance.sh</h5>
+
+<pre><code>#/bin/bash
+# deployIntoELBBackendInstance.sh
+
+succeed_instances=&quot;&quot;
+failed_instances=&quot;&quot;
+ELB_NAME=&quot;&quot;
+DEPLOY_COMMAND=&quot;sudo -s /home/ec2-user/target/deployFromS3.sh&quot;
+
+function usage()
+{
+    echo &quot;Usage: $0 [Option] &quot;
+    echo &quot;Options:&quot;
+    echo &quot;  -b  ELB name&quot;
+    echo &quot;  -c  Deployment command. Default: \&quot;$DEPLOY_COMMAND\&quot;&quot;
+}
+
+function addSuccessInstance()
+{
+    if [[ $# -ne 1 ]]; then
+        return 1
+    fi
+
+    #add this intance to &quot;succeed instances list&quot; if get private ip
+    if [[ -z &quot;$succeed_instances&quot; ]]; then
+        succeed_instances=$instance
+    else
+        succeed_instances=&quot;$succeed_instances&quot;,\ &quot;$instance&quot;
+    fi
+}
+
+function addFailedInstance()
+{
+    if [[ $# -ne 1 ]]; then
+        return 1
+    fi
+
+    #add this intance to &quot;fialed instance list&quot; if can't get private ip
+    if [[ -z &quot;$failed_instances&quot; ]]; then
+        failed_instances=$instance
+    else
+        failed_instances=&quot;$failed_instances&quot;,\ &quot;$instance&quot;
+    fi
+}
+
+function deploy()
+{
+    if [[ $# -ne 1 ]]; then
+        return 1
+    fi
+
+    privateIp=$1
+    # ssh in and deploy on this instance
+    echo Deploying...
+    ssh $privateIp &quot;$DEPLOY_COMMAND&quot;
+    # ssh $privateIp echo deploying...
+    for (( i = 0; i &lt; 6; i++ )); do
+        echo -n Please wait for retarting tomcat 
+        for (( j = 0; j &lt; 10; j++ )); do
+            echo -n .
+            sleep 1s
+        done
+        echo .
+
+        testLineNum=`curl -s $privateIp:8080 | grep html | wc -l`
+        if [[ $testLineNum -gt 0 ]]; then
+            echo tomcat retarts successfully.
+            break
+        fi
+    done
+}
+
+#main
+while getopts &quot;b:c:&quot; arg
+do
+    case $arg in
+        b )
+            ELB_NAME=$OPTARG
+            ;;
+        c ) 
+            DEPLOY_COMMAND=$OPTARG
+            ;;
+        ? ) 
+            echo &quot;Unknown argument.&quot;
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -z &quot;$ELB_NAME&quot; ]]; then
+    echo &quot;$0: missing elb name&quot;
+    usage
+    exit 1
+fi
+# verify if exist this ELB
+verifyELB=`aws elb describe-load-balancers --load-balancer-name $ELB_NAME | grep LoadBalancerName | awk -F '&quot;' '{print $4}'`
+if [[ &quot;$verifyELB&quot;x != &quot;$ELB_NAME&quot;x ]]; then
+    echo Cannot find Load Balancer $ELB_NAME
+    exit 1
+fi
+# go on if exist this elb
+for instance in `aws elb describe-instance-health --load-balancer-name $ELB_NAME | grep InstanceId | awk -F '&quot;' '{print $4}'` ; do
+    echo $instance is in progress...
+
+    #loop getting until get private ip
+    privateIp=&quot;&quot;
+    for ip in `aws ec2 describe-instances --instance-ids $instance | grep PrivateIpAddress | awk -F '&quot;' '{print $4}'` ; do
+        if [[ -n &quot;$ip&quot; ]]; then
+            privateIp=$ip
+            break
+        fi
+    done
+
+    if [[ -z &quot;$privateIp&quot; ]]; then
+        addFailedInstance $instance
+    else
+        #deregister this instance from elb
+        aws elb deregister-instances-from-load-balancer --load-balancer-name $ELB_NAME --instances $instance &gt;/dev/null 2&gt;&amp;1
+        echo -n Please waitting for deregister $instance from elb $ELB_NAME
+        for (( i = 0; i &lt; 20; i++ )); do
+            sleep 5s
+            echo -n .
+            outservice=`aws elb describe-instance-health --load-balancer-name $ELB_NAME --instances $instance | grep OutOfService | wc -l`
+            if [[ $outservice -eq 1 ]]; then
+                echo
+                echo $instance has been deregistered from elb $ELB_NAME
+                deploy $privateIp
+                #register this instance with elb
+                aws elb register-instances-with-load-balancer --load-balancer-name $ELB_NAME --instances $instance &gt;/dev/null 2&gt;&amp;1
+                echo -n Please wait for register $instance with elb $ELB_NAME
+                for (( j = 0; j &lt; 20; j++ )); do
+                    sleep 6s
+                    echo -n .
+                    inservice=`aws elb describe-instance-health --load-balancer-name $ELB_NAME --instances $instance | grep InService | wc -l`
+                    if [[ $inservice -eq 1 ]]; then
+                        echo
+                        echo $instance has been registered with elb $ELB_NAME
+                        addSuccessInstance $instance
+                        break
+                    fi
+                    if [[ $j -ge 19 ]]; then
+                        addFailedInstance $instance
+                    fi
+                done
+                echo
+                break
+            elif [[ $i -ge 19 ]]; then
+                echo 
+                echo Deregister $instance time out. Process the next
+                addFailedInstance $instance
+                echo
+                continue
+            fi
+        done
+    fi
+done
+
+echo 
+echo succeed instances: $succeed_instances
+echo failed instances: $failed_instances
+</code></pre>
+
+<p>该脚本能实现自动将指定ELB 下的后端健康实例进行部署，最后会提示部署成功和部署失败的实例。</p>
+
+<p>至此，整个部署流程在updateWarToS3.sh 之后只需要执行deployIntoELBBackendInstance.sh 就可以了。</p>
+
+<p>手执“大铁锤”，开着“巨型铲车”，慵懒的日子~舒坦~~~</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

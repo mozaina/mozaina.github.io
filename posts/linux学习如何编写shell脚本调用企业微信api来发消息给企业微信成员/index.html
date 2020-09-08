@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux学习如何编写Shell脚本调用企业微信api来发消息给企业微信成员 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux学习如何编写Shell脚本调用企业微信api来发消息给企业微信成员 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux学习如何编写Shell脚本调用企业微信api来发消息给企业微信成员">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E5%AD%A6%E4%B9%A0%E5%A6%82%E4%BD%95%E7%BC%96%E5%86%99shell%E8%84%9A%E6%9C%AC%E8%B0%83%E7%94%A8%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1api%E6%9D%A5%E5%8F%91%E6%B6%88%E6%81%AF%E7%BB%99%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%88%90%E5%91%98/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux学习如何编写Shell脚本调用企业微信api来发消息给企业微信成员</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="一-前言">一、前言</h1>
+
+<p>最近通过python实现了发送消息给企业微信的功能，参考链接：</p>
+
+<ul>
+<li>【Jenkins学习 】如何编写Python脚本来调用企业微信的api通知企业微信成员关于Jenkins的编译结果？ <a href="https://blog.csdn.net/qq446282412/article/details/86361318">https://blog.csdn.net/qq446282412/article/details/86361318</a></li>
+</ul>
+
+<p>但是并不是每台Linux服务器上都有合适的python版本，之前这个python脚本是运行在Python
+2环境下的，但是可能新的Linux服务器上装的是Python 3
+之类的，因此可能写一个Shell脚本更加通用，因此我准备来写个Shell脚本来实现发送消息给企业微信。</p>
+
+<p>但是写好的脚本都是需要传入参数的，因此学习一下Shell命令行参数解析工具getopts是如何使用的？通过下面的链接可以学习到。</p>
+
+<ul>
+<li>【Linux学习】Shell命令行参数解析工具getopts是如何使用的？ <a href="https://mp.csdn.net/postedit/86493502">https://mp.csdn.net/postedit/86493502</a></li>
+</ul>
+
+<p>下面我们来真正实现通过shell脚本调用企业微信api来发消息给企业微信成员的功能。</p>
+
+<h1 id="二-企业微信封装接口介绍">二、企业微信封装接口介绍</h1>
+
+<p>公司负责企业微信推广的同事对企业微信发送消息的api进行了再次封装，然后发送了一篇api文档给我，大致如下：</p>
+
+<h2 id="2-1-请求接口步骤">2.1 请求接口步骤</h2>
+
+<ul>
+<li><p>1 获取apid与Secret<br />
+请联系公司内部推广企业微信的同事，可得到调用所需的ClientId与Secret</p></li>
+
+<li><p>2 获取token的api<br />
+请求api</p>
+
+<pre><code>POST: http://ip地址:8000/connect/token
+{
+    client_id:步骤1中获得,
+    client_secret:步骤1中获得,
+    grant_type:&quot;client_credentials&quot;,
+    scope:&quot;ApiGateway&quot;
+}
+</code></pre></li>
+</ul>
+
+<p>注：body使用x-www-form-urlencoded</p>
+
+<p>返回的内容</p>
+
+<pre><code>    返回内容:
+    {
+        &quot;access_token&quot;:&quot;&quot;,
+        &quot;expires_in&quot;: 3600,
+        &quot;token_type&quot;:&quot;Bearer&quot;
+    }
+</code></pre>
+
+<ul>
+<li>3 使用步骤2中得到的Bearer Token请求资源.</li>
+</ul>
+
+<h2 id="2-2-请求接口步骤发送微信消息接口说明">2.2 请求接口步骤发送微信消息接口说明</h2>
+
+<ul>
+<li><ol>
+<li>发送图文信息
+
+<br />
+<br /></li>
+</ol>
+
+<p>POST: <a href="http://ip地址:8000/api/wechat/news">http://ip地址:8000/api/wechat/news</a>
+{
+   &ldquo;toUser&rdquo; : &ldquo;工号1|工号2&hellip;.&rdquo;,
+   &ldquo;agentId&rdquo; : 0,
+   &ldquo;news&rdquo; : {
+       &ldquo;articles&rdquo; : [
+           {
+               &ldquo;title&rdquo; : &ldquo;中秋节礼品领取&rdquo;,
+               &ldquo;description&rdquo; : &ldquo;今年中秋节公司有豪礼相送&rdquo;,
+               &ldquo;url&rdquo; : &ldquo;URL&rdquo;,
+               &ldquo;picurl&rdquo; : &ldquo;<a href="http://res.mail.qq.com/node/ww/wwopenmng/images/independent/doc/test_pic_msg1.png&quot;">http://res.mail.qq.com/node/ww/wwopenmng/images/independent/doc/test_pic_msg1.png&quot;</a>,
+               &ldquo;btntxt&rdquo;:&ldquo;更多&rdquo;
+           }
+        ]
+   }
+}</p></li>
+
+<li><ol>
+<li>发送文本消息
+
+<br />
+<br /></li>
+</ol>
+
+<p>POST: <a href="http://ip地址:8000/api/wechat/text">http://ip地址:8000/api/wechat/text</a>
+{
+   &ldquo;toUser&rdquo; : &ldquo;工号1|工号2&hellip;.&rdquo;,
+   &ldquo;agentId&rdquo; : 0,
+   &ldquo;content&rdquo;:&ldquo;xxxxxx&rdquo;
+}</p></li>
+
+<li><ol>
+<li>文本卡片消息
+
+<br />
+<br /></li>
+</ol>
+
+<p>POST: <a href="http://ip地址:8000/api/wechat/textcard">http://ip地址:8000/api/wechat/textcard</a></p>
+
+<p>{
+   &ldquo;toUser&rdquo; : &ldquo;工号1|工号2&hellip;.&rdquo;,
+   &ldquo;agentId&rdquo; : 0,
+   &ldquo;title&rdquo; : &ldquo;领奖通知&rdquo;,
+   &ldquo;description&rdquo; : &ldquo;</p>
+
+<p>2016年9月26日</p>
+
+<p>恭喜你抽中iPhone 7一台，领奖码：xxxx</p>
+
+<p>请于2016年10月10日前联系行政同事领取</p>
+
+<p>&rdquo;,
+   &ldquo;url&rdquo;:&ldquo;<a href="http://www.baidu.com&quot;">http://www.baidu.com&quot;</a>,
+   &ldquo;btntxt&rdquo;:&ldquo;更多&rdquo;</p>
+
+<p>}</p></li>
+</ul>
+
+<h1 id="三-编写shell脚本来调用企业微信api">三、编写shell脚本来调用企业微信api</h1>
+
+<pre><code>#!/bin/bash
+
+#用法提示
+usage() {
+    echo &quot;Usage:&quot;
+    echo &quot;  qiyewechat.sh [-u USER] [-t TITLE] [-c CONTENT] [-d DETAIL] [-p PICTURE]&quot;
+    echo &quot;Description:&quot;
+    echo &quot;    USER, 用户.&quot;
+    echo &quot;    TITLE, 标题.&quot;
+    echo &quot;    CONTENT, 内容.&quot;
+    echo &quot;    DETAIL, 细节.&quot;
+    echo &quot;    PICTURE, 图片.&quot;
+    exit -1
+}
+
+
+# 获取脚本执行时的选项
+while getopts u:t:c:d:p: option
+do
+   case &quot;${option}&quot;  in
+                u) USER=${OPTARG};;
+                t) TITLE=${OPTARG};;
+                c) CONTENT=${OPTARG};;
+                d) DETAIL=${OPTARG};;
+                p) PICTURE=${OPTARG};;
+                h) usage;;
+                ?) usage;;
+   esac
+   echo $option
+   echo $OPTARG
+
+done
+
+#api的token相关参数
+client_id='yourId'
+client_secret='yourSecret'
+grant_type='client_credentials'
+scope='ApiGateway'
+
+agentId=0
+
+#RESTFUL API 接口相关参数
+HOST=http://xxx.xxxxxx.com:8000
+
+wechat_api_token=$HOST/connect/token
+#POST: http://ip地址/connect/token
+#{
+#       client_id:步骤1中获得,
+#       client_secret:步骤1中获得,
+#       grant_type:&quot;client_credentials&quot;,
+#       scope:&quot;ApiGateway&quot;
+#}
+#注：body使用x-www-form-urlencoded
+
+#返回内容:
+#{
+#       &quot;access_token&quot;:&quot;&quot;,
+#       &quot;expires_in&quot;: 3600,
+#       &quot;token_type&quot;:&quot;Bearer&quot;
+#}
+
+wechat_api_textcard=$HOST/api/wechat/textcard
+#POST: http://ip地址/api/wechat/textcard
+#{
+#   &quot;toUser&quot; : &quot;工号1|工号2....&quot;,
+#   &quot;agentId&quot; : 0,
+#   &quot;title&quot; : &quot;领奖通知&quot;,
+#   &quot;description&quot; : &quot;
+
+2016年9月26日
+
+
+
+恭喜你抽中iPhone 7一台，领奖码：xxxx
+
+请于2016年10月10日
+前联系行政同事领取&lt;/div&gt;&quot;,
+#   &quot;url&quot;:&quot;http://www.baidu.com&quot;,
+#   &quot;btntxt&quot;:&quot;更多&quot;
+#}
+
+wechat_api_news=$HOST/api/wechat/news
+#POST: http://ip地址/api/wechat/news
+#{
+#   &quot;toUser&quot; : &quot;工号1|工号2....&quot;,
+#   &quot;agentId&quot; : 0,
+#   &quot;news&quot; : {
+#          &quot;articles&quot; : [
+#                  {
+#                          &quot;title&quot; : &quot;中秋节礼品领取&quot;,
+#                          &quot;description&quot; : &quot;今年中秋节公司有豪礼相送&quot;,
+#                          &quot;url&quot; : &quot;URL&quot;,
+#                          &quot;picurl&quot; : &quot;http://res.mail.qq.com/node/ww/wwopenmng/images/independent/doc/test_pic_msg1.png&quot;,
+#                          &quot;btntxt&quot;:&quot;更多&quot;
+#                  }
+#               ]
+#  }
+#}
+
+wechat_api_text=$HOST/api/wechat/text
+#发送文本消息
+#POST: http://ip地址/api/wechat/text
+#{
+#       &quot;toUser&quot; : &quot;工号1|工号2&quot;,
+#       &quot;agentId&quot; : 0,
+#       &quot;content&quot;:&quot;xxxxxx&quot;
+#}
+
+
+# 获取token
+function getAccessToken {
+   curl -d &quot;client_id=$client_id&amp;client_secret=$client_secret&amp;grant_type=$grant_type&amp;scope=$scope&quot; -X POST $wechat_api_token &gt; token.json
+   token=$(cat token.json | python3 -c &quot;import sys, json; print(json.load(sys.stdin)['access_token'])&quot;)
+   echo $token
+}
+
+#发送文本消息
+echo -e &quot;{\&quot;toUser\&quot;:\&quot;&quot;$USER&quot;\&quot;, \&quot;agentId\&quot;:&quot;$agentId&quot;, \&quot;content\&quot;:\&quot;&quot;$CONTENT&quot;\&quot;}&quot; &gt; data_textcard.json
+curl  --write-out %{http_code} -d '@data_textcard.json' -H &quot;Content-Type: application/json&quot; -H &quot;Authorization: Bearer $(getAccessToken)&quot; -X POST $wechat_api_text
+
+#发送图文信息
+#echo -e &quot;{\&quot;toUser\&quot;:\&quot;&quot;$USER&quot;\&quot;, \&quot;agentId\&quot;:&quot;$agentId&quot;, \&quot;title\&quot;:\&quot;&quot;$TITLE&quot;\&quot;, \&quot;description\&quot;:\&quot;&quot;$CONTENT&quot;\&quot;, \&quot;url\&quot;:\&quot;&quot;$DETAIL&quot;\&quot;}&quot; &gt; data_textcard.json
+#curl  --write-out %{http_code} -d '@data_textcard.json' -H &quot;Content-Type: application/json&quot; -H &quot;Authorization: Bearer $(getAccessToken)&quot; -X POST $wechat_api_textcard
+
+#发送图文信息
+# echo -e &quot;{\&quot;toUser\&quot;:\&quot;&quot;$USER&quot;\&quot;,\&quot;agentId\&quot;:&quot;$agentId&quot;, \&quot;articles\&quot;:[{\&quot;title\&quot;:\&quot;&quot;$TITLE&quot;\&quot;, \&quot;description\&quot;:\&quot;&quot;$CONTENT&quot;\&quot;, \&quot;url\&quot;:\&quot;&quot;$DETAIL&quot;\&quot;, \&quot;picUrl\&quot;:\&quot;&quot;$PICTURE&quot;\&quot;}]}&quot; &gt; data_news.json
+# curl  --write-out %{http_code} -d '@data_news.json' -H &quot;Content-Type: application/json&quot; -H &quot;Authorization: Bearer $(getAccessToken)&quot; -X POST $wechat_api_news
+
+
+
+
+[![【Linux学习】如何编写Shell脚本调用企业微信api来发消息给企业微信成员？_第1张图片](https://img.it610.com/image/info8/fb3c2b64607f4ff191cc861d6b6ad414.jpg)](https://img.it610.com/image/info8/fb3c2b64607f4ff191cc861d6b6ad414.jpg)
+
+
+
+
+[![【Linux学习】如何编写Shell脚本调用企业微信api来发消息给企业微信成员？_第2张图片](https://img.it610.com/image/info8/c069fa63fd244162bc43255bb746a508.jpg)](https://img.it610.com/image/info8/c069fa63fd244162bc43255bb746a508.jpg)
+
+
+
+
+[![【Linux学习】如何编写Shell脚本调用企业微信api来发消息给企业微信成员？_第3张图片](https://img.it610.com/image/info8/1c9fdec4be54457dae3fc15715a65a19.jpg)](https://img.it610.com/image/info8/1c9fdec4be54457dae3fc15715a65a19.jpg)
+
+
+
+
+[![【Linux学习】如何编写Shell脚本调用企业微信api来发消息给企业微信成员？_第4张图片](https://img.it610.com/image/info8/98025e383205453da265216014debdc3.jpg)](https://img.it610.com/image/info8/98025e383205453da265216014debdc3.jpg)
+
+
+
+
+其中
+
+
+
+
+
+  token=$(cat token.json | python3 -c &quot;import sys, json; print(json.load(sys.stdin)['access_token'])&quot;)
+</code></pre>
+
+<p>这句中的python3是Linux服务器配置好的，可以参考下面的链接，如果你的系统默认是python2的话，直接改成python即可。</p>
+
+<ul>
+<li><a href="https://blog.csdn.net/u010383937/article/details/73162281">https://blog.csdn.net/u010383937/article/details/73162281</a></li>
+</ul>
+
+<h1 id="四-运行shell脚本调用企业微信api来发消息给企业微信成员">四、运行shell脚本调用企业微信api来发消息给企业微信成员</h1>
+
+<p>我们来测试一下，20xxxxxx是我的工号，我发给自己测试下。</p>
+
+<pre><code>root@ubuntu116:/data/gitlabData/auto_back_shell# ./qiyewechat-notifier.sh  -c “测试下Linux环境下发生企业微信消息” -u 20xxxxxx
+c
+“测试下Linux环境下发生企业微信消息”
+u
+20xxxxxx
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   902    0   787  100   115  34220   5000 --:--:-- --:--:-- --:--:-- 35772
+{&quot;result&quot;:true}200root@ubuntu116:/data/gitlabData/auto_back_shell# 
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/eff52f4da32a457a86dd4669f70fba97.jpg"><img src="https://img.it610.com/image/info8/eff52f4da32a457a86dd4669f70fba97.jpg" alt="【Linux学习】如何编写Shell脚本调用企业微信api来发消息给企业微信成员？_第5张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/fade6e2ff85a48938edeaee323e17985.jpg"><img src="https://img.it610.com/image/info8/fade6e2ff85a48938edeaee323e17985.jpg" alt="【Linux学习】如何编写Shell脚本调用企业微信api来发消息给企业微信成员？_第6张图片" /></a></p>
+
+<p>OK了，成功了！现在我可以去修改之前的gitlab备份的全部shell脚本了，之前都是讲备份结果通过发邮件的方式，现在可以改为发送结果到企业微信了。</p>
+
+<hr />
+
+<p><img src="https://img.it610.com/image/info8/bcaad8d673a0499bb67fbc527c9f38d8.jpg" alt="" /></p>
+
+<blockquote>
+<p>作者：欧阳鹏 欢迎转载，与人分享是进步的源泉！<br />
+ 转载请保留原文地址：<a href="https://blog.csdn.net/qq446282412/article/details/86495251">https://blog.csdn.net/qq446282412/article/details/86495251</a><br />
+ ☞ 本人QQ: 3024665621<br />
+ ☞ QQ交流群: 123133153<br />
+ ☞ github.com/ouyangpeng<br />
+ ☞ oypcz@foxmail.com</p>
+</blockquote>
+
+<hr />
+
+<p><img src="https://img.it610.com/image/info8/9a22d7cd1b5c419a85538179087d8c4b.jpg" alt="" /></p>
+
+<p><img src="https://img.it610.com/image/info8/3e7d271a7f3b4a1eb5da267deebbd230.jpg" alt="" /></p>
+
+<p>`</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

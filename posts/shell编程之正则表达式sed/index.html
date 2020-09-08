@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell编程之正则表达式sed | 开发者问答集锦</title>
+    <meta property="og:title" content="shell编程之正则表达式sed - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell编程之正则表达式sed">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E7%BC%96%E7%A8%8B%E4%B9%8B%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8Fsed/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell编程之正则表达式sed</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="shell编程之正则表达式-sed">shell编程之正则表达式（sed）</h3>
+
+<ul>
+<li>一：sed概述</li>
+<li>二：sed命令常见用法</li>
+<li>三：用法案例
+
+<ul>
+<li>3.1：输出符合条件的文本</li>
+<li>3.2：删除符合条件的文本（d）</li>
+<li>3.3：替换符合条件的文本</li>
+<li>3.4：迁移符合条件的文本</li>
+<li>3.5：使用脚本编辑文件</li>
+</ul></li>
+</ul>
+
+<h1 id="一-sed概述">一：sed概述</h1>
+
+<p>sed（Stream
+EDitor）是一个强大而简单的文本解析转换工具，可以读取文本，并根据指定的条件对文本内容进行编辑（删除、替换、添加、移动等），最后输出所有行或者仅输出处理的某些行。sed
+也可以在无交互的情况下实现相当复杂的文本处理操作，被广泛应用于 Shell 脚本中，用以完成各种自动化处理任务。<br />
+sed 的工作流程主要包括读取、执行和显示三个过程。</p>
+
+<ul>
+<li>读取：sed 从输入流（文件、管道、标准输入）中读取一行内容并存储到临时的缓冲区中（又称模式空间，pattern space）</li>
+<li>执行：默认情况下，所有的 sed 命令都在模式空间中顺序地执行，除非指定了行的地址，否则 sed 命令将会在所有的行上依次执行</li>
+<li>显示：发送修改后的内容到输出流。在发送数据后，模式空间将会被清空</li>
+</ul>
+
+<p>注意：默认情况下所有的 sed 命令都是在模式空间内执行的，因此输入的文件并不会发生任何变化，除非是用重定向存储输出。</p>
+
+<h1 id="二-sed命令常见用法">二：sed命令常见用法</h1>
+
+<p>通常情况下调用 sed 命令有两种格式，如下所示。其中，“参数”是指操作的目标文件， 当存在多个操作对象时用，文件之间用逗号“，”分隔；而
+scriptfile 表示脚本文件，需要用“-f” 选项指定，当脚本文件出现在目标文件之前时，表示通过指定的脚本文件来处理输入的目标文件。</p>
+
+<ul>
+<li>sed [选项] ‘操作’ 参数</li>
+<li>sed [选项] -f scriptfile 参数</li>
+</ul>
+
+<p>常见的 sed 命令选项主要包含以下几种：</p>
+
+<ul>
+<li>-e 或–expression=：允许多个脚本指令被执行</li>
+<li>-f 或–file=：表示用指定的脚本文件来处理输入的文本文件</li>
+<li>-n、–quiet 或 silent：表示仅显示处理后的结果</li>
+<li>-i：直接编辑文本文件</li>
+<li>-r 在脚本中使用扩展正则表达式</li>
+</ul>
+
+<p>sed命令由定位文本行和sed编辑命令俩部分组成<br />
+sed编辑命令对定位文本进行操作，sed定位方式主要有俩种</p>
+
+<ul>
+<li>1.行号，指定一行或者多行范围</li>
+<li>2.使用正则表达式</li>
+</ul>
+
+<p>ed命令定位文本方法：</p>
+
+<ul>
+<li>x x指定行号</li>
+<li>x,y 指定x-y行范围</li>
+<li>/pattern/ 查看包含的行</li>
+<li>/pattern/pattern/ 查看包含俩个匹配的行</li>
+<li>/pattern/,x 从paeertn包含行到x行之间的行</li>
+<li>x,y! 不包含x，y行</li>
+</ul>
+
+<p>sed编辑方法主要为增删改查打印</p>
+
+<ul>
+<li>p 打印，如果同时指定行，表示打印指定行；如果不指定行，则表示打印所有内容；如果有非打印字符，则以 ASCII 码输出。其通常与“-n”选项一起使用</li>
+<li>= 打印文件行号</li>
+<li>a\ 增加，在当前行下面增加一行指定内容</li>
+<li>i\ 插入，在选定行上面插入一行指定内容</li>
+<li>d 删除，删除选定的行</li>
+<li>c\ 替换，将选定行替换为指定内容</li>
+<li>s 替换，替换指定字符</li>
+<li>r 从另一个文本中读入文本</li>
+<li>w 保存为文件</li>
+<li>y 字符转换</li>
+<li>H 复制到剪贴板</li>
+<li>g 将剪贴板中的数据覆盖至指定行</li>
+<li>G 将剪贴板中的数据追加至指定行</li>
+</ul>
+
+<h1 id="三-用法案例">三：用法案例</h1>
+
+<p>以 test.txt 文件为例进行演示</p>
+
+<pre><code>[root@server ~]# cat test.txt
+he was short and fat.
+He was wearing a blue polo shirt with black pants. 
+The home of Football on BBC Sport online.
+the tongue is boneless but it breaks bones.12! 
+google is the best tools for search keyword.
+The year ahead will test our political establishment to the limit.
+PI=3.141592653589793238462643383249901429
+a wood cross!
+Actions speak louder than words
+
+#woood # 
+#woooooood # 
+AxyzxyzxyzxyzC
+I bet this place is really spooky late at night! 
+Misfortunes never come alone/single.
+I shouldn't have lett so tast.
+</code></pre>
+
+<h2 id="3-1-输出符合条件的文本">3.1：输出符合条件的文本</h2>
+
+<pre><code>#输出第三行
+[root@server ~]# sed -n '3p' test.txt 
+The home of Football on BBC Sport online.
+#输出3-5行
+[root@server ~]# sed -n '3,5p' test.txt 
+The home of Football on BBC Sport online.
+the tongue is boneless but it breaks bones.12! 
+google is the best tools for search keyword.
+#输出所有奇数行，n表示读入下一行
+[root@server ~]# sed -n 'p;n' test.txt 
+he was short and fat.
+The home of Football on BBC Sport online.
+google is the best tools for search keyword.
+PI=3.141592653589793238462643383249901429
+Actions speak louder than words
+#woood # 
+AxyzxyzxyzxyzC
+Misfortunes never come alone/single.
+#输出所有偶数行，n表示读入下一行
+[root@server ~]# sed -n 'n;p' test.txt 
+He was wearing a blue polo shirt with black pants. 
+the tongue is boneless but it breaks bones.12! 
+The year ahead will test our political establishment to the limit.
+a wood cross!
+
+#woooooood # 
+I bet this place is really spooky late at night! 
+I shouldn't have lett so tast.
+#输出第 1~5 行之间的奇数行(第 1、3、5 行) 
+[root@server ~]# sed -n '1,5{p;n}' test.txt 
+he was short and fat.
+The home of Football on BBC Sport online.
+google is the best tools for search keyword.
+#输出第 10 行至文件尾之间的偶数行
+[root@server ~]# sed -n '10,${n;p}' test.txt 
+#woood # 
+AxyzxyzxyzxyzC
+Misfortunes never come alone/single.
+</code></pre>
+
+<p>在执行“sed -n‘10,${n;p}’test.txt”命令时，读取的第 1 行是文件的第 10 行，读取的第 2行是文件的第 11
+行，依此类推，所以输出的偶数行是文件的第 11 行、13 行直至文件结尾， 其中包括空行。</p>
+
+<p>sed 命令结合正则表达式时，格式略有不同，正则表达式以“/”包围。</p>
+
+<pre><code>#输出包含the 的行
+[root@server ~]# sed -n '/the/p' test.txt 
+the tongue is boneless but it breaks bones.12! 
+google is the best tools for search keyword.
+The year ahead will test our political establishment to the limit.
+#输出从第 4 行至第一个包含 the 的行
+[root@server ~]# sed -n '4,/the/p' test.txt 
+the tongue is boneless but it breaks bones.12! 
+google is the best tools for search keyword.
+#输出包含the 的行所在的行号,等号(=)用来输出行号
+[root@server ~]# sed -n '/the/=' test.txt 
+4
+5
+6
+#输出以PI 开头的行
+[root@server ~]# sed -n '/^PI/P' test.txt 
+PI=3.141592653589793238462643383249901429
+#输出以数字结尾的行
+[root@server ~]# sed -n '/[0-9]$/P' test.txt 
+PI=3.141592653589793238462643383249901429
+#输出包含单词wood 的行,\代表单词边界
+[root@server ~]# sed -n '/\/P' test.txt 
+a wood cross!
+</code></pre>
+
+<h2 id="3-2-删除符合条件的文本-d">3.2：删除符合条件的文本（d）</h2>
+
+<pre><code>#nl命令用于计算文件的行数
+[root@server ~]# nl test.txt | sed '3d'   #删除第三行
+[root@server ~]# nl test.txt | sed '3,5d'   #删除第 3~5 行
+[root@server ~]# nl test.txt |sed '/cross/d'  #删除包含cross的行
+[root@server ~]# nl test.txt |sed '/cross/!d'  #删除不包含cross的行
+[root@server ~]# sed '/^[a-z]/d' test.txt   #删除以小写字母开头的行
+[root@server ~]# sed '/\.$/d' test.txt    #删除以&quot;.&quot;结尾的行
+[root@server ~]# sed '/^$/d' test.txt     #删除所有空行
+[root@server ~]# sed  -e '/^$/{n;/^$/d}' test.txt     #删 除 重 复 的 空行 ， 即 连 续 的 空 行 只 保 留 一 个
+</code></pre>
+
+<h2 id="3-3-替换符合条件的文本">3.3：替换符合条件的文本</h2>
+
+<p>在使用 sed 命令进行替换操作时需要用到 s（字符串替换）、c（整行/整块替换）、y（字符转换）命令选项，常见的用法如下所示:</p>
+
+<ul>
+<li>sed ‘s/the/THE/’ test.txt //将每行中的第一个the 替换为 THE</li>
+<li>sed ‘s/l/L/2’ test.txt //将每行中的第 2 个 l 替换为 L</li>
+<li>sed ‘s/the/THE/g’ test.txt //将文件中的所有the 替换为 THE</li>
+<li>sed ‘s/o//g’ test.txt //将文件中的所有o 删除(替换为空串)</li>
+<li>sed ‘s/^/#/’ test.txt //在每行行首插入#号</li>
+<li>sed ‘/the/s/^/#/’ test.txt //在包含the 的每行行首插入#号</li>
+<li>sed ‘s/$/EOF/’ test.txt //在每行行尾插入字符串EOF</li>
+<li>sed ‘3,5s/the/THE/g’ test.txt //将第 3~5 行中的所有 the 替换为 THE</li>
+<li>sed ‘/the/s/o/O/g’ test.txt //将包含the 的所有行中的 o 都替换为 O</li>
+</ul>
+
+<h2 id="3-4-迁移符合条件的文本">3.4：迁移符合条件的文本</h2>
+
+<ul>
+<li>sed ‘/the/{H;d};$G’ test.txt //将包含the 的行迁移至文件末尾,{;}用于多个操作</li>
+<li>sed ‘1,5{H;d};17G’ test.txt //将第 1~5 行内容转移至第 17 行后</li>
+<li>sed ‘/the/w out.file’ test.txt //将包含the 的行另存为文件 out.file</li>
+<li>sed ‘/the/r /etc/hostname’ test.txt //将文件/etc/hostname 的内容添加到包含 the 的每行以后</li>
+<li>sed ‘3aNew’ test.txt //在第 3 行后插入一个新行,内容为New</li>
+<li>sed ‘/the/aNew’ test.txt //在包含the 的每行后插入一个新行,内容为 New</li>
+<li>sed ‘3aNew1\nNew2’ test.txt //在第 3 行后插入多行内容,中间的\n 表示换行</li>
+</ul>
+
+<h2 id="3-5-使用脚本编辑文件">3.5：使用脚本编辑文件</h2>
+
+<p>使用 sed 脚本将多个编辑指令存放到文件中（每行一条编辑指令），通过“-f”选项来调用。例如执行以下命令即可将第 1~5 行内容转移至第 17 行后。<br />
+sed ‘1,5{H;d};17G’ test.txt #将第 1~5 行内容转移至第 17 行后<br />
+以上操作可以改用脚本文件方式：</p>
+
+<pre><code>[root@localhost ~]# vi opt.list
+1,5H
+1,5d
+17G
+[root@localhost ~]# sed -f opt.list test.txt
+The year ahead will test our political establishment to the limit.
+PI=3.141592653589793238462643383249901429
+a wood cross!
+Actions speak louder than words
+
+
+#woood # #woooooood # AxyzxyzxyzxyzC
+I bet this place is really spooky late at night! Misfortunes never come alone/single.
+I shouldn't have lett so tast.
+
+
+he was short and fat.
+He was wearing a blue polo shirt with black pants. The home of Football on BBC Sport online.
+the tongue is boneless but it breaks bones.12! google is the best tools for search keyword.
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

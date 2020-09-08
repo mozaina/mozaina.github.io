@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用shell脚本自动部署发布重起mavenjava项目 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用shell脚本自动部署发布重起mavenjava项目 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用shell脚本自动部署发布重起mavenjava项目">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8shell%E8%84%9A%E6%9C%AC%E8%87%AA%E5%8A%A8%E9%83%A8%E7%BD%B2%E5%8F%91%E5%B8%83%E9%87%8D%E8%B5%B7mavenjava%E9%A1%B9%E7%9B%AE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用shell脚本自动部署发布重起mavenjava项目</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>项目结构如下图</p>
+
+<p><a href="https://img.it610.com/image/info8/3389040d9b4a400fa031649074c89dba.jpg"><img src="https://img.it610.com/image/info8/3389040d9b4a400fa031649074c89dba.jpg" alt="使用shell脚本自动部署（发布，重起）maven\(java\)项目_第1张图片" /></a></p>
+
+<p>一：系统环境</p>
+
+<p>本机:10.4.18.3</p>
+
+<p>服务器: 10.4.18.4，用户名: web02</p>
+
+<p>二：初始化服务器环境</p>
+
+<p>在服务器上的家目录创建目录deploy,deploy/profile</p>
+
+<p>mkdir -p /home/web01/deploy</p>
+
+<p>mkdir -p /home/web02/deploy/profile</p>
+
+<p>安装jdk</p>
+
+<p>export JAVA_HOME=/home/web02/jdk1.7.0_67</p>
+
+<p>三：源代码(这里演示了一个自己写的http web服务器)</p>
+
+<p>com.lala.server.Server.java</p>
+
+<pre><code>package com.lala.server;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Executors;
+
+import com.google.gson.Gson;
+import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+
+public class Server 
+{
+    public void httpserverService() throws IOException 
+    {  
+        String hr = &quot;======================================================================&quot;;
+        System.out.println(&quot;&quot;);
+        System.out.println(hr);
+        int port = 17002;
+        InetSocketAddress addr = new InetSocketAddress(port);   
+        System.out.println(&quot;http server start at &quot; + port + &quot; ...&quot;);
+        HttpServer server = HttpServer.create(addr, 0);   
+        server.createContext(&quot;/gson&quot;, new GsonHandler());   
+        System.out.println(&quot;create path /gson&quot;);
+        server.createContext(&quot;/index&quot;, new MyHandler());   
+        System.out.println(&quot;create path /index&quot;);
+        server.setExecutor(Executors.newCachedThreadPool());   
+        server.start();   
+        System.out.println(&quot;start http server success at port [&quot; + port + &quot;]&quot;);
+        System.out.println(hr);
+    }
+}
+
+class MyHandler implements HttpHandler 
+{
+    @SuppressWarnings(&quot;deprecation&quot;)
+    public void handle(HttpExchange exchange) throws IOException 
+    {
+        Headers responseHeaders = exchange.getResponseHeaders();   
+        OutputStream responseBody = exchange.getResponseBody();   
+        responseHeaders.set(&quot;Content-Type&quot;, &quot;text/html;charset=UTF-8&quot;);   
+        String html = &quot;
+
+# 你好，现在是：&quot; + new Date().toLocaleString() + &quot;
+
+&quot;;
+        exchange.sendResponseHeaders(200, html.getBytes().length);
+        responseBody.write(html.getBytes());
+        responseBody.close();
+    }
+}
+
+class GsonHandler implements HttpHandler 
+{
+    public void handle(HttpExchange exchange) throws IOException 
+    {
+        Headers responseHeaders = exchange.getResponseHeaders();   
+        OutputStream responseBody = exchange.getResponseBody();   
+        responseHeaders.set(&quot;Content-Type&quot;, &quot;application/json;charset=UTF-8&quot;);   
+        Map map = new HashMap();
+        map.put(&quot;id&quot;, &quot;10083&quot;);
+        map.put(&quot;name&quot;, &quot;CMCC&quot;);
+        map.put(&quot;nick&quot;, &quot;china mobile&quot;);
+        String html = null;
+        try
+        {
+            Gson g = new Gson();
+            html = g.toJson(map);
+        }catch(Exception e)
+        {
+            e.printStackTrace();
+            html = &quot;{code : 500, msg : '&quot;+e.getMessage()+&quot;'}&quot;;
+        }
+        exchange.sendResponseHeaders(200, html.getBytes().length);
+        responseBody.write(html.getBytes());
+        responseBody.close();
+    }
+}
+</code></pre>
+
+<p>com.lala.server.Start.java</p>
+
+<pre><code>package com.lala.server;
+
+import java.io.IOException;
+
+public class Start 
+{
+    public static void main(String[] args) throws IOException 
+    {
+        new Server().httpserverService();
+    }
+}
+</code></pre>
+
+<p>pom.xml</p>
+
+<pre><code>    4.0.0
+
+    com.lala
+    profile
+    0.0.1
+    jar
+
+    profile
+    http://maven.apache.org
+
+
+        UTF-8
+
+
+
+
+            junit
+            junit
+            4.10
+            test
+
+
+            org.postgresql
+            postgresql
+            9.3-1102-jdbc4
+
+
+            com.google.code.gson
+            gson
+            2.3.1
+
+
+
+
+
+
+            dev
+
+                dev
+
+
+                true
+
+
+
+
+
+            test
+
+                test
+
+
+
+
+
+            production
+
+                production
+
+
+
+
+
+
+
+
+
+                ${project.basedir}/src/main/resources/${env}
+
+                    *.*
+
+                true
+
+
+                ${project.basedir}/src/main/resources/
+
+                    logback.xml
+
+                true
+
+
+
+
+
+
+                maven-compiler-plugin
+                3.2
+
+                    1.7
+                    1.7
+
+
+
+                org.apache.maven.plugins
+                maven-war-plugin
+                2.5
+
+                    tiles
+
+                        false
+
+
+
+                            src/main/resources/${env}/application.properties
+                            true
+
+
+
+
+
+                org.apache.maven.plugins
+                maven-jar-plugin
+                2.5
+
+
+
+                            true
+                            /home/web02/deploy/profile/current/lib/
+                            com.lala.server.Start
+
+
+
+
+
+                org.apache.maven.plugins
+                maven-dependency-plugin
+                2.9
+
+
+                        copy
+                        package
+
+                            copy-dependencies
+
+
+                            ${project.build.directory}/lib
+                            false
+                            false
+</code></pre>
+
+<p>deploy.sh</p>
+
+<pre><code>#!/bin/sh
+
+echo &quot;============*******************=================&quot;
+echo &quot;============ java 自动部署脚本 =================&quot;
+echo &quot;============*******************=================&quot;
+
+read -p &quot;请输入将要部署的ip(例如:10.4.18.4): &quot; ip
+read -p &quot;请输入部署的分支名称(例如:master): &quot; branch
+read -p &quot;请输入部署的环境(例如:product|test|dev): &quot; env
+read -p &quot;请输入程序操作(例如:start|stop|restart|info|status): &quot; handle
+read -p &quot;是否需要从远程仓库pull代码(例如:y|n): &quot; pull
+
+ip=${ip:-10.4.18.4}
+branch=${branch:-master}
+env=${env:-dev}
+handle=${handle:-restart}
+pull=${pull:-n}
+
+echo $ip $branch $env $handle $pull
+
+user=web02
+applicationName=profile
+myProject=.
+rootDir=/home/${user}/deploy
+project=$rootDir/$applicationName
+appName=$applicationName-0.0.1.jar
+jar_file=$myProject/target/$appName
+
+if [ $pull == 'y' ];then
+    git checkout $branch
+    git pull origin $branch
+fi
+
+mvn clean package -P${env}
+
+scp -r target/lib $user@$ip:$project/
+scp $jar_file deploy/apiService.sh $user@$ip:$project/
+ssh $user@$ip sh $project/apiService.sh $handle $project $appName
+</code></pre>
+
+<p>deploy/apiService.sh</p>
+
+<pre><code>#!/bin/sh
+
+#警告!!!：该脚本stop部分使用系统kill命令来强制终止指定的java程序进程。
+#在杀死进程前，未作任何条件检查。在某些情况下，如程序正在进行文件或数据库写操作，
+#可能会造成数据丢失或数据不完整。如果必须要考虑到这类情况，则需要改写此脚本，
+
+JAVA_HOME=/home/web02/jdk1.7.0_67
+
+#执行程序启动所使用的系统用户，考虑到安全，不推荐使用root帐号
+RUNNING_USER=web02
+
+#Java程序所在的目录（classes的上一级目录）
+APP_HOME=$2
+
+#需要启动的Java主程序（main方法类）
+APP_MAINCLASS=$3
+
+#java虚拟机启动参数
+JAVA_OPTS=&quot;-ms512m -mx512m -Xmn256m -Djava.awt.headless=true -XX:MaxPermSize=128m -Xdebug -Xrunjdwp:transport=dt_socket,address=17003,server=y,suspend=n&quot;
+
+mkdir -p $APP_HOME/release
+mkdir -p $APP_HOME/current
+
+releaseFile=$APP_HOME/release/$APP_MAINCLASS-`date  &quot;+%Y-%m-%d_%H:%M:%S&quot;`
+
+#备份之前的代码
+cp -r $APP_HOME/$APP_MAINCLASS $releaseFile
+rm -rf $APP_HOME/current/$APP_MAINCLASS
+rm -rf $APP_HOME/current/lib
+ln -s $releaseFile $APP_HOME/current/$APP_MAINCLASS
+rm -rf $APP_HOME/$APP_MAINCLASS
+mv $APP_HOME/lib $APP_HOME/current/
+cd $APP_HOME/current
+
+psid=0
+
+checkpid() {
+   javaps=`$JAVA_HOME/bin/jps -l | grep $APP_MAINCLASS`
+   if [ -n &quot;$javaps&quot; ]; then
+      psid=`echo $javaps | awk '{print $1}'`
+   else
+      psid=0
+   fi
+}
+
+###################################
+#(函数)启动程序
+#说明：
+#1. 首先调用checkpid函数，刷新$psid全局变量
+#2. 如果程序已经启动（$psid不等于0），则提示程序已启动
+#3. 如果程序没有被启动，则执行启动命令行
+#4. 启动命令执行后，再次调用checkpid函数
+#5. 如果步骤4的结果能够确认程序的pid,则打印[OK]，否则打印[Failed]
+#注意：echo -n 表示打印字符后，不换行
+###################################
+
+start() {
+   checkpid
+   if [ $psid -ne 0 ]; then
+      echo &quot;================================&quot;
+      echo &quot;warn: $APP_MAINCLASS already started! (pid=$psid)&quot;
+      echo &quot;================================&quot;
+   else
+      echo -n &quot;Starting $APP_MAINCLASS ...&quot;
+      nohup $JAVA_HOME/bin/java $JAVA_OPTS -jar $APP_HOME/current/$APP_MAINCLASS &amp;
+      checkpid
+      if [ $psid -ne 0 ]; then
+         echo &quot;(pid=$psid) [OK]&quot;
+      else
+         echo &quot;[Failed]&quot;
+      fi
+   fi
+}
+
+###################################
+#说明：
+#1. 首先调用checkpid函数，刷新$psid全局变量
+#2. 如果程序已经启动（$psid不等于0），则开始执行停止，否则，提示程序未运行
+#3. 使用kill -9 pid命令进行强制杀死进程
+#4. 执行kill命令行紧接其后，马上查看上一句命令的返回值: $?
+#5. 如果步骤4的结果$?等于0,则打印[OK]，否则打印[Failed]
+#6. 为了防止java程序被启动多次，这里增加反复检查进程，反复杀死的处理（递归调用stop）。
+#注意: 在shell编程中，&quot;$?&quot; 表示上一句命令或者一个函数的返回值
+###################################
+stop() {
+   checkpid
+   if [ $psid -ne 0 ]; then
+      echo -n &quot;Stopping $APP_MAINCLASS ...(pid=$psid) &quot;
+      kill -9 $psid
+      if [ $? -eq 0 ]; then
+         echo &quot;[OK]&quot;
+      else
+         echo &quot;[Failed]&quot;
+      fi
+
+      checkpid
+      if [ $psid -ne 0 ]; then
+         stop
+      fi
+   else
+      echo &quot;================================&quot;
+      echo &quot;warn: $APP_MAINCLASS is not running&quot;
+      echo &quot;================================&quot;
+   fi
+}
+
+###################################
+#说明：
+#1. 首先调用checkpid函数，刷新$psid全局变量
+#2. 如果程序已经启动（$psid不等于0），则提示正在运行并表示出pid
+#3. 否则，提示程序未运行
+###################################
+status() {
+   checkpid
+   if [ $psid -ne 0 ];  then
+      echo &quot;$APP_MAINCLASS is running! (pid=$psid)&quot;
+   else
+      echo &quot;$APP_MAINCLASS is not running&quot;
+   fi
+}
+
+###################################
+#(函数)打印系统环境参数
+###################################
+info() {
+   echo &quot;System Information:&quot;
+   echo &quot;****************************&quot;
+   echo `head -n 1 /etc/issue`
+   echo `uname -a`
+   echo
+   echo &quot;JAVA_HOME=$JAVA_HOME&quot;
+   echo `$JAVA_HOME/bin/java -version`
+   echo
+   echo &quot;APP_HOME=$APP_HOME&quot;
+   echo &quot;APP_MAINCLASS=$APP_MAINCLASS&quot;
+   echo &quot;****************************&quot;
+}
+
+###################################
+#读取脚本的第一个参数($1)，进行判断
+#参数取值范围：{start|stop|restart|status|info}
+#如参数不在指定范围之内，则打印帮助信息
+###################################
+case &quot;$1&quot; in
+   'start')
+      start
+      ;;
+   'stop')
+     stop
+     ;;
+   'restart')
+     stop
+     start
+     ;;
+   'status')
+     status
+     ;;
+   'info')
+     info
+     ;;
+  *)
+     echo &quot;Usage: $0 {start|stop|restart|status|info}&quot;
+     exit 1
+esac
+exit 0
+</code></pre>
+
+<p>四：注意事项</p>
+
+<p>1：pom.xml里面的/home/web02/deploy/profile/current/lib/需要和服务器的发布目录保持一致，否则会找不到jar</p>
+
+<p>2：pom.xml里面的profiles配置用法，请参照我的上一篇博客</p>
+
+<p>五：用法</p>
+
+<p>去到项目的根目录执行</p>
+
+<p>sh deploy.sh 按照提示输入即可自动部署（发布，重起）</p>
+
+<p>发布成功之后，在浏览器中输入</p>
+
+<p><a href="http://10.4.18.4:17002/index">http://10.4.18.4:17002/index</a></p>
+
+<p><a href="http://10.4.18.4:17002/gson">http://10.4.18.4:17002/gson</a></p>
+
+<p>即可看到结果</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本实现查找文件夹下重复的文件并提供删除功能 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本实现查找文件夹下重复的文件并提供删除功能 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本实现查找文件夹下重复的文件并提供删除功能">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0%E6%9F%A5%E6%89%BE%E6%96%87%E4%BB%B6%E5%A4%B9%E4%B8%8B%E9%87%8D%E5%A4%8D%E7%9A%84%E6%96%87%E4%BB%B6%E5%B9%B6%E6%8F%90%E4%BE%9B%E5%88%A0%E9%99%A4%E5%8A%9F%E8%83%BD/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本实现查找文件夹下重复的文件并提供删除功能</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>Windows下有软件FindDupFile，可以搜索指定目录及其下子目录，列出所有内容完全相同的文件（文件名可能不同），然后由用户选择删除重复的文件。</p>
+
+<p>然而shell脚本却可以使用几行的命令完成与此相同的工作，借助windows下的shell脚本工具Cygwin，可以实现扫描Windows下的目录，原理简述如下：</p>
+
+<p>1.首先借助find命令扫描文件夹下类型为普通文件的所有文件，find命令的输出是一行一个文件</p>
+
+<p>2.对find找到的所有文件进行MD5校验，校验命令为md5sum files，输出文本格式为：MD5SUM *file</p>
+
+<p>3.内容的文件的md5校验值是相同的，所有对MD5SUM校验值进行相同值查询，因此使用awk的关联数组，将不相同的文件输出</p>
+
+<p>4.对awk输出重复的文件表进行删除。</p>
+
+<p>shell脚本如下:</p>
+
+<pre><code>#!/bin/bash -
+
+#查找文件夹下相同的文件
+#Usage: dupfile.sh [-ds] dirs
+#       dirs 请用单引号引起来
+
+del=0
+silent=0
+
+trap &quot;&quot; PIPE
+
+#参数处理
+while test $# -gt 0
+do
+    case $1 in
+        -d | --delete) 
+            del=1
+            ;;
+        -s | --silent)
+            silent=1
+            ;;
+        -*) 
+            break
+            ;;
+        *)  
+            break
+            ;;
+    esac
+    shift
+done
+
+if [ $# -eq 0 ]
+then
+    echo &quot;Usage: dupfile.sh [-ds] dirs&quot; &gt;&amp;2
+    exit 0
+fi
+
+#find查找所有文件并进行MD5校验,
+# md5sum对二进制文件输出为 MD5SUM *file
+#  awk使用关联数组处理相同的md5值并按照格式输出,使用DEL传递参数
+#   tee命令将管道拷贝一份到进程替换,另一份到stdout
+find &quot;$@&quot; -type f -exec md5sum {} + |  
+    awk -v FS=&quot;*&quot; -v DEL=$del -v SLT=$silent '
+        {
+            if($1 in md5)
+                md5[$1] = md5[$1] &quot;*&quot; $2
+            else
+                md5[$1] = $2
+        }
+        END{
+            for(key in md5)
+            {
+                if(DEL==0) K++
+                n = split(md5[key], files, &quot;*&quot;)
+                if(SLT==1 &amp;&amp; n==1) continue
+                if(DEL==0)
+                    printf(&quot;%-*s  %s\n&quot;, length(key), key, files[n])
+                for(n-- ;n&gt;0 ; n--)
+                {
+                    K++
+                    if(DEL==0)
+                        printf(&quot;%-*s  %s\n&quot;, length(key), &quot;&quot;, files[n])
+                    else
+                        printf(&quot;\&quot;%s\&quot;\n&quot;, files[n]) 
+                }
+            }
+            K = K&gt;0 ? K : 0
+            print &quot;Total: &quot; K &quot; files&quot; 
+        }' |
+            tee &gt;(
+                    if [ &quot;$del&quot; -eq 1 ]
+                    then
+                        xargs rm -f
+                    else
+                        tee &gt;/dev/null
+                    fi
+                 )
+</code></pre>
+
+<p>看看用Cygwin在Windows下的测试结果： （注意将列出的所有目录加单引号）</p>
+
+<p>首先，我在E盘test目录下创建10个临时文件，文件都为空，测试结果如下：</p>
+
+<pre><code>hp@hp-PC ~
+$ (cd 'E:/test'; i=0; while [ &quot;$i&quot; -lt 10 ] ; do mktemp &quot;./XXXXXX&quot; ; i=$((i+1)) ; done)
+./pOsdFm
+./5tndDZ
+./wjSDR2
+./oFrSaG
+./7zlZcA
+./9sNmEo
+./UVDQLR
+./qZdDNI
+./iwfYdn
+./IP52BK
+
+hp@hp-PC ~
+$ ./dupfile.sh 'E:/test'
+cygwin warning:
+  MS-DOS style path detected: E:/test
+  Preferred POSIX equivalent is: /cygdrive/e/test
+  CYGWIN environment variable option &quot;nodosfilewarning&quot; turns off this warning.
+  Consult the user's guide for more details about POSIX paths:
+    http://cygwin.com/cygwin-ug-net/using.html#using-pathnames
+d41d8cd98f00b204e9800998ecf8427e   E:/test/wjSDR2
+                                   E:/test/UVDQLR
+                                   E:/test/qZdDNI
+                                   E:/test/pOsdFm
+                                   E:/test/oFrSaG
+                                   E:/test/iwfYdn
+                                   E:/test/IP52BK
+                                   E:/test/9sNmEo
+                                   E:/test/7zlZcA
+                                   E:/test/5tndDZ
+Total: 10 files
+
+hp@hp-PC ~
+$
+</code></pre>
+
+<p>从结果中看出，已经完全的将10个重复的空文件完全查找出来。</p>
+
+<p>使用-d选项，则可以删除重复的，只保留其中的一个。</p>
+
+<pre><code>hp@hp-PC ~
+$ (cd 'E:/test' ; ls ;)
+5tndDZ  7zlZcA  9sNmEo  IP52BK  iwfYdn  oFrSaG  pOsdFm  qZdDNI  UVDQLR  wjSDR2
+
+hp@hp-PC ~
+$ ./dupfile.sh -d 'E:/test'
+&quot;E:/test/UVDQLR&quot;
+&quot;E:/test/qZdDNI&quot;
+&quot;E:/test/pOsdFm&quot;
+&quot;E:/test/oFrSaG&quot;
+&quot;E:/test/iwfYdn&quot;
+&quot;E:/test/IP52BK&quot;
+&quot;E:/test/9sNmEo&quot;
+&quot;E:/test/7zlZcA&quot;
+&quot;E:/test/5tndDZ&quot;
+Total: 9 files
+
+hp@hp-PC ~
+$ (cd 'E:/test' ; ls ;)
+wjSDR2
+</code></pre>
+
+<p>再测试一下不相同的情况，我在E:/test目录下，创建10个不相同的文件，每个文件内包含自己的文件名：</p>
+
+<pre><code>hp@hp-PC ~
+$ (cd 'E:/test'; i=0; while [ &quot;$i&quot; -lt 10 ] ; do name=`mktemp &quot;./XXXXXX&quot;` ; echo &quot;$name&quot; &gt; &quot;$name&quot; ; i=$((i+1)) ; done)
+
+hp@hp-PC ~
+$ ./dupfile.sh 'E:/test'
+26288eeea00c650ae612dcf5b0efa5ab   E:/test/wBMk5c
+6f28a86738b227553b116914befd7b55   E:/test/lOT1Yd
+1bc7d2563796cf63c7f0d68affb190ef   E:/test/haDFBY
+679bc5d2d3e17761185ed82d43fd7d4a   E:/test/CHOmSd
+aaefa81fafd87bf3c3378ef02e22ef5a   E:/test/yZ635B
+e13b59ae07a9fd0e0a8095701c4003b2   E:/test/QdWtsN
+ae2eabc1232111d9f12190b3a62d60bf   E:/test/13PWOU
+621d060c7c313f06eff1ce21a6b25f0c   E:/test/sql7KV
+7108830bbf019166d4af9a10030384f3   E:/test/lxGd5y
+6dc2d2815a69f8a754503f1301e1cbcb   E:/test/efUo7c
+Total: 10 files
+</code></pre>
+
+<p>看到，列出的全部是不相同的文件，当文件数目比较多的时候，可以使用-s选项，静默输出，只列出重复的文件，不重复的文件则不列出。</p>
+
+<p>最后，有个耐人寻味的问题，我在测试中发现，dupfile程序最后的管道末端的 tee &gt;(&hellip;.)
+命令会莫名奇妙的终止，脚本的退出码为141，对应的是SIGPIPE信号。</p>
+
+<p>我原先的脚本最后是这样写的：</p>
+
+<pre><code>            tee &gt;(
+                    if [ &quot;$del&quot; -eq 1 ]
+                    then
+                        xargs rm -f
+                    fi
+                 )
+</code></pre>
+
+<p>分析得到，&gt;( &hellip; ) 这样的进程替换的实现原理是通过命名管道来做的，首先将 &gt;( &hellip; ) 此位置替换为 /dev/fd/63
+或其他的命名管道文件，然后启动新的bash程序，来执行 &gt;( &hellip; ) 中的命令部分，而且bash程序的标准输入被替换为 /dev/fd/63
+的管道输出端。而此时，为什么会触发SIGPIPE信号？</p>
+
+<p>括号内部的命令部分是个判断语句，当判断为否定的时候，xargs命令不会执行，因此启动的bash程序就退出了，此时就造成，tee命令向 /dev/fd/63
+这个管道端写的时候收到SIGPIPE信号，改正的做法是，要么保证 启动的bash程序不会退出，加一个else语句，tee &gt;/dev/null
+，要么就是忽略SIGPIPE信号，加上trap &ldquo;&rdquo; SIGPIPE就可以，同时将tee命令的stderr输出忽略 tee 2&gt;/dev/null &gt; (
+&hellip; )。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

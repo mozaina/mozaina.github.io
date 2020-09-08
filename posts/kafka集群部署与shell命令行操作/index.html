@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Kafka集群部署与shell命令行操作 | 开发者问答集锦</title>
+    <meta property="og:title" content="Kafka集群部署与shell命令行操作 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Kafka集群部署与shell命令行操作">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/kafka%E9%9B%86%E7%BE%A4%E9%83%A8%E7%BD%B2%E4%B8%8Eshell%E5%91%BD%E4%BB%A4%E8%A1%8C%E6%93%8D%E4%BD%9C/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Kafka集群部署与shell命令行操作</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>1、kafka简介</strong><br />
+在流式计算中，Kafka一般用来缓存数据，Storm通过消费Kafka的数据进行计算。</p>
+
+<p>KAFKA + STORM +REDIS</p>
+
+<p>1、Apache Kafka是一个开源消息系统，由Scala写成。是由Apache软件基金会开发的一个开源消息系统项目。<br />
+2、Kafka最初是由LinkedIn开发，并于2011年初开源。2012年10月从Apache
+Incubator毕业。该项目的目标是为处理实时数据提供一个统一、高通量、低等待的平台。<br />
+3、Kafka是一个分布式消息队列：生产者、消费者的功能。它提供了类似于JMS的特性，但是在设计实现上完全不同，此外它并不是JMS规范的实现。<br />
+4、Kafka对消息保存时根据Topic进行归类，发送消息者称为Producer,消息接受者称为Consumer,此外kafka集群有多个kafka实例组成，每个实例(server)称为broker。<br />
+5、无论是kafka集群，还是producer和consumer都依赖于zookeeper集群保存一些meta信息，来保证系统可用性<br />
+注：类JMS消息队列，结合JMS中的两种模式，可以有多个消费者主动拉取数据，在JMS中只有点对点模式才有消费者主动拉取数据。<br />
+<strong>2、kafka集群部署</strong><br />
+kafka集群跟storm集群类似，分为：下载安装包、解压安装包、修改配置文件、分发安装包（之后需要在各个机器上再次修改配置文件）、启动集群。</p>
+
+<p>准备工作<br />
+这里使用三台机器进行集群:mini1,mini2,mini3<br />
+关闭防火墙，各机器的hosts文件如下</p>
+
+<pre><code>127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6 localhost.jinbm
+192.168.25.127 mini1
+192.168.25.129 mini2
+192.168.25.130 mini3
+</code></pre>
+
+<p>1、下载安装包并上传到mini1机器上，这里下载的是 kafka_2.11-0.8.2.0.tgz；<br />
+2、解压安装包导指定目录，我这台机器的apps目录下安装了很多大数据相关的软件，所以解压到该目录了，并且重命名。</p>
+
+<pre><code>[root@mini1 ~]# tar -zxvf kafka_2.11-0.8.2.0.tgz -C apps/
+[root@mini1 ~]# cd apps/
+[root@mini1 apps]# ll
+总用量 28
+drwxr-xr-x.  8 root   root   4096 10月 19 15:15 apache-flume-1.6.0-bin
+drwxrwxr-x. 10 hadoop hadoop 4096 9月  30 22:04 hadoop-2.6.4
+drwxr-xr-x.  7 root   root   4096 10月 30 00:20 hbase
+drwxr-xr-x.  8 root   root   4096 10月 17 12:38 hive
+drwxr-xr-x.  5 root   root   4096 1月  29 2015 kafka_2.11-0.8.2.0
+drwxr-xr-x. 10 root   root   4096 10月 30 15:34 storm
+drwxr-xr-x. 10 root   root   4096 10月 29 23:21 zookeeper-3.4.6
+[root@mini1 apps]# mv kafka_2.11-0.8.2.0/ kafka
+[root@mini1 apps]# ll
+总用量 28
+drwxr-xr-x.  8 root   root   4096 10月 19 15:15 apache-flume-1.6.0-bin
+drwxrwxr-x. 10 hadoop hadoop 4096 9月  30 22:04 hadoop-2.6.4
+drwxr-xr-x.  7 root   root   4096 10月 30 00:20 hbase
+drwxr-xr-x.  8 root   root   4096 10月 17 12:38 hive
+drwxr-xr-x.  5 root   root   4096 1月  29 2015 kafka
+drwxr-xr-x. 10 root   root   4096 10月 30 15:34 storm
+drwxr-xr-x. 10 root   root   4096 10月 29 23:21 zookeeper-3.4.6
+</code></pre>
+
+<p>3、修改配置文件，进入kafka的config目录下，可以查看到各类配置文件，这里修改server.properties 。</p>
+
+<pre><code>[root@mini1 config]# ll
+总用量 32
+-rw-r--r--. 1 root root 1199 1月  29 2015 consumer.properties
+-rw-r--r--. 1 root root 3846 1月  29 2015 log4j.properties
+-rw-r--r--. 1 root root 2228 1月  29 2015 producer.properties
+-rw-r--r--. 1 root root 5559 1月  29 2015 server.properties
+-rw-r--r--. 1 root root 3325 1月  29 2015 test-log4j.properties
+-rw-r--r--. 1 root root  993 1月  29 2015 tools-log4j.properties
+-rw-r--r--. 1 root root 1023 1月  29 2015 zookeeper.properties
+[root@mini1 config]# vi server.properties 
+#broker的全局唯一编号，不能重复
+broker.id=0
+
+#用来监听链接的端口，producer或consumer将在此端口建立连接
+port=9092
+
+#处理网络请求的线程数量
+num.network.threads=3
+
+#用来处理磁盘IO的线程数量
+num.io.threads=8
+
+#发送套接字的缓冲区大小
+socket.send.buffer.bytes=102400
+
+#接受套接字的缓冲区大小
+socket.receive.buffer.bytes=102400
+
+#请求套接字的缓冲区大小
+socket.request.max.bytes=104857600
+
+#kafka运行日志存放的路径
+log.dirs=/root/apps/kafka
+
+#topic在当前broker上的分片个数
+num.partitions=2
+
+#用来恢复和清理data下数据的线程数量
+num.recovery.threads.per.data.dir=1
+
+#segment文件保留的最长时间，超时将被删除
+log.retention.hours=168
+
+#滚动生成新的segment文件的最大时间
+log.roll.hours=168
+
+#日志文件中每个segment的大小，默认为1G
+log.segment.bytes=1073741824
+
+#周期性检查文件大小的时间
+log.retention.check.interval.ms=300000
+
+#日志清理是否打开
+log.cleaner.enable=true
+
+#broker需要使用zookeeper保存meta数据
+zookeeper.connect=mini1:2181,mini2:2181,mini3:2181
+
+#zookeeper链接超时时间
+zookeeper.connection.timeout.ms=6000
+
+#partion buffer中，消息的条数达到阈值，将触发flush到磁盘
+log.flush.interval.messages=10000
+
+#消息buffer的时间，达到阈值，将触发flush到磁盘
+log.flush.interval.ms=3000
+
+#删除topic需要server.properties中设置delete.topic.enable=true否则只是标记删除
+delete.topic.enable=true
+
+#此处的host.name为本机IP(重要),如果不改,则客户端会抛出:Producer connection to localhost:9092 unsuccessful 错误!
+host.name=mini1
+</code></pre>
+
+<p>4、将mini1上的kafka分发到mini2和mini3上</p>
+
+<pre><code>[root@mini1 ~]# scp -r apps/kafka/ mini2:/root/apps/
+[root@mini1 ~]# scp -r apps/kafka/ mini3:/root/apps/
+</code></pre>
+
+<p>5、再次修改mini2和mini3上的配置文件server.properties，修改两处，一个是broker编号一个是主机名<br />
+mini2上如下</p>
+
+<pre><code>#broker的全局唯一编号，不能重复
+broker.id=1
+#此处的host.name为本机IP(重要),如果不改,则客户端会抛出:Producer connection to localhost:9092 unsuccessful 错误!
+host.name=mini2
+</code></pre>
+
+<p>mini3上如下</p>
+
+<pre><code>#broker的全局唯一编号，不能重复
+broker.id=2
+#此处的host.name为本机IP(重要),如果不改,则客户端会抛出:Producer connection to localhost:9092 unsuccessful 错误!
+host.name=mini3
+</code></pre>
+
+<p>6、到这里配置完了，但是为了不进入kafka的bin目录下就能执行命令行操作，所以需要修改环境变量。三台机器上修改均如下(添加最后两行)</p>
+
+<pre><code>[root@mini1 ~]# vi /etc/profile
+...
+JAVA_HOME=/heima32/jdk1.7.0_55/
+HADOOP_HOME=/root/apps/hadoop-2.6.4
+export PATH=$JAVA_HOME/bin:$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+export HBASE_HOME=/root/apps/hbase
+export PATH=$PATH:$HBASE_HOME/bin
+export STORM_HOME=/root/apps/storm
+export PATH=$PATH:$STORM_HOME/bin
+export KAFKA_HOME=/root/apps/kafka
+export PATH=$PATH:$KAFKA_HOME/bin
+</code></pre>
+
+<p>7、启动集群<br />
+依次启动mini1，mini2和mini3上的kafka（进入kafka安装目录执行以下命令）</p>
+
+<pre><code>[root@mini1 kafka]# bin/kafka-server-start.sh config/server.properties
+</code></pre>
+
+<p><strong>3、kafka命令行操作</strong><br />
+1、创建topic（注：因为修改了环境变量，所以不管有没有进入bin目录都能执行相应命令行操作）<br />
+参数表示：指定副本数，使用几个partition（分片），topic名称</p>
+
+<pre><code>[root@mini1 bin]# ./kafka-topics.sh --create --zookeeper mini1:2181 --replication-factor 2 --partitions 3 --topic orderMq
+Created topic &quot;orderMq&quot;.
+[root@mini1 kafka]# kafka-topics.sh --create --zookeeper mini1:2181 --replication-factor 2 --partitions 3 --topic test
+Created topic &quot;test&quot;.
+</code></pre>
+
+<p>2、查看当前存在哪些topic</p>
+
+<pre><code>[root@mini1 kafka]# kafka-topics.sh --list --zookeeper mini1:2181
+orderMq
+test
+</code></pre>
+
+<p>3、删除指定topic</p>
+
+<pre><code>[root@mini1 kafka]# kafka-topics.sh --delete --zookeeper mini1:2181 --topic test
+Topic test is marked for deletion.
+Note: This will have no impact if delete.topic.enable is not set to true.
+[root@mini1 kafka]# kafka-topics.sh --list --zookeeper mini1:2181
+orderMq
+</code></pre>
+
+<p>4、通过shell命令行发送message(消息)</p>
+
+<pre><code>[root@mini1 bin]# kafka-console-producer.sh --broker-list mini1:9092 --topic orderMq
+hello tom
+hi jerry
+spring ^H
+hhaah
+xixi
+nini
+</code></pre>
+
+<p>5、通过shell命令行消费消息</p>
+
+<pre><code>[root@mini1 bin]# kafka-console-consumer.sh --zookeeper mini1:2181 -from-beginning --topic orderMq
+hello tom
+hi jerry
+spring 
+hhaah
+xixi
+nini
+</code></pre>
+
+<p>注：这里的生成和消费是同顺序的，但有时候是不会顺序一致的，只能保证消费一个partition里面的消息时是一致，消费多个partition（上面指定了消息被发送到了4个partition）里面的是不能保证顺序完全一致。</p>
+
+<p>6、查看某个topic的详情<br />
+orderMq这个topic有用了三个partition（自己创建的时候指定的），各自有2个副本（也是自己创建的时候指定的）以及对于的leader（用处后面讲）。</p>
+
+<pre><code>[root@mini2 bin]# ./kafka-topics.sh --topic orderMq --describe --zookeeper mini1:2181
+Topic:orderMq   PartitionCount:3        ReplicationFactor:2     Configs:
+        Topic: orderMq  Partition: 0    Leader: 2       Replicas: 2,0   Isr: 0,2
+        Topic: orderMq  Partition: 1    Leader: 0       Replicas: 0,1   Isr: 0,1
+        Topic: orderMq  Partition: 2    Leader: 1       Replicas: 1,2   Isr: 1,2
+</code></pre>
+
+<p>接下来再创建个topic并且查看详情（使用4个partition，两个副本），并且进入运行日志存放的路径查看</p>
+
+<pre><code>[root@mini2 bin]# kafka-topics.sh --create --zookeeper mini1:2181 --replication-factor 2 --partitions 4 --topic payment
+Created topic &quot;payment&quot;.
+[root@mini2 bin]# kafka-topics.sh --topic payment --describe --zookeeper mini1:2181
+Topic:payment   PartitionCount:4        ReplicationFactor:2     Configs:
+        Topic: payment  Partition: 0    Leader: 2       Replicas: 2,1   Isr: 2,1
+        Topic: payment  Partition: 1    Leader: 0       Replicas: 0,2   Isr: 0,2
+        Topic: payment  Partition: 2    Leader: 1       Replicas: 1,0   Isr: 1,0
+        Topic: payment  Partition: 3    Leader: 2       Replicas: 2,0   Isr: 2,0
+
+
+[root@mini1 kafka]# cd kafka-logs/
+[root@mini1 kafka-logs]# ll
+总用量 32
+-rw-r--r--. 1 root root    4 11月 21 22:34 cleaner-offset-checkpoint
+drwxr-xr-x. 2 root root 4096 11月 21 22:25 orderMq-0
+drwxr-xr-x. 2 root root 4096 11月 21 22:25 orderMq-1
+drwxr-xr-x. 2 root root 4096 11月 21 23:13 payment-1
+drwxr-xr-x. 2 root root 4096 11月 21 23:13 payment-2
+drwxr-xr-x. 2 root root 4096 11月 21 23:13 payment-3
+-rw-r--r--. 1 root root   64 11月 22 03:38 recovery-point-offset-checkpoint
+-rw-r--r--. 1 root root   64 11月 22 03:39 replication-offset-checkpoint
+[root@mini1 kafka-logs]# cd orderMq-1
+[root@mini1 orderMq-1]# ll
+总用量 4
+-rw-r--r--. 1 root root 10485760 11月 21 22:31 00000000000000000000.index
+-rw-r--r--. 1 root root      194 11月 21 22:39 00000000000000000000.log
+#00000000000000000000.log里面是发送的消息内容，乱码就没贴出来了。
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

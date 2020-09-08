@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>hadoop二HDFS概述shell操作客户端操作各种API操作以及hdfs读写流程 | 开发者问答集锦</title>
+    <meta property="og:title" content="hadoop二HDFS概述shell操作客户端操作各种API操作以及hdfs读写流程 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="hadoop二HDFS概述shell操作客户端操作各种API操作以及hdfs读写流程">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/hadoop%E4%BA%8Chdfs%E6%A6%82%E8%BF%B0shell%E6%93%8D%E4%BD%9C%E5%AE%A2%E6%88%B7%E7%AB%AF%E6%93%8D%E4%BD%9C%E5%90%84%E7%A7%8Dapi%E6%93%8D%E4%BD%9C%E4%BB%A5%E5%8F%8Ahdfs%E8%AF%BB%E5%86%99%E6%B5%81%E7%A8%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">hadoop二HDFS概述shell操作客户端操作各种API操作以及hdfs读写流程</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<blockquote>
+<p>hadoop系列笔记<br />
+ hadoop（一）入门、hadoop架构、集群环境搭建.<br />
+ hadoop（二）HDFS概述、shell操作、客户端操作（各种API操作）以及hdfs读写流程.<br />
+ hadoop（三）hdfs的NameNode和DataNode工作机制.<br />
+ hadoop（四）MapReduce入门及序列化实操.<br />
+ hadoop（五）MapReduce框架原理及工作机制.<br />
+ hadoop（六）hadoop数据压缩、yarn架构及工作原理、hadoop企业优化.</p>
+</blockquote>
+
+<h3 id="文章目录">文章目录</h3>
+
+<ul>
+<li>第一章HDFS概述
+
+<ul>
+<li>1.1 HDFS产生背景</li>
+<li>1.2 HDFS概念</li>
+<li>1.3 HDFS优缺点
+
+<ul>
+<li>1.3.1 优点</li>
+<li>1.3.2 缺点</li>
+</ul></li>
+<li>1.4 HDFS组成架构</li>
+<li>1.5 HDFS文件块大小（面试重点）</li>
+</ul></li>
+<li>第2章 HDFS的Shell操作（开发重点）
+
+<ul>
+<li>2.1 基本语法</li>
+<li>2.2 hadoop fs常用命令</li>
+</ul></li>
+<li>第3章 HDFS客户端操作（开发重点）
+
+<ul>
+<li>3.1 HDFS客户端环境准备</li>
+<li>3.2 HDFS的API操作</li>
+</ul></li>
+<li>第四章HDFS的数据流（面试重点）
+
+<ul>
+<li>4.1HDFS 写数据流程</li>
+<li>4.2 HDFS读数据流程</li>
+</ul></li>
+</ul>
+
+<h1 id="第一章hdfs概述">第一章HDFS概述</h1>
+
+<h2 id="1-1-hdfs产生背景">1.1 HDFS产生背景</h2>
+
+<ul>
+<li>随着数据量越来越大，在一个操作系统管辖的范围内存不下了，那么就分配到更多的操作系统管理的磁盘中，但是不方便管理和维护，迫切需要一种系统来管理多台机器上的文件，这就是分布式文件管理系统。HDFS只是分布式文件管理系统中的一种。</li>
+</ul>
+
+<h2 id="1-2-hdfs概念">1.2 HDFS概念</h2>
+
+<ul>
+<li>HDFS（Hadoop Distributed File System）， <strong>它是一个文件系统</strong> ，用于存储文件，通过目录树来定位文件； <strong>其次，它是分布式的</strong> ，由很多服务器联合起来实现其功能，集群中的服务器有各自的角色。</li>
+<li>HDFS 使用场景：HDFS的设计适合一次写入，多次读出的场景，且不支持文件的修改。适合用来做数据分析，并不适合用来做网盘应用。</li>
+</ul>
+
+<h2 id="1-3-hdfs优缺点">1.3 HDFS优缺点</h2>
+
+<h3 id="1-3-1-优点">1.3.1 优点</h3>
+
+<ul>
+<li><p>1）高容错性<br />
+（1）数据自动保存多个副本。它通过增加副本的形式，提高容错性。<br />
+（2）某一个副本丢失以后，它可以自动恢复。</p></li>
+
+<li><p>2）适合大数据处理<br />
+（1）数据规模：能够处理数据规模达到 GB、TB、甚至PB级别的数据。<br />
+（2）文件规模：能够处理百万规模以上的文件数量，数量相当之大。</p></li>
+
+<li><p>3）流式数据访问，它能保证数据的一致性。</p></li>
+
+<li><p>4）可构建在廉价机器上，通过多副本机制，提高可靠性。</p></li>
+</ul>
+
+<h3 id="1-3-2-缺点">1.3.2 缺点</h3>
+
+<ul>
+<li>1） <strong>不适合低延时数据访问</strong> ，比如毫秒级的存储数据，是做不到的。</li>
+
+<li><p>2） <strong>无法高效的对大量小文件进行存储</strong><br />
+（1）存储大量小文件的话，它会占用 NameNode大量的内存来存储文件、目录和块信息。这样是不可取的，因为NameNode的内存总是有限的。<br />
+（2）小文件存储的寻道时间会超过读取时间，它违反了HDFS的设计目标。</p></li>
+
+<li><p>3）并发写入、文件随机修改<br />
+（1）一个文件只能有一个写，不允许多个线程同时写。<br />
+（2） <strong>仅支持数据 append（追加）</strong> ，不支持文件的随机修改。</p></li>
+</ul>
+
+<h2 id="1-4-hdfs组成架构">1.4 HDFS组成架构</h2>
+
+<p><a href="https://img.it610.com/image/info8/46ff7290546e46d3967a516c0d5d6a6f.jpg"><img src="https://img.it610.com/image/info8/46ff7290546e46d3967a516c0d5d6a6f.jpg" alt="hadoop（二）HDFS概述、shell操作、客户端操作（各种API操作）以及hdfs读写流程_第1张图片" /></a></p>
+
+<ul>
+<li><p>1）Client：就是客户端。<br />
+（1）文件切分。文件上传 HDFS 的时候，Client 将文件切分成一个一个的Block，然后进行存储。<br />
+（2）与NameNode交互，获取文件的位置信息。<br />
+（3）与DataNode交互，读取或者写入数据。<br />
+（4）Client提供一些命令来管理HDFS，比如启动或者关闭HDFS。<br />
+（5）Client可以通过一些命令来访问HDFS。</p></li>
+
+<li><p>2） <strong>NameNode</strong> ：就是Master，它是一个主管、管理者。<br />
+（1）管理HDFS的名称空间。<br />
+（2）管理数据块（Block）映射信息<br />
+（3）配置副本策略<br />
+（4）处理客户端读写请求。</p></li>
+
+<li><p>3）DataNode：就是Slave，NameNode下达命令，DataNode执行实际的操作。<br />
+（1）存储实际的数据块。<br />
+（2）执行数据块的读/写操作。</p></li>
+
+<li><p>4）Secondary NameNode：并非NameNode的热备。当NameNode挂掉的时候，它并不能马上替换NameNode并提供服务。<br />
+（1）辅助NameNode，分担其工作量。<br />
+（2）定期合并Fsimage和Edits，并推送给NameNode。<br />
+这时都会疑问secondary NameNode存在的意义，请看Secondary NameNode存在的意义，与NameNode的区别.</p></li>
+</ul>
+
+<h2 id="1-5-hdfs文件块大小-面试重点">1.5 HDFS文件块大小（面试重点）</h2>
+
+<ul>
+<li>HDFS中的文件在物理上是分块存储（block），块的大小可以通过配置参数( dfs.blocksize)来规定，默认大小在hadoop2.x版本中是128M，老版本中是64M。<br />
+<a href="https://img.it610.com/image/info8/603e125fe45c4d0599fd2771cfa3801e.jpg"><img src="https://img.it610.com/image/info8/603e125fe45c4d0599fd2771cfa3801e.jpg" alt="hadoop（二）HDFS概述、shell操作、客户端操作（各种API操作）以及hdfs读写流程_第2张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/6f63695cc0194b44b0ecd6550ef8b430.jpg"><img src="https://img.it610.com/image/info8/6f63695cc0194b44b0ecd6550ef8b430.jpg" alt="hadoop（二）HDFS概述、shell操作、客户端操作（各种API操作）以及hdfs读写流程_第3张图片" /></a></li>
+</ul>
+
+<h1 id="第2章-hdfs的shell操作-开发重点">第2章 HDFS的Shell操作（开发重点）</h1>
+
+<h2 id="2-1-基本语法">2.1 基本语法</h2>
+
+<p>hadoop fs 具体命令 OR hdfs dfs 具体命令<br />
+dfs是fs的实现类</p>
+
+<h2 id="2-2-hadoop-fs常用命令">2.2 hadoop fs常用命令</h2>
+
+<p>用法是hadoop fs 加下面后缀执行</p>
+
+<ul>
+<li><p><strong>1.HDFS– &gt;HDFS</strong></p>
+
+<ul>
+<li>-cp:从HDFS的一个路径拷贝到HDFS的另一个路径</li>
+<li>-mv：在HDFS目录中移动文件</li>
+<li>-chown、 chgrp、chmod：Linux文件系统中的用法一样，修改文件所属权限</li>
+<li>-mkdir ：在HDFS上创建目录</li>
+<li>-du：统计文件夹的大小信息</li>
+<li>-df：查看文件的使用情况和分区</li>
+<li>-cat：显示文件内容</li>
+<li>-rm：删除指定文件</li>
+<li>-rm -R ：删除文件夹</li>
+</ul></li>
+
+<li><p><strong>2.本地– &gt;HDFS</strong></p>
+
+<ul>
+<li>-put：上传 等同于copyFromLocal</li>
+<li>-copyFromLocal：从本地文件系统中拷贝文件到HDFS路径去</li>
+<li>-moveFromLocal：从本地剪切粘贴到HDFS</li>
+<li>-appendToFile：追加一个文件到已经存在的文件末尾</li>
+</ul></li>
+
+<li><p><strong>3.HDFS– &gt;本地</strong></p>
+
+<ul>
+<li>-get：等同于copyToLocal，就是从HDFS下载文件到本地</li>
+<li>-getmerge：合并下载多个文件，比如HDFS的目录 /user/liuyongjun/test下有多个文件:log.1, log.2,log.3,…</li>
+<li>-copyToLocal：从HDFS拷贝到本地</li>
+</ul></li>
+
+<li><p>4.其他</p>
+
+<ul>
+<li>-rm：删除指定文件</li>
+<li>-ls: 显示目录信息</li>
+<li>-tail：显示一个文件的末尾</li>
+<li>-setrep：设置HDFS中文件的副本数量</li>
+<li>这里设置的副本数只是记录在NameNode的元数据中，是否真的会有这么多副本，还得看DataNode的数量。因为目前只有3台设备，最多也就3个副本，只有节点数的增加到10台时，副本数才能达到10。<br />
+D:\software\hadoop-2.7.2</li>
+</ul></li>
+</ul>
+
+<h1 id="第3章-hdfs客户端操作-开发重点">第3章 HDFS客户端操作（开发重点）</h1>
+
+<h2 id="3-1-hdfs客户端环境准备">3.1 HDFS客户端环境准备</h2>
+
+<ul>
+<li><p>1．根据自己电脑的操作系统拷贝对应的编译后的hadoop jar包到非中文路径（例如：D:\software\hadoop-2.7.2），如图3-4所示<br />
+<a href="https://img.it610.com/image/info8/1fe132c7a94b438f93c78ce9d78b7bd9.jpg"><img src="https://img.it610.com/image/info8/1fe132c7a94b438f93c78ce9d78b7bd9.jpg" alt="hadoop（二）HDFS概述、shell操作、客户端操作（各种API操作）以及hdfs读写流程_第4张图片" /></a></p></li>
+
+<li><p>2．配置HADOOP_HOME环境变量<br />
+<a href="https://img.it610.com/image/info8/68d2f78c20644b3ab235772bade8f738.png"><img src="https://img.it610.com/image/info8/68d2f78c20644b3ab235772bade8f738.png" alt="在这里插入图片描述" /></a></p></li>
+
+<li><p>3.配置Path环境变量<br />
+在path中加入%HADOOP_HOME\bin;</p></li>
+
+<li><p>4执行winutils测试<br />
+<a href="https://img.it610.com/image/info8/a0741cb032804916a43448f217f51ba7.jpg"><img src="https://img.it610.com/image/info8/a0741cb032804916a43448f217f51ba7.jpg" alt="hadoop（二）HDFS概述、shell操作、客户端操作（各种API操作）以及hdfs读写流程_第5张图片" /></a><br />
+或者这样测（都行）<br />
+<a href="https://img.it610.com/image/info8/a83e85dcb28743f1b0e268005f23e4ae.jpg"><img src="https://img.it610.com/image/info8/a83e85dcb28743f1b0e268005f23e4ae.jpg" alt="hadoop（二）HDFS概述、shell操作、客户端操作（各种API操作）以及hdfs读写流程_第6张图片" /></a><br />
+测试成功一定要重启一下</p></li>
+
+<li><p>5.创建一个Maven工程HdfsClientDemo</p></li>
+
+<li><p>6.导入相应的依赖坐标+日志添加</p>
+
+<p><dependencies>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.8.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+            <version>2.7.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-client</artifactId>
+            <version>2.7.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs</artifactId>
+            <version>2.7.2</version>
+        </dependency>
+        <dependency>
+            <groupId>jdk.tools</groupId>
+            <artifactId>jdk.tools</artifactId>
+            <version>1.8</version>
+            <scope>system</scope>
+            <systemPath>${JAVA_HOME}/lib/tools.jar</systemPath>
+        </dependency>
+</dependencies></p></li>
+</ul>
+
+<p>导完之后，需要在项目的src/main/resources目录下，新建一个文件，命名为“log4j.properties”，在文件中填入</p>
+
+<pre><code>log4j.rootLogger=INFO, stdout
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern=%d %p [%c] - %m%n
+log4j.appender.logfile=org.apache.log4j.FileAppender
+log4j.appender.logfile.File=target/spring.log
+log4j.appender.logfile.layout=org.apache.log4j.PatternLayout
+log4j.appender.logfile.layout.ConversionPattern=%d %p [%c] - %m%n
+</code></pre>
+
+<ul>
+<li>7.创建包名：com.liuyongjun.hdfs</li>
+
+<li><p>8.创建HdfsClient类</p>
+
+<p>package com.liuyongjun.hdfs;</p>
+
+<p>import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.junit.Test;</p>
+
+<p>import java.io.IOException;
+import java.net.URI;</p>
+
+<p>/**</p>
+
+<ul>
+<li>@author liuyongjun</li>
+
+<li><p>@date 2020-06-30-16:19
+*/
+public class HdfsClient {
+@Test
+public void get() throws IOException, InterruptedException {
+    // 1 获取文件系统（hdfs抽象封装对象）
+    Configuration configuration = new Configuration();
+    // 配置在集群上运行
+    // configuration.set(&ldquo;fs.defaultFS&rdquo;, &ldquo;hdfs://hadoop102:9000&rdquo;);
+    // FileSystem fs = FileSystem.get(configuration);
+    /*三个参数：URI：统一资源标识符，指定一下hdfs资源，hdfs://hadoop102:9000，首先hdfs是指schema（模式），是指用hdfs模式进行访问
+                                                                          hadoop102:9000是访问位置
+              configuration：之前搭hadoop集群，在配置文件的configration标签中配置的
+               user:登录用户
+     得到的fs就是文件系统（hdfs抽象封装对象）
+    */
+    FileSystem fs = FileSystem.get(URI.create(&ldquo;hdfs://hadoop102:9000&rdquo;), configuration, &ldquo;liuyongjun&rdquo;);</p>
+
+<pre><code>// 2 下载到本地（用这个对象操作文件系统）
+//Path是hadoop提供的对路径进行封装的抽象类
+fs.copyToLocalFile(new Path(&quot;/test&quot;),new Path(&quot;d:\\&quot;));
+
+// 3 关闭资源
+//hdfs不支持并发写入，所以关闭资源
+fs.close();
+</code></pre>
+
+<p>}
+}</p></li>
+</ul></li>
+</ul>
+
+<h2 id="3-2-hdfs的api操作">3.2 HDFS的API操作</h2>
+
+<ul>
+<li><p>HDFS文件名更改</p>
+
+<p>@Test
+    public void rename() throws IOException, InterruptedException {
+        //获取文件系统
+        FileSystem fs = FileSystem.get(URI.create(&ldquo;hdfs://hadoop102:9000&rdquo;), new Configuration(), &ldquo;liuyongjun&rdquo;);
+        //操作
+        fs.rename(new Path(&ldquo;/test&rdquo;),new Path(&ldquo;/test2&rdquo;));
+        //关闭文件系统
+        fs.close();
+    }</p></li>
+</ul>
+
+<p>结果：<br />
+<a href="https://img.it610.com/image/info8/24a587e86838407e9cfd24c7330429b9.jpg"><img src="https://img.it610.com/image/info8/24a587e86838407e9cfd24c7330429b9.jpg" alt="在这里插入图片描述" /></a></p>
+
+<ul>
+<li><p>一个一个太麻烦了，其他文件操作用before，test，after一起执行，开始写before，最后写after，中间测试，头尾必执行，可以将重复命令放在那里</p>
+
+<p>package com.liuyongjun.hdfs;</p>
+
+<p>import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.*;
+import org.apache.hadoop.io.IOUtils;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;</p>
+
+<p>import javax.swing.*;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.net.URI;</p>
+
+<p>/**</p>
+
+<ul>
+<li>@author liuyongjun</li>
+
+<li><p>@date 2020-06-30-16:19
+*/
+public class HdfsClient {
+private FileSystem fs;
+@Test
+public void get() throws IOException, InterruptedException {
+    // 1 获取文件系统
+    Configuration configuration = new Configuration();</p>
+
+<pre><code>/*三个参数：URI：统一资源标识符，指定一下hdfs资源，hdfs://hadoop102:9000，首先hdfs是指schema（模式），是指用hdfs模式进行访问
+                                                                      hadoop102:9000是访问位置
+          configuration：之前搭hadoop集群，在配置文件的configration标签中配置的
+           user:登录用户
+ 得到的fs就是文件系统（hdfs抽象对象）
+*/
+FileSystem fs = FileSystem.get(URI.create(&quot;hdfs://hadoop102:9000&quot;), configuration, &quot;liuyongjun&quot;);
+
+// 2 下载
+//Path是hadoop提供的对路径进行封装的抽象类
+fs.copyToLocalFile(new Path(&quot;/test&quot;),new Path(&quot;d:\\&quot;));
+
+// 3 关闭资源
+//hdfs不支持并发写入，所以关闭资源
+fs.close();
+</code></pre>
+
+<p>}
+@Before
+public void before() throws IOException, InterruptedException {
+    //获取文件系统
+    fs = FileSystem.get(URI.create(&ldquo;hdfs://hadoop102:9000&rdquo;), new Configuration(), &ldquo;liuyongjun&rdquo;);
+}
+@Test
+public void rename() throws IOException {
+    //操作HDFS文件名更改
+    fs.rename(new Path(&ldquo;/test&rdquo;),new Path(&ldquo;/test2&rdquo;));
+}
+@Test
+public void testCopyFromLocalFile() throws IOException {
+    //HDFS文件上传
+    fs.copyFromLocalFile(new Path(&ldquo;d:/2.txt&rdquo;),new Path(&ldquo;/&rdquo;));
+}
+@Test
+public void append() throws IOException {
+    //HDFS文件拼接操作
+    FSDataOutputStream append = fs.append(new Path(&ldquo;/test/1.txt&rdquo;), 1024);
+    FileInputStream open = new FileInputStream(&ldquo;d:/testhdfs/2.txt&rdquo;);</p>
+
+<pre><code>//流拷贝
+IOUtils.copyBytes(open,append,1024,true);
+//上面输入是本地，输出是hdfs，所以为文件上传
+//如果输入为hdfs，输出为本地，则为文件下载
+//hdfs获取输入流用open，获取输出流用append
+</code></pre>
+
+<p>}
+@Test
+public void delete() throws IOException, InterruptedException {
+    //删除操作
+    boolean delete = fs.delete(new Path(&ldquo;/test2&rdquo;), true);
+    if(delete){
+        System.out.println(&ldquo;删除成功&rdquo;);
+    }else{
+        System.out.println(&ldquo;删除失败&rdquo;);
+    }
+}
+@Test
+public void ls() throws IOException {
+    //HDFS文件查看
+    FileStatus[] fileStatuses = fs.listStatus(new Path(&ldquo;/&rdquo;));
+    for (FileStatus fileStatus : fileStatuses) {
+        //HDFS文件和文件夹判断
+       if(fileStatus.isFile()){
+           System.out.println(&ldquo;以下信息是一个文件的信息&rdquo;);
+           System.out.println(fileStatus.getPath());
+           System.out.println(fileStatus.getLen());
+       }else{
+           System.out.println(&ldquo;以下信息是一个文件夹的信息&rdquo;);
+           System.out.println(fileStatus.getPath());
+       }
+    }
+}</p>
+
+<p>@Test
+public void listFiles() throws IOException {
+    //查看目录下所有文件
+    RemoteIterator<LocatedFileStatus> files = fs.listFiles(new Path(&ldquo;/&rdquo;), true);
+    while(files.hasNext()){
+        LocatedFileStatus file = files.next();
+        System.out.println(&ldquo;==============================&rdquo;);
+        System.out.println(file.getPath());
+        System.out.println(&ldquo;块信息&rdquo;);
+        BlockLocation[] blockLocations = file.getBlockLocations();
+        for (BlockLocation blockLocation : blockLocations) {
+            String[] hosts = blockLocation.getHosts();
+            System.out.print(&ldquo;块在&rdquo;);
+            for (String host : hosts) {
+                System.out.print(host+&rdquo; &ldquo;);
+            }
+        }</p>
+
+<pre><code>}
+</code></pre>
+
+<p>}
+@After
+public void after() throws IOException {
+    //关闭文件系统
+    fs.close();
+}
+}</p></li>
+</ul></li>
+
+<li><p>注意参数优先级的考虑</p>
+
+<ul>
+<li>拿上传文件进行举例</li>
+<li>首先将hdfs-site.xml拷贝到项目的根目录下</li>
+</ul></li>
+</ul>
+
+<p>hdfs-site.xml</p>
+
+<pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;?xml-stylesheet type=&quot;text/xsl&quot; href=&quot;configuration.xsl&quot;?&gt;
+
+&lt;configuration&gt;
+    &lt;!--指定HDFS副本的数量--&gt;
+    &lt;property&gt;
+        &lt;name&gt;dfs.replication&lt;/name&gt;
+        &lt;value&gt;2&lt;/value&gt;
+    &lt;/property&gt;
+&lt;/configuration&gt;
+</code></pre>
+
+<p>上传程序</p>
+
+<pre><code>@Test
+public void testCopyFromLocalFile() throws Exception {
+
+        // 1 获取文件系统
+        Configuration configuration = new Configuration();
+        //设置配置文件
+        configuration.set(&quot;dfs.replication&quot;, &quot;1&quot;);
+        FileSystem fs = FileSystem.get(new URI(&quot;hdfs://hadoop102:9000&quot;), configuration, &quot;liuyongjun&quot;);
+
+        // 2 上传文件
+        fs.copyFromLocalFile(new Path(&quot;d:/1.txt&quot;), new Path(&quot;/1.txt&quot;));
+
+        // 3 关闭资源
+        fs.close();
+
+        System.out.println(&quot;over&quot;);
+}
+</code></pre>
+
+<p>上面我们设置副本数，服务器默认是3个，ClassPath下的用户自定义配置2个，客户端代码中设置的是1个，我们看看它响应哪个，则哪个优先级高<br />
+如图，副本数为：<br />
+<a href="https://img.it610.com/image/info8/3063ea1433764333b02ed686153a358a.jpg"><img src="https://img.it610.com/image/info8/3063ea1433764333b02ed686153a358a.jpg" alt="在这里插入图片描述" /></a><br />
+所以参数优先级排序：（1）客户端代码中设置的值 &gt;（2）ClassPath下的用户自定义配置文件 &gt;（3）然后是服务器的默认配置</p>
+
+<h1 id="第四章hdfs的数据流-面试重点">第四章HDFS的数据流（面试重点）</h1>
+
+<h2 id="4-1hdfs-写数据流程">4.1HDFS 写数据流程</h2>
+
+<ul>
+<li><p>首先，两个重要概念：</p>
+
+<p>NameNode：领导级别。管理数据块映射；处理客户端的读写请求；配置副本策略；管理HDFS的名称空间；</p>
+
+<p>DataNode：员工级别。负责存储客户端发来的数据块block；执行数据块的读写操作。</p></li>
+
+<li><p><strong>写流程</strong></p></li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/89f535109775414eb30a937fce1c560f.jpg"><img src="https://img.it610.com/image/info8/89f535109775414eb30a937fce1c560f.jpg" alt="hadoop（二）HDFS概述、shell操作、客户端操作（各种API操作）以及hdfs读写流程_第7张图片" /></a></p>
+
+<pre><code>写详细步骤：
+1、首先向namenode通信，请求上传文件，namenode检查目标文件是否已存在，父目录是否存在 ，还得看看是否有上传的权限，说白了，就是判断是否可以上传
+2、namenode返回是否可以上传 ，如果可以，client会先对文件进行切分（逻辑切分）
+3、客户端请求第一个 Block上传到哪几个DataNode服务器上。
+4、NameNode返回3个DataNode节点，分别为dn1、dn2、dn3。
+5、客户端通过FSDataOutputStream模块请求dn1上传数据，dn1收到请求会继续调用dn2，然后dn2调用dn3，将这个通信管道建立完成。
+6、dn1、dn2、dn3逐级应答客户端。
+7、客户端开始往dn1上传第一个Block（先从磁盘读取数据放到一个本地内存缓存），以Packet为单位，dn1收到一个Packet就会传给dn2，dn2传给dn3；dn1每传一个packet会放入一个应答队列等待应答。
+8、当一个Block传输完成之后，客户端再次请求NameNode上传第二个Block的服务器。（重复执行3-7步）。
+9、传输完毕之后，客户端关闭流资源，并且会告诉hdfs数据传输完毕，然后hdfs收到传输完毕就恢复元数据
+</code></pre>
+
+<ul>
+<li><p>具体概念介绍</p></li>
+
+<li><p><strong>Distributed FileSystem</strong> :进行抽象封装，FileSystem会利用JDK的反射机制创建一个DistributedFileSystem实例（对象），然后调用它的initialize()方法</p></li>
+
+<li><p><strong>逻辑切分</strong> ：客户端并没有将文件真正切分，只是画了个标志线加以区分</p></li>
+
+<li><p>写操作，上传文件，所以本地是输入流，hdfs是输出流</p></li>
+
+<li><p>第三步有哪几个DataNode服务器上：这里指副本数，设置了几个副本，就返回几个DataNode（记住数据是存储在DataNode）我设置了三个副本，所以，返回三个；</p></li>
+
+<li><p>同时，返回的DataNode也有一定规矩，首先第一个DataNode是距离客户端最近的，后两个是根据第一个选出，产生了两个问题，如何判断最近，以及如何根据第一个选，这个请看: 拓扑距离和机架感知.</p></li>
+
+<li><p>第七步，packet为单位，每个64KB</p></li>
+
+<li><p>传输Packet：dn1收到之后，一边往本地落盘，一边传给dn2，之后的dn2同理，当dn3落盘结束之后，它将成功信息发给dn2，之后dn2需要等自己成功并且收到dn3成功信息之后，将成功信息发给dn1,同理，dn1在接收到dn2成功信息并且自己落盘成功之后发给客户端，此时一个packet就成功了；注意packet不是逐个发的，是一个队列同时发的，成功了，在队列里删除掉，这样全部packet发完，第一块就传完了，接着传第二块，第二次选择的DataNode可能和第一次一样，也可能不一样</p></li>
+
+<li><p>传输过程中几种失败可能：</p>
+
+<ul>
+<li>1.在建立通道时失败，这样直接上传失败，直接抛异常</li>
+<li>2.在传输数据过程中失败：
+
+<ul>
+<li>1）.客户端传输Packet到第一个DataNode过程中失败就上传失败</li>
+<li>2）dn1与dn2或者dn2与dn3之间的传输Packet失败，上传仍然进行，并且传出成功信号，因为即使这两个过程失败了，副本数就变成1了，hdfs有高容错性，副本丢失，第一个DataNode会触发自动备份，自动寻找两个DataNode</li>
+</ul></li>
+</ul></li>
+</ul>
+
+<h2 id="4-2-hdfs读数据流程">4.2 HDFS读数据流程</h2>
+
+<ul>
+<li><p><strong>读流程</strong><br />
+<a href="https://img.it610.com/image/info8/a54cd9d7f18146208b18ed8ff25c6151.jpg"><img src="https://img.it610.com/image/info8/a54cd9d7f18146208b18ed8ff25c6151.jpg" alt="hadoop（二）HDFS概述、shell操作、客户端操作（各种API操作）以及hdfs读写流程_第8张图片" /></a></p>
+
+<p>1）客户端通过Distributed FileSystem向NameNode请求下载文件，NameNode通过查询元数据，找到文件块所在的DataNode地址。
+2）挑选一台DataNode（就近原则，然后随机）服务器，请求读取数据。
+3）DataNode开始传输数据给客户端（从磁盘里面读取数据输入流，以Packet为单位来做校验）。
+4）客户端以Packet为单位接收，先在本地缓存，然后写入目标文件。
+5）下载完第一块，在重复上面2.3步下载</p></li>
+</ul>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

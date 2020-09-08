@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>SPARKAPP压测清理检查相关SHELL1 | 开发者问答集锦</title>
+    <meta property="og:title" content="SPARKAPP压测清理检查相关SHELL1 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="SPARKAPP压测清理检查相关SHELL1">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/sparkapp%E5%8E%8B%E6%B5%8B%E6%B8%85%E7%90%86%E6%A3%80%E6%9F%A5%E7%9B%B8%E5%85%B3shell1/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">SPARKAPP压测清理检查相关SHELL1</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>压力测试前需要对大数据环境、日志和存储数据库进行清理、检查环境是否可用、保存测试前的环境状态。</p>
+
+<p>压力测试过程中需要定期检查PARQUET文件生成情况、报表生成情况、HBASE数据生成情况、是否有SPARK APP FAILED、收集错误日志等。</p>
+
+<p>压力测试后需要检查PARQUET文件生成情况、报表生成情况、HBASE数据生成情况、是否有SPARK APP
+FAILED、收集错误日志、查看APP执行时间间隔、各主机CPU内存网络磁盘状况等。</p>
+
+<p>基础脚本，eea_2_all.sh，分发命令到HDP集群各节点主机执行，内容如下，注意基础脚本运行于HDP第一台主机（与其他主机做免密处理）。</p>
+
+<p>#!/bin/bash<br />
+#数组中用主机名亦可<br />
+HOSTS=(192.168.1.4 192.168.1.5 192.168.1.6 192.168.1.8 192.168.1.9
+192.168.1.10 192.168.1.11 192.168.1.12 192.168.1.13)<br />
+COMMAND=$1<br />
+PROMPT=$2<br />
+if [ $# == 0 ] ; then<br />
+COMMAND=&ldquo;/bin/rm -rf /var/log/rmslog/*;/bin/echo &ldquo; &gt;
+/var/log/rmslog/debug.log;/bin/chmod 666 /var/log/rmslog/debug.log&rdquo;</p>
+
+<p>PROMPT=&ldquo;Clear debug log&rdquo;<br />
+fi</p>
+
+<p>count=1<br />
+for host in ${HOSTS[@]}<br />
+do<br />
+echo &ldquo;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;eea-younge-${count}.test&ndash;$host:
+${PROMPT}&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-&rdquo;<br />
+ssh $host ${COMMAND}<br />
+let count++<br />
+done</p>
+
+<p>1.测试前的准备工作包括，</p>
+
+<p>a.确保Hmaster上面的Hbase Thrift Server处于运行状态，命令如下。</p>
+
+<p>. ssh 192.168.1.6 &ldquo;if test $(ps -ef | grep &lsquo;hbase.thrift.ThriftServer start&rsquo; |
+wc -l ) -eq 2 then ; echo &lsquo;Hbase Thrift Server is running.&rsquo; else nohup hbase
+thrift start &amp; fi&rdquo;</p>
+
+<p>b.对大数据环境、本地日志和存储数据库进行清理，检查YARN中应用情况。</p>
+
+<p>#清理Hbase表</p>
+
+<p>#其中cmd.hbase存放的是按行存储的hbase shell命令，最后一行需为exit，用于退出hbase shell。</p>
+
+<p>nohup hbase shell hbase/cmds.hbase &gt; result/clear<em>hbase</em>${now}.log</p>
+
+<p>#清理Hdfs Parquet文件，shell/clear_parquets.sh</p>
+
+<p>#!/bin/bash</p>
+
+<p>DeleteHDFSFolder()</p>
+
+<p>{</p>
+
+<p>sudo -u spark hadoop fs -rm -r -f $1</p>
+
+<p>if [ $? -ne 0 ] ; then</p>
+
+<p>LogMessage &ldquo;Can not create Delete files and folders $1.&rdquo;</p>
+
+<p>fi</p>
+
+<p>}</p>
+
+<p>CreateHDFSFolder()</p>
+
+<p>{</p>
+
+<p>sudo -u spark hadoop fs -mkdir -p $1</p>
+
+<p>if [ $? -ne 0 ] ; then</p>
+
+<p>LogMessage &ldquo;Can not create HDFS folders $1.&rdquo;</p>
+
+<p>fi</p>
+
+<p>}</p>
+
+<p>DeleteHDFSFolder &ldquo;/user/spark/eea/alarm/*&rdquo;</p>
+
+<p>DeleteHDFSFolder &ldquo;/user/spark/eea/fine/*&rdquo;</p>
+
+<p>DeleteHDFSFolder &ldquo;/user/spark/eea/trip/*&rdquo;</p>
+
+<p>DeleteHDFSFolder &ldquo;/user/spark/eea/event/*&rdquo;</p>
+
+<p>DeleteHDFSFolder &ldquo;/user/spark/eea/collector/*&rdquo;</p>
+
+<p>DeleteHDFSFolder &ldquo;/user/spark/eea/rawdata/*&rdquo;</p>
+
+<p>sudo -u hdfs hdfs dfs -expunge</p>
+
+<p>CreateHDFSFolder &ldquo;/user/spark/eea/alarm/enrichment/&rdquo;</p>
+
+<p>CreateHDFSFolder &ldquo;/user/spark/eea/fine/enrichment/&rdquo;</p>
+
+<p>CreateHDFSFolder &ldquo;/user/spark/eea/trip/enrichment/&rdquo;</p>
+
+<p>#清理各主机的本地日志</p>
+
+<p>. ${shell_path}/eea_2_all.sh</p>
+
+<p>#清理Redis数据库，其中cmds.redis中存放的为按行存储命令，本篇中仅一条命令flushall</p>
+
+<p>nohup /bin/cat redis/cmds.redis | redis-cli -h 192.168.1.5 -a runoob &gt;
+result/clear<em>redis</em>${now}.log</p>
+
+<p>#清理PostgreSQL工作日志表</p>
+
+<p>export PGPASSWORD=pass123456</p>
+
+<p>nohup psql -h 192.168.1.155 -p 5432 -U test -d test -f
+sql/query_truncate_app_orchestration.sql &gt;
+result/test_clear_work<em>log</em>${now}.log</p>
+
+<p>#query_truncate_work_log.sql 内容如下，</p>
+
+<p>select * from app_orchestration;</p>
+
+<p>truncate app_orchestration;</p>
+
+<p>#检查磁盘挂载情况</p>
+
+<p>nohup shell/eea_2_all.sh &ldquo;mount | grep \&ldquo;data/eea\&ldquo;&rdquo; &ldquo;Mount Directory
+/data/eea Check&rdquo; &gt; result/mount<em>check</em>${now}.txt</p>
+
+<p>#检查各主机磁盘空间情况</p>
+
+<p>nohup shell/eea_2_all.sh &ldquo;df -hT&rdquo; &ldquo;Disk Usage&rdquo; 2&gt;&amp;1 &gt;
+result/&ldquo;vms_disk<em>usage</em>${now}.txt&rdquo;</p>
+
+<p>#检查数据库空间情况</p>
+
+<p>psql -h 192.168.1.155 -p 5432 -U test -d test -f sql/check_databases_size.sql
+&gt; result/rms_eea_databases<em>size</em>${now}.txt</p>
+
+<p>#check_databases_size.sql 内容如下，</p>
+
+<p><strong>SELECT</strong> d.datname <strong>AS</strong> <strong>Name</strong> , pg_catalog.pg_get_userbyid(d.datdba)
+<strong>AS</strong> Owner,</p>
+
+<p>CASE <strong>WHEN</strong> pg_catalog.has_database_privilege(d.datname, &lsquo;CONNECT&rsquo;)</p>
+
+<p><strong>THEN</strong> pg_catalog.pg_size_pretty(pg_catalog.pg_database_size(d.datname))</p>
+
+<p><strong>ELSE</strong> &lsquo;No Access&rsquo; <strong>END</strong> <strong>AS</strong> <strong>SIZE</strong></p>
+
+<p><strong>FROM</strong> pg_catalog.pg_database d WHERE d.datname in (&lsquo;test&rsquo;)</p>
+
+<p><strong>ORDER</strong> <strong>BY</strong></p>
+
+<p>CASE <strong>WHEN</strong> pg_catalog.has_database_privilege(d.datname, &lsquo;CONNECT&rsquo;)</p>
+
+<p><strong>THEN</strong> pg_catalog.pg_database_size(d.datname)</p>
+
+<p><strong>ELSE</strong> NULL</p>
+
+<p><strong>END</strong> <strong>DESC</strong> -- nulls first</p>
+
+<p>LIMIT 20 ;</p>
+
+<p>#检查数据库表空间情况</p>
+
+<p>psql -h 192.168.1.155 -p 5432 -U test -d test -f sql/check_tables_size.sql &gt;
+result/rms_eea_tables<em>size</em>${now}.txt</p>
+
+<p>#check_tables_size.sql内容如下，</p>
+
+<p><strong>SELECT</strong></p>
+
+<p>table_schema || &lsquo;.&rsquo; || table_name <strong>AS</strong> table_full_name,</p>
+
+<p>pg_size_pretty(pg_total_relation_size(&lsquo;&ldquo;&rsquo; || table_schema || &lsquo;&ldquo;.&rdquo;&rsquo; ||
+table_name || &lsquo;&ldquo;&rsquo;)) <strong>AS</strong> <strong>size</strong></p>
+
+<p><strong>FROM</strong> information_schema.tables WHERE table_schema=&lsquo;public&rsquo;</p>
+
+<p><strong>ORDER</strong> <strong>BY</strong></p>
+
+<p>pg_total_relation_size(&lsquo;&ldquo;&rsquo; || table_schema || &lsquo;&ldquo;.&rdquo;&rsquo; || table_name || &lsquo;&ldquo;&rsquo;)
+<strong>DESC;</strong></p>
+
+<p>#检查YARN中失败的应用列表</p>
+
+<p>nohup yarn application -list -appStates FAILED &gt;
+result/yarn_app_failed_list.log</p>
+
+<p>#检查YARN中KILLED的应用列表</p>
+
+<p>nohup yarn application -list -appStates KILLED &gt;
+result/yarn_app_killed_list.log</p>
+
+<p>压测过程中检查见后续文章。。。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

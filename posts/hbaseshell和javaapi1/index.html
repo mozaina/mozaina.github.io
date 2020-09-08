@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Hbaseshell和JavaAPI1 | 开发者问答集锦</title>
+    <meta property="og:title" content="Hbaseshell和JavaAPI1 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Hbaseshell和JavaAPI1">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/hbaseshell%E5%92%8Cjavaapi1/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Hbaseshell和JavaAPI1</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h5 id="hbase-shell">Hbase shell</h5>
+
+<blockquote>
+<p>在Hbase中，namespace(名字空间)相当于关系型数据库的数据库(database)。Hbase是一种非关系型数据库，以键值对(key-
+value)形式进行存储。所以，对于Hbase数据库的CRUD与Map的操作很相似: put(插入)，get(查询)</p>
+</blockquote>
+
+<pre><code>$&gt;hbase shell                           //登录shell终端.
+$hbase&gt;help                             //查看帮助
+$hbase&gt;help 'list_namespace'            //查看特定的命令帮助
+$hbase&gt;list_namespace                   //列出名字空间(数据库)
+$hbase&gt;list_namespace_tables 'defalut'  //列出名字空间(数据库)
+$hbase&gt;create_namespace 'ns1'           //创建名字空间
+$hbase&gt;create 'ns1:t1','f1'             //创建指定空间下的表(形如：名字空间:表名)，后面跟上列族
+
+$hbase&gt;put 'ns1:t1','row1','f1:id',100      //插入数据
+$hbase&gt;put 'ns1:t1','row1','f1:name','tom'  
+
+$hbase&gt;get 'ns1:t1','row1'                  //查询指定行的值
+$hbase&gt;scan 'ns1:t1'                        //扫描表(全表扫描)
+
+$hbase&gt;flush 'ns1:t1'       //清理内存数据到磁盘。
+$hbase&gt;count 'ns1:t1'       //统计函数(统计表中的数据)
+$hbase&gt;disable 'ns1:t1'     //删除表之前需要禁用表
+$hbase&gt;drop 'ns1:t1'        //删除表
+
+$hbase&gt;scan 'hbase:meta'    //查看元数据表(元数据表非常重要，存放了所建表的一切信息)
+$hbase&gt;split 'ns1:t1'       //切割表 
+$hbase&gt;split ''             //切割区域
+
+//移动区域
+move 区域标识符, 被移动区域主机标识(主机名,端口号,服务器起始码)
+move '5ecb5fb4f7a070cb894420c518c1327c', 's202,16020,1534674768444'
+
+//分割区域
+split 区域名称, 行号
+split 'ns1:t2,,1534675408158.5ecb5fb4f7a070cb894420c518c1327c.', 'row8888'
+
+//合并两个区域
+merge_region 第一个区域标识符(MD5), 第二个区域标识符(MD5)
+merge_region 'fea835d1a68ec6c7a6a7c98abe0f748d', '210d7754edad92e3e1fb067e803f04e7'
+</code></pre>
+
+<h5 id="hbase的-java-api">Hbase的 Java API</h5>
+
+<pre><code>//maven依赖
+&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.hbase&lt;/groupId&gt;
+    &lt;artifactId&gt;hbase-client&lt;/artifactId&gt;
+    &lt;version&gt;1.2.6&lt;/version&gt;
+&lt;/dependency&gt;
+
+
+  /**
+     * 插入数据
+     */
+    @Test
+    public void put() throws Exception {
+        //创建conf对象
+        Configuration conf = HBaseConfiguration.create();
+        //通过连接工厂创建连接对象
+        Connection conn = ConnectionFactory.createConnection(conf);
+        //通过连接查询tableName对象
+        TableName tname = TableName.valueOf(&quot;ns1:t1&quot;);
+        //获得table
+        Table table = conn.getTable(tname);
+
+        //通过bytes工具类创建字节数组
+        byte[] rowid = Bytes.toBytes(&quot;row3&quot;);
+
+        //创建put对象
+        Put put = new Put(rowid);
+
+        byte[] f1 = Bytes.toBytes(&quot;f1&quot;);
+        byte[] id = Bytes.toBytes(&quot;id&quot;);
+        byte[] value = Bytes.toBytes(100);
+        put.addColumn(f1, id, value);
+
+        //执行插入
+        table.put(put);
+    }
+
+    /**
+     * 得到数据
+     */
+    @Test
+    public void get() throws Exception {
+        //创建conf对象
+        Configuration conf = HBaseConfiguration.create();
+        //通过连接工厂创建连接对象
+        Connection conn = ConnectionFactory.createConnection(conf);
+        //通过连接查询tableName对象
+        TableName tname = TableName.valueOf(&quot;ns1:t1&quot;);
+        //获得table
+        Table table = conn.getTable(tname);
+
+        //通过bytes工具类创建字节数组(将字符串)
+        Get get = new Get(Bytes.toBytes(&quot;row3&quot;));
+        Result r = table.get(get);
+        byte[] idvalue = r.getValue(Bytes.toBytes(&quot;f1&quot;), Bytes.toBytes(&quot;id&quot;));
+        System.out.println(Bytes.toInt(idvalue));
+    }
+
+    /**
+     * 导入大量数据
+     */
+    @Test
+    public void bigPut() throws Exception {
+        DecimalFormat format = new DecimalFormat();
+        format.applyPattern(&quot;0000&quot;);
+
+        long start = System.currentTimeMillis();
+        Configuration conf = HBaseConfiguration.create();
+        Connection conn = ConnectionFactory.createConnection(conf);
+        TableName tname = TableName.valueOf(&quot;ns1:t2&quot;);
+        HTable table = (HTable) conn.getTable(tname);
+        //不要自动清理缓冲区
+        table.setAutoFlush(false);
+
+        for (int i = 1; i &lt; 10000; i++) {
+            Put put = new Put(Bytes.toBytes(&quot;row&quot; + format.format(i)));
+            //关闭写前日志
+            put.setWriteToWAL(false);
+            put.addColumn(Bytes.toBytes(&quot;f1&quot;), Bytes.toBytes(&quot;id&quot;), Bytes.toBytes(i));
+            put.addColumn(Bytes.toBytes(&quot;f1&quot;), Bytes.toBytes(&quot;name&quot;), Bytes.toBytes(&quot;tom&quot; + i));
+            put.addColumn(Bytes.toBytes(&quot;f1&quot;), Bytes.toBytes(&quot;age&quot;), Bytes.toBytes(i % 100));
+            table.put(put);
+
+            if (i % 200 == 0) {
+                table.flushCommits();
+            }
+        }
+        //剩余不足的刷新提交
+        table.flushCommits();
+        System.out.println(System.currentTimeMillis() - start);
+    }
+
+    /**
+     * 创建名字空间
+     */
+    @Test
+    public void createNameSpace() throws Exception {
+        Configuration conf = HBaseConfiguration.create();
+        Connection conn = ConnectionFactory.createConnection(conf);
+        Admin admin = conn.getAdmin();
+        //创建名字空间描述符
+        NamespaceDescriptor nsd = NamespaceDescriptor.create(&quot;ns2&quot;).build();
+        admin.createNamespace(nsd);
+    }
+
+    /**
+     * 列出名字空间
+     */
+    @Test
+    public void listNameSpaces() throws Exception {
+        Configuration conf = HBaseConfiguration.create();
+        Connection conn = ConnectionFactory.createConnection(conf);
+        Admin admin = conn.getAdmin();
+
+        NamespaceDescriptor[] ns = admin.listNamespaceDescriptors();
+        for (NamespaceDescriptor n : ns) {
+            System.out.println(n.getName());
+        }
+    }
+
+    /**
+     * 创建表
+     */
+    @Test
+    public void createTable() throws Exception {
+        Configuration conf = HBaseConfiguration.create();
+        Connection conn = ConnectionFactory.createConnection(conf);
+        Admin admin = conn.getAdmin();
+        //创建表名对象
+        TableName tableName = TableName.valueOf(&quot;ns2:t1&quot;);
+        //创建表描述符对象
+        HTableDescriptor tbl = new HTableDescriptor(tableName);
+        //创建列族描述符对象
+        HColumnDescriptor col = new HColumnDescriptor(&quot;f1&quot;);
+        tbl.addFamily(col);
+
+        admin.createTable(tbl);
+        System.out.println(&quot;over&quot;);
+    }
+
+    /**
+     * 删除表：需要先禁用表
+     * &gt; disable 禁用表
+     * &gt; enable 启用表
+     */
+    @Test
+    public void dropTable() throws Exception {
+        Configuration conf = HBaseConfiguration.create();
+        Connection conn = ConnectionFactory.createConnection(conf);
+        Admin admin = conn.getAdmin();
+        //禁用表
+        admin.disableTable(TableName.valueOf(&quot;ns2:t1&quot;));
+        //删除表
+        admin.disableTable(TableName.valueOf(&quot;ns2:t1&quot;));
+    }
+
+    /**
+     * 删除数据
+     */
+    @Test
+    public void deleteData() throws Exception {
+        Configuration conf = HBaseConfiguration.create();
+        Connection conn = ConnectionFactory.createConnection(conf);
+        TableName tname = TableName.valueOf(&quot;ns1:t2&quot;);
+
+        Table table = conn.getTable(tname);
+        Delete del = new Delete(Bytes.toBytes(&quot;row0001&quot;));
+        del.addColumn(Bytes.toBytes(&quot;f1&quot;), Bytes.toBytes(&quot;id&quot;));
+        del.addColumn(Bytes.toBytes(&quot;f1&quot;), Bytes.toBytes(&quot;name&quot;));
+
+        table.delete(del);
+
+        System.out.println(&quot;over&quot;);
+    }
+
+    /**
+     * 测试全表扫描
+     */
+    @Test
+    public void scan() throws Exception {
+        Configuration conf = HBaseConfiguration.create();
+        Connection conn = ConnectionFactory.createConnection(conf);
+        TableName tname = TableName.valueOf(&quot;ns1:t2&quot;);
+        Table table = conn.getTable(tname);
+
+        //创建一个扫描器对象
+        Scan scan = new Scan();
+        //设置起始行
+        scan.setStartRow(Bytes.toBytes(&quot;row5000&quot;));
+        //设置结束行
+        scan.setStopRow(Bytes.toBytes(&quot;row8000&quot;));
+
+        ResultScanner rs = table.getScanner(scan);
+        Iterator&lt;Result&gt; it = rs.iterator();
+        while (it.hasNext()) {
+            Result r = it.next();
+            byte[] name = r.getValue(Bytes.toBytes(&quot;f1&quot;), Bytes.toBytes(&quot;name&quot;));
+            System.out.println(Bytes.toString(name));
+        }
+    }
+
+    /**
+     * 动态遍历
+     */
+    @Test
+    public void scan2() throws Exception {
+        Configuration conf = HBaseConfiguration.create();
+        Connection conn = ConnectionFactory.createConnection(conf);
+        TableName tname = TableName.valueOf(&quot;ns1:t2&quot;);
+        Table table = conn.getTable(tname);
+
+        //创建一个扫描器对象
+        Scan scan = new Scan();
+        //设置起始行
+        scan.setStartRow(Bytes.toBytes(&quot;row5000&quot;));
+        //设置结束行
+        scan.setStopRow(Bytes.toBytes(&quot;row8000&quot;));
+
+        ResultScanner rs = table.getScanner(scan);
+        Iterator&lt;Result&gt; it = rs.iterator();
+        while (it.hasNext()) {
+            Result r = it.next();
+            Map&lt;byte[], byte[]&gt; map = r.getFamilyMap(Bytes.toBytes(&quot;f1&quot;));
+            for (Map.Entry&lt;byte[], byte[]&gt; entrySet : map.entrySet()) {
+                String col = Bytes.toString(entrySet.getKey());
+                String val = Bytes.toString(entrySet.getValue());
+                System.out.print(col + &quot;:&quot; + val + &quot;,&quot;);
+            }
+            System.out.println();
+        }
+    }
+
+    /**
+     * 动态遍历
+     */
+    @Test
+    public void scan3() throws Exception {
+        Configuration conf = HBaseConfiguration.create();
+        Connection conn = ConnectionFactory.createConnection(conf);
+        TableName tname = TableName.valueOf(&quot;ns1:t2&quot;);
+        Table table = conn.getTable(tname);
+
+        //创建一个扫描器对象
+        Scan scan = new Scan();
+        //设置起始行
+        scan.setStartRow(Bytes.toBytes(&quot;row5000&quot;));
+        //设置结束行
+        scan.setStopRow(Bytes.toBytes(&quot;row8000&quot;));
+
+        ResultScanner rs = table.getScanner(scan);
+        Iterator&lt;Result&gt; it = rs.iterator();
+        while (it.hasNext()) {
+            Result r = it.next();
+            //得到一行中的所有Map，key=f1(列族)，value=Map&gt;
+            NavigableMap&lt;byte[], NavigableMap&lt;byte[], NavigableMap&lt;Long, byte[]&gt;&gt;&gt; map = r.getMap();
+            for (Map.Entry&lt;byte[], NavigableMap&lt;byte[], NavigableMap&lt;Long, byte[]&gt;&gt;&gt; entry : map.entrySet()) {
+                //得到列族
+                String f1 = Bytes.toString(entry.getKey());
+                Map&lt;byte[], NavigableMap&lt;Long, byte[]&gt;&gt; colDataMap = entry.getValue();
+                for (Map.Entry&lt;byte[], NavigableMap&lt;Long, byte[]&gt;&gt; ets : colDataMap.entrySet()) {
+                    //得到列
+                    String c = Bytes.toString(ets.getKey());
+                    Map&lt;Long, byte[]&gt; tsValueMap = ets.getValue();
+                    for (Map.Entry&lt;Long, byte[]&gt; e : tsValueMap.entrySet()) {
+                        //得到时间戳
+                        Long ts = e.getKey();
+                        String value = Bytes.toString(e.getValue());
+                        System.out.print(f1 + &quot;:&quot; + c + &quot;:&quot; + ts + &quot;=&quot; + value + &quot;,&quot;);
+                    }
+                }
+            }
+            System.out.println();
+        }
+    }
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

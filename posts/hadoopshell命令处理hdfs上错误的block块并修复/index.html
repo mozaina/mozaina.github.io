@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Hadoopshell命令处理hdfs上错误的block块并修复 | 开发者问答集锦</title>
+    <meta property="og:title" content="Hadoopshell命令处理hdfs上错误的block块并修复 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Hadoopshell命令处理hdfs上错误的block块并修复">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/hadoopshell%E5%91%BD%E4%BB%A4%E5%A4%84%E7%90%86hdfs%E4%B8%8A%E9%94%99%E8%AF%AF%E7%9A%84block%E5%9D%97%E5%B9%B6%E4%BF%AE%E5%A4%8D/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Hadoopshell命令处理hdfs上错误的block块并修复</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>情景：运行Spark程序出现报错</strong></p>
+
+<p><strong>1、报错信息：</strong><br />
+17/05/09 14:30:58 WARN scheduler.TaskSetManager: Lost task 28162.1 in stage
+0.0 (TID 30490, 127.0.0.1): java.io.IOException: Cannot obtain block length
+for LocatedBlock{BP-203532773-dfsfdf-1476004795661:blk_1080431162_6762963;
+getBlockSize()=411; corrupt=false; offset=0;
+locs=[DatanodeInfoWithStorage[127.0.0.1:1004,DS-e9905a06-4607-4113-b717-709a087b8b96,DISK],
+DatanodeInfoWithStorage[127.0.0.1:1004,DS-a5046b43-4416-45d9-8ff6-44891bcdf3b8,DISK],
+DatanodeInfoWithStorage[127.0.0.1:1004,DS-f6b04bbe-9555-4ac8-b06a-3317eb229511,DISK]]}</p>
+
+<p><strong>2、解决参考：</strong><br />
+<a href="https://community.hortonworks.com/questions/37412/cannot-obtain-block-length-">https://community.hortonworks.com/questions/37412/cannot-obtain-block-length-</a>
+for-locatedblock.html<br />
+ <strong>3、开始检查文件</strong></p>
+
+<p>执行命令检查的结果：注意红色字体</p>
+
+<pre><code>hdfs fsck /user/admin/data/cdn/20170509 -locations -blocks -files
+ Status: HEALTHY
+ Total size:    2115443944 B (Total open files size: 7684855 B)
+ Total dirs:    1
+ Total files:    67353
+ Total symlinks:        0 (Files currently being written: 367)
+ Total blocks (validated):    67339 (avg. block size 31414 B) (Total open file blocks (not validated): **357** )
+ Minimally replicated blocks:    67339 (100.0 %)
+ Over-replicated blocks:    0 (0.0 %)
+ Under-replicated blocks:    0 (0.0 %)
+ Mis-replicated blocks:        0 (0.0 %)
+ Default replication factor:    3
+ Average block replication:    3.0
+ Corrupt blocks:        0
+ Missing replicas:        0 (0.0 %)
+ Number of data-nodes:        6
+ Number of racks:        1
+</code></pre>
+
+<p>发现：有357个文件处于打开状态</p>
+
+<p><strong>4、再列出有问题的文件</strong><br />
+hdfs fsck /user/admin/data/cdn/20170509 -openforwrite</p>
+
+<pre><code>Total size:    2123128799 B
+ Total dirs:    1
+ Total files:    67720
+ Total symlinks:        0
+ Total blocks (validated):    67696 (avg. block size 31362 B)
+ * ** ******* ** ****** ******************
+  CORRUPT FILES:    253
+  MISSING BLOCKS:    253
+  MISSING SIZE:        7473074 B
+ * ** ******* ** ****** ******************
+ Minimally replicated blocks:    67443 (99.626274 %)
+ Over-replicated blocks:    0 (0.0 %)
+ Under-replicated blocks:    0 (0.0 %)
+ Mis-replicated blocks:        0 (0.0 %)
+ Default replication factor:    3
+ Average block replication:    2.9887881
+ Corrupt blocks:        0
+ Missing replicas:        0 (0.0 %)
+ Number of data-nodes:        6
+ Number of racks:        1
+FSCK ended at Wed May 10 10:01:56 CST 2017 in 1357 milliseconds
+</code></pre>
+
+<p>The filesystem under path &lsquo;/user/admin/data/cdn/20170509&rsquo; is CORRUPT</p>
+
+<p><strong>(1)找到有问题的文件</strong></p>
+
+<p>cat tmp.txt |tr &lsquo;/&rsquo; &lsquo;\n&rsquo; |grep ngaahcs-acc |tr &lsquo;:&rsquo; &lsquo; &lsquo;|awk &lsquo;{print $1}&rsquo; |sort
+|uniq |grep -v &ldquo;2017112318&rdquo;</p>
+
+<p><strong>(2)最好的解决方法：删除tmp文件</strong><br />
+hdfs dfs -rmr /user/admin/data/cdn/20170509/*.tmp</p>
+
+<p>然而没有解决!!<br />
+ <strong>(3)删除tmp文件后，再执行</strong><br />
+hdfs fsck /user/admin/data/cdn/20170509 -openforwrite</p>
+
+<p><strong>或者用这种方式查找那些文件</strong><br />
+[root@eeeee spark]# hdfs fsck /user/admin/data/cdn/20170509 -openforwrite
+|grep &ldquo;/user/admin/data/cdn//20170509&rdquo;<br />
+Connecting to namenode via <a href="http://rrrrrr:50070">http://rrrrrr:50070</a></p>
+
+<p>/user/admin/data/cdn//20170509/ngaahcs-
+access.log..201705090002.1494259322790.gz 250 bytes, 1 block(s), OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log..201705090002.1494259322790.gz: MISSING 1 blocks of total size 250
+B&hellip;&hellip;.<br />
+/user/admin/data/cdn//20170509/ngaahcs-access.log.705090000.1494259200039.gz
+1222 bytes, 1 block(s), OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.l4.201705090000.1494259200039.gz: MISSING 1 blocks of total size
+1222<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.C2-3l4.201705090245.1494269103909.gz 211 bytes, 1 block(s),
+OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.CTSX2-3l4.201705090750.1494287404133.gz 1504 bytes, 1 block(s),
+OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.CT-3l4.201705090820.1494289204450.gz 308 bytes, 1 block(s),
+OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.C2-3l4.201705091545.1494315903839.gz 437 bytes, 1 block(s),
+OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.SX3-3l3.201705090002.1494259321230.gz 1075 bytes, 1 block(s),
+OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.CX3-3l4.201705090001.1494259260581.gz 521 bytes, 1 block(s),
+OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.CT-X3-3l4.201705090001.1494259260581.gz: MISSING 1 blocks of total
+size<br />
+/user/admin/data/cdn//20170509/ngaahcs-access.log.CT-
+SX3-3l4.201705090002.1494259320807.gz 729 bytes, 1 block(s), OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-access.log.CT-GX-GD-
+SX4-3l4.201705090001.1494259260236.gz 1138 bytes, 1 block(s), OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.CT-3l4.201705090001.1494259260236.gz: MISSING 1 blocks of total
+size 1138 B&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;.<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.CTX9-3n3.201705090001.1494259260495.gz 2379 bytes, 1 block(s),
+OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.CXq-3k1.201705090002.1494259320204.gz: MISSING 1 blocks of total
+size 10153 /user/admin/data/cdn//20170509/ngaahcs-
+access.log.CTXq-3k2.201705090001.1494259260772.gz 539 bytes, 1 block(s),
+OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-access.log.CT-
+GXq-3n1.201705090002.1494259320328.gz 1278 bytes, 1 block(s), OPENFORWRITE:<br />
+/user/admin/data/cdn//20170509/ngaahcs-
+access.log.CT-G-3n2.201705090001.1494259260696.gz 2183 bytes, 1 block(s),
+OPENFORWRITE:</p>
+
+<p><strong>如果文件不重要则删除他们</strong></p>
+
+<pre><code> hdfs dfs -rmr   /user/admin/data/cdn/meitu/20170509/ngaahcs-access.log.CT.201705090002.1494259322790.gz
+ hdfs dfs -rmr   /user/admin/data/cdn/meitu/20170509/ngaahcs-access.log.C.201705090002.1494259322790.gz
+ hdfs dfs -rmr   /user/admin/data/cdn/meitu/20170509/ngaahcs-access.log.CT-.201705090000.1494259200039.gz
+ hdfs dfs -rmr   /user/admin/data/cdn/meitu/20170509/ngaahcs-access.log.CT-.201705090000.1494259200039.gz
+ hdfs dfs -rmr   /user/admin/data/cdn/meitu/20170509/ngaahcs-access.log.CT-.201705090245.1494269103909.gz
+ hdfs dfs -rmr   /user/admin/data/cdn/meitu/20170509/ngaahcs-access.log.CT-Gl4.201705090750.1494287404133.gz
+ hdfs dfs -rmr   /user/admin/data/cdn/meitu/20170509/ngaahcs-access.log.CT-G3l4.201705090820.1494289204450.gz
+</code></pre>
+
+<p><strong>再检查</strong><br />
+hdfs fsck /user/admin/data/cdn/20170509 -openforwrite<br />
+Total size: 2115004402 B<br />
+Total dirs: 1<br />
+Total files: 67337<br />
+Total symlinks: 0<br />
+Total blocks (validated): 67337 (avg. block size 31409 B)<br />
+Minimally replicated blocks: 67337 (100.0 %)<br />
+Over-replicated blocks: 0 (0.0 %)<br />
+Under-replicated blocks: 0 (0.0 %)<br />
+Mis-replicated blocks: 0 (0.0 %)<br />
+Default replication factor: 3<br />
+Average block replication: 3.0<br />
+Corrupt blocks: 0<br />
+Missing replicas: 0 (0.0 %)<br />
+Number of data-nodes: 6<br />
+Number of racks: 1<br />
+FSCK ended at Wed May 10 10:16:52 CST 2017 in 1329 milliseconds</p>
+
+<p>The filesystem under path &lsquo;/user/admin/data/cdn//20170509&rsquo; is HEALTHY</p>
+
+<p>然后再运行spark程序</p>
+
+<p>注：这不是最终解决方法，所以需要查明原因</p>
+
+<p><strong>如果文件重要，则需要修复。</strong><br />
+一个一个地查看文件状态并且恢复<br />
+以这个文件为例：/user/admin/data/cdn//20170508/ngaahcs-
+access.log.3k3.201705081700.1494234003128.gz</p>
+
+<p><strong>执行修复命令：</strong></p>
+
+<p>hdfs debug recoverLease -path  -retries<br />
+hdfs debug recoverLease -path /user/admin/data/cdn//20170508/ngaahcs-
+access.log.C00.1494234003128.gz -retries 10</p>
+
+<p>hadoop 命令汇总：</p>
+
+<p><a href="https://hadoop.apache.org/docs/r2.7.1/hadoop-project-dist/hadoop-">https://hadoop.apache.org/docs/r2.7.1/hadoop-project-dist/hadoop-</a>
+hdfs/HDFSCommands.html#fsck</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

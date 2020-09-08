@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linuxshell系统常用监控脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="linuxshell系统常用监控脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linuxshell系统常用监控脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E7%B3%BB%E7%BB%9F%E5%B8%B8%E7%94%A8%E7%9B%91%E6%8E%A7%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linuxshell系统常用监控脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>监控指标包括：应用是否启用、磁盘使用率是否超过告警值、CPU使用率是否超过告警值、内存使用率是否超过告警值、IP能否ping通、远程IP的端口telnet能否成功、文件夹中最后修改时间、数据库是否能连接/查询数据库结果</p>
+
+<p>做之前介绍下情况，正在做的系统，采用分布式，包括前台、后台、数据库一共10台机器，其中一台要是出现问题，例如某台机器磁盘空间满了，系统就会出异常，但是客户提供的运维工具简直无语，只能自己写一个极简监控自身系统相关的脚本。</p>
+
+<p>思路：1.写一个监控配置文本，格式：要监控的IP|监控类型|监控指标|监控关键参数，例如，用于记录要监控的机器及监控参数，我这边每台机器都有挂载同一个文件目录，赶紧将配置文本放到挂载目录里面，2.再写一个监控shell脚本，从监控配置文本中读取监控参数，将监控结果返回到一个txt中,3.有了监控结果，是发短信还是告警之类的都好说，4定时监控可以在crontab中配置时间频率</p>
+
+<p>monitconfig.txt监控配置文本</p>
+
+<p>11.211.19.21|PROGRAM|IS_ENABLED|PDFWorkServer<br />
+11.211.19.21|PROGRAM|IS_ENABLED|CompassServer<br />
+11.211.19.21|PROGRAM|IS_ENABLED|GrabServer<br />
+11.211.19.20|PROGRAM|IS_ENABLED|WorkServer<br />
+11.211.19.22|PROGRAM|IS_ENABLED|WorkServer<br />
+11.211.19.22|PROGRAM|IS_ENABLED|PDFWorkServer<br />
+11.211.19.23|PROGRAM|IS_ENABLED|tomcat<br />
+11.211.19.24|PROGRAM|IS_ENABLED|tomcat<br />
+11.211.19.25|PROGRAM|IS_ENABLED|tomcat<br />
+11.211.19.23|SYSTEMCFG|DISK_SPACE_USAGE|80<br />
+11.211.19.24|SYSTEMCFG|DISK_SPACE_USAGE|80<br />
+11.211.19.25|SYSTEMCFG|DISK_SPACE_USAGE|80<br />
+11.211.19.22|SYSTEMCFG|DISK_SPACE_USAGE|80<br />
+11.211.19.20|SYSTEMCFG|DISK_SPACE_USAGE|80<br />
+11.211.19.21|SYSTEMCFG|DISK_SPACE_USAGE|80<br />
+11.211.19.23|SYSTEMCFG|CPU_USAGE|90<br />
+11.211.19.24|SYSTEMCFG|CPU_USAGE|90<br />
+11.211.19.25|SYSTEMCFG|CPU_USAGE|90<br />
+11.211.19.22|SYSTEMCFG|CPU_USAGE|90<br />
+11.211.19.20|SYSTEMCFG|CPU_USAGE|90<br />
+11.211.19.21|SYSTEMCFG|CPU_USAGE|90<br />
+11.211.19.23|NETWORK|NETWORK_PING|11.211.19.21<br />
+11.211.19.21|NETWORK|NETWORK_PING|11.211.19.23<br />
+11.211.19.23|NETWORK|NETWORK_TELNET|11.211.19.21,9090<br />
+11.211.19.21|NETWORK|NETWORK_TELNET|11.211.19.23,8300<br />
+11.211.19.21|FILES|FOLDER_OVERTIME_VALID|/filedata/ftp/as_gd/,GOrder<br />
+11.211.19.21|FILES|FOLDER_OVERTIME_VALID|/filedata/ftp/as_face/,FOrder<br />
+11.211.19.21|FILES|FOLDER_OVERTIME_VALID|/filedata/ftp/as_aicenter/,AOrder<br />
+11.211.19.21|DB|DB_CONN|ORACLE,smartItil,smart@2019,11.211.19.26:1522/smart<br />
+11.211.19.21|DB|DB_CONN|ORACLE,test,ddd,11.211.19.26:1522/test<br />
+11.211.19.21|DB|DB_DATA_MONIT|ORACLE,smartItil,smart@2019,11.211.19.26:1522/smart,select
+count(*) from tbl_wo</p>
+
+<p>监控shell脚本monit.shell</p>
+
+<p>#！/bin/bash<br />
+printf &ldquo;*************************************\n&rdquo;<br />
+searchMonitType=$1<br />
+searchMonitCode=$2<br />
+searchMonitPara=$3<br />
+#判断应用是否启用,并将结果存入txt文件 参数说明
+localIpAddr,monitType,monitCode,procName,datetime,FILE<br />
+procNameIsEnabled(){<br />
+isEnabled=<code>ps -ef |grep -w $4|grep -v grep|wc -l</code><br />
+procNumber=<code>ps -ef | grep $4 | grep -v &quot;grep&quot; | awk '{print $2}'</code><br />
+descs=&ldquo;IP:$1,应用:$4&rdquo;<br />
+if [ $isEnabled -le 0 ];then<br />
+result=0<br />
+sendMsg=1<br />
+descs=$descs&rdquo;未启用&rdquo;<br />
+else<br />
+result=1<br />
+sendMsg=0<br />
+descs=$descs&rdquo;已启用,进程ID:$procNumber&rdquo;<br />
+fi<br />
+echo &ldquo;$1|$2|$3|$4|$result|$sendMsg|$5|$descs&rdquo; &gt;&gt; $6<br />
+}</p>
+
+<p>#判断磁盘使用率是否超过告警值,并将结果存入txt文件 参数说明
+localIpAddr,monitType,monitCode,diskAlarmNum,datetime,FILE<br />
+diskSpaceUsage(){<br />
+isAlarm=0<br />
+diskPer=0<br />
+for diskArr in <code>df -Ph | grep / | awk '{print $6&quot;,&quot;$2&quot;,&quot;$3&quot;,&quot;$4&quot;,&quot;$5}' | sed
+'s/%//g'</code><br />
+do<br />
+DISK_OLD_IFS=&ldquo;$IFS&rdquo;<br />
+IFS=&ldquo;,&rdquo;<br />
+diskTmpArr=($diskArr)<br />
+IFS=&ldquo;$DISK_OLD_IFS&rdquo;<br />
+diskPer=${diskTmpArr[4]}<br />
+if [ $diskPer -ge $4 ]; then<br />
+isAlarm=1<br />
+sendMsg=1<br />
+echo
+&ldquo;$1|$2|$3|$4|$diskPer|$sendMsg|$5|IP:$localIpAddr,目录:${diskTmpArr[0]}磁盘使用率超过$diskPer%,其中目录总大小${diskTmpArr[1]},已用${diskTmpArr[2]},剩余${diskTmpArr[3]}&rdquo;
+&gt;&gt; $6<br />
+fi<br />
+done<br />
+if [ $isAlarm -le 0 ]; then<br />
+sendMsg=0<br />
+echo &ldquo;$1|$2|$3|$4|$diskPer|$sendMsg|$5|IP:$localIpAddr磁盘空间未超过上限$4%&rdquo; &gt;&gt; $6<br />
+fi<br />
+}</p>
+
+<p>#判断CPU使用率是否超过告警值,并将结果存入txt文件 参数说明
+localIpAddr,monitType,monitCode,cpuAlarmNum,datetime,FILE<br />
+cpuUsage(){<br />
+cpuCurUsage=<code>top -b -n 1|grep Cpu|awk '{print $2}'|cut -f 1 -d &quot;.&quot;</code><br />
+if [ $cpuCurUsage -ge $4 ]; then<br />
+sendMsg=1<br />
+echo
+&ldquo;$1|$2|$3|$4|$cpuCurUsage|$sendMsg|$5|IP:$localIpAddr,CPU使用率:$cpuCurUsage%,异常,超过阀值$4,&rdquo;
+&gt;&gt; $6</p>
+
+<p>else<br />
+sendMsg=0<br />
+echo
+&ldquo;$1|$2|$3|$4|$cpuCurUsage|$sendMsg|$5|IP:$localIpAddr,CPU使用率:$cpuCurUsage%,正常&rdquo;
+&gt;&gt; $6<br />
+fi<br />
+}</p>
+
+<p>#判断内存使用率是否超过告警值,并将结果存入txt文件 参数说明
+localIpAddr,monitType,monitCode,memAlarmNum,datetime,FILE<br />
+memerySpaceUsage(){<br />
+memeryCurUsage=<code>free |grep Mem|awk '{print ($6+$7)*100/$2}'|cut -f 1 -d &quot;.&quot;</code><br />
+if [ $memeryCurUsage -ge $4 ]; then<br />
+sendMsg=1<br />
+echo
+&ldquo;$1|$2|$3|$4|$memeryCurUsage|$sendMsg|$5|IP:$localIpAddr,内存使用率:$memeryCurUsage%,异常,超过阀值$4,&rdquo;
+&gt;&gt; $6<br />
+else<br />
+sendMsg=0<br />
+echo
+&ldquo;$1|$2|$3|$4|$memeryCurUsage|$sendMsg|$5|IP:$localIpAddr,内存使用率:$memeryCurUsage%,正常&rdquo;
+&gt;&gt; $6<br />
+fi<br />
+}</p>
+
+<p>#判断IP能否ping通,并将结果存入txt文件 参数说明
+localIpAddr,monitType,monitCode,testIp,datetime,FILE<br />
+networkPing(){<br />
+descs=&ldquo;IP:$1,ping:$4&rdquo;<br />
+if ping -c1 $4 &amp;&gt;/dev/null<br />
+then<br />
+result=1<br />
+sendMsg=0<br />
+descs=$descs&rdquo;成功&rdquo;<br />
+else<br />
+result=0<br />
+sendMsg=1<br />
+descs=$descs&rdquo;失败&rdquo;<br />
+fi<br />
+echo &ldquo;$1|$2|$3|$4|$result|$sendMsg|$5|$descs&rdquo; &gt;&gt; $6<br />
+}</p>
+
+<p>#判断远程IP的端口telnet能否成功,并将结果存入txt文件 参数说明
+localIpAddr,monitType,monitCode,testIp|testPort,datetime,FILE<br />
+networkTelnet(){<br />
+TELNET_OLD_IFS=&ldquo;$IFS&rdquo;<br />
+IFS=&ldquo;,&rdquo;<br />
+telnetArr=($4)<br />
+IFS=&ldquo;$TELNET_OLD_IFS&rdquo;<br />
+testIp=${telnetArr[0]}<br />
+testPort=${telnetArr[1]}<br />
+descs=&ldquo;IP:$1,telnet $testIp:$testPort&rdquo;<br />
+num=<code>echo -n &quot;\n&quot;|telnet 10.253.58.36 8300|grep Connected|wc -l</code><br />
+if [ $num -eq 1 ]<br />
+then<br />
+result=1<br />
+descs=$descs&rdquo;成功&rdquo;<br />
+sendMsg=0<br />
+else<br />
+result=0<br />
+descs=$descs&rdquo;失败&rdquo;<br />
+sendMsg=1<br />
+fi<br />
+echo &ldquo;$1|$2|$3|$4|$result|$sendMsg|$5|$descs&rdquo; &gt;&gt; $6<br />
+}<br />
+#获取文件夹中最后修改时间,并将结果存入txt文件 参数说明
+localIpAddr,monitType,monitCode,path,datetime,FILE<br />
+fileFolderOvertimeValid(){<br />
+FILE_OLD_IFS=&ldquo;$IFS&rdquo;<br />
+IFS=&ldquo;,&rdquo;<br />
+telnetArr=($4)<br />
+IFS=&ldquo;$FILE_OLD_IFS&rdquo;<br />
+testPath=${telnetArr[0]}<br />
+valiKey=${telnetArr[1]}<br />
+descs=&ldquo;IP:$1,文件夹 $testPath&rdquo;<br />
+FILE_NAME=<code>ls -lt $testPath | grep $valiKey | head -n 1 |awk '{print $9}'</code><br />
+if [ $valiKey = &ldquo;&rdquo; ]<br />
+then<br />
+FILE_NAME=<code>ls -lt $testPath | grep -v &quot;total&quot; | head -n 1 |awk '{print $9}'</code><br />
+fi</p>
+
+<p>descs=$descs&rdquo;最后修改的文件名称$FILE_NAME&rdquo;<br />
+FILE_NAME=$testPath$FILE_NAME<br />
+LAST_MODIFY_TIMESTAMP=<code>stat -c %Y $FILE_NAME</code><br />
+echo &ldquo;$LAST_MODIFY_TIMESTAMP&rdquo;<br />
+result=<code>date '+%Y-%m-%d %H:%M:%S' -d @$LAST_MODIFY_TIMESTAMP</code><br />
+echo &ldquo;$result&rdquo;<br />
+descs=$descs&rdquo;,最后修改时间:$result&rdquo;<br />
+sendMsg=0<br />
+echo &ldquo;$1|$2|$3|$4|$result|$sendMsg|$5|$descs&rdquo; &gt;&gt; $6<br />
+}</p>
+
+<p>#判断数据库是否能连接,并将结果存入txt文件 参数说明
+localIpAddr,monitType,monitCode,path,datetime,FILE<br />
+dbConn(){<br />
+DB_OLD_IFS=&ldquo;$IFS&rdquo;<br />
+IFS=&ldquo;,&rdquo;<br />
+dbArr=($4)<br />
+IFS=&ldquo;$DB_OLD_IFS&rdquo;<br />
+dbType=${dbArr[0]}<br />
+dbUser=${dbArr[1]}<br />
+dbPwd=${dbArr[2]}<br />
+dbSid=${dbArr[3]}</p>
+
+<p>descs=&ldquo;IP:$1,连接$dbType类型数据库,用户:$dbUser,SID:$dbSid&rdquo;<br />
+echo $descs<br />
+if [ $dbType == &ldquo;ORACLE&rdquo; ];<br />
+then<br />
+sqlplus /nolog &gt;/dev/null &lt; whenever sqlerror exit 1;<br />
+connect $dbUser/$dbPwd@$dbSid;<br />
+exit<br />
+!<br />
+fi<br />
+if [ $? == 1 ]<br />
+then<br />
+result=0<br />
+descs=$descs&rdquo;,连接失败&rdquo;<br />
+sendMsg=1<br />
+else<br />
+result=1<br />
+descs=$descs&rdquo;,连接成功&rdquo;<br />
+sendMsg=0<br />
+fi<br />
+echo &ldquo;$1|$2|$3|$dbType,$dbUser,$dbSid|$result|$sendMsg|$5|$descs&rdquo; &gt;&gt; $6<br />
+}</p>
+
+<p>#查询数据库结果,并将结果存入txt文件 参数说明 localIpAddr,monitType,monitCode,path,datetime,FILE<br />
+dbExec(){<br />
+DB_OLD_IFS=&ldquo;$IFS&rdquo;<br />
+IFS=&ldquo;,&rdquo;<br />
+dbArr=($4)<br />
+IFS=&ldquo;$DB_OLD_IFS&rdquo;<br />
+dbType=${dbArr[0]}<br />
+dbUser=${dbArr[1]}<br />
+dbPwd=${dbArr[2]}<br />
+dbSid=${dbArr[3]}<br />
+dbSql=${dbArr[4]}<br />
+descs=&ldquo;IP:$1,操作$dbType类型数据库,用户:$dbUser,SID:$dbSid,SQL:$dbSql&rdquo;<br />
+echo $descs<br />
+if [ $dbType == &ldquo;ORACLE&rdquo; ];<br />
+then<br />
+rowsCount=`sqlplus -s ${dbUser}/${dbPwd}@${dbSid} &lt; set pagesize 0 heading off
+echo off termout off feedback off linesize 1200 colsep &ldquo;,&rdquo; trimspool on
+trimout on</p>
+
+<p>${dbSql}<br />
+quit;<br />
+EOF`<br />
+result=${rowsCount}<br />
+echo ${rowsCount}<br />
+descs=$descs&rdquo;,查询结果为${rowsCount}&rdquo;<br />
+fi<br />
+sendMsg=0</p>
+
+<h1 id="if-rowscount-le-hoperls">if [ ${rowsCount} -le $hopeRls ]</h1>
+
+<h1 id="then">then</h1>
+
+<h1 id="descs-descs-与期望结果-hoperls不匹配">descs=$descs&rdquo;,与期望结果$hopeRls不匹配&rdquo;</h1>
+
+<h1 id="sendmsg-1">sendMsg=1</h1>
+
+<h1 id="else">else</h1>
+
+<h1 id="descs-descs">descs=$descs&rdquo;&rdquo;</h1>
+
+<h1 id="sendmsg-0">sendMsg=0</h1>
+
+<h1 id="fi">fi</h1>
+
+<p>echo &ldquo;$1|$2|$3|$dbType,$dbUser,$dbSid|$result|$sendMsg|$5|$descs&rdquo; &gt;&gt; $6<br />
+}</p>
+
+<p>localIpAddr=&lsquo;127.0.0.1&rsquo;<br />
+localIpAddr=$(ip addr | awk &lsquo;/<sup class="footnote-ref" id="fnref:0-9"><a href="#fn:0-9">1</a></sup>+: / {}; /inet.<em>global/ {print
+gensub(/(.</em>)\/(.*)/, &ldquo;\\1&rdquo;, &ldquo;g&rdquo;, $2)}&lsquo;)<br />
+#echo &ldquo;本地IP:&rdquo; $localIpAddr<br />
+monitcfgfile=&ldquo;/filedata/ftp/monit/monitcfg.txt&rdquo;</p>
+
+<p>#echo &ldquo; 遍历读取监控配置文件$monitcfgfile&rdquo;</p>
+
+<p>datetime=$(date &lsquo;+%Y-%m-%d %H:%M:%S&rsquo;)</p>
+
+<p>monitRlsFile=&ldquo;/filedata/ftp/monit/records/&rdquo;$(date &lsquo;+%Y%m%d&rsquo;)&ldquo;.txt&rdquo;</p>
+
+<p>cat $monitcfgfile |while read line<br />
+do<br />
+echo $line;<br />
+string=$line;<br />
+OLD_IFS=&ldquo;$IFS&rdquo;<br />
+IFS=&ldquo;|&rdquo;<br />
+array=($string)<br />
+IFS=&ldquo;$OLD_IFS&rdquo;<br />
+monitIp=${array[0]}<br />
+monitType=${array[1]}<br />
+monitCode=${array[2]}<br />
+monitPara=${array[3]}<br />
+#echo
+&ldquo;本地IP$localIpAddr监控IP$monitIp监控类型$monitType监控编码$monitCode关键值$monitPara入参$searchMonitCode&rdquo;</p>
+
+<p>if [[ $localIpAddr == $monitIp ]] &amp;&amp; [[ $monitType == $searchMonitType ]] &amp;&amp;
+[[ $monitCode == $searchMonitCode ]]; then<br />
+if [ $monitType = &ldquo;PROGRAM&rdquo; ] ; then<br />
+if [ $monitCode = &ldquo;IS_ENABLED&rdquo; ] ; then<br />
+procNameIsEnabled $localIpAddr $monitType $monitCode $monitPara &ldquo;$datetime&rdquo;
+$monitRlsFile<br />
+else<br />
+echo &ldquo;not monitCode&rdquo;<br />
+fi</p>
+
+<p>elif [ $monitType = &ldquo;NETWORK&rdquo; ] ; then<br />
+if [ $monitCode = &ldquo;NETWORK_PING&rdquo; ] ; then<br />
+networkPing $localIpAddr $monitType $monitCode $monitPara &ldquo;$datetime&rdquo;
+$monitRlsFile<br />
+elif [ $monitCode = &ldquo;NETWORK_TELNET&rdquo; ] ; then<br />
+networkTelnet $localIpAddr $monitType $monitCode $monitPara &ldquo;$datetime&rdquo;
+$monitRlsFile<br />
+else<br />
+echo &ldquo;not monitCode&rdquo;<br />
+fi<br />
+elif [ $monitType = &ldquo;SYSTEMCFG&rdquo; ] ; then<br />
+if [ $monitCode = &ldquo;DISK_SPACE_USAGE&rdquo; ] ; then<br />
+diskSpaceUsage $localIpAddr $monitType $monitCode $monitPara &ldquo;$datetime&rdquo;
+$monitRlsFile<br />
+elif [ $monitCode = &ldquo;CPU_USAGE&rdquo; ] ; then<br />
+cpuUsage $localIpAddr $monitType $monitCode $monitPara &ldquo;$datetime&rdquo;
+$monitRlsFile<br />
+elif [ $monitCode = &ldquo;MEMERY_USAGE&rdquo; ] ; then<br />
+memerySpaceUsage $localIpAddr $monitType $monitCode $monitPara &ldquo;$datetime&rdquo;
+$monitRlsFile<br />
+else<br />
+echo &ldquo;not monitCode&rdquo;<br />
+fi<br />
+elif [ $monitType = &ldquo;FILES&rdquo; ] ; then</p>
+
+<p>if [ $monitCode = &ldquo;FILE_OVERTIME_VALID&rdquo; ] ; then<br />
+echo &ldquo;FILE_OVERTIME_VALID&rdquo;<br />
+elif [ $monitCode = &ldquo;FOLDER_OVERTIME_VALID&rdquo; ] ; then<br />
+if [[ $monitPara == <em>$searchMonitPara</em> ]] ; then<br />
+fileFolderOvertimeValid $localIpAddr $monitType $monitCode &ldquo;$monitPara&rdquo;
+&ldquo;$datetime&rdquo; $monitRlsFile<br />
+fi</p>
+
+<p>else<br />
+echo &ldquo;not monitCode&rdquo;<br />
+fi<br />
+elif [ $monitType = &ldquo;DB&rdquo; ] ; then<br />
+if [ $monitCode = &ldquo;DB_CONN&rdquo; ] ; then<br />
+dbConn $localIpAddr $monitType $monitCode &ldquo;$monitPara&rdquo; &ldquo;$datetime&rdquo;
+$monitRlsFile<br />
+elif [ $monitCode = &ldquo;DB_DATA_MONIT&rdquo; ] ; then<br />
+dbExec $localIpAddr $monitType $monitCode &ldquo;$monitPara&rdquo; &ldquo;$datetime&rdquo;
+$monitRlsFile<br />
+else<br />
+echo &ldquo;not monitCode&rdquo;<br />
+fi<br />
+else<br />
+echo &ldquo;not monit type&rdquo;<br />
+fi<br />
+fi<br />
+done</p>
+<div class="footnotes">
+
+<hr />
+
+<ol>
+<li id="fn:0-9">0-9 <a class="footnote-return" href="#fnref:0-9"><sup>[return]</sup></a></li>
+</ol>
+</div>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

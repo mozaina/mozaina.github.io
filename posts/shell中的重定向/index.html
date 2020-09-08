@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell中的重定向 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell中的重定向 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell中的重定向">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E4%B8%AD%E7%9A%84%E9%87%8D%E5%AE%9A%E5%90%91/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell中的重定向</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>Working with redirections in bash is really easy once you realize that it&rsquo;s
+all about manipulating file descriptors. When bash starts it opens the three
+standard file descriptors: stdin (file descriptor 0), stdout (file descriptor
+1), and stderr (file descriptor 2). You can open more file descriptors (such
+as 3, 4, 5, &hellip;), and you can close them. You can also copy file descriptors.
+And you can write to them and read from them.</p>
+
+<p>File descriptors always point to some file (unless they&rsquo;re closed). Usually
+when bash starts all three file descriptors, stdin, stdout, and stderr, point
+to your terminal. The input is read from what you type in the terminal and
+both outputs are sent to the terminal.</p>
+
+<p>Assuming your terminal is <code>/dev/tty0</code>, here is how the file descriptor table
+looks like when bash starts:</p>
+
+<p><a href="https://img.it610.com/image/info8/53dcb60b3dd34bb991539a1d79e7796d.png"><img src="https://img.it610.com/image/info8/53dcb60b3dd34bb991539a1d79e7796d.png" alt="Shell中的重定向_第1张图片" /></a></p>
+
+<p>When bash runs a command it forks a child process (see <code>man 2 fork</code>) that
+inherits all the file descriptors from the parent process, then it sets up the
+redirections that you specified, and execs the command (see<code>man 3 exec</code>).</p>
+
+<p>To be a pro at bash redirections all you need to do is visualize how the file
+descriptors get changed when redirections happen. The graphics illustrations
+will help you.</p>
+
+<p><strong>1. Redirect the standard output of a command to a file</strong></p>
+
+<pre><code>$ command &gt;file
+</code></pre>
+
+<p>Operator <code>&gt;</code> is the output redirection operator. Bash first tries to open the
+file for writing and if it succeeds it sends the stdout of <code>command</code> to the
+newly opened file. If it fails opening the file, the whole command fails.</p>
+
+<p>Writing <code>command &gt;file</code> is the same as writing <code>command 1&gt;file</code>. The number
+<code>1</code> stands for stdout, which is the file descriptor number for standard
+output.</p>
+
+<p>Here is how the file descriptor table changes. Bash opens <code>file</code> and replaces
+file descriptor 1 with the file descriptor that points to <code>file</code>. So all the
+output that gets written to file descriptor 1 from now on ends up being
+written to <code>file</code>:</p>
+
+<p><a href="https://img.it610.com/image/info8/ab35f56878264ccda4c23be192ee9c1c.png"><img src="https://img.it610.com/image/info8/ab35f56878264ccda4c23be192ee9c1c.png" alt="Shell中的重定向_第2张图片" /></a></p>
+
+<p>In general you can write <code>command n&gt;file</code>, which will redirect the file
+descriptor <code>n</code> to <code>file</code>.</p>
+
+<p>For example,</p>
+
+<pre><code>$ ls &gt; file_list
+</code></pre>
+
+<p>Redirects the output of the <code>ls</code> command to the <code>file_list</code> file.</p>
+
+<p><strong>2. Redirect the standard error of a command to a file</strong></p>
+
+<pre><code>$ command 2&gt; file
+</code></pre>
+
+<p>Here bash redirects the stderr to file. The number <code>2</code> stands for stderr.</p>
+
+<p>Here is how the file descriptor table changes:</p>
+
+<p><a href="https://img.it610.com/image/info8/8365671a6a2640ea88ec3c8d76673f6b.png"><img src="https://img.it610.com/image/info8/8365671a6a2640ea88ec3c8d76673f6b.png" alt="Shell中的重定向_第3张图片" /></a></p>
+
+<p>Bash opens <code>file</code> for writing, gets the file descriptor for this file, and it
+replaces file descriptor 2 with the file descriptor of this file. So now
+anything written to stderr gets written to file.</p>
+
+<p><strong>3. Redirect both standard output and standard error to a file</strong></p>
+
+<pre><code>$ command &amp;&gt;file
+</code></pre>
+
+<p>This one-liner uses the <code>&amp;&gt;</code> operator to redirect both output streams - stdout
+and stderr - from <code>command</code> to<code>file</code>. This is bash&rsquo;s shortcut for quickly
+redirecting both streams to the same destination.</p>
+
+<p>Here is how the file descriptor table looks like after bash has redirected
+both streams:</p>
+
+<p><a href="https://img.it610.com/image/info8/3f2ce0add05049ba852b4b9171e45f2e.png"><img src="https://img.it610.com/image/info8/3f2ce0add05049ba852b4b9171e45f2e.png" alt="Shell中的重定向_第4张图片" /></a></p>
+
+<p>As you can see both stdout and stderr now point to <code>file</code>. So anything written
+to stdout and stderr gets written to <code>file</code>.</p>
+
+<p>There are several ways to redirect both streams to the same destination. You
+can redirect each stream one after another:</p>
+
+<pre><code>$ command &gt;file 2&gt;&amp;1
+</code></pre>
+
+<p>This is a much more common way to redirect both streams to a file. First
+stdout is redirected to <code>file</code>, and then stderr is duplicated to be the same
+as stdout. So both streams end up pointing to <code>file</code>.</p>
+
+<p>When bash sees several redirections it processes them from left to right.
+Let&rsquo;s go through the steps and see how that happens. Before running any
+commands bash&rsquo;s file descriptor table looks like this:</p>
+
+<p><a href="https://img.it610.com/image/info8/53dcb60b3dd34bb991539a1d79e7796d.png"><img src="https://img.it610.com/image/info8/53dcb60b3dd34bb991539a1d79e7796d.png" alt="Shell中的重定向_第5张图片" /></a></p>
+
+<p>Now bash processes the first redirection <code>&gt;file</code>. We&rsquo;ve seen this before and
+it makes stdout point to<code>file</code>:</p>
+
+<p><a href="https://img.it610.com/image/info8/ab35f56878264ccda4c23be192ee9c1c.png"><img src="https://img.it610.com/image/info8/ab35f56878264ccda4c23be192ee9c1c.png" alt="Shell中的重定向_第6张图片" /></a></p>
+
+<p>Next bash sees the second redirection <code>2&gt;&amp;1</code>. We haven&rsquo;t seen this redirection
+before. This one duplicates file descriptor 2 to be a copy of file descriptor
+1 and we get:</p>
+
+<p><a href="https://img.it610.com/image/info8/3f2ce0add05049ba852b4b9171e45f2e.png"><img src="https://img.it610.com/image/info8/3f2ce0add05049ba852b4b9171e45f2e.png" alt="Shell中的重定向_第7张图片" /></a></p>
+
+<p>Both streams have been redirected to <code>file</code>.</p>
+
+<p>However be careful here! Writing:</p>
+
+<pre><code>command &gt;file 2&gt;&amp;1
+</code></pre>
+
+<p>Is not the same as writing:</p>
+
+<pre><code>$ command 2&gt;&amp;1 &gt;file
+</code></pre>
+
+<p>The order of redirects matters in bash! This command redirects only the
+standard output to the file. The stderr will still print to the terminal. To
+understand why that happens, let&rsquo;s go through the steps again. So before
+running the command the file descriptor table looks like this:</p>
+
+<p><a href="https://img.it610.com/image/info8/53dcb60b3dd34bb991539a1d79e7796d.png"><img src="https://img.it610.com/image/info8/53dcb60b3dd34bb991539a1d79e7796d.png" alt="Shell中的重定向_第8张图片" /></a></p>
+
+<p>Now bash processes redirections left to right. It first sees <code>2&gt;&amp;1</code> so it
+duplicates stderr to stdout. The file descriptor table becomes:</p>
+
+<p><a href="https://img.it610.com/image/info8/8c035249f40c4d5e9c961d553f44c868.png"><img src="https://img.it610.com/image/info8/8c035249f40c4d5e9c961d553f44c868.png" alt="Shell中的重定向_第9张图片" /></a></p>
+
+<p>Now bash sees the second redirect <code>&gt;file</code> and it redirects stdout to <code>file</code>:</p>
+
+<p><a href="https://img.it610.com/image/info8/0abe34611202487fa86d1571446cda57.png"><img src="https://img.it610.com/image/info8/0abe34611202487fa86d1571446cda57.png" alt="Shell中的重定向_第10张图片" /></a></p>
+
+<p>Do you see what happens here? Stdout now points to <code>file</code> but the stderr still
+points to the terminal! Everything that gets written to stderr still gets
+printed out to the screen! So be very, very careful with the order of
+redirects!</p>
+
+<p>Also note that in bash, writing this:</p>
+
+<pre><code>$ command &amp;&gt;file
+</code></pre>
+
+<p>Is exactly the same as:</p>
+
+<pre><code>$ command &gt;&amp;file
+</code></pre>
+
+<p>The first form is preferred however.</p>
+
+<p><strong>4. Discard the standard output of a command</strong></p>
+
+<pre><code>$ command &gt; /dev/null
+</code></pre>
+
+<p>The special file <code>/dev/null</code> discards all data written to it. So what we&rsquo;re
+doing here is redirecting stdout to this special file and it gets discarded.
+Here is how it looks from the file descriptor table&rsquo;s perspective:</p>
+
+<p><a href="https://img.it610.com/image/info8/3e797c6bc5b543fe89bf029fe2e2aba9.png"><img src="https://img.it610.com/image/info8/3e797c6bc5b543fe89bf029fe2e2aba9.png" alt="Shell中的重定向_第11张图片" /></a></p>
+
+<p>Similarly, by combining the previous one-liners, we can discard both stdout
+and stderr by doing:</p>
+
+<pre><code>$ command &gt;/dev/null 2&gt;&amp;1
+</code></pre>
+
+<p>Or just simply:</p>
+
+<pre><code>$ command &amp;&gt;/dev/null
+</code></pre>
+
+<p>File descriptor table for this feat looks like this:</p>
+
+<p><a href="https://img.it610.com/image/info8/3401e5cb1e274a40a3e2026516209da4.png"><img src="https://img.it610.com/image/info8/3401e5cb1e274a40a3e2026516209da4.png" alt="Shell中的重定向_第12张图片" /></a></p>
+
+<p><strong>5. Redirect the contents of a file to the stdin of a command</strong></p>
+
+<pre><code>$ command  
+
+
+ Here bash tries to open the file for reading before running any commands. If opening the file fails, bash quits with error and doesn't run the command. If opening the file succeeds, bash uses the file descriptor of the opened file as the stdin file descriptor for the command.
+
+
+
+
+ After doing that the file descriptor table looks like this:
+
+
+
+
+
+ [![Shell中的重定向_第13张图片](https://img.it610.com/image/info8/5e616347afbb45e6809eddd9275db512.png)](https://img.it610.com/image/info8/5e616347afbb45e6809eddd9275db512.png)
+
+
+
+
+
+ Here is an example. Suppose you want to read the first line of the file in a variable. You can simply do this:
+
+
+
+
+
+$ read -r line &lt; file
+</code></pre>
+
+<p>Bash&rsquo;s built-in <code>read</code> command reads a single line from standard input. By
+using the input redirection operator <code>&lt;</code> we set it up to read the line from
+the file.</p>
+
+<p><strong>6. Redirect a bunch of text to the stdin of a command</strong></p>
+
+<pre><code>$ command &lt; 
+
+
+ Here we use the here-document redirection operator &lt;. This operator instructs bash to read the input from stdin until a line containing only MARKER is found. At this point bash passes the all the input read so far to the stdin of the command.
+
+
+
+
+ Here is a common example. Suppose you've copied a bunch of URLs to the clipboard and you want to remove http:// part of them. A quick one-liner to do this would be:
+
+
+
+
+
+$ sed 's|http://||' &lt; 
+
+
+ Here the input of a list of URLs is redirected to the sed command that strips http:// from the input.
+
+
+
+
+ This example produces this output:
+
+
+
+
+
+url1.com
+url2.com
+url3.com
+</code></pre>
+
+<p><strong>7. Redirect a single line of text to the stdin of a command</strong></p>
+
+<pre><code>$ command &lt;&lt;&lt; &quot;foo bar baz&quot;
+</code></pre>
+
+<p>For example, let&rsquo;s say you quickly want to pass the text in your clipboard as
+the stdin to a command. Instead of doing something like:</p>
+
+<pre><code>$ echo &quot;clipboard contents&quot; | command
+</code></pre>
+
+<p>You can now just write:</p>
+
+<pre><code>$ command &lt;&lt;&lt; &quot;clipboard contents&quot;
+</code></pre>
+
+<p>This trick changed my life when I learned it!</p>
+
+<p><strong>8. Redirect stderr of all commands to a file forever</strong></p>
+
+<pre><code>$ exec 2&gt;file
+$ command1
+$ command2
+$ ...
+</code></pre>
+
+<p>This one-liner uses the built-in <code>exec</code> bash command. If you specify redirects
+after it, then they will last forever, meaning until you change them or exit
+the script/shell.</p>
+
+<p>In this case the <code>2&gt;file</code> redirect is setup that redirects the stderr of the
+current shell to the <code>file</code>. Running commands after setting up this redirect
+will have the stderr of all of them redirected to file. It&rsquo;s really useful in
+situations when you want to have a complete log of all errors that happened in
+the script, but you don&rsquo;t want to specify <code>2&gt;file</code> after every single command!</p>
+
+<p>In general <code>exec</code> can take an optional argument of a command. If it&rsquo;s
+specified, bash replaces itself with the command. So what you get is only that
+command running, and there is no more shell.</p>
+
+<p><strong>9. Open a file for reading using a custom file descriptor</strong></p>
+
+<pre><code>$ exec 3 
+
+
+ Here we use the exec command again and specify the 3 redirect to it. What this does is opens the file for reading and assigns the opened file-descriptor to the shell's file descriptor number 3. The file descriptor table now looks like this:
+
+
+
+
+
+ [![Shell中的重定向_第14张图片](https://img.it610.com/image/info8/bfc7067418ff4b549ac6da1715b0fa82.png)](https://img.it610.com/image/info8/bfc7067418ff4b549ac6da1715b0fa82.png)
+
+
+
+
+
+ Now you can read from the file descriptor 3, like this:
+
+
+
+
+
+$ read -u 3 line
+</code></pre>
+
+<p>This reads a line from the file that we just opened as fd <code>3</code>.</p>
+
+<p>Or you can use regular shell commands such as <code>grep</code> and operate on file
+descriptor <code>3</code>:</p>
+
+<pre><code>$ grep &quot;foo&quot;  
+
+
+ What happens here is file descriptor 3 gets duplicated to file descriptor 1 - stdin of grep. Just remember that once you read the file descriptor it's been exhausted and you need to close it and open it again to use it. (You can't rewind an fd in bash.)
+
+
+
+
+ After you're done using fd 3, you can close it this way:
+
+
+
+
+
+$ exec 3&gt;&amp;-
+</code></pre>
+
+<p>Here the file descriptor <code>3</code> is duped to <code>-</code>, which is bash&rsquo;s special way to
+say &ldquo;close this fd&rdquo;.</p>
+
+<p><strong>10. Open a file for writing using a custom file descriptor</strong></p>
+
+<pre><code>$ exec 4&gt;file
+</code></pre>
+
+<p>Here we simply tell bash to open file for writing and assign it number <code>4</code>.
+The file descriptor table looks like this:</p>
+
+<p><a href="https://img.it610.com/image/info8/11d734b0efca4149bfb35b518b7cf4eb.png"><img src="https://img.it610.com/image/info8/11d734b0efca4149bfb35b518b7cf4eb.png" alt="Shell中的重定向_第15张图片" /></a></p>
+
+<p>As you can see file descriptors don&rsquo;t have to be used in order, you can open
+any file descriptor number you like from 0 to 255.</p>
+
+<p>Now we can simply write to the file descriptor <code>4</code>:</p>
+
+<pre><code>$ echo &quot;foo&quot; &gt;&amp;4
+</code></pre>
+
+<p>And we can close the file descriptor <code>4</code>:</p>
+
+<pre><code>$ exec 4&gt;&amp;-
+</code></pre>
+
+<p>It&rsquo;s so simple now once we learned how to work with custom file descriptors!</p>
+
+<p><strong>11. Open a file both for writing and reading</strong></p>
+
+<pre><code>$ exec 3&lt;&gt;file
+</code></pre>
+
+<p>Here we use bash&rsquo;s diamond operator <code>&lt;&gt;</code>. The diamond operator opens a file
+descriptor for both reading and writing.</p>
+
+<p>So for example, if you do this:</p>
+
+<pre><code>$ echo &quot;foo bar&quot; &gt; file   # write string &quot;foo bar&quot; to file &quot;file&quot;.
+$ exec 5&lt;&gt; file           # open &quot;file&quot; for rw and assign it fd 5.
+$ read -n 3 var  
+
+
+ This will output foo as we just read the first 3 chars from the file.
+
+
+
+
+ Now we can write some stuff to the file:
+
+
+
+
+
+$ echo -n + &gt;&amp;5           # write &quot;+&quot; at 4th position.
+$ exec 5&gt;&amp;-               # close fd 5.
+$ cat file
+</code></pre>
+
+<p>This will output <code>foo+bar</code> as we wrote the <code>+</code> char at 4th position in the
+file.</p>
+
+<p><strong>12. Send the output from multiple commands to a file</strong></p>
+
+<pre><code>$ (command1; command2) &gt;file
+</code></pre>
+
+<p>This one-liner uses the <code>(commands)</code> construct that runs the commands a sub-
+shell. A sub-shell is a child process launched by the current shell.</p>
+
+<p>So what happens here is the commands <code>command1</code> and <code>command2</code> get executed in
+the sub-shell, and bash redirects their output to <code>file</code>.</p>
+
+<p><strong>13. Execute commands in a shell through a file</strong></p>
+
+<p>Open two shells. In shell 1 do this:</p>
+
+<pre><code>mkfifo fifo
+exec &lt; fifo
+</code></pre>
+
+<p>In shell 2 do this:</p>
+
+<pre><code>exec 3&gt; fifo;
+echo 'echo test' &gt;&amp;3
+</code></pre>
+
+<p>Now take a look in shell 1. It will execute <code>echo test</code>. You can keep writing
+commands to <code>fifo</code> and shell 1 will keep executing them.</p>
+
+<p>Here is how it works.</p>
+
+<p>In shell 1 we use the <code>mkfifo</code> command to create a named pipe called <code>fifo</code>. A
+named pipe (also called a FIFO) is similar to a regular pipe, except that it&rsquo;s
+accessed as part of the file system. It can be opened by multiple processes
+for reading or writing. When processes are exchanging data via the FIFO, the
+kernel passes all data internally without writing it to the file system. Thus,
+the FIFO special file has no contents on the file system; the file system
+entry merely serves as a reference point so that processes can access the pipe
+using a name in the file system.</p>
+
+<p>Next we use <code>exec &lt; fifo</code> to replace current shell&rsquo;s stdin with <code>fifo</code>.</p>
+
+<p>Now in shell 2 we open the named pipe for writing and assign it a custom file
+descriptor 3. Next we simply write <code>echo test</code> to the file descriptor 3, which
+goes to <code>fifo</code>.</p>
+
+<p>Since shell 1&rsquo;s stdin is connected to this pipe it executes it! Really simple!</p>
+
+<p><strong>14. Access a website through bash</strong></p>
+
+<pre><code>$ exec 3&lt;&gt;/dev/tcp/www.google.com/80
+$ echo -e &quot;GET / HTTP/1.1\n\n&quot; &gt;&amp;3
+$ cat  
+
+
+ Bash treats the /dev/tcp/host/port as a special file. It doesn't need to exist on your system. This special file is for opening tcp connections through bash.
+
+
+
+
+ In this example we first open file descriptor 3 for reading and writing and point it to/dev/tcp/www.google.com/80 special file, which is a connection to www.google.com on port 80.
+
+
+
+
+ Next we write GET / HTTP/1.1\n\n to file descriptor 3. And then we simply read the response back from the same file descriptor by using cat.
+
+
+
+
+ Similarly you can create a UDP connection through /dev/udp/host/port special file.
+
+
+
+
+ With /dev/tcp/host/port you can even write things like port scanners in bash!
+
+
+
+
+ **15. Prevent overwriting the contents of a file when redirecting output**
+
+
+
+
+
+$ set -o noclobber
+</code></pre>
+
+<p>This turns on the <code>noclobber</code> option for the current shell. The noclobber
+option prevents you from overwriting existing files with the &gt; operator.</p>
+
+<p>If you try redirecting output to a file that exists, you&rsquo;ll get an error:</p>
+
+<pre><code>$ program &gt; file
+bash: file: cannot overwrite existing file
+</code></pre>
+
+<p>If you&rsquo;re 100% sure that you want to overwrite the file, use the <code>&gt;|</code>
+redirection operator:</p>
+
+<pre><code>$ program &gt;| file
+</code></pre>
+
+<p>This succeeds as it overrides the noclobber option.</p>
+
+<p><strong>16. Redirect standard input to a file and print it to standard output</strong></p>
+
+<pre><code>$ command | tee file
+</code></pre>
+
+<p>The <code>tee</code> command is super handy. It&rsquo;s not part of bash but you&rsquo;ll use it
+often. It takes an input stream and prints it both to standard output and to a
+file.</p>
+
+<p>In this example it takes the stdout of command, puts it in file, and prints it
+to stdout.</p>
+
+<p>Here is a graphical illustration of how it works:</p>
+
+<p><a href="https://img.it610.com/image/info8/4b05ed7040914fd9b80ac44c4422f562.png"><img src="https://img.it610.com/image/info8/4b05ed7040914fd9b80ac44c4422f562.png" alt="Shell中的重定向_第16张图片" /></a></p>
+
+<p><strong>17. Send stdout of one process to stdin of another process</strong></p>
+
+<pre><code>$ command1 | command2
+</code></pre>
+
+<p>This is simple piping. I&rsquo;m sure everyone is familiar with this. I&rsquo;m just
+including it here for completeness. Just to remind you, a pipe connects stdout
+of <code>command1</code> with the stdin of <code>command2</code>.</p>
+
+<p>It can be illustrated with a graphic:</p>
+
+<p><a href="https://img.it610.com/image/info8/b92331eb4ad9452c943c67ca82f048df.png"><img src="https://img.it610.com/image/info8/b92331eb4ad9452c943c67ca82f048df.png" alt="Shell中的重定向_第17张图片" /></a></p>
+
+<p>As you can see, everything sent to file descriptor 1 (stdout) of command1 gets
+redirected through a pipe to file descriptor 0 (stdin) of command2.</p>
+
+<p>You can read more about pipes in <code>man 2 pipe</code>.</p>
+
+<p><strong>18. Send stdout and stderr of one process to stdin of another process</strong></p>
+
+<pre><code>$ command1 |&amp; command2
+</code></pre>
+
+<p>This works on bash versions starting 4.0. The <code>|&amp;</code> redirection operator sends
+both stdout and stderr of command1 over a pipe to stdin of command2.</p>
+
+<p>As the new features of bash 4.0 aren&rsquo;t widely used, the old, and more portable
+way to do the same is:</p>
+
+<pre><code>$ command1 2&gt;&amp;1 | command2
+</code></pre>
+
+<p>Here is an illustration that shows what happens with file descriptors:</p>
+
+<p><a href="https://img.it610.com/image/info8/e87313237c6440bab0227a0f4760b1b5.png"><img src="https://img.it610.com/image/info8/e87313237c6440bab0227a0f4760b1b5.png" alt="Shell中的重定向_第18张图片" /></a></p>
+
+<p>First command1&rsquo;s stderr is redirected to stdout, and then a pipe is setup
+between command1&rsquo;s stdout and command2&rsquo;s stdin.</p>
+
+<p><strong>19. Give file descriptors names</strong></p>
+
+<pre><code>$ exec {filew}&gt;output_file
+</code></pre>
+
+<p>Named file descriptors is a feature of bash 4.1. Named file descriptors look
+like <code>{varname}</code>. You can use them just like regular, numeric, file
+descriptors. Bash internally chooses a free file descriptor and assigns it a
+name.</p>
+
+<p><strong>20. Order of redirections</strong></p>
+
+<p>You can put the redirections anywhere in the command you wish. Check out these
+3 examples, they all do the same:</p>
+
+<pre><code>$ echo hello &gt;/tmp/example
+
+$ echo &gt;/tmp/example hello
+
+$ &gt;/tmp/example echo hello
+</code></pre>
+
+<p>Got to love bash!</p>
+
+<p><strong>21. Swap stdout and stderr</strong></p>
+
+<pre><code>$ command 3&gt;&amp;1 1&gt;&amp;2 2&gt;&amp;3
+</code></pre>
+
+<p>Here we first duplicate file descriptor 3 to be a copy of stdout. Then we
+duplicate stdout to be a copy of stderr, and finally we duplicate stderr to be
+a copy of file descriptor 3, which is stdout. As a result we&rsquo;ve swapped stdout
+and stderr.</p>
+
+<p>Let&rsquo;s go through each redirection with illustrations. Before running the
+command, we&rsquo;ve file descriptors pointing to the terminal:</p>
+
+<p><a href="https://img.it610.com/image/info8/53dcb60b3dd34bb991539a1d79e7796d.png"><img src="https://img.it610.com/image/info8/53dcb60b3dd34bb991539a1d79e7796d.png" alt="Shell中的重定向_第19张图片" /></a></p>
+
+<p>Next bash setups <code>3&gt;&amp;1</code> redirection. This creates file descriptor 3 to be a
+copy of file descriptor 1:</p>
+
+<p><a href="https://img.it610.com/image/info8/124d0e97a0184100b580e8785e5129a9.png"><img src="https://img.it610.com/image/info8/124d0e97a0184100b580e8785e5129a9.png" alt="Shell中的重定向_第20张图片" /></a></p>
+
+<p>Next bash setups <code>1&gt;&amp;2</code> redirection. This makes file descriptor 1 to be a copy
+of file descriptor 2:</p>
+
+<p><a href="https://img.it610.com/image/info8/d7b120e62a814d67a62883616f1c6f38.png"><img src="https://img.it610.com/image/info8/d7b120e62a814d67a62883616f1c6f38.png" alt="Shell中的重定向_第21张图片" /></a></p>
+
+<p>Next bash setups <code>2&gt;&amp;3</code> redirection. This makes file descriptor 2 to be a copy
+of file descriptor 3:</p>
+
+<p><a href="https://img.it610.com/image/info8/a969f8f041f44d78b45e7dc130e634f3.png"><img src="https://img.it610.com/image/info8/a969f8f041f44d78b45e7dc130e634f3.png" alt="Shell中的重定向_第22张图片" /></a></p>
+
+<p>If we want to be nice citizens we can also close file descriptor 3 as it&rsquo;s no
+longer needed:</p>
+
+<pre><code>$ command 3&gt;&amp;1 1&gt;&amp;2 2&gt;&amp;3 3&gt;&amp;-
+</code></pre>
+
+<p>The file descriptor table then looks like this:</p>
+
+<p><a href="https://img.it610.com/image/info8/a8c450e5ae204cb1a7452b9d3f4d7a56.png"><img src="https://img.it610.com/image/info8/a8c450e5ae204cb1a7452b9d3f4d7a56.png" alt="Shell中的重定向_第23张图片" /></a></p>
+
+<p>As you can see, file descriptors 1 and 2 have been swapped.</p>
+
+<p><strong>22. Send stdout to one process and stderr to another process</strong></p>
+
+<pre><code>$ command &gt; &gt;(stdout_cmd) 2&gt; &gt;(stderr_cmd)
+</code></pre>
+
+<p>This one-liner uses process substitution. The <code>&gt;(...)</code> operator runs the
+commands in <code>...</code> with stdin connected to the read part of an anonymous named
+pipe. Bash replaces the operator with the filename of the anonymous pipe.</p>
+
+<p>So for example, the first substitution <code>&gt;(stdout_cmd)</code> might return
+<code>/dev/fd/60</code>, and the second substitution might return <code>/dev/fd/61</code>. Both of
+these files are named pipes that bash created on the fly. Both named pipes
+have the commands as readers. The commands wait for someone to write to the
+pipes so they can read the data.</p>
+
+<p>The command then looks like this:</p>
+
+<pre><code>$ command &gt; /dev/fd/60 2&gt; /dev/fd/61
+</code></pre>
+
+<p>Now these are just simple redirections. Stdout gets redirected to
+<code>/dev/fd/60</code>, and stderr gets redirected to <code>/dev/fd/61</code>.</p>
+
+<p>When the command writes to stdout, the process behind <code>/dev/fd/60</code> (process
+<code>stdout_cmd</code>) reads the data. And when the command writes to stderr, the
+process behind <code>/dev/fd/61</code> (process <code>stderr_cmd</code>) reads the data.</p>
+
+<p><strong>23. Find the exit codes of all piped commands</strong></p>
+
+<p>Let&rsquo;s say you run several commands all piped together:</p>
+
+<pre><code>$ cmd1 | cmd2 | cmd3 | cmd4
+</code></pre>
+
+<p>And you want to find out the exit status codes of all these commands. How do
+you do it? There is no easy way to get the exit codes of all commands as bash
+returns only the exit code of the last command.</p>
+
+<p>Bash developers thought about this and they added a special <code>PIPESTATUS</code> array
+that saves the exit codes of all the commands in the pipe stream.</p>
+
+<p>The elements of the <code>PIPESTATUS</code> array correspond to the exit codes of the
+commands. Here&rsquo;s an example:</p>
+
+<pre><code>$ echo 'pants are cool' | grep 'moo' | sed 's/o/x/' | awk '{ print $1 }'
+$ echo ${PIPESTATUS[@]}
+0 1 0 0
+</code></pre>
+
+<p>In this example <code>grep 'moo'</code> fails, and the 2nd element of the <code>PIPESTATUS</code>
+array indicates failure.</p>
+
+<h2 id="shoutouts">Shoutouts</h2>
+
+<p>Shoutouts to bash hackers wiki for their illustrated redirection tutorial and
+bash version changes.</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

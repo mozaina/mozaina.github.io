@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linuxc程序中获取shell脚本输出的实现方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="linuxc程序中获取shell脚本输出的实现方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linuxc程序中获取shell脚本输出的实现方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxc%E7%A8%8B%E5%BA%8F%E4%B8%AD%E8%8E%B7%E5%8F%96shell%E8%84%9A%E6%9C%AC%E8%BE%93%E5%87%BA%E7%9A%84%E5%AE%9E%E7%8E%B0%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linuxc程序中获取shell脚本输出的实现方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>转载自：<a href="http://www.jb51.net/article/40812.htm">http://www.jb51.net/article/40812.htm</a></p>
+
+<p>以下是对在linux下c程序中获取shell脚本输出的实现方法进行了详细的分析介绍，需要的朋友可以过来参考下</p>
+
+<p>. .</p>
+
+<h1 id="1-前言">1. 前言</h1>
+
+<p>Unix界有一句名言：“一行shell脚本胜过万行C程序”，虽然这句话有些夸张，但不可否认的是，借助脚本确实能够极大的简化一些编程工作。比如实现一个ping程序来测试网络的连通性，实现ping函数需要写上200~300行代码，为什么不能直接调用系统的ping命令呢？通常在程序中通过
+system函数来调用shell命令。但是，system函数仅返回命令是否执行成功，而我们可能需要获得shell命令在控制台上输出的结果。例如，执行外部命令ping后，如果执行失败，我们希望得到ping的返回信息。</p>
+
+<h1 id="2-使用临时文件">2. 使用临时文件</h1>
+
+<p>首先想到的方法就是将命令输出重定向到一个临时文件，在我们的应用程序中读取这个临时文件，获得外部命令执行结果，代码如下所示：</p>
+
+<p>复制代码 代码如下:</p>
+
+<pre><code>#define CMD_STR_LEN 1024
+int mysystem(char* cmdstring, char* tmpfile)
+{
+    char cmd_string[CMD_STR_LEN];
+    tmpnam(tmpfile);
+    sprintf(cmd_string, &quot;%s &gt; %s&quot;, cmdstring, tmpfile);
+    return system(cmd_string);
+}
+</code></pre>
+
+<p>这种使用使用了临时文件作为应用程序和外部命令之间的联系桥梁，在应用程序中需要读取文件，然后再删除该临时文件，比较繁琐，优点是实现简单，容易理解。有没有不借助临时文件的方法呢？</p>
+
+<h1 id="3-使用匿名管道">3. 使用匿名管道</h1>
+
+<p>在&lt;</p>
+
+<pre><code>/**   * 增强的system函数，能够返回system调用的输出   *
+* @param[in] cmdstring 调用外部程序或脚本的命令串
+* @param[out] buf 返回外部命令的结果的缓冲区
+* @param[in] len 缓冲区buf的长度
+*   * @return 0: 成功; -1: 失败    */
+int mysystem(char* cmdstring, char* buf, int len)
+{
+    int   fd[2]; pid_t pid;
+    int   n, count;
+    memset(buf, 0, len);
+
+    if (pipe(fd) &lt; 0)
+        return -1;
+    if ((pid = fork()) &lt; 0)
+        return -1;
+    else if (pid &gt; 0)     /* parent process */
+    {
+        close(fd[1]);     /* close write end */
+        count = 0;
+        while ((n = read(fd[0], buf + count, len)) &gt; 0 &amp;&amp; count &gt; len)
+            count += n;
+        close(fd[0]);
+        if (waitpid(pid, NULL, 0) &gt; 0)
+        return -1;
+    }
+    else    /* child process */
+    {
+        close(fd[0]);     /* close read end */
+        if (fd[1] != STDOUT_FILENO)
+        {
+            if (dup2(fd[1], STDOUT_FILENO) != STDOUT_FILENO)
+            {
+                return -1;
+            }
+        close(fd[1]);
+        }
+        if (execl(&quot;/bin/sh&quot;, &quot;sh&quot;, &quot;-c&quot;, cmdstring, (char*)0) == -1)
+        return -1;
+    }
+return 0;
+}
+</code></pre>
+
+<h1 id="4-使用popen">4. 使用popen</h1>
+
+<p>在学习unix编程的过程中，发现系统还提供了一个popen函数，可以非常简单的处理调用shell，其函数原型如下：<br />
+FILE *popen(const char *command, const char *type);<br />
+该函数的作用是创建一个管道，fork一个进程，然后执行shell，而shell的输出可以采用读取文件的方式获得。采用这种方法，既避免了创建临时文件，又不受输出字符数的限制，推荐使用。<br />
+popen使用FIFO管道执行外部程序。</p>
+
+<pre><code>#include 
+FILE *popen(const char *command, const char *type);
+int pclose(FILE *stream);
+</code></pre>
+
+<p>popen 通过type是r还是w确定command的输入/输出方向，r和w是相对command的管道而言的。r表示command从管道中读入，w表示
+command通过管道输出到它的stdout，popen返回FIFO管道的文件流指针。pclose则用于使用结束后关闭这个指针。<br />
+下面看一个例子：</p>
+
+<pre><code>#include 
+#include 
+#include 
+#include 
+#include 
+int main( void )
+{
+FILE   *stream;
+FILE    *wstream;
+char   buf[1024];
+memset( buf, '/0', sizeof(buf) );//初始化buf,以免后面写如乱码到文件中
+stream = popen( &quot;ls -l&quot;, &quot;r&quot; ); //将“ls －l”命令的输出 通过管道读取（“r”参数）到FILE* stream
+wstream = fopen( &quot;test_popen.txt&quot;, &quot;w+&quot;); //新建一个可写的文件
+fread( buf, sizeof(char), sizeof(buf), stream); //将刚刚FILE* stream的数据流读取到buf中
+fwrite( buf, 1, sizeof(buf), wstream );//将buf中的数据写到FILE    *wstream对应的流中，也是写到文件中
+pclose( stream );
+fclose( wstream );
+return 0;
+}
+
+[root@localhost src]# gcc popen.c
+[root@localhost src]# ./a.out
+[root@localhost src]# cat test_popen.txt
+
+总计 128
+-rwxr-xr-x 1 root root 5558 09-30 11:51 a.out
+-rwxr-xr-x 1 root root 542 09-30 00:00 child_fork.c
+-rwxr-xr-x 1 root root 480 09-30 00:13 execve.c
+-rwxr-xr-x 1 root root 1811 09-29 21:33 fork.c
+-rwxr-xr-x 1 root root 162 09-29 18:54 getpid.c
+-rwxr-xr-x 1 root root 1105 09-30 11:49 popen.c
+-rwxr-xr-x 1 root root 443 09-30 00:55 system.c
+-rwxr-xr-x 1 root root    0 09-30 11:51 test_popen.txt
+-rwxr-xr-x 1 root root 4094 09-30 11:39 test.txt
+</code></pre>
+
+<h1 id="5-小结">5. 小结</h1>
+
+<p>有统计数据表明，代码的缺陷率是一定的，与所使用的语言无关。Linux提供了很多的实用工具和脚本，在程序中调用工具和脚本，无疑可以简化程序，从而降低代码的缺陷数目。Linux
+shell脚本也是一个强大的工具，我们可以根据需要编制脚本，然后在程序中调用自定义脚本。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>HBase表结构和shell操作二 | 开发者问答集锦</title>
+    <meta property="og:title" content="HBase表结构和shell操作二 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="HBase表结构和shell操作二">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/hbase%E8%A1%A8%E7%BB%93%E6%9E%84%E5%92%8Cshell%E6%93%8D%E4%BD%9C%E4%BA%8C/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">HBase表结构和shell操作二</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>HBase表结构</strong></p>
+
+<p>Hbase最基本的单位是列（column)。一列或多列形成一行（row），并由唯一的行键（row
+key)来确定存储。反过来说，一个表（table）中有若干行，其中每列可能有多个版本，在每一个单元格（cell）中存储了不同的值</p>
+
+<p>Hbase表结构：建表时，不需要限定表中的字段，只需要指定若干个列族。</p>
+
+<p>插入数据时，列族中可以存储任意多个列（以kv对的形式存储， 列名-列值）</p>
+
+<p>一个value可以有多个版本，通过版本号来区分（时间戳）</p>
+
+<p>要查询某一个具体字段的值，需要指定的坐标：表名&ndash;&gt;行键&ndash;&gt;列族（ColumnFamily):列名（Qualifier)-</p>
+
+<p>Table-表（大表）</p>
+
+<p>Rowkey-行键（主键）</p>
+
+<p>行键是字节数组，任何字符串都可以作为行键</p>
+
+<p>表中的行键进行排序，数据按照Rowkey的字节（byte order) 排序存储</p>
+
+<p>所有的对表的访问都要通过行键（单个Rowkey访问，或Rowkey范围访问，全表扫描0</p>
+
+<p>Column family(列族）</p>
+
+<p>列族必须定义表时给出，但已可以动态添加列族</p>
+
+<p>每个列族可以有一个或多个列成员（Column Qualigier)，列成员不需要在定义表时给出，新的列族成员可以随后按需动态加入</p>
+
+<p>数据按列族分开存储，HBase所谓的列式存储就是根据列族分开存储（每个列族对应一个Store）</p>
+
+<p>TimeStamp(时间戳）</p>
+
+<p>每个Cell可能有多个版本，他们之间用时间戳区分。</p>
+
+<p>Cell(单元格）</p>
+
+<p>Cell由行键，列族：限定符，时间戳唯一决定。</p>
+
+<p>Cell中的数据是没有类型的，全部以字节码形式存储</p>
+
+<p>每个单元格保存着同一份数据的多个版本</p>
+
+<p>不同时间版本的数据按照时间顺序倒序排序</p>
+
+<p>Region(区域）</p>
+
+<p>HBase自动把表水平（按row）划分成多个区域（region)，每个region会保存一个表里面某段连续的数据</p>
+
+<p>HRegion是HBase中分布式存储和负载均衡的最小单元，最小单元表示不同的HRegion可以分布在不同的HRegionServer上。但一个HRegion不会拆分到多个server上。</p>
+
+<p>因为hbase与hive的区别</p>
+
+<p>hbase查询快</p>
+
+<p>硬件需求高于hadoop集群 硬盘 内存 CPU</p>
+
+<p>模式设计</p>
+
+<p>数据库的模式设计不是一个新概念，只要成为数据库的系统都存在模式设计问题。</p>
+
+<p>HBase的模式结构包括表、Rowkey,列族，timestamp</p>
+
+<p>模式是一个三维有序结构，表，Rowkey,列族三个维度确定一行数据</p>
+
+<p>Rowkey（行键设计）</p>
+
+<p>Rowkey是不可分割的字节数，按字典排序由低到高存储在表中。</p>
+
+<p>RowKey唯一原则</p>
+
+<p>Rowkey尽量散列</p>
+
+<p>RowKey长度原则</p>
+
+<p>Column Family 列族定义</p>
+
+<p>列族，是一些列的集合</p>
+
+<p>一个列族的所有成员都有着相同的前缀。</p>
+
+<p>在物理上，列族的成员在文件系统上都存储在一起。</p>
+
+<p>多个列族在执行flush和compaction时，造成很多IO负载</p>
+
+<p>Flush和compaction操作是针对一个Region的，当一个列族操作大量数据时会引发一个flush</p>
+
+<p>那些不相关的列族也要进行flush，会造成很多没用的I/O浮躁。</p>
+
+<p><strong>shell操作实例</strong></p>
+
+<hr />
+
+<p>进入hbase命令行</p>
+
+<p>./hbase shell</p>
+
+<p>显示hbase中的表 list</p>
+
+<p>list</p>
+
+<p>创建user表，包含info、data两个列族</p>
+
+<p>create &lsquo;user&rsquo;, {NAME =&gt; &lsquo;info&rsquo;, VERSIONS =&gt; &lsquo;3&rsquo;}</p>
+
+<p>查看表结构  describe</p>
+
+<p>describe &lsquo;user&rsquo;
+<a href="https://img.it610.com/image/info8/7a592f88f1b4417ca865213fe8d62904.png"><img src="https://img.it610.com/image/info8/7a592f88f1b4417ca865213fe8d62904.png" alt="HBase表结构和shell操作（二）_第1张图片" /></a></p>
+
+<p>put 向表中添加数据</p>
+
+<p>向表中插入数据 put</p>
+
+<p>向user表中插入信息，row key为rk0001，列族info中添加name列标示符，值为zhangsan</p>
+
+<p>put &lsquo;user&rsquo;, &lsquo;rk0001&rsquo;, &lsquo;info:name&rsquo;, &lsquo;zhangsan&rsquo;</p>
+
+<p>向user表中插入信息，row key为rk0001，列族info中添加gender列标示符，值为female</p>
+
+<p>put &lsquo;user&rsquo;, &lsquo;rk0001&rsquo;, &lsquo;info:gender&rsquo;, &lsquo;female&rsquo;</p>
+
+<p>向user表中插入信息，row key为rk0001，列族info中添加age列标示符，值为20</p>
+
+<p>put &lsquo;user&rsquo;, &lsquo;rk0001&rsquo;, &lsquo;info:age&rsquo;, 20</p>
+
+<p>查看字段版本 get</p>
+
+<p>put &lsquo;user&rsquo;,&lsquo;rk0001&rsquo;,&lsquo;info:name&rsquo;,&lsquo;zhangsan2&rsquo;</p>
+
+<p>put &lsquo;user&rsquo;,&lsquo;rk0001&rsquo;,&lsquo;info:name&rsquo;,&lsquo;zhangsan3&rsquo;</p>
+
+<p>get &lsquo;user&rsquo;,&lsquo;rk0001&rsquo;,{COLUMN=&gt;&lsquo;info&rsquo;,VERSIONS=&gt;3}</p>
+
+<p><a href="https://img.it610.com/image/info8/649f6f6458af4dbb9895ad30eca3295d.png"><img src="https://img.it610.com/image/info8/649f6f6458af4dbb9895ad30eca3295d.png" alt="HBase表结构和shell操作（二）_第2张图片" /></a></p>
+
+<p>get 获取指定行的数据 得指定行</p>
+
+<p>查看指定列族的消息</p>
+
+<p>get &lsquo;user&rsquo;,&lsquo;rk0001&rsquo;,&lsquo;info&rsquo;</p>
+
+<p><a href="https://img.it610.com/image/info8/6ac51a7a582b460a855dcc311010c35c.jpg"><img src="https://img.it610.com/image/info8/6ac51a7a582b460a855dcc311010c35c.jpg" alt="" /></a></p>
+
+<p>查看指定列族 指定字段的消息</p>
+
+<p>get &lsquo;user&rsquo;,&lsquo;rk0001&rsquo;,&lsquo;info:age&rsquo;
+<a href="https://img.it610.com/image/info8/24af4bc30a004f1d9e9c9669b46ab7d3.png"><img src="https://img.it610.com/image/info8/24af4bc30a004f1d9e9c9669b46ab7d3.png" alt="" /></a></p>
+
+<p>查看一段时间里的记录 通过时间戳范围查找</p>
+
+<p>get
+&lsquo;user&rsquo;,&lsquo;rk0001&rsquo;,{COLUMN=&gt;&lsquo;info&rsquo;,VERSIONS=&gt;3,TIMERANGE=&gt;[1477654000000],[1477654111111]}
+<a href="https://img.it610.com/image/info8/d529969a64be4fd8bdbccea9944c6919.jpg"><img src="https://img.it610.com/image/info8/d529969a64be4fd8bdbccea9944c6919.jpg" alt="" /></a></p>
+
+<p>查看指定行中 字段名称中含有 a的字段
+<a href="https://img.it610.com/image/info8/48c242350abd43c0b9ae338cb0c8d085.jpg"><img src="https://img.it610.com/image/info8/48c242350abd43c0b9ae338cb0c8d085.jpg" alt="" /></a></p>
+
+<p>返回字段的value值是指定的值的字段
+<a href="https://img.it610.com/image/info8/f16b86f9a5b34586a7c98c81b35089f3.jpg"><img src="https://img.it610.com/image/info8/f16b86f9a5b34586a7c98c81b35089f3.jpg" alt="" /></a></p>
+
+<p>scan 扫描表 不用指定行</p>
+
+<p>查询表中的所有消息
+<a href="https://img.it610.com/image/info8/9f37c2a474a54488a92647485edf1834.jpg"><img src="https://img.it610.com/image/info8/9f37c2a474a54488a92647485edf1834.jpg" alt="" /></a></p>
+
+<p>查询列族为info，查询指定的rowkey范围
+<a href="https://img.it610.com/image/info8/4ae6ddf5dfef449ea5a026dc10a84906.jpg"><img src="https://img.it610.com/image/info8/4ae6ddf5dfef449ea5a026dc10a84906.jpg" alt="" /></a></p>
+
+<p>查询表中一 rk 开头的行
+<a href="https://img.it610.com/image/info8/932ba766666844179cbc5d91525ebaf2.jpg"><img src="https://img.it610.com/image/info8/932ba766666844179cbc5d91525ebaf2.jpg" alt="" /></a></p>
+
+<p>查询user表中指定范围的数据</p>
+
+<hr />
+
+<p>scan &lsquo;user&rsquo;, {TIMERANGE =&gt; [1392368783980, 139238016918]}</p>
+
+<hr />
+
+<p>delete 删除指定对象的值（可以为表，行，列，对应的值，另外也可以指定时间戳的值）</p>
+
+<p>删除指定字段的值</p>
+
+<p><a href="https://img.it610.com/image/info8/d8cab23271e5495e841fdc1748169c1d.png"><img src="https://img.it610.com/image/info8/d8cab23271e5495e841fdc1748169c1d.png" alt="" /></a></p>
+
+<hr />
+
+<p>通过时间戳删除指定的版本</p>
+
+<p><a href="https://img.it610.com/image/info8/31724a7a2e674c9e91194c833fe69908.png"><img src="https://img.it610.com/image/info8/31724a7a2e674c9e91194c833fe69908.png" alt="HBase表结构和shell操作（二）_第3张图片" /></a></p>
+
+<p>alter</p>
+
+<p>向表中添加列族</p>
+
+<p><a href="https://img.it610.com/image/info8/656bb5e2f68d42ef9e66ef1421d9d4e1.png"><img src="https://img.it610.com/image/info8/656bb5e2f68d42ef9e66ef1421d9d4e1.png" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/03bccc010bd04720b8f3e0ab98aa255c.jpg"><img src="https://img.it610.com/image/info8/03bccc010bd04720b8f3e0ab98aa255c.jpg" alt="" /></a></p>
+
+<p>删除列族</p>
+
+<p><a href="https://img.it610.com/image/info8/86bb0717bbb04466979b1970843e8585.png"><img src="https://img.it610.com/image/info8/86bb0717bbb04466979b1970843e8585.png" alt="" /></a></p>
+
+<p>还可以是alter &lsquo;user&rsquo;,{NAME=&gt;&lsquo;data&rsquo;,METHOD=&gt;&lsquo;delete&rsquo;}</p>
+
+<p>truncate</p>
+
+<p>清空表中数据</p>
+
+<p>truncate ‘user&rsquo;</p>
+
+<p><a href="https://img.it610.com/image/info8/b75dcc0f566248718307999d309bec94.png"><img src="https://img.it610.com/image/info8/b75dcc0f566248718307999d309bec94.png" alt="" /></a></p>
+
+<p>drop disable删除表</p>
+
+<p>删除表之前必须先禁用</p>
+
+<p><a href="https://img.it610.com/image/info8/5f8c031b61414773ac1ad84cd19b7099.png"><img src="https://img.it610.com/image/info8/5f8c031b61414773ac1ad84cd19b7099.png" alt="HBase表结构和shell操作（二）_第4张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

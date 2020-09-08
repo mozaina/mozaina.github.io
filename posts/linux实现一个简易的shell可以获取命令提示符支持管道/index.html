@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux实现一个简易的Shell可以获取命令提示符支持管道 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux实现一个简易的Shell可以获取命令提示符支持管道 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux实现一个简易的Shell可以获取命令提示符支持管道">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E5%AE%9E%E7%8E%B0%E4%B8%80%E4%B8%AA%E7%AE%80%E6%98%93%E7%9A%84shell%E5%8F%AF%E4%BB%A5%E8%8E%B7%E5%8F%96%E5%91%BD%E4%BB%A4%E6%8F%90%E7%A4%BA%E7%AC%A6%E6%94%AF%E6%8C%81%E7%AE%A1%E9%81%93/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux实现一个简易的Shell可以获取命令提示符支持管道</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="shell的实现过程">Shell的实现过程</h3>
+
+<p>1.从标准输入获取命令行；<br />
+2.对用户输入的命令行进行解析，解析出要执行的指令和参数；<br />
+3.创建一个子进程；<br />
+4.子进程进行程序替换，父进程等待；<br />
+5.当子进程执行完毕，父进程从wait中返回，继续下一次循环。</p>
+
+<h5 id="shell命令提示符">shell命令提示符</h5>
+
+<p>（1）一般的shell输入命令之前都会有命令提示符：</p>
+
+<pre><code>[root@localhost 进程替换]# 
+</code></pre>
+
+<p>root为用户名，localhost为主机名，后面跟着的是当前目录的相对路径；<br />
+（2）所以在自己的Shell里面也可以输出这个命令提示符：<br />
+①获取用户名<br />
+getpwuid根据传入的用户ID,返回指向passwd的结构体,该结构体初始化了里面的所有成员.用户的ID通过getuid( )函数获得。</p>
+
+<pre><code>//passwd结构体
+struct passwd
+{
+      char *pw_name;       /* 用户名*/
+      char *pw_passwd;     /* 密码.*/
+      __uid_t pw_uid;      /* 用户ID.*/
+      __gid_t pw_gid;      /*组ID.*/
+      char *pw_gecos;      /*真实名*/
+      char *pw_dir;        /* 主目录.*/
+      char *pw_shell;      /*使用的shell*/
+};
+</code></pre>
+
+<p>用于获取用户名：</p>
+
+<pre><code>        struct passwd *pwd; //定义一个passwd类型的指针pwd
+        pwd = getpwuid(getuid());
+        pwd-&gt;pw_name;   
+</code></pre>
+
+<p>②获取主机名：（通过gethostname函数）</p>
+
+<pre><code>//获得主机名
+char hostname[100] ={0};
+gethostname(hostname,sizeof(hostname));   //hostname里面存放的就是主机名
+</code></pre>
+
+<p>③获取相对路径<br />
+getcwd( )函数用于获取当前目录的绝对路径，但是shell里命令提示符的后面是相对路径，路径使用/进行分隔，所以最后一个/后面的内容为相对路径。</p>
+
+<pre><code>//char * strtok ( char * str, const char * delimiters );
+</code></pre>
+
+<p>Parse函数用于路径的切分，将路径按照”/”进行切分，将切分后的结果保存在字符串数组output里面。</p>
+
+<pre><code>void Parse(char* input, char* output[])//用于将路径进行切分，最后一个/后面为当前路径
+{
+    char* p = strtok(input,&quot;/&quot;);
+    int i = 0;
+    while(p!= NULL)
+    {
+        output[i++] = p;
+        p=strtok(NULL,&quot;/&quot;);
+    }
+}
+</code></pre>
+
+<p>main函数中获取相对路径的有关代码：</p>
+
+<pre><code> char path[100] = {0};
+ getcwd(path,sizeof(path)); //getcwd获得的是绝对路径(path里面存放的是绝对路径)
+
+ char* path2[100] = {0};                                                                                                             
+ Parse(path,path2);  //Parse函数用于切分路径，将路径按照&quot;/&quot;进行切分
+
+ char* path3 = NULL;  //path里面为绝对路径，将path按照/进行分割，分割的结果保存在path2里面,path3里面保存最后一个字符串，即相对路&gt;径
+ int i = 0;
+ while(path2[i] !=NULL)
+ {                                                                                                                             
+       path3= path2[i];
+       i++;
+ }
+</code></pre>
+
+<h5 id="从标准输入获取命令">从标准输入获取命令</h5>
+
+<p>定义一个buf数组用于存放输入的指令（指令是字符串的形式）；<br />
+在main函数中编写如下代码，用于获取命令行：</p>
+
+<pre><code>    char buf[1024] = {0};
+    fgets(buf);
+</code></pre>
+
+<h5 id="对用户输入的命令行进行解析">对用户输入的命令行进行解析</h5>
+
+<p>通过ParseArg函数对指令按照空格进行切分，将切分出来的单独的字符串放入output数组里面。（切分用到字符串处理函数strtok）</p>
+
+<pre><code>void ParseArg(char* input, char* output[])  //用于对输入的命令进行切分
+{
+    char* p = strtok(input,&quot; &quot;);
+    int output_size = 0;
+    while(p != NULL)
+    {
+        output[output_size++] = p;
+        p = strtok(NULL,&quot; &quot;);
+    }
+    output[output_size] = NULL;
+}
+</code></pre>
+
+<p>在main函数中编写如下代码：</p>
+
+<pre><code>//解析字符串，解析出指令和参数
+char* argv[100] = {};
+ParseArg(buf,argv);  //ParseArg函数用于对命令行进行切分，buf存放从标准输入获取的指令，argv存放解析出来的命令参数
+</code></pre>
+
+<h5 id="创建一个子进程-子进程进行程序替换-父进程等待">创建一个子进程，子进程进行程序替换，父进程等待</h5>
+
+<p>用Exec函数进行封装，Exec函数里面创建一个子进程，子进程进行程序替换，父进程进行等待（父进程不关心子进程的退出状态，所以可以采用wait(NULL)）</p>
+
+<pre><code>void Exec(char* argv[])  //创建子进程执行进程程序替换
+{
+    pid_t pid = fork();
+    if(pid == -1)
+    {
+        perror(&quot;fork()&quot;);
+    }
+    else if(pid == 0)
+    {
+        //child
+        execvp(argv[0],argv);
+        //execvp失败会执行下面的语句
+        perror(&quot;execvp()&quot;);
+        exit(0);
+    }
+    else
+    {
+        //parent                                                                                                                      
+        wait(NULL);
+    }
+</code></pre>
+
+<h4 id="shell简易版">Shell简易版</h4>
+
+<pre><code>#include                                                                                                                  
+#include
+#include
+#include
+#include
+#include
+#include
+#include
+#include
+
+void Parse(char* input, char* output[])//用于将路径进行切分，最后一个/后面为当前路径
+{
+    char* p = strtok(input,&quot;/&quot;);
+    int i = 0;
+    while(p!= NULL)
+    {
+        output[i++] = p;
+        p=strtok(NULL,&quot;/&quot;);
+    }
+}
+
+void ParseArg(char* input, char* output[])  //用于对输入的命令进行切分
+{
+    char* p = strtok(input,&quot; &quot;);
+    int output_size = 0;
+    while(p != NULL)
+    {
+        output[output_size++] = p;
+        p = strtok(NULL,&quot; &quot;);
+    }
+    output[output_size] = NULL;
+}
+
+void Exec(char* argv[])  //创建子进程执行进程程序替换
+{
+    pid_t pid = fork();
+    if(pid == -1)                                                                                                                       
+    {
+        perror(&quot;fork()&quot;);
+    }
+    else if(pid == 0)
+    {
+            execvp(argv[0],argv);
+        //execvp失败会执行下面的语句
+        perror(&quot;execvp()&quot;);
+        exit(0);
+    }
+    else
+    {
+        //parent
+        wait(NULL);
+    }
+ }
+
+int main()
+{
+    while(1)
+    {
+        //首先显示shell提示
+        //通过getuid获得用户的id,然后通过getpwuid通过用户的id查找用户的passwd数据来获取系统登录的用户名
+        //获得当前路径
+        char path[100] = {0};
+        getcwd(path,sizeof(path)); //getcwd获得的是绝对路径(path里面存放的是绝对路径)
+        char* path2[100] = {0};                                                                                                             
+        Parse(path,path2);
+
+        char* path3 = NULL;  //path里面为绝对路径，将path按照/进行分割，分割的结果保存在path2里面,path3里面保存最后一个字符串，即相对路&gt;径
+        int i = 0;                                                                                                                      
+        while(path2[i] !=NULL)
+        {
+            path3= path2[i];
+            i++;
+        }
+
+        struct passwd *pwd;
+        pwd = getpwuid(getuid());
+
+        //获得主机名
+        char hostname[100] ={0};
+        gethostname(hostname,sizeof(hostname));
+        printf(&quot;[%s@%s %s MyShell]&quot;,pwd-&gt;pw_name,hostname,path3);
+        fflush(stdout);
+
+        //从标准输入读取字符串
+        char buf[1024] = {0};
+        gets(buf);
+
+        //解析字符串，解析出指令和参数
+        char* argv[100] = {};
+        ParseArg(buf,argv);
+
+        //子进程执行exec函数，将这个过程封装在Exec函数里
+         Exec(argv);
+    }
+    return 0;
+}
+</code></pre>
+
+<p>运行结果：（注意到自己编写的shell的命令提示符后面会带上MyShell，这是为了与自己的shell进行区分）<br />
+<a href="https://img.it610.com/image/info8/c82d2c89315d4196ae57c409a1ea0930.jpg"><img src="https://img.it610.com/image/info8/c82d2c89315d4196ae57c409a1ea0930.jpg" alt="Linux--
+实现一个简易的Shell（可以获取命令提示符，支持管道）_第1张图片" /></a></p>
+
+<h4 id="让shell支持管道">让Shell支持管道</h4>
+
+<h5 id="管道的实现方法">管道的实现方法</h5>
+
+<p>1.管道”|”是将”|”左边指令的执行结果作为”|”右边的输入。<br />
+2.我们可以将一条带有”|”的指令进行分割，将管道左边指令的输出结果重定向到管道的输入（也就是管道的写端），将标准输入重定向至管道的读端。让两个进程分别执行两边重定向后的指令。</p>
+
+<h5 id="管道的具体实现">管道的具体实现</h5>
+
+<p>（1）首先判断一条指令是否包含管道（指令已经存放至char*的数组里面，且该数组以NULL作为结束标志）</p>
+
+<pre><code>int IsPipe(char* argv[])
+{                                                                                                                                       
+    int i = 0;
+    while(argv[i] != NULL)
+    {
+        if(strcmp(argv[i], &quot;|&quot;) == 0)
+        {
+            return i+1;     //i的位置是管道，则i+1就是管道的下一个命令
+        }
+        ++i;
+    }
+    return 0;
+}
+</code></pre>
+
+<p>（2）将管道左右两边的指令进行切分,切分后的分别放入两个char*数组里，并保证每个数组以NULL作为结束标志</p>
+
+<pre><code>void ParsePipe(char* input[], char* output1[],char* output2[])//用于将input按照|进行切分，最后一个后面为当前路径                    
+
+{
+    int i = 0;
+    int size1 = 0;
+    int size2 = 0;
+    int ret = IsPipe(input);   //ret是input数组中管道&quot;|&quot;的下一个位置
+
+    while(strcmp(input[i], &quot;|&quot;)!=0)
+    {
+        output1[size1++] = input[i++];
+    }
+    output1[size1] = NULL;  //将分割出来的两个char*数组都以NULL结尾
+
+    int j = ret;//j指向管道的后面那个字符
+    while(input[j] != NULL)
+    {
+        output2[size2++] = input[j++];
+    }           
+    output2[size2] = NULL;
+}
+</code></pre>
+
+<p>（3）执行包含管道的指令（利用execvp函数，首先创建一个进程，让子进程创建一个管道，再创让子进程建一个子进程（孙子进程），让孙子进程执行管道左边的指令，并将输出结果重定向入管道，让子进程从执行管道右边的指令）</p>
+
+<pre><code>void ExecvPipe(char* argv1[],char* argv2[])  //argv1为左边指令及参数的数组argv2则为存放管道右边指令及参数的数组
+{
+    pid_t pid = fork();
+    if(pid == -1)                                                                                                                       
+    {                                                                                                                           
+        perror(&quot;fork()&quot;);
+    }
+    else if(pid == 0)
+    {
+        //child,创建一个管道
+        int fd[2];
+        int ret = pipe(fd);
+
+        if(fork() == 0 )
+        {
+            //子进程创建一个子进程，用于执行管道之前的命令
+            close(fd[0]); //孙子进程关闭掉读端
+            dup2(fd[1],1);  //将标准输出作为管道的标准输入
+            execvp(argv1[0],argv1);
+        }
+        wait(NULL);
+        close(fd[1]); //子进程关闭掉写端
+
+        dup2(fd[0],0);   //将标准输入重定向至管道的读端
+        execvp(argv2[0],argv2);
+        //execvp失败会执行下面的语句
+        perror(&quot;execvp()&quot;);
+        exit(0);    
+    }
+    else
+    {
+        //parent
+        wait(NULL);                                                                                                                     
+    }
+}
+</code></pre>
+
+<p>（4）整体代码</p>
+
+<pre><code>#include                                                                                                                       
+#include
+#include
+#include
+#include
+#include
+#include
+#include
+#include
+
+//用于将路径进行切分，最后一个/后面为当前路径
+void Parse(char* input, char* output[])
+{
+    char* p = strtok(input,&quot;/&quot;);
+    int i = 0;
+    while(p!= NULL)
+    {
+        output[i++] = p;
+        p=strtok(NULL,&quot;/&quot;);
+    }
+}
+
+//用于对输入的命令进行切分
+void ParseArg(char* input, char* output[])  
+{
+    char* p = strtok(input,&quot; &quot;);
+    int output_size = 0;
+    while(p != NULL)
+    {
+        output[output_size++] = p;
+        p = strtok(NULL,&quot; &quot;);
+    }
+    output[output_size] = NULL;
+}
+
+void Exec(char* argv[])  //创建子进程执行进程程序替换
+{
+    pid_t pid = fork();
+    if(pid == -1)                                                                                                                       
+    {
+        perror(&quot;fork()&quot;);
+    }
+    else if(pid == 0)
+    {
+         //child                                                                                                                         
+        execvp(argv[0],argv);
+        //execvp失败会执行下面的语句
+        perror(&quot;execvp()&quot;);
+        exit(0);
+    }
+    else
+    {
+        //parent
+        wait(NULL);
+    }
+}
+
+//判断指令是否包含管道
+int IsPipe(char* argv[])
+{
+    int i = 0;
+    while(argv[i] != NULL)
+    {
+        if(strcmp(argv[i], &quot;|&quot;) == 0)
+        {
+            return i+1; //i是管道，则i+1就是管道的下一个命令
+        }
+        ++i;
+    }
+    return 0;
+}
+
+void ParsePipe(char* input[], char* output1[],char* output2[])//用于将input按照|进行切分，最后一个后面为当前路径                    
+
+{
+    int i = 0;
+    int size1 = 0;
+    int size2 = 0;                                                                                                                      
+    int ret = IsPipe(input);
+
+    while(strcmp(input[i], &quot;|&quot;)!=0)
+    {
+        output1[size1++] = input[i++];
+    }
+     output1[size1] = NULL;
+
+     int j = ret;//j指向管道的后面那个字符
+     while(input[j] != NULL)
+     {
+         output2[size2++] = input[j++];
+     }
+
+     output2[size2] = NULL;
+}
+
+
+void ExecvPipe(char* argv1[],char* argv2[])
+{
+    pid_t pid = fork();
+    if(pid == -1)
+    {                                                                                                                           
+        perror(&quot;fork()&quot;);
+    }                                                                                                                                   
+    else if(pid == 0)
+    {
+        //child,创建一个管道
+        int fd[2];
+        int ret = pipe(fd);
+        if(fork() == 0 )
+        {
+            //子进程创建一个子进程，用于执行管道之前的命令
+            close(fd[0]); //孙子进程关闭掉读端
+            dup2(fd[1],1);  //将标准输出作为管道的标准输入
+            execvp(argv1[0],argv1);
+        }
+        wait(NULL);
+
+        close(fd[1]); //关闭掉写端
+        dup2(fd[0],0);
+        execvp(argv2[0],argv2);
+        //execvp失败会执行下面的语句
+        perror(&quot;execvp()&quot;);
+        exit(0);    
+    }
+    else                                                                                                                                
+    {
+        //parent
+        wait(NULL);
+    }
+}
+int main()
+{
+    //获得当前路径
+    while(1)
+    {
+        //首先显示shell提示
+        //通过getuid获得用户的id,然后通过getpwuid通过用户的id查找用户的passwd数据来获取系统登录的用户名
+
+        //获得当前路径
+        char path[100] = {0};
+        getcwd(path,sizeof(path)); //getcwd获得的是绝对路径(path里面存放的是绝对路径)
+        char* path2[100] = {0};                                                                                                             
+        Parse(path,path2);
+
+        char* path3 = NULL;  //path里面为绝对路径，将path按照/进行分割，分割的结果保存在path2里面,path3里面保存最后一个字符串，即相对路&gt;径                                                                                                                                      
+        int i = 0;
+        while(path2[i] !=NULL)
+        {
+            path3= path2[i];
+            i++;
+        }      
+
+        struct passwd *pwd;
+        pwd = getpwuid(getuid());
+        //获得主机名
+        char hostname[100] ={0};
+        gethostname(hostname,sizeof(hostname));
+        printf(&quot;[%s@%s %s MyShell]&quot;,pwd-&gt;pw_name,hostname,path3);
+        fflush(stdout);
+
+        //从标准输入读取字符串
+        char buf[1024] = {0};
+
+        //解析字符串，解析出指令和参数
+        char* argv[100];
+        ParseArg(buf,argv);
+
+        //判断解析出来的字符串数组里面是否含有管道                                                                                      
+        int ret1 = IsPipe(argv);
+        if(ret1 &gt; 0)
+        {
+            //是管道
+            char* argv1[10];
+            char* argv2[10];
+            ParsePipe(argv,argv1,argv2);
+            ExecvPipe(argv1,argv2);
+        }
+        else
+        {
+            Exec(argv);
+        }
+    }
+    return 0;
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

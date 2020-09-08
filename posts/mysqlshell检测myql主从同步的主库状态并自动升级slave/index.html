@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>mysqlshell检测myql主从同步的主库状态并自动升级slave | 开发者问答集锦</title>
+    <meta property="og:title" content="mysqlshell检测myql主从同步的主库状态并自动升级slave - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="mysqlshell检测myql主从同步的主库状态并自动升级slave">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/mysqlshell%E6%A3%80%E6%B5%8Bmyql%E4%B8%BB%E4%BB%8E%E5%90%8C%E6%AD%A5%E7%9A%84%E4%B8%BB%E5%BA%93%E7%8A%B6%E6%80%81%E5%B9%B6%E8%87%AA%E5%8A%A8%E5%8D%87%E7%BA%A7slave/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">mysqlshell检测myql主从同步的主库状态并自动升级slave</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>都是没有上过生产实际测试的- -.只是自己操作玩玩的.</p>
+
+<p>假设现在主库已经宕机
+出现问题.按照我的设想.现在先dump一下98的全库,模拟晚上24点的全备,执行完备份之后再进行一些操作,使binlog的偏移量发生变化.测试用从库的全量备份
+可不可以再98从库升级为主库之后恢复到和98一样的偏移量的位置.</p>
+
+<p>需要一个虚拟ip 配置在主上.如果需要读写分离 可以一个虚拟ip 在主上负责写 一个虚拟ip 在从上负责读.</p>
+
+<p>50 23 * * * sh /opt/dump_mysql.sh &gt;&gt; /opt/mysql_dump/dump.log</p>
+
+<p>mkdir -p /opt/mysql_dump</p>
+
+<p>#!/bin/bash</p>
+
+<p>. /etc/init.d/functions</p>
+
+<p>#全量备份每天11点50运行 最好是锁表备份</p>
+
+<p>#获取今天的日期</p>
+
+<p>log=$(date -d &ldquo;now&rdquo; +%Y-%m-%d)</p>
+
+<p>echo ${log}</p>
+
+<p>#获取昨天的日期</p>
+
+<p>log2=$(date -d &ldquo;yesterday&rdquo; +%Y-%m-%d)</p>
+
+<p>echo ${log2}</p>
+
+<p>#主库锁表</p>
+
+<p>lockCmd=&ldquo;flush tables with read lock; &ldquo;</p>
+
+<p>mysql -uroot -pHangzhou@123 -e &ldquo;${lockCmd}&rdquo;</p>
+
+<p>data_dir=/opt/mysql_dump</p>
+
+<p>Now=$(date -d &ldquo;now&rdquo; +%Y-%m-%d)</p>
+
+<p>echo $Now</p>
+
+<p>SQL=$data_dir/$Now.sql</p>
+
+<p>mysqldump -E -uroot -pHangzhou@123 &ndash;all-databases &gt; $SQL</p>
+
+<p>echo $SECONDS</p>
+
+<p>#获取pos</p>
+
+<p>masterSqlname=root</p>
+
+<p>masterSqlpass=Hangzhou@123</p>
+
+<p>#查看master状态</p>
+
+<p>statusCmd=&ldquo;mysql -u${masterSqlname} -p${masterSqlpass} -e \&ldquo;show master
+status;\&ldquo;&rdquo;</p>
+
+<p>echo &ldquo;status cmd:&rdquo; ${statusCmd}</p>
+
+<p>mysql -u${masterSqlname} -p${masterSqlpass} -e &ldquo;show master status;&rdquo;
+&gt;/opt/mysql<em>dump/status</em>$log.txt</p>
+
+<p>if [ $? -eq 0 ]; then</p>
+
+<p>echo &ldquo;exec:  success&rdquo;</p>
+
+<p>[ $? -eq 0 ] &amp;&amp; action &ldquo;查看 master 状态成功&rdquo; /bin/true</p>
+
+<p>else</p>
+
+<p>echo &ldquo;exec:  failure&rdquo;</p>
+
+<p>fi</p>
+
+<p>#查看master状态 获取file 以及position的信息</p>
+
+<p>file=<code>tac /opt/mysql_dump/status_$log.txt|head -n 1 |awk '{print $1}'</code></p>
+
+<p>pos=<code>tac /opt/mysql_dump/status_$log.txt |head -n 1 |awk '{print $2}'</code></p>
+
+<p>if [ -n &ldquo;$file&rdquo; ] &amp;&amp; [ -n &ldquo;$pos&rdquo; ];then</p>
+
+<p>echo &ldquo; $file $pos&rdquo;</p>
+
+<p>[ $? -eq 0 ] &amp;&amp; action &ldquo;获取 master status 参数成功&rdquo; /bin/true</p>
+
+<p>else</p>
+
+<p>echo &ldquo;put in please&rdquo;</p>
+
+<p>fi</p>
+
+<p>#表锁释放</p>
+
+<p>unlockCmd=&rdquo; unlock tables; &ldquo;</p>
+
+<p>mysql -uroot -pHangzhou@123 -e &ldquo;${unlockCmd}&rdquo;</p>
+
+<p>#find /opt/mysql_dump -mtime +7 |xargs rm -rf</p>
+
+<hr />
+
+<p>创建初始的主从同步的过程省略,初始是49是主 98是从,并且98是用154这个偏移量生成的. 下面显示结果已经同步,首次主从复制成功.</p>
+
+<p>root@localhost [(none)] [Sat Jul 27 13:20:48 2019]&gt;change master to
+master_host=&lsquo;172.20.19.49&rsquo;,master_user=&lsquo;repl&rsquo;,master_password=&lsquo;ht00@pass&rsquo;,master_port=3306,master_log_file=&lsquo;mysql-
+bin.000015&rsquo;,master_log_pos=154,master_connect_retry=30;</p>
+
+<p>Query OK, 0 rows affected, 2 warnings (0.22 sec)</p>
+
+<p>root@localhost [(none)] [Sat Jul 27 13:21:54 2019]&gt;start slave;</p>
+
+<p>Query OK, 0 rows affected (0.03 sec)</p>
+
+<p>root@localhost [(none)] [Sat Jul 27 13:22:02 2019]&gt;show slave status\G;</p>
+
+<p>*************************** 1. row ***************************</p>
+
+<p>Slave_IO_State: Waiting for master to send event</p>
+
+<p>Master_Host: 172.20.19.49</p>
+
+<p>Master_User: repl</p>
+
+<p>Master_Port: 3306</p>
+
+<p>Connect_Retry: 30</p>
+
+<p>Master_Log_File: mysql-bin.000015</p>
+
+<p>Read_Master_Log_Pos: 316</p>
+
+<p>Relay_Log_File: zookeeper-2-relay-bin.000002</p>
+
+<p>Relay_Log_Pos: 482</p>
+
+<p>Relay_Master_Log_File: mysql-bin.000015</p>
+
+<p>Slave_IO_Running: Yes</p>
+
+<p>Slave_SQL_Running: Yes</p>
+
+<p>Replicate_Do_DB:</p>
+
+<p>Replicate_Ignore_DB: mysql,information_schema,performance_schema</p>
+
+<p>Replicate_Do_Table:</p>
+
+<p>Replicate_Ignore_Table:</p>
+
+<p>Replicate_Wild_Do_Table:</p>
+
+<p>Replicate_Wild_Ignore_Table:</p>
+
+<p>Last_Errno: 0</p>
+
+<p>Last_Error:</p>
+
+<p>Skip_Counter: 0</p>
+
+<p>Exec_Master_Log_Pos: 316</p>
+
+<p>Relay_Log_Space: 695</p>
+
+<p>Until_Condition: None</p>
+
+<p>Until_Log_File:</p>
+
+<p>Until_Log_Pos: 0</p>
+
+<p>Master_SSL_Allowed: No</p>
+
+<p>Master_SSL_CA_File:</p>
+
+<p>Master_SSL_CA_Path:</p>
+
+<p>Master_SSL_Cert:</p>
+
+<p>Master_SSL_Cipher:</p>
+
+<p>Master_SSL_Key:</p>
+
+<p>Seconds_Behind_Master: 0</p>
+
+<p>Master_SSL_Verify_Server_Cert: No</p>
+
+<p>Last_IO_Errno: 0</p>
+
+<p>Last_IO_Error:</p>
+
+<p>Last_SQL_Errno: 0</p>
+
+<p>Last_SQL_Error:</p>
+
+<p>Replicate_Ignore_Server_Ids:</p>
+
+<p>Master_Server_Id: 49</p>
+
+<p>Master_UUID: 9346321d-a2ec-11e9-87ef-080027adcbf9</p>
+
+<p>Master_Info_File: /usr/local/mysql/data/master.info</p>
+
+<p>SQL_Delay: 0</p>
+
+<p>SQL_Remaining_Delay: NULL</p>
+
+<p>Slave_SQL_Running_State: Slave has read all relay log; waiting for more
+updates</p>
+
+<p>Master_Retry_Count: 86400</p>
+
+<p>Master_Bind:</p>
+
+<p>Last_IO_Error_Timestamp:</p>
+
+<p>Last_SQL_Error_Timestamp:</p>
+
+<p>Master_SSL_Crl:</p>
+
+<p>Master_SSL_Crlpath:</p>
+
+<p>Retrieved_Gtid_Set:</p>
+
+<p>Executed_Gtid_Set:</p>
+
+<p>Auto_Position: 0</p>
+
+<p>Replicate_Rewrite_DB:</p>
+
+<p>Channel_Name:</p>
+
+<p>Master_TLS_Version:</p>
+
+<p>1 row in set (0.00 sec)</p>
+
+<p>ERROR:</p>
+
+<p>No query specified</p>
+
+<p>root@localhost [(none)] [Sat Jul 27 13:22:14 2019]&gt;show master status;</p>
+
+<p>+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;+&mdash;&mdash;&mdash;-+&mdash;&mdash;&mdash;&mdash;&ndash;+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-+</p>
+
+<p>| File | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |</p>
+
+<p>+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;+&mdash;&mdash;&mdash;-+&mdash;&mdash;&mdash;&mdash;&ndash;+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-+</p>
+
+<p>| mysql-bin.000014 | 2493553 | | | |</p>
+
+<p>+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;+&mdash;&mdash;&mdash;-+&mdash;&mdash;&mdash;&mdash;&ndash;+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-+</p>
+
+<p>1 row in set (0.00 sec)</p>
+
+<p>root@localhost [(none)] [Sat Jul 27 13:22:45 2019]&gt;</p>
+
+<p>通过上面在98的show master status;</p>
+
+<p>看到mysql-bin.000014 | 2493553 这两个信息</p>
+
+<p><a href="https://img.it610.com/image/info8/794b3fe344aa472ab7abb375336dc8cb.png"><img src="https://img.it610.com/image/info8/794b3fe344aa472ab7abb375336dc8cb.png" alt="\[mysql\]-shell
+检测myql主从同步的主库状态并自动升级slave_第1张图片" /></a></p>
+
+<p>#定时任务就不执行了直接手动在98上执行以下备份脚本</p>
+
+<p><a href="https://img.it610.com/image/info8/a5a363f9f5734f2abe6fcf436e80ee02.jpg"><img src="https://img.it610.com/image/info8/a5a363f9f5734f2abe6fcf436e80ee02.jpg" alt="\[mysql\]-shell
+检测myql主从同步的主库状态并自动升级slave_第2张图片" /></a></p>
+
+<p>在从上编写一个定时任务脚本/opt/check.sh 检测vip是否飘到了从机98上</p>
+
+<p>#!/bin/bash</p>
+
+<h1 id="author">Author:</h1>
+
+<h1 id="email">Email:</h1>
+
+<h1 id="description-检测vip">Description: 检测vip</h1>
+
+<h1 id="notes-只在98上执行">Notes:只在98上执行</h1>
+
+<p>#调试模式</p>
+
+<p>#set -x</p>
+
+<p>if [ <code>ip addr |grep 172.20.19.95 | wc -l</code> -eq 1 ];then</p>
+
+<p>echo 95 here</p>
+
+<p>fi</p>
+
+<p>sleep 5</p>
+
+<p>if [ <code>ip addr |grep 172.20.19.95 | wc -l</code> -eq 1 ];then</p>
+
+<p>echo 95 here</p>
+
+<p>echo 执行切换主从操作</p>
+
+<p>bash /opt/change.sh #测试的时候我注释了 手动执行了</p>
+
+<p>exit</p>
+
+<p>fi</p>
+
+<p>echo 95 not here</p>
+
+<p>echo 95已经飘回49</p>
+
+<hr />
+
+<p>这边为了测试第二天出现故障 使用第一天晚上的全备进行恢复.所以将</p>
+
+<p>sql名称和status的名称改成前一天的了</p>
+
+<p><a href="https://img.it610.com/image/info8/512323dcb18144e58a963db72f06ffdb.png"><img src="https://img.it610.com/image/info8/512323dcb18144e58a963db72f06ffdb.png" alt="\[mysql\]-shell
+检测myql主从同步的主库状态并自动升级slave_第3张图片" /></a></p>
+
+<p>在98的/opt下编写change.sh 用于变更主从并从新建立.</p>
+
+<p>#去除主从关系</p>
+
+<p>mysql -uroot -pHangzhou@123 -e &ldquo;</p>
+
+<p>stop slave;</p>
+
+<p>reset slave;</p>
+
+<p>change master to master_host=&rsquo; &lsquo;;</p>
+
+<p>show slave status\G;</p>
+
+<p>quit&rdquo;</p>
+
+<p>echo 1</p>
+
+<p>#获取昨天的日期</p>
+
+<p>log2=$(date -d &ldquo;yesterday&rdquo; +%Y-%m-%d)</p>
+
+<p>echo ${log2}</p>
+
+<p>data_dir=/opt/mysql_dump</p>
+
+<p>SQL=$data_dir/$log2.sql</p>
+
+<p>echo $SQL</p>
+
+<p>echo 2</p>
+
+<p>#查看master状态 获取file 以及position的信息</p>
+
+<p>file=<code>tac /opt/mysql_dump/status_$log2.txt|head -n 1 |awk '{print $1}'</code></p>
+
+<p>pos=<code>tac /opt/mysql_dump/status_$log2.txt |head -n 1 |awk '{print $2}'</code></p>
+
+<p>echo $file $pos</p>
+
+<p>echo 3</p>
+
+<p>#</p>
+
+<p>mysql -uroot -pHangzhou@123 -h172.20.19.49 &lt; $SQL</p>
+
+<p>echo 4</p>
+
+<p>mysql -uroot -pHangzhou@123 -e &ldquo;</p>
+
+<p>CREATE USER repl_user;</p>
+
+<p>GRANT REPLICATION SLAVE On <em>.</em> TO repl_user IDENTIFIED BY &lsquo;ht00@pass&rsquo;;</p>
+
+<p>flush privileges;</p>
+
+<p>quit&rdquo;</p>
+
+<p>echo 5</p>
+
+<p>changeCmd=&ldquo;change master to
+MASTER_HOST=&lsquo;172.20.19.98&rsquo;,MASTER_PORT=3306,MASTER_USER=&lsquo;repl_user&rsquo;,MASTER_PASSWORD=&lsquo;ht00@pass&rsquo;,MASTER_LOG_FILE=&lsquo;${file}&rsquo;,MASTER_LOG_POS=${pos};&rdquo;</p>
+
+<p>echo $changeCmd</p>
+
+<p>mysql -uroot -pHangzhou@123 -h172.20.19.49 -e &ldquo;${changeCmd}&rdquo;</p>
+
+<p>echo 6</p>
+
+<p>mysql -uroot -pHangzhou@123 -h172.20.19.49 -e &ldquo;</p>
+
+<p>stop slave;</p>
+
+<p>start slave;</p>
+
+<p>show slave status\G;</p>
+
+<p>quit&rdquo;</p>
+
+<p>echo 7</p>
+
+<hr />
+
+<p>模拟vip 漂移 发生了故障. 这主从两台机子date时间差1分钟 请忽略吧 哈哈.尴尬</p>
+
+<p><a href="https://img.it610.com/image/info8/a5ab8d153f28430b8683049f7a8a015d.jpg"><img src="https://img.it610.com/image/info8/a5ab8d153f28430b8683049f7a8a015d.jpg" alt="\[mysql\]-shell
+检测myql主从同步的主库状态并自动升级slave_第4张图片" /></a></p>
+
+<p>vip 现在在98上了 如果定时任务执行了检测的话</p>
+
+<p>就会执行脚本了..</p>
+
+<p><a href="https://img.it610.com/image/info8/f64ef959df104584aa9503739fb059fc.jpg"><img src="https://img.it610.com/image/info8/f64ef959df104584aa9503739fb059fc.jpg" alt="\[mysql\]-shell
+检测myql主从同步的主库状态并自动升级slave_第5张图片" /></a></p>
+
+<p>执行check.sh</p>
+
+<p><a href="https://img.it610.com/image/info8/ec56d6995ebb40b9a003ce5c6b571ff0.jpg"><img src="https://img.it610.com/image/info8/ec56d6995ebb40b9a003ce5c6b571ff0.jpg" alt="\[mysql\]-shell
+检测myql主从同步的主库状态并自动升级slave_第6张图片" /></a></p>
+
+<p>执行change.sh</p>
+
+<p>[root@zookeeper-2 opt]# sh change.sh</p>
+
+<p>Logging to file &lsquo;/usr/local/mysql/data/mysql_history.log&rsquo;</p>
+
+<p>mysql: [Warning] Using a password on the command line interface can be
+insecure.</p>
+
+<p>*************************** 1. row ***************************</p>
+
+<p>Slave_IO_State:</p>
+
+<p>Master_Host:</p>
+
+<p>Master_User: repl</p>
+
+<p>Master_Port: 3306</p>
+
+<p>Connect_Retry: 30</p>
+
+<p>Master_Log_File:</p>
+
+<p>Read_Master_Log_Pos: 4</p>
+
+<p>Relay_Log_File: zookeeper-2-relay-bin.000001</p>
+
+<p>Relay_Log_Pos: 4</p>
+
+<p>Relay_Master_Log_File:</p>
+
+<p>Slave_IO_Running: No</p>
+
+<p>Slave_SQL_Running: No</p>
+
+<p>Replicate_Do_DB:</p>
+
+<p>Replicate_Ignore_DB: mysql,information_schema,performance_schema</p>
+
+<p>Replicate_Do_Table:</p>
+
+<p>Replicate_Ignore_Table:</p>
+
+<p>Replicate_Wild_Do_Table:</p>
+
+<p>Replicate_Wild_Ignore_Table:</p>
+
+<p>Last_Errno: 0</p>
+
+<p>Last_Error:</p>
+
+<p>Skip_Counter: 0</p>
+
+<p>Exec_Master_Log_Pos: 0</p>
+
+<p>Relay_Log_Space: 154</p>
+
+<p>Until_Condition: None</p>
+
+<p>Until_Log_File:</p>
+
+<p>Until_Log_Pos: 0</p>
+
+<p>Master_SSL_Allowed: No</p>
+
+<p>Master_SSL_CA_File:</p>
+
+<p>Master_SSL_CA_Path:</p>
+
+<p>Master_SSL_Cert:</p>
+
+<p>Master_SSL_Cipher:</p>
+
+<p>Master_SSL_Key:</p>
+
+<p>Seconds_Behind_Master: NULL</p>
+
+<p>Master_SSL_Verify_Server_Cert: No</p>
+
+<p>Last_IO_Errno: 0</p>
+
+<p>Last_IO_Error:</p>
+
+<p>Last_SQL_Errno: 0</p>
+
+<p>Last_SQL_Error:</p>
+
+<p>Replicate_Ignore_Server_Ids:</p>
+
+<p>Master_Server_Id: 0</p>
+
+<p>Master_UUID:</p>
+
+<p>Master_Info_File: /usr/local/mysql/data/master.info</p>
+
+<p>SQL_Delay: 0</p>
+
+<p>SQL_Remaining_Delay: NULL</p>
+
+<p>Slave_SQL_Running_State:</p>
+
+<p>Master_Retry_Count: 86400</p>
+
+<p>Master_Bind:</p>
+
+<p>Last_IO_Error_Timestamp:</p>
+
+<p>Last_SQL_Error_Timestamp:</p>
+
+<p>Master_SSL_Crl:</p>
+
+<p>Master_SSL_Crlpath:</p>
+
+<p>Retrieved_Gtid_Set:</p>
+
+<p>Executed_Gtid_Set:</p>
+
+<p>Auto_Position: 0</p>
+
+<p>Replicate_Rewrite_DB:</p>
+
+<p>Channel_Name:</p>
+
+<p>Master_TLS_Version:</p>
+
+<p>2019-07-26</p>
+
+<p>/opt/mysql_dump/2019-07-26.sql</p>
+
+<p>mysql-bin.000014 2493553</p>
+
+<p>Logging to file &lsquo;/usr/local/mysql/data/mysql_history.log&rsquo;</p>
+
+<p>mysql: [Warning] Using a password on the command line interface can be
+insecure.</p>
+
+<p>mysql: [Warning] Using a password on the command line interface can be
+insecure.</p>
+
+<p>change master to
+MASTER_HOST=&lsquo;172.20.19.98&rsquo;,MASTER_PORT=3306,MASTER_USER=&lsquo;repl_user&rsquo;,MASTER_PASSWORD=&lsquo;ht00@pass&rsquo;,MASTER_LOG_FILE=&lsquo;mysql-
+bin.000014&rsquo;,MASTER_LOG_POS=2493553;</p>
+
+<p>Logging to file &lsquo;/usr/local/mysql/data/mysql_history.log&rsquo;</p>
+
+<p>mysql: [Warning] Using a password on the command line interface can be
+insecure.</p>
+
+<p>Logging to file &lsquo;/usr/local/mysql/data/mysql_history.log&rsquo;</p>
+
+<p>mysql: [Warning] Using a password on the command line interface can be
+insecure.</p>
+
+<p>*************************** 1. row ***************************</p>
+
+<p>Slave_IO_State: Connecting to master</p>
+
+<p>Master_Host: 172.20.19.98</p>
+
+<p>Master_User: repl_user</p>
+
+<p>Master_Port: 3306</p>
+
+<p>Connect_Retry: 60</p>
+
+<p>Master_Log_File: mysql-bin.000014</p>
+
+<p>Read_Master_Log_Pos: 2493553</p>
+
+<p>Relay_Log_File: zookeeper-1-relay-bin.000001</p>
+
+<p>Relay_Log_Pos: 4</p>
+
+<p>Relay_Master_Log_File: mysql-bin.000014</p>
+
+<p>Slave_IO_Running: Connecting</p>
+
+<p>Slave_SQL_Running: Yes</p>
+
+<p>Replicate_Do_DB:</p>
+
+<p>Replicate_Ignore_DB: mysql,information_schema,performance_schema</p>
+
+<p>Replicate_Do_Table:</p>
+
+<p>Replicate_Ignore_Table:</p>
+
+<p>Replicate_Wild_Do_Table:</p>
+
+<p>Replicate_Wild_Ignore_Table:</p>
+
+<p>Last_Errno: 0</p>
+
+<p>Last_Error:</p>
+
+<p>Skip_Counter: 0</p>
+
+<p>Exec_Master_Log_Pos: 2493553</p>
+
+<p>Relay_Log_Space: 154</p>
+
+<p>Until_Condition: None</p>
+
+<p>Until_Log_File:</p>
+
+<p>Until_Log_Pos: 0</p>
+
+<p>Master_SSL_Allowed: No</p>
+
+<p>Master_SSL_CA_File:</p>
+
+<p>Master_SSL_CA_Path:</p>
+
+<p>Master_SSL_Cert:</p>
+
+<p>Master_SSL_Cipher:</p>
+
+<p>Master_SSL_Key:</p>
+
+<p>Seconds_Behind_Master: NULL</p>
+
+<p>Master_SSL_Verify_Server_Cert: No</p>
+
+<p>Last_IO_Errno: 0</p>
+
+<p>Last_IO_Error:</p>
+
+<p>Last_SQL_Errno: 0</p>
+
+<p>Last_SQL_Error:</p>
+
+<p>Replicate_Ignore_Server_Ids:</p>
+
+<p>Master_Server_Id: 0</p>
+
+<p>Master_UUID:</p>
+
+<p>Master_Info_File: /usr/local/mysql/data/master.info</p>
+
+<p>SQL_Delay: 0</p>
+
+<p>SQL_Remaining_Delay: NULL</p>
+
+<p>Slave_SQL_Running_State: Waiting for the next event in relay log</p>
+
+<p>Master_Retry_Count: 86400</p>
+
+<p>Master_Bind:</p>
+
+<p>Last_IO_Error_Timestamp:</p>
+
+<p>Last_SQL_Error_Timestamp:</p>
+
+<p>Master_SSL_Crl:</p>
+
+<p>Master_SSL_Crlpath:</p>
+
+<p>Retrieved_Gtid_Set:</p>
+
+<p>Executed_Gtid_Set:</p>
+
+<p>Auto_Position: 0</p>
+
+<p>Replicate_Rewrite_DB:</p>
+
+<p>Channel_Name:</p>
+
+<p>Master_TLS_Version:</p>
+
+<p>[root@zookeeper-2 opt]# ll</p>
+
+<p>总用量 12</p>
+
+<p>-rw-r&ndash;r&ndash;. 1 root root 1063 7月 27 14:57 change.sh</p>
+
+<p>-rw-r&ndash;r&ndash;. 1 root root 471 7月 27 15:14 check.sh</p>
+
+<p>-rw-r&ndash;r&ndash;. 1 root root 1485 7月 27 14:16 dump_mysql.sh</p>
+
+<p>drwxr-xr-x. 2 root root 57 7月 27 14:39 mysql_dump</p>
+
+<p>[root@zookeeper-2 opt]# mysql -uroot -pHangzhou123 -h172.20.19.49</p>
+
+<p>Logging to file &lsquo;/usr/local/mysql/data/mysql_history.log&rsquo;</p>
+
+<p>mysql: [Warning] Using a password on the command line interface can be
+insecure.</p>
+
+<p>ERROR 1045 (28000): Access denied for user &lsquo;root&rsquo;@&lsquo;172.20.19.98&rsquo; (using
+password: YES)</p>
+
+<p>[root@zookeeper-2 opt]# mysql -uroot -pHangzhou@123 -h172.20.19.49</p>
+
+<p>Logging to file &lsquo;/usr/local/mysql/data/mysql_history.log&rsquo;</p>
+
+<p>mysql: [Warning] Using a password on the command line interface can be
+insecure.</p>
+
+<p>Welcome to the MySQL monitor. Commands end with ; or \g.</p>
+
+<p>Your MySQL connection id is 21</p>
+
+<p>Server version: 5.7.12-log MySQL Community Server (GPL)</p>
+
+<p>Copyright &copy; 2000, 2016, Oracle and/or its affiliates. All rights reserved.</p>
+
+<p>Oracle is a registered trademark of Oracle Corporation and/or its</p>
+
+<p>affiliates. Other names may be trademarks of their respective</p>
+
+<p>owners.</p>
+
+<p>Type &lsquo;help;&rsquo; or &lsquo;\h&rsquo; for help. Type &lsquo;\c&rsquo; to clear the current input statement.</p>
+
+<p>root@172.20.19.98 [(none)] [Sat Jul 27 15:20:57 2019]&gt;show slave status\G;</p>
+
+<p>*************************** 1. row ***************************</p>
+
+<p>Slave_IO_State: Waiting for master to send event</p>
+
+<p>Master_Host: 172.20.19.98</p>
+
+<p>Master_User: repl_user</p>
+
+<p>Master_Port: 3306</p>
+
+<p>Connect_Retry: 60</p>
+
+<p>Master_Log_File: mysql-bin.000014</p>
+
+<p>Read_Master_Log_Pos: 2494188</p>
+
+<p>Relay_Log_File: zookeeper-1-relay-bin.000002</p>
+
+<p>Relay_Log_Pos: 955</p>
+
+<p>Relay_Master_Log_File: mysql-bin.000014</p>
+
+<p>Slave_IO_Running: Yes</p>
+
+<p>Slave_SQL_Running: Yes</p>
+
+<p>Replicate_Do_DB:</p>
+
+<p>Replicate_Ignore_DB: mysql,information_schema,performance_schema</p>
+
+<p>Replicate_Do_Table:</p>
+
+<p>Replicate_Ignore_Table:</p>
+
+<p>Replicate_Wild_Do_Table:</p>
+
+<p>Replicate_Wild_Ignore_Table:</p>
+
+<p>Last_Errno: 0</p>
+
+<p>Last_Error:</p>
+
+<p>Skip_Counter: 0</p>
+
+<p>Exec_Master_Log_Pos: 2494188</p>
+
+<p>Relay_Log_Space: 1168</p>
+
+<p>Until_Condition: None</p>
+
+<p>Until_Log_File:</p>
+
+<p>Until_Log_Pos: 0</p>
+
+<p>Master_SSL_Allowed: No</p>
+
+<p>Master_SSL_CA_File:</p>
+
+<p>Master_SSL_CA_Path:</p>
+
+<p>Master_SSL_Cert:</p>
+
+<p>Master_SSL_Cipher:</p>
+
+<p>Master_SSL_Key:</p>
+
+<p>Seconds_Behind_Master: 0</p>
+
+<p>Master_SSL_Verify_Server_Cert: No</p>
+
+<p>Last_IO_Errno: 0</p>
+
+<p>Last_IO_Error:</p>
+
+<p>Last_SQL_Errno: 0</p>
+
+<p>Last_SQL_Error:</p>
+
+<p>Replicate_Ignore_Server_Ids:</p>
+
+<p>Master_Server_Id: 98</p>
+
+<p>Master_UUID: 98f6c429-a2ec-11e9-8664-0800279939e8</p>
+
+<p>Master_Info_File: /usr/local/mysql/data/master.info</p>
+
+<p>SQL_Delay: 0</p>
+
+<p>SQL_Remaining_Delay: NULL</p>
+
+<p>Slave_SQL_Running_State: Slave has read all relay log; waiting for more
+updates</p>
+
+<p>Master_Retry_Count: 86400</p>
+
+<p>Master_Bind:</p>
+
+<p>Last_IO_Error_Timestamp:</p>
+
+<p>Last_SQL_Error_Timestamp:</p>
+
+<p>Master_SSL_Crl:</p>
+
+<p>Master_SSL_Crlpath:</p>
+
+<p>Retrieved_Gtid_Set:</p>
+
+<p>Executed_Gtid_Set:</p>
+
+<p>Auto_Position: 0</p>
+
+<p>Replicate_Rewrite_DB:</p>
+
+<p>Channel_Name:</p>
+
+<p>Master_TLS_Version:</p>
+
+<p>1 row in set (0.00 sec)</p>
+
+<p>ERROR:</p>
+
+<p>No query specified</p>
+
+<p>root@172.20.19.98 [(none)] [Sat Jul 27 15:21:02 2019]&gt;</p>
+
+<p><a href="https://img.it610.com/image/info8/0c629af9b31c463b94ed057928d05646.jpg"><img src="https://img.it610.com/image/info8/0c629af9b31c463b94ed057928d05646.jpg" alt="\[mysql\]-shell
+检测myql主从同步的主库状态并自动升级slave_第7张图片" /></a></p>
+
+<p>问题1.我这个检测第二遍vip是否飘回去是否有必要,毕竟如果当时sleep的时候有数据写入,那估计没有重新更换主从,原主从恢复的时候 也报错了.</p>
+
+<p>问题2.如果是网络问题的话.我脚本重新拉起一个新从会报错,只能等服务器启动了之后再手动执行脚本</p>
+
+<p>问题3 定时检测vip的脚本 需要修改一下.让脚本只执行一次.否则主宕机的话 会一直去执行.比如执行的时候创建一个文件里面是日期 每次执行前判断一下
+上次执行时间是不是今天?</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

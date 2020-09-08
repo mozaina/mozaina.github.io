@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>用adbshell让APP获得Root权限bySuperSU | 开发者问答集锦</title>
+    <meta property="og:title" content="用adbshell让APP获得Root权限bySuperSU - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="用adbshell让APP获得Root权限bySuperSU">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%94%A8adbshell%E8%AE%A9app%E8%8E%B7%E5%BE%97root%E6%9D%83%E9%99%90bysupersu/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">用adbshell让APP获得Root权限bySuperSU</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>最近对一些系统级的第三方app很感兴趣，这类app通常需要root权限，手上虽然有可以编译android的源码，但默认只开发adb shell
+root权限（eng版本），于是研究了一下SuperSU这个ROOT权限管理app，让第三方app可以通过SuperSU获得ROOT，下面写了个脚本方便以后使用。</p>
+
+<p><strong>开发环境:</strong> 高通MSM8998 / android 8.1 / SuperSU 2.82</p>
+
+<h3 id="1-使用前提">1.使用前提</h3>
+
+<ul>
+<li>adb shell拥有root权限</li>
+<li>selinux可以关闭</li>
+<li>自行下载 SuperSU Recovery Flashable.zip</li>
+</ul>
+
+<h3 id="2-supersu原理">2.SuperSU原理</h3>
+
+<p>非系统进程通过su命令可以将自身提权到root权限，但是原生SU程序一上来就把非root和非shell用户封死了</p>
+
+<pre><code>  //android/system/extras/su/su.c 
+  int main(int argc, char** argv) {
+    uid_t current_uid = getuid();
+   if (current_uid != AID_ROOT &amp;&amp; current_uid != AID_SHELL) error(1, 0, &quot;not allowed&quot;);
+</code></pre>
+
+<p>SuperSU提供了另外一套su文件和对应的权限管理方案，我用到以下的文件：</p>
+
+<pre><code>   common/Superuser.apk
+   ARCH/su
+   ARCH/supolicy
+   ARCH/libsupol.so
+</code></pre>
+
+<p>强烈推荐阅读一下SuperSU的说明文档的 <code>----- &quot;SYSTEM&quot; INSTALL -----</code>
+章节，特别如果你的SuperSU版本或者环境平台与我有差异，本文使用的脚本根据该文档修改而来，文档路径如下：</p>
+
+<blockquote>
+<p>SR5-SuperSU-v2.82-SR5-20171001224502\META-INF\com\google\android\update-
+binary</p>
+</blockquote>
+
+<p>几点说明：</p>
+
+<h4 id="2-1-selinux">2.1 selinux</h4>
+
+<p>selinux情况比较复杂，在不关闭selinux的情况下也可以运行superSU，但我没有搞定，所以直接关了selinux，不纠结。<br />
+selinux关闭的方法，不同厂家应该有自己的方法，比如修改编译参数：<br />
+<code>$YOUR_AOSP/device/$YOUR_RAND/$YOUR_DEVICE/BoardConfig.mk</code></p>
+
+<pre><code>BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
+</code></pre>
+
+<p>也可以每次开机的时候执行:</p>
+
+<pre><code>setenforce 0
+</code></pre>
+
+<p>或</p>
+
+<pre><code>echo 0 &gt; /sys/fs/selinux/enforce
+</code></pre>
+
+<h4 id="2-2-app-process">2.2 app_process</h4>
+
+<p>SuperSU中劫持app_process的目的之一是为了开机执行daemonsu，但在我们的平台替换app_process后，开机会报错……我这里便没有使用这套方案，直接找了一个开机需要执行的脚本，比如常见的
+install-recovery.sh，在最末尾加入</p>
+
+<pre><code>/system/xbin/daemonsu --auto-daemon &amp;
+</code></pre>
+
+<p>请根据自己平台情况修改</p>
+
+<h3 id="3-脚本">3.脚本</h3>
+
+<p>剩下的没什么好说的了，show the code.<br />
+使用前请先关闭selinux，进入superSU会提示SU二进制文件需要更新，请选取消，以下为windows bat脚本</p>
+
+<pre><code>@echo off
+@echo -----------------------------------------------------------
+@echo ------ ENG Binary Android ROOT Script               -------
+@echo ------ SuperSU version: 2.82                        -------
+@echo ------ For MSM8998 / by bingoCoder2013 / 2018-5-8   -------
+@echo -----------------------------------------------------------
+
+::---------------------------------------------------------------
+::------- Define related folder &amp; files names here --------------
+::---------------------------------------------------------------
+set CPU_TYPE=arm64
+set LIB_FORDER=lib64
+
+::set CPU_TYPE=armv7
+::set LIB_FORDER=lib
+::---------------------------------------------------------------
+::---------------------- Define End -----------------------------
+::---------------------------------------------------------------
+
+adb remount
+adb shell setenforce 0
+adb push common/Superuser.apk /system/app/SuperSU/SuperSU.apk 
+adb shell chmod 0644 /system/app/SuperSU/SuperSU.apk 
+adb shell chcon u:object_r:system_file:s0 /system/app/SuperSU/SuperSU.apk 
+
+::add running su deamon to install-recovery.sh
+adb shell &quot;echo &gt;&gt; /system/bin/install-recovery.sh&quot;
+adb shell &quot;echo '# Disable SELINUX &amp; Run SuperSU deamon' &gt;&gt; /system/bin/install-recovery.sh&quot;
+adb shell &quot;echo '/system/xbin/daemonsu --auto-daemon &amp;' &gt;&gt; /system/bin/install-recovery.sh&quot;
+adb shell chmod 0755 /system/bin/install-recovery.sh
+
+adb push %CPU_TYPE%/su /system/xbin/su 
+adb shell chmod 0755 /system/xbin/su 
+adb shell chcon u:object_r:system_file:s0 /system/xbin/su 
+
+adb push %CPU_TYPE%/su /system/bin/.ext/.su 
+adb shell chmod 0755 /system/bin/.ext/.su 
+adb shell chcon u:object_r:system_file:s0 /system/bin/.ext/.su 
+
+adb push %CPU_TYPE%/su /system/xbin/daemonsu 
+adb shell chmod 0755 /system/xbin/daemonsu 
+adb shell chcon u:object_r:system_file:s0 /system/xbin/daemonsu 
+
+adb push %CPU_TYPE%/supolicy /system/xbin/supolicy 
+adb shell chmod 0755 /system/xbin/supolicy 
+adb shell chcon u:object_r:system_file:s0 /system/xbin/supolicy 
+
+adb push %CPU_TYPE%/libsupol.so /system/%LIB_FORDER%/libsupol.so 
+adb shell chmod 0755 /system/%LIB_FORDER%/libsupol.so 
+adb shell chcon u:object_r:system_file:s0 /system/%LIB_FORDER%/libsupol.so 
+
+::adb shell su --install
+@echo -----------------------------------------------------------
+@echo All done! 
+@echo Press any key to reboot ...
+@echo If you do not want to reboot, plz close this CMD window
+@echo -----------------------------------------------------------
+pause
+adb reboot
+</code></pre>
+
+<h3 id="4-参考">4.参考</h3>
+
+<p>如果想用编译的方法可以参考以下博文：<br />
+给Android ROM(AOSP)集成 SuperSU 的方法</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

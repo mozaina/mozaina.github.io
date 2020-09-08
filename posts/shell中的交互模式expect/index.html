@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell中的交互模式expect | 开发者问答集锦</title>
+    <meta property="og:title" content="shell中的交互模式expect - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell中的交互模式expect">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E4%B8%AD%E7%9A%84%E4%BA%A4%E4%BA%92%E6%A8%A1%E5%BC%8Fexpect/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell中的交互模式expect</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>在shell开发中，我们连接FTP或者passwd或sudo等操作时，需要手动输入密码。对于自动化而言，这显然是不合适的。而expect的强交互模式解决了这个问题。工作中偶有涉及到这个，个人也是简单的了解，解决实际问题，作学习记录。</p>
+
+<p><strong>一：安装</strong> 【参考地址：<a href="https://www.cnblogs.com/lixigang/articles/4849527.html】">https://www.cnblogs.com/lixigang/articles/4849527.html】</a></p>
+
+<p>expect需要Tcl编程语言的支持，所以expect需要安装两个东西。一个tcl，一个expect；[安装前，可通过 &ldquo;which/whereis
+expect&rdquo;判断服务器是否已安装]</p>
+
+<p><strong>1、tcl下载与安装</strong></p>
+
+<p>下载： wget <a href="http://nchc.dl.sourceforge.net/sourceforge/tcl/tcl8.4.11-src.tar.gz">http://nchc.dl.sourceforge.net/sourceforge/tcl/tcl8.4.11-src.tar.gz</a></p>
+
+<p>解压： tar -xzvf tcl8.4.11-src.tar.gz 【-C 目标地址]</p>
+
+<p>配置：cd tcl8.4.11/unix &amp;&amp; ./configure &ndash;prefix=/usr/tcl &ndash;enable-shared &amp;&amp; make
+&amp;&amp;make install</p>
+
+<p>拷贝：安装完毕以后，将目录unix下面的tclUnixPort.h copy到tcl8.4.11 目录下的generic目录中</p>
+
+<p><strong>2、expect下载与安装</strong></p>
+
+<p>下载：wget
+<a href="http://sourceforge.net/projects/expect/files/Expect/5.45/expect5.45.tar.gz">http://sourceforge.net/projects/expect/files/Expect/5.45/expect5.45.tar.gz</a></p>
+
+<p>解压：tar -xzvf expect5.45.tar.gz</p>
+
+<p>配置：cd expect5.45 [切换到解压路径下]</p>
+
+<p>安装： ./configure &ndash;prefix=/usr/expect &ndash;with-tcl=/usr/tcl/lib &ndash;with-
+tclinclude=../tcl8.4.11/generic &amp;&amp; make &amp;&amp; make install</p>
+
+<p><strong>3、创建软链</strong></p>
+
+<p>ln -s /usr/expect/bin/expect /usr/bin/expect
+[指向引用，这时可以检查一下自己的Linux是否已安装expect。有的话就安装正确了。]</p>
+
+<p><strong>二：命令介绍</strong></p>
+
+<p>我们通过对一个简单脚本的分析，来看看expect是如何实现的。</p>
+
+<pre><code> 1 #!/usr/bin/expect
+ 2 set timeout 5
+ 3 set passwd {9m[S)UWe4r}
+ 4 spawn su root
+ 5 expect {
+ 6   &quot;password&quot; { send &quot;$passwd\r&quot;;exp_continue }
+ 7   &quot;Password&quot; { send &quot;$passwd\r&quot;;exp_continue }
+ 8   eof {;}
+ 9 }
+10 exec sleep 5
+11 expect {
+12     &quot;#&quot; send{&quot;touch tt\r&quot;}
+13     eof {;}
+14 }
+15 expect eof
+</code></pre>
+
+<p>1、#!/usr/bin/expect</p>
+
+<p>如果通过sh命令方式调用，则忽略该语句，实际脚本仍以bash脚本语言来执行，应用expect命令调用该文件；如将expect文件赋予可执行权限，输入对应路径加文件名（或./文件名）,即可实现expect脚本语言方式处理【如果处理过程中，还希望用到bash，可通过在bash脚本中添加/bin/bash方式，调用bash
+shell。】</p>
+
+<p>2、set timeout 10</p>
+
+<p>设置超时时间，单位：秒</p>
+
+<p>3、设置变量passwd</p>
+
+<p>通过set方式，不需要添加“=”，也可以通过$args传递参数，使用[lindex $args n]调用参数，其中n从0开始，
+分别表示第一个,第二个,第三个&hellip;.参数。如我们将传递的第一个参数赋值给脚本内部变量：set my_var &ldquo;[lindex $args 0]&rdquo;</p>
+
+<p>4、spawn su root</p>
+
+<p>启动一个进程，并给这个进程加上一个外壳，可用来传递交互信息。</p>
+
+<p>5、expect &hellip;</p>
+
+<p>是expect的一个内部命令，等待进程发送的某些字符串（如&rdquo;password&rdquo;）；类型于switch/case，能同时等待多个字符串，并对每一个字符串执行不同的操作。本例中使用了大括号（必须两个），也可以直接后接字符串如：expect
+“Password” ;send &ldquo;$passwd\r&rdquo;</p>
+
+<p>使用exp_continue后，会重新从当前expect块的开始重新执行，可以简单理解问while循环的continue</p>
+
+<p>6、sleep</p>
+
+<p>由于自动执行受限于系统响应时间和send内指令的执行时间，设置sleep时间，单位：秒</p>
+
+<p>7、eof</p>
+
+<p>进程的结束在expect的最后有两种选择。一个是用eof匹配，在spawn进程结束后会向expect发送eof，结束进程。也可以使用interact，在执行完成后保持交互状态将控制权交给控制台；</p>
+
+<p>谢谢！</p>
+
+<p><strong>原创博客，转载请注明出处！欢迎邮件沟通：shj8319@sina.com</strong></p>
+
+<p>转载于:<a href="https://www.cnblogs.com/SunHuaJ/p/9098172.html">https://www.cnblogs.com/SunHuaJ/p/9098172.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

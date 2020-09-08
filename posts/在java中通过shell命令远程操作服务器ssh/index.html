@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>在java中通过shell命令远程操作服务器SSH | 开发者问答集锦</title>
+    <meta property="og:title" content="在java中通过shell命令远程操作服务器SSH - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="在java中通过shell命令远程操作服务器SSH">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%9C%A8java%E4%B8%AD%E9%80%9A%E8%BF%87shell%E5%91%BD%E4%BB%A4%E8%BF%9C%E7%A8%8B%E6%93%8D%E4%BD%9C%E6%9C%8D%E5%8A%A1%E5%99%A8ssh/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">在java中通过shell命令远程操作服务器SSH</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>在工作中，比如我们的产品是需要根据代码中的情况，时时的去操作远程的服务器，
+所以这样不能通过固定的shell脚本去完成，所以就只能在java中通过shell命令远程的操作服务器。所以本博客就是，在java中，通过使用shell命令操作远程的服务器。
+本类包含： 远程执行shell命令， 文件上传下载，文件删除，查询文件列表几个方法。 话不多说，直接上代码：</p>
+
+<h3 id="准备工作">准备工作：</h3>
+
+<p>因为这个是使用的jsch工具，所以需要首先导入这个包， maven下引入：</p>
+
+<pre><code>    &lt;dependency&gt;
+        &lt;groupId&gt;com.jcraft&lt;/groupId&gt;
+        &lt;artifactId&gt;jsch&lt;/artifactId&gt;
+        &lt;version&gt;0.1.55&lt;/version&gt;
+    &lt;/dependency&gt;
+</code></pre>
+
+<p>非maven项目的话，可以通点击后面下载jar包：点击下载<br />
+，没有积分的可以后面留言，我发送到邮箱</p>
+
+<h3 id="1-为了方便管理-我先把登陆需要输入的ip-帐号-密码使用一个实体类来进行封装-代码如下">1. 为了方便管理，我先把登陆需要输入的ip,帐号，密码使用一个实体类来进行封装，代码如下：</h3>
+
+<pre><code>package com.bdm.pojo;
+
+import java.io.Serializable;
+
+/**
+ *@Packge: com.bdm.pojo
+ *@Description: 远程连接服务器并发送命令的登陆信息
+ *@author: mulming
+ *@data: Dec 25, 2019 10:54:04 AM
+ */
+public class SSHLoginInfo  implements Serializable{
+    /**
+     *@Packge: com.bdm.pojo
+     *@author: mulming
+     *@data: Dec 25, 2019 11:16:30 AM
+     */
+    private static final long serialVersionUID = 1L;
+    private String ipAddress;// ip 地址
+    private String userName;// 登陆帐号
+    private String passWord;// 登陆密码
+
+    public String getIpAddress() {
+        return ipAddress;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public String getPassWord() {
+        return passWord;
+    }
+
+    public static class Builder{
+        private String ipAddress;// ip 地址
+        private String userName;// 登陆帐号
+        private String passWord;// 登陆密码
+
+        public Builder setIpAddress(String ipAddress) {
+            this.ipAddress = ipAddress;
+            return this;
+        }
+        public Builder setUserName(String userName) {
+            this.userName = userName;
+            return this;
+        }
+        public Builder setPassWord(String passWord) {
+            this.passWord = passWord;
+            return this;
+        }
+
+        public SSHLoginInfo build() {
+            return new SSHLoginInfo(this);
+        }
+    }
+
+    private SSHLoginInfo(Builder builder) {
+        this.ipAddress = builder.ipAddress;
+        this.userName = builder.userName;
+        this.passWord = builder.passWord;
+    }
+}
+</code></pre>
+
+<h3 id="2-管理连接的工具类-以及封装的常用方法-代码如下">2. 管理连接的工具类，以及封装的常用方法，代码如下：</h3>
+
+<pre><code>package com.bdm.ssh.util;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.Properties;
+import java.util.Vector;
+import org.apache.log4j.Logger;
+import com.bdm.common.tools.DBCommonTools;
+import com.bdm.pojo.SSHLoginInfo;
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.ChannelSftp.LsEntry;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.Session;
+import com.jcraft.jsch.SftpException;
+
+/**
+ *@Packge: com.shell
+ *@Description: exec用于执行命令;sftp用于文件处理
+ *@author: mulming
+ *@data: Dec 23, 2019 9:03:41 PM
+ */
+public class SSHRemoteUtil {
+
+    public static Logger LOG = Logger.getLogger(SSHRemoteUtil.class);
+    private static volatile SSHRemoteUtil instance = null;
+    private static final int DEFAULT_PORT = 22;// 默认端口号
+    private Session session;// JSCH session
+
+    private boolean logined = false;// 是否登陆
+
+    private SSHRemoteUtil() {}
+
+    public static SSHRemoteUtil getInstance() {
+        if(instance == null) {
+            synchronized (DBCommonTools.class) {
+                if(instance == null) {
+                    instance = new SSHRemoteUtil(); 
+                }
+            }
+        }
+        return instance;
+    }
+
+    /**
+     *@Description: 远程登陆
+     *@author: mulming
+     *@param: @param ipAddress ip
+     *@param: @param userName 帐号
+     *@param: @param password 密码
+     *@param: @throws Exception
+     *@return: void
+     */
+    public void sshRemoteCallLogin(SSHLoginInfo loginInfo) {
+        // 如果登陆就直接返回
+        if (logined) {
+            return;
+        }
+        // 创建jSch对象
+        JSch jSch = new JSch();
+        try {
+            // 获取到jSch的session, 根据用户名、主机ip、端口号获取一个Session对象
+            session = jSch.getSession(loginInfo.getUserName(), loginInfo.getIpAddress(), DEFAULT_PORT);
+            // 设置密码
+            session.setPassword(loginInfo.getPassWord());
+
+            Properties config = new Properties();
+            config.put(&quot;StrictHostKeyChecking&quot;, &quot;no&quot;);
+            session.setConfig(config);
+            // session.setTimeout(3000);// 设置超时
+            session.connect(); 通过Session建立连接
+
+            // 设置登陆状态
+            logined = true;
+            LOG.info(&quot;SSH connection success ...&quot;);
+        } catch (JSchException e) {
+            // 设置登陆状态为false
+            logined = false;
+            LOG.info(&quot;主机登录失败, IP = &quot; + loginInfo.getIpAddress() + &quot;, USERNAME = &quot; + loginInfo.getUserName() + &quot;, Exception:&quot; + e);
+        }
+    }
+
+    /**
+     * 关闭连接
+     */
+    public void closeSession() {
+        // 调用session的关闭连接的方法
+        if (session != null) {
+            // 如果session不为空,调用session的关闭连接的方法
+            session.disconnect();
+        }
+        LOG.info(&quot;SSH close success ...&quot;);
+    }
+
+    /**
+     *@Description: 执行相关的命令
+     *@author: mulming
+     *@param: @param command 具体的命令
+     *@param: @throws IOException
+     *@return: String ： 返回命令执行后的结果
+     */
+    public String execCommand(String command){
+        InputStream in = null;// 输入流(读)
+        Channel channel = null;// 定义channel变量
+        try {
+            // 如果命令command不等于null
+            if (command != null) {
+                // 打开channel
+                //说明：exec用于执行命令;sftp用于文件处理
+                channel = session.openChannel(&quot;exec&quot;);
+                // 设置command
+                ((ChannelExec) channel).setCommand(command);
+                // channel进行连接
+                channel.connect();
+                // 获取到输入流
+                in = channel.getInputStream();
+                // 执行相关的命令
+                String processDataStream = processDataStream(in);
+                return processDataStream;
+            }
+        } catch (JSchException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException e) {
+                    LOG.error(e);
+                    e.printStackTrace();
+                }
+            }
+            if (channel != null) {
+                channel.disconnect();
+            }
+        }
+        return null;
+    }
+
+    /**
+     *@Description:内部使用 对将要执行的linux的命令进行遍历,专门处理执行，以及执行后返回的命令
+     *@author: mulming
+     *@param: @param in
+     *@param: @return
+     *@param: @throws Exception
+     *@return: String
+     */
+    private String processDataStream(InputStream in){
+        StringBuffer sb = new StringBuffer();
+        BufferedReader br = new BufferedReader(new InputStreamReader(in));
+        String result = &quot;&quot;;
+        try {
+            while ((result = br.readLine()) != null) {
+                sb.append(result + &quot;\n&quot;);
+            }
+        } catch (Exception e) {
+            LOG.error(&quot;Failed to get BufferedReader: &quot;,e);
+        } finally {
+            if(br != null) {
+                try {
+                    br.close();
+                } catch (IOException e) {
+                    LOG.error(e);
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     *@Description: 上传文件 可参考:https://www.cnblogs.com/longyg/archive/2012/06/25/2556576.html
+     *@author: mulming
+     *@param: @param directory 上传文件的目录,即服务端的目录
+     *@param: @param uploadFile 将要上传的文件，本地文件
+     *@return: void
+     */
+    public void uploadFile(String directory, String uploadFile) {
+        try {
+            System.out.println(&quot; Upload start .....&quot;);
+            // 打开channelSftp
+            ChannelSftp channelSftp = (ChannelSftp) session.openChannel(&quot;sftp&quot;);
+            // 远程连接
+            channelSftp.connect();
+            // 创建一个文件名称问uploadFile的文件
+            File file = new File(uploadFile);
+            // 将文件进行上传(sftp协议)
+            // 将本地文件名为src的文件上传到目标服务器,目标文件名为dst,若dst为目录,则目标文件名将与src文件名相同.
+            // 采用默认的传输模式:OVERWRITE
+            channelSftp.put(new FileInputStream(file), directory, ChannelSftp.OVERWRITE);
+            // 切断远程连接
+            channelSftp.exit();
+            System.out.println( file.getName() + &quot; Upload success .....&quot;);
+        } catch (JSchException e) {
+            e.printStackTrace();
+        } catch (SftpException e) {
+            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     *@Description: TODO下载文件 采用默认的传输模式：OVERWRITE
+     *@author: mulming
+     *@param: @param src linux服务器文件地址
+     *@param: @param dst 本地存放地址
+     *@return: void
+     */
+    public void fileDownload(String src, String dst){
+        try {
+            // src 是linux服务器文件地址,dst 本地存放地址
+            ChannelSftp channelSftp = (ChannelSftp) session.openChannel(&quot;sftp&quot;);
+            // 远程连接
+            channelSftp.connect();
+            // 下载文件,多个重载方法
+            channelSftp.get(src, dst);
+            // 切断远程连接,quit()等同于exit()，底层 disconnect();
+            channelSftp.quit(); 
+        } catch (JSchException e) {
+            LOG.error(e);
+            e.printStackTrace();
+        } catch (SftpException e) {
+            LOG.error(e);
+            e.printStackTrace();
+        }
+        LOG.info(src + &quot; ,download complete.....&quot;);
+    }
+
+    /**
+     *@Description: 删除文件
+     *@author: mulming
+     *@param: @param directoryFile 要删除文件所在目录
+     *@return: void
+     */
+    public void deleteFile(String directoryFile) throws SftpException, JSchException {
+        // 打开openChannel的sftp
+        ChannelSftp channelSftp = (ChannelSftp) session.openChannel(&quot;sftp&quot;);
+        // 远程连接
+        channelSftp.connect();
+        // 删除文件
+        channelSftp.rm(directoryFile);
+        // 切断远程连接
+        channelSftp.exit();
+        LOG.info(directoryFile + &quot; delete complete.....&quot;);
+    }
+
+    /**
+     *@Description: 列出目录下的文件
+     *@author: mulming
+     *@param: @param directory   要列出的目录
+     *@param: @throws JSchException
+     *@param: @throws SftpException
+     *@return: Vector
+     */
+    public Vector&lt;LsEntry&gt; listFiles(String directory) throws JSchException, SftpException {
+        ChannelSftp channelSftp = (ChannelSftp) session.openChannel(&quot;sftp&quot;);
+        // 远程连接
+        channelSftp.connect();
+        // 显示目录信息
+        @SuppressWarnings(&quot;unchecked&quot;)
+        Vector&lt;LsEntry&gt; ls = channelSftp.ls(directory);
+        // 切断连接
+        channelSftp.exit();
+        return ls;
+    }
+}
+</code></pre>
+
+<h3 id="3-建立测试类-测试工具-代码如下">3. 建立测试类，测试工具，代码如下：</h3>
+
+<pre><code>package com.shell;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Vector;
+
+import org.junit.After;
+import org.junit.Test;
+
+import com.jcraft.jsch.ChannelSftp.LsEntry;
+import com.bdm.pojo.SSHLoginInfo;
+import com.bdm.ssh.util.SSHRemoteUtil;
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.SftpException;
+
+public class TestOracleEXP {
+
+    static {
+         //int port;// 端口号
+        String ipAddress = &quot;xxx&quot;;// ip地址 
+        String userName = &quot;xxx&quot;;// 账号
+        String password = &quot;xxx&quot;;// 密码
+        try {
+//          首先远程连接ssh
+            SSHLoginInfo info=new SSHLoginInfo.Builder().setIpAddress(ipAddress).setUserName(userName).setPassWord(password).build();
+            SSHRemoteUtil.getInstance().sshRemoteCallLogin(info);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @After // 7、关闭连接
+    public void CloseConn() {
+        System.out.println(&quot;close conn ...&quot;);
+        SSHRemoteUtil.getInstance().closeSession();
+    }
+
+    @Test //测试执行命令
+    public void TestExecCommand() throws IOException {
+         String command = &quot;ls /opt &quot;;
+         String string = SSHRemoteUtil.getInstance().execCommand(command);
+         System.out.println(string);
+    }
+
+    @Test // 测试上传文件
+    public void TestUploadFile() {
+         String directory = &quot;/home/bdm/mlm1.text&quot;;// 目标文件名
+         String uploadFile = &quot;/home/marico/mlm.test&quot;;// 本地文件名
+         SSHRemoteUtil.getInstance().uploadFile(directory, uploadFile);
+    }
+
+    @Test //测试下载文件
+    public void TestFileDownLoad() throws JSchException, SftpException {
+        String src = &quot;/home/bdm/mlm1.text&quot;;
+        String dst = &quot;/home/marico&quot;;
+        SSHRemoteUtil.getInstance().fileDownload(src, dst);
+    }
+
+    @Test
+    public void TestDeleteFile() throws SftpException, JSchException {
+        SSHRemoteUtil.getInstance().deleteFile(&quot;/home/bdm/mlm.txt&quot;);
+    }
+
+    @Test
+    public void TestListFiles() throws JSchException, SftpException {
+        Vector&lt;LsEntry&gt; listFiles = SSHRemoteUtil.getInstance().listFiles(&quot;/home/bdm&quot;);
+        for(LsEntry s:listFiles) {
+            //System.out.println(s.getLongname());
+//          System.out.println(s.getFilename());
+            System.out.println(s.getClass());
+        }
+    }
+}
+</code></pre>
+
+<h3 id="4-测试的部分结果">4. 测试的部分结果：</h3>
+
+<p>读取文件夹下文件数量：<br />
+<a href="https://img.it610.com/image/info8/09a4201edc6d4dcaa763665114ef1992.jpg"><img src="https://img.it610.com/image/info8/09a4201edc6d4dcaa763665114ef1992.jpg" alt="在java中通过shell命令远程操作服务器（SSH）_第1张图片" /></a>删除文件：<br />
+<a href="https://img.it610.com/image/info8/bee5b1bede8340aeb0b6f72c19b8f692.jpg"><img src="https://img.it610.com/image/info8/bee5b1bede8340aeb0b6f72c19b8f692.jpg" alt="在java中通过shell命令远程操作服务器（SSH）_第2张图片" /></a>下载文件：<br />
+<a href="https://img.it610.com/image/info8/6e91e472706d40bc8ee625ee7f4faed0.jpg"><img src="https://img.it610.com/image/info8/6e91e472706d40bc8ee625ee7f4faed0.jpg" alt="在java中通过shell命令远程操作服务器（SSH）_第3张图片" /></a>其他的就不一一列举啦，
+如果觉得还好用，麻烦顶一下 3KS。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

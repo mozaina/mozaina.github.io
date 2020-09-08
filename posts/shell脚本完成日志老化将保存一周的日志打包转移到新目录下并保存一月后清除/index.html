@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本完成日志老化将保存一周的日志打包转移到新目录下并保存一月后清除 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本完成日志老化将保存一周的日志打包转移到新目录下并保存一月后清除 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本完成日志老化将保存一周的日志打包转移到新目录下并保存一月后清除">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%8C%E6%88%90%E6%97%A5%E5%BF%97%E8%80%81%E5%8C%96%E5%B0%86%E4%BF%9D%E5%AD%98%E4%B8%80%E5%91%A8%E7%9A%84%E6%97%A5%E5%BF%97%E6%89%93%E5%8C%85%E8%BD%AC%E7%A7%BB%E5%88%B0%E6%96%B0%E7%9B%AE%E5%BD%95%E4%B8%8B%E5%B9%B6%E4%BF%9D%E5%AD%98%E4%B8%80%E6%9C%88%E5%90%8E%E6%B8%85%E9%99%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本完成日志老化将保存一周的日志打包转移到新目录下并保存一月后清除</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="一-功能介绍">一、功能介绍</h1>
+
+<p>将某一目录下的所有日志进行老化处理，这些日志是来自于其他容器的外挂日志，由于各个容器内的日志安排不同，所以结构不统一，具体如下举例：</p>
+
+<p>1.所有容器下的日志会外挂到/home/log下，我们处理这个目录下的日志就可以；</p>
+
+<p>2./home/log下的结构按外挂容器名和具体日志有如下结构，只是举例，列举部分容器的外挂：</p>
+
+<p>-home-log-Container1-catalog1-catalog2.1-catalog3-catalog4-catalog5-cataline.out</p>
+
+<p>| | | - cataline20181126.out</p>
+
+<p>| | | -cataline20181127.out</p>
+
+<p>| | | -someimporttemp.txt</p>
+
+<p>| | | -someimport.log</p>
+
+<p>| | | -import.tar</p>
+
+<p>| | -someimporttemp.txt</p>
+
+<p>| | -someimport.log</p>
+
+<p>| | -catalog2.2-catalog3- someimporttemp.txt</p>
+
+<p>| | -someimport.log</p>
+
+<p>| | -import.tar</p>
+
+<p>| -Container2-catalog1-catalog2.1-catalog3-catalog4-someimporttemp.txt</p>
+
+<p>| | -someimport.log</p>
+
+<p>| | - import.tar</p>
+
+<p>| -后面的容器日志类似于上面</p>
+
+<p>现在要求日志老化，具体要求如下：</p>
+
+<p>1.将以上具体某个日志下的日志已保留了七天的统一打包到一个目录下，该目录的名称和原来的目录名称基本对应，以保证在看其备份日志时，可以方便查找；</p>
+
+<p>2.上面打包以后采用直接move操作来转移到新目录下；</p>
+
+<p>3.在新的统一目录下，要求所有的tar包都只保留一个月，一个月后自动清除。</p>
+
+<h1 id="二-部分注意指令">二、部分注意指令</h1>
+
+<p>1.find 目录 -maxdepth 1 -ctime +7 -type f &mdash;&mdash;&mdash;-查找某一目录下以保存了一周的日志文件；</p>
+
+<p>2.if [[ &ldquo; &ldquo;x != ${NOT_INCLUDE}x ]] &amp;&amp; [[ -n &ldquo;<code>find ${targetdir} -maxdepth 1
+-type f | grep -v 'gz$'</code>&rdquo; ]]</p>
+
+<p>当判断条件居多且内含一些繁琐操作的命令时，将原有的单[ ]，改为[[ ]]，可有效避免Linux的兼容性问题；</p>
+
+<p>3.tar指令中添加&ndash;warning=no-file-changed来解决常见的报错处理；</p>
+
+<p>4.tar指令中&ndash;exclude的使用，将常见使用的“&ndash;exclude 文件”改为“&ndash;exclude=文件”，有效避免Linux的兼容性问题；</p>
+
+<p>5.tar &ndash;zpcP中注意p和P的区别：</p>
+
+<p>-p ：保留备份数据的原本权限和属性，常用于备份重要的配置文件；</p>
+
+<p>-P ：保留绝对路径，即允许备份数据中含有根目录存在之意。</p>
+
+<h1 id="三-具体代码">三、具体代码</h1>
+
+<pre><code>#!/bin/bash
+#Program:
+#History: 2018.11.20 zyf
+
+#Common constant
+NOWTIME=`date +&quot;%Y%m%d%H%M%S&quot;`
+LOG_PATH=/home/log
+LOG_BACKUP_PATH=/home/backuplog
+LOG_TEMPFILE_PATH=/home/logtemp
+LOG_TEMPFILE1=${LOG_TEMPFILE_PATH}/temp.dat
+LOG_TEMPFILE2=${LOG_TEMPFILE_PATH}/clearlog-${NOWTIME}.dat
+LOG_TEMPFILE3=${LOG_TEMPFILE_PATH}/firsttarfiles.dat
+
+#print timestamp
+getTimeStamp()
+{
+    echo `date +&quot;%Y-%m-%d %H:%M:%S&quot;` 
+}
+
+mkdir_clearlog()
+{
+    if [ ! -f &quot;${LOG_TEMPFILE2}&quot; ]; then
+        log &quot;mkdir_clearlog touch ${LOG_TEMPFILE2}...&quot;
+        touch ${LOG_TEMPFILE2}
+    fi
+}
+
+#print log for analyzing
+log()
+{
+    echo &quot; $1&quot;
+    echo &quot;`getTimeStamp` : $1&quot; &gt;&gt; ${LOG_TEMPFILE2}
+}
+
+errlog()
+{
+  echo &quot;[ERROR:] $1&quot;
+  echo &quot;`getTimeStamp` : [ERROR:] $1&quot; &gt;&gt; ${LOG_TEMPFILE2}
+}
+
+abnormalexit()
+{   
+
+  errlog &quot;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&quot;
+  errlog &quot;@@@@@@@@        !!! FAILED !!!       @@@@@@@&quot;
+  errlog &quot;@@@@@    CLEARLOGS OPERATE FAILED!!   @@@@@@&quot;
+  errlog &quot;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&quot;
+      
+  exit 1
+}
+
+function cmdlog()
+{
+   cmd=$1
+   log &quot;$cmd&quot;
+   `$cmd`
+   if [ $? -ne 0 ]
+   then
+      errlog &quot;$cmd&quot;
+      abnormalexit
+   fi
+}
+
+#scan all subdirectories of the current directory 
+#and make the corresponding directories in the specified directory,
+#then mv required files in sourcedir to targetdir and make new tar
+mkdir_and_deallog()
+{       
+    if [ ! -d ${LOG_TEMPFILE_PATH} ]; then
+        mkdir -p ${LOG_TEMPFILE_PATH}
+    elif [ ! -f &quot;${LOG_TEMPFILE1}&quot; ]; then
+        log &quot;mkdir_and_deallog() touch LOG_TEMPFILE1...&quot;
+        touch ${LOG_TEMPFILE1}
+    else
+        cat /dev/null &gt; ${LOG_TEMPFILE1}
+    fi
+
+    find ${LOG_PATH} -maxdepth 15 -type d &gt;&gt; ${LOG_TEMPFILE1}
+    for line in `cat ${LOG_TEMPFILE1}`
+    do
+        CURRENT_DIR=`echo ${line} | cut -d '/' -f 4-`
+        if [ -n &quot;${CURRENT_DIR}&quot; ]; then
+            CORRESPOND_DIR=${LOG_BACKUP_PATH}/${CURRENT_DIR}
+            if [ ! -d ${CORRESPOND_DIR} ]; then
+                log &quot;mkdir_and_deallog mkdir -p ${CORRESPOND_DIR}&quot;
+                mkdir -p ${CORRESPOND_DIR}
+            fi
+            deal_required_logs &quot;${CORRESPOND_DIR}&quot; &quot;${LOG_PATH}/${CURRENT_DIR}&quot;
+        fi        
+    done
+}
+
+#mv required files in sourcedir to targetdir and make new tar
+deal_required_logs()
+{
+    targetdir=$1
+    sourcedir=$2
+    
+    #view sourcedir log files and mv
+    log &quot;==========================================================&quot;
+    log &quot;deal_required_logs start, and now executing in ${sourcedir}...&quot;
+    log &quot;==========================================================&quot;
+    for file in `find ${sourcedir} -maxdepth 1 -ctime +7 -type f`
+    do
+        log &quot;deal_required_logs ${file} in ${sourcedir} created over 7 days&quot;
+        if [ -n &quot;${file}&quot; ] &amp;&amp; [ ! -n &quot;`lsof ${file}`&quot; ]; then
+            cmdlog &quot;cp ${file} ${targetdir}&quot;            
+        fi
+    done
+
+    #tar targetdir
+    log &quot;==========================================================&quot;
+    log &quot;cp-execute end, and now executing in ${targetdir}...&quot;
+    log &quot;==========================================================&quot;
+    NOT_INCLUDE=&quot; &quot;
+    for file in `find ${targetdir} -maxdepth 1 -type f | grep 'gz$'`
+    do
+        if [ -n &quot;${file}&quot; ]; then   
+            NOT_INCLUDE=${NOT_INCLUDE}&quot;  --exclude=&quot;${file}&quot; &quot;        
+        fi
+    done
+    
+    log &quot;deal_required_logs() set files that not-including, NOT_INCLUDE=${NOT_INCLUDE}......&quot;
+    if [[ &quot; &quot;x == ${NOT_INCLUDE}x ]]; then
+        log &quot;start firsttarfile_targetdir : firsttarfile_targetdir ${targetdir}&quot;
+        firsttarfile_targetdir ${targetdir}
+    elif [[ &quot; &quot;x != ${NOT_INCLUDE}x ]] &amp;&amp; [[ -n &quot;`find ${targetdir} -maxdepth 1 -type f | grep -v 'gz$'`&quot; ]]; then
+        log &quot;tar --zpcP -f ${targetdir}/${NOWTIME}.tar.gz ${NOT_INCLUDE}  ${targetdir}&quot;
+        tar --warning=no-file-changed -zpcP -f ${targetdir}/${NOWTIME}.tar.gz ${NOT_INCLUDE} ${targetdir}
+    fi      
+}
+
+firsttarfile_targetdir()
+{
+    targetdir=$1
+    if [ ! -f &quot;${LOG_TEMPFILE3}&quot; ]; then
+        log &quot;firsttarfile_targetdir() touch LOG_TEMPFILE3...&quot;
+        touch ${LOG_TEMPFILE3}
+    fi
+
+    find ${targetdir} -maxdepth 1 -type f &gt;&gt; ${LOG_TEMPFILE3}
+    FIRST_TAR_FILES=&quot; &quot;
+    for line in `cat ${LOG_TEMPFILE3}`
+    do
+        if [[ &quot; &quot;x != ${line}x ]]; then
+            FIRST_TAR_FILES=${FIRST_TAR_FILES}&quot; &quot;${line}    
+        fi          
+    done
+
+    log &quot;firsttarfile_targetdir : FIRST_TAR_FILES=${FIRST_TAR_FILES}&quot;
+    if [[ &quot; &quot;x != ${FIRST_TAR_FILES}x ]]; then
+        log &quot;tar --warning=no-file-changed -zpcP -f ${targetdir}/${NOWTIME}0.tar.gz ${FIRST_TAR_FILES}&quot;
+        tar --warning=no-file-changed -zpcP -f ${targetdir}/${NOWTIME}0.tar.gz ${FIRST_TAR_FILES}   
+    fi  
+
+    rm  ${LOG_TEMPFILE3}
+}
+
+clear_overtime_files()
+{
+    log &quot;clear_overtime_files rm tar.gz that save more than 30 days......&quot;
+    find ${LOG_BACKUP_PATH} -mtime +30 -name &quot;*.tar.gz&quot; -exec rm -rf {} \;
+    
+    log &quot;clear_overtime_files rm temp files that save more than 2 days......&quot;
+    find ${LOG_TEMPFILE_PATH} -mtime +2 -name &quot;*.log&quot; -exec rm -rf {} \;
+    
+    log &quot;clear_overtime_files rm extra files in /home/backuplog......&quot;
+    find /home/backuplog -type f -not -name '*gz' -print0 | xargs -0 -I {} rm -v {} 
+}
+
+###############main##############
+cd ${LOG_PATH}
+mkdir_clearlog
+
+log &quot;clearlogs.sh start...&quot;
+mkdir_and_deallog
+clear_overtime_files
+log &quot;clearlogs.sh end...&quot;
+log &quot;[~CLEARLOGS OPERATE SUCCESS~]&quot; 
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

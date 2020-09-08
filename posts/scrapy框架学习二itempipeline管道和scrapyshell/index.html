@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Scrapy框架学习二ItemPipeline管道和ScrapyShell | 开发者问答集锦</title>
+    <meta property="og:title" content="Scrapy框架学习二ItemPipeline管道和ScrapyShell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Scrapy框架学习二ItemPipeline管道和ScrapyShell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/scrapy%E6%A1%86%E6%9E%B6%E5%AD%A6%E4%B9%A0%E4%BA%8Citempipeline%E7%AE%A1%E9%81%93%E5%92%8Cscrapyshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Scrapy框架学习二ItemPipeline管道和ScrapyShell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="scrapy框架学习-二-item-pipeline-管道-和scrapy-shell">Scrapy框架学习（二）—-Item Pipeline(管道)和Scrapy Shell</h3>
+
+<h4 id="item-pipeline-管道">Item Pipeline（管道）</h4>
+
+<p>当Item在Spider中被收集之后，它将会被传递到Item Pipeline，一些组件会按照一定的顺序执行对Item进行处理。</p>
+
+<p>每个Item Pipeline都是实现了简单方法的Python类，比如决定此Item是丢弃而存储。以下是Item Pipeline的典型应用：</p>
+
+<ul>
+<li><p>验证爬取的数据（检查爬取的数据是否包含某些字段，数据清洗）</p></li>
+
+<li><p>查重（重复的数据丢弃）</p></li>
+
+<li><p>将爬取的结果保存到文件或数据库</p></li>
+</ul>
+
+<p><strong>编写Item Pipeline类</strong></p>
+
+<p>在pipelines.py文件中定义一个Pipeline类，同时 <strong>必须</strong> 实现下面的方法：</p>
+
+<pre><code>process_item(self,item,spider)
+</code></pre>
+
+<p>每个item pipeline组件都需要调用该方法，这个方法 <strong>必须返回一个Item对象，或是抛出DropItem异常</strong>
+，被丢弃的item将不会被之后的pipeline组件处理。</p>
+
+<p>代码如下：</p>
+
+<pre><code>import json
+
+class BaiduPipeline(object):
+
+    def process_item(self, item, spider):
+        &quot;&quot;&quot;
+        处理item的方法，处理业务逻辑，保存数据，返回item
+
+        :param item: 是items.py中定义item类
+        :param spider: 是spiders目录中定义的Spider类
+        :return: 返回需要的item数据（经过清洗，业务逻辑处理后的item数据）
+        &quot;&quot;&quot;
+
+        print(spider)   # 输出 
+        print(type(spider)) # 输出 
+        print(spider.name) # 输出 baidu
+
+        print(item) # 输出 {'title': '百度一下'}
+        print(type(item)) # 输出 
+
+        with open('baidu.json', 'w') as f:
+            jsondata = json.dumps(dict(item))
+            f.write(jsondata)
+
+        return item
+</code></pre>
+
+<p>Pipeline 除此之外还可以实现以下方法：</p>
+
+<ul>
+<li><code>open_spider(self, spider)</code></li>
+</ul>
+
+<p>当spider被开启是调用该方法。</p>
+
+<p>spider参数：被开启的spider对象</p>
+
+<ul>
+<li><code>close_spider(self, spider)</code></li>
+</ul>
+
+<p>当spider被关闭时，这个方法被调用</p>
+
+<p>spider参数：被关闭的spider对象</p>
+
+<p><strong>在settings配置Item Pipeline</strong></p>
+
+<p>在<code>settings.py</code>文件中，将<code>ITEM_PIPELINES</code>，注释打开，将我们编写的Item Pipeline配置好。</p>
+
+<pre><code>ITEM_PIPELINES = {
+    # 我们写好的Pipeline的路径，300表示优先级，范围（0-1000），越小级别越高
+    'scrapydemo.pipelines.BaiduPipeline': 300,
+}
+</code></pre>
+
+<hr />
+
+<h4 id="scrapy-shell">Scrapy Shell</h4>
+
+<p>Scrapy
+shell是一个交互终端，在未启动spider的情况下尝试及调试你的爬取代码。其本意是用来测试提取数据的代码。不过也可以将其当做正常的Python终端，在上面测试任何的Python代码。</p>
+
+<p>该终端是用来测试XPath或CSS表达式，查看他们的工作方式及爬取的网页中提取的数据。该终端提供了交互性测试您的表达式代码的功能，免去了每次修改后运行spider的麻烦。</p>
+
+<p><strong>启动终端</strong></p>
+
+<p>进入项目的根目录，执行下面的命令，启动shell，以<code>&quot;http://www.baidu.com&quot;</code>为例，如下：</p>
+
+<blockquote>
+<p>scrapy shell “<a href="http://www.baidu.com”">http://www.baidu.com”</a></p>
+</blockquote>
+
+<p>命令执行后，结果如下图：</p>
+
+<p>在我们执行<code>scrapy shell url</code>命令后，Scrapy终端根据下载页面会自动创建一些方便使用的对象和可用的快捷命令，如：</p>
+
+<p>可用的对象：</p>
+
+<ul>
+<li><p><code>crawler</code>：当前的Crawler的对象</p></li>
+
+<li><p><code>spider</code>：处理URL的spider。</p></li>
+
+<li><p><code>request</code>：最近获取到的页面的Request对象。</p></li>
+
+<li><p><code>response</code>：包含最近获取到的页面的<code>Response</code>对象。</p></li>
+
+<li><p><code>scrapy</code>：scrapy 模块 (包含 scrapy.Request, scrapy.Selector等)</p></li>
+
+<li><p><code>settings</code>：当前Scrapy项目的settings.py</p></li>
+</ul>
+
+<p>可用的快捷命令：</p>
+
+<ul>
+<li><p><code>shelp()</code>：打印可用对象及快捷命令的帮助列表</p></li>
+
+<li><p><code>fetch(request_or_url)</code>：根据给定的<code>url</code>或<code>request</code>获取到一个<code>response</code>，并更新相关的对象</p></li>
+
+<li><p><code>view(response)</code>：在本机的浏览器打开给定的<code>response</code>。会在<code>response</code>的<code>body</code>中添加一个<code>tag</code>，使得外部链接（例如图片及<code>css</code>）能正常显示。</p></li>
+</ul>
+
+<p>eg:</p>
+
+<p>当我们执行<code>scrapy shell
+&quot;http://www.baidu.com&quot;</code>命令时，通过response对象调用selector，在调用xpath()。输出xpath查询结果。</p>
+
+<pre><code>print(response.selector.xpath(&quot;//title&quot;))
+
+# 输出结果：['//title' data='百度一下'&gt;]
+</code></pre>
+
+<p>除此之外，我们也可以通过<code>response.selector.css()</code>来解析响应的页面数据。</p>
+
+<p>Scrapy还提供了快捷方式，如：<code>response.xpath()</code>,<code>response.css()</code>。</p>
+
+<p>eg:</p>
+
+<pre><code>print(response.xpath(&quot;//title&quot;))
+
+# 输出结果：['//title' data='百度一下'&gt;]
+</code></pre>
+
+<p><strong>Selector选择器</strong></p>
+
+<p>Scrapy Selector内置XPath和CSS Selector表达式机制</p>
+
+<p><code>Selector</code>有四个基本的方法，最常用的还XPath</p>
+
+<ul>
+<li><code>xpath()</code>：传入<code>xpath</code>表达式，返回该表达式所对应的所有节点的<code>Selector list</code>列表。</li>
+<li><code>ectract()</code>：序列化该节点为<code>Unicode</code>字符串，并返回list。</li>
+<li><code>css()</code>：传入<code>CSS</code>表达式，返回该表达式所对应的所有节点的<code>selector list</code>列表，语法同<code>BeautifulSoup4</code>。</li>
+<li><code>re()</code>：根据传入的正则表达式对数据进行提取，返回<code>Unicode</code>字符串<code>list</code>列表。</li>
+</ul>
+
+<p>eg：</p>
+
+<pre><code># 获取 title 标签的值
+print(response.xpath(&quot;//title/text()&quot;)[0].extract())
+
+# 输出： 百度一下
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

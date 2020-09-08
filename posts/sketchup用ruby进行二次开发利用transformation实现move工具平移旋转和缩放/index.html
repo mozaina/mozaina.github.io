@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Sketchup用ruby进行二次开发利用Transformation实现Move工具平移旋转和缩放 | 开发者问答集锦</title>
+    <meta property="og:title" content="Sketchup用ruby进行二次开发利用Transformation实现Move工具平移旋转和缩放 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Sketchup用ruby进行二次开发利用Transformation实现Move工具平移旋转和缩放">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/sketchup%E7%94%A8ruby%E8%BF%9B%E8%A1%8C%E4%BA%8C%E6%AC%A1%E5%BC%80%E5%8F%91%E5%88%A9%E7%94%A8transformation%E5%AE%9E%E7%8E%B0move%E5%B7%A5%E5%85%B7%E5%B9%B3%E7%A7%BB%E6%97%8B%E8%BD%AC%E5%92%8C%E7%BC%A9%E6%94%BE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Sketchup用ruby进行二次开发利用Transformation实现Move工具平移旋转和缩放</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>在Sketchup中，move工具使用的非常广泛，<img src="https://img.it610.com/image/info8/2c46e9d0929646ff94dd55200b261a75.jpg" alt="" />，可以移动、拉伸和复制几何体，也可以用来旋转组件。举一个简单地例子。</p>
+
+<p>我们要做一个建筑物的尖顶，如下图所示，就是使用move工具实现的。</p>
+
+<p><img src="https://img.it610.com/image/info8/4efb942692504332af24d798e9458324.jpg" alt="" /><img src="https://img.it610.com/image/info8/cabcf24852cf46a6a527b86813085689.jpg" alt="" /></p>
+
+<p>接下来我们就要学习如何使用ruby实现这样的功能。</p>
+
+<p>实体类（Entities）提供了transform_entities方法来实现move的功能，transform_entities需要两个参数，一个或一系列实体对象和一个变换对象（Transformation）。</p>
+
+<p>例如，上图中屋顶中间的线我们叫做roof_line，下面的代码实现把这条线沿着Z轴网上移动5个单位（英寸）。</p>
+
+<p>ents = Sketchup.active_model.entities<br />
+tr = Geom::Transformation.translation [0, 0, 5]<br />
+ents.transform_entities tr, roof_line<br />
+在第二行，前缀“Geom：：”是必须的，这是因为Transformation类包含于Geom模型，这在接下来的章节中会介绍它是如何使用的。在这个例子中，tr是一个transformation对象，用于把roof_line从一个位置移动到另一个位置。<br />
+transformation可以实现平移、旋转和缩放。</p>
+
+<p>1、平移</p>
+
+<p>在讲平移之前，我们要先了解一个概念，平移向量。我们在高中学习过，从一个点移动到另一个点，如从点（1,2,3）移动到点（3,4,5），只需要知道起点和移动向量就能到达终点，这个移动向量是用终点坐标减去起点坐标，即向量（2,2,2）。这里的平移向量类似于移动向量。</p>
+
+<p>SketchUp API提供了三种方法来实现平移动能。</p>
+
+<p>调用Geom::Transformation.new<br />
+调用Geom::Transformation.translation<br />
+使用平移向量本身。<br />
+下面用一个例子演示如何使用这三种方法，这个例子是将一个面移动三次，首先沿着X轴正向移动4个单位，然后Y轴正向6个单位，最后沿X轴负向移动3个单位。</p>
+
+<h1 id="创建一个正方形面">创建一个正方形面</h1>
+
+<p>ents = Sketchup.active_model.entities<br />
+tran_face = ents.add_face [-1, -1, 0],<br />
+[-1, 1, 0], [1, 1, 0], [1, -1, 0]</p>
+
+<h1 id="t沿着x轴正向移动4个单位">T沿着X轴正向移动4个单位</h1>
+
+<p>t = Geom::Transformation.new [4, 0, 0]<br />
+ents.transform_entities t, tran_face</p>
+
+<h1 id="y轴正向6个单位">Y轴正向6个单位</h1>
+
+<p>t = Geom::Transformation.new [0, 6, 0]<br />
+ents.transform_entities t, tran_face</p>
+
+<h1 id="x轴负向移动3个单位">X轴负向移动3个单位</h1>
+
+<p>ents.transform_entities [-3, 0, 0], tran_face</p>
+
+<p>移动路径如下图所示。<br />
+<img src="https://img.it610.com/image/info8/afdeccdfd5994536b272b897cff3cea0.jpg" alt="" /></p>
+
+<p>2、旋转</p>
+
+<p>去旋转一个图形，我们需要三个参数。</p>
+
+<p>旋转起源点（点）<br />
+旋转轴（向量）<br />
+旋转角度（浮点型）<br />
+看下图更有助于理解。</p>
+
+<p><img src="https://img.it610.com/image/info8/f7ccf777e3e24bbd855f7b262b6fa6a9.jpg" alt="" /></p>
+
+<p>系统提供两种方法用Transformation对象实现旋转功能</p>
+
+<p>调用Geom::Transformation.new 和起源点、旋转轴和角度参数<br />
+调用Geom::Transformation.rotation和起源点、旋转轴和角度参数<br />
+例如，要实现上图把圆围绕（0,0,0）和Z轴旋转30度，代码写为：</p>
+
+<p>tr = Geom::Transformation.new [0, 0, 0], [0, 0, 1], 30.degrees<br />
+tr = Geom::Transformation.rotation [0, 0, 0], [0, 0, 1], 30.degrees</p>
+
+<p>另外需要注意的是如果旋转角度是正值，则按‘逆时钟方向’旋转，如果是负值，就按顺时针方向旋转。</p>
+
+<p>3、缩放<br />
+在Sketchup中，缩放工具<img src="https://img.it610.com/image/info8/569ad0487da74fe6a0e1f679fe162ee0.jpg" alt="" />可以改变图形的大小形状和改变图形的位置。在用代码实现时，我们创建的缩放Transformation对象即会缩放图形的大小也会缩放相对于默认点（0,0,0）的距离，例如下面的代码缩小了图形的大小，也减小了到（0,0,0）的距离。</p>
+
+<p>#创建一个正方形<br />
+ents = Sketchup.active_model.entities</p>
+
+<p>tran_face = ents.add_face [-1, -1, 0],<br />
+[-1, 1, 0], [1, 1, 0], [1, -1, 0]<br />
+#沿X轴正向移动4个单位<br />
+t = Geom::Transformation.new [4, 0, 0]</p>
+
+<p>ents.transform_entities t, tran_face<br />
+#把正方形缩放为原来的一半，即改变形状也改变距原点的长度<br />
+t = Geom::Transformation.new 0.5</p>
+
+<p>ents.transform_entities t, tran_face</p>
+
+<p>效果如下图所示</p>
+
+<p><img src="https://img.it610.com/image/info8/5251448d44ed4636a22d684828e2fb29.jpg" alt="" /></p>
+
+<p>实现缩放功能还可以用如下代码，效果跟上面的一样。</p>
+
+<p>ents = Sketchup.active_model.entities<br />
+t = Geom::Transformation.scaling 0.5<br />
+ents.transform_entities t, shape<br />
+除此之外，我们还可以改变默认缩放的源点，即上面的（0,0,0）。例如，下面的代码实现把图形放大2倍并把源点变为（5,5,5），相信在以后的应用中，这种写法会比较常见。<br />
+t = Geom::Transformation.scaling [5, 5, 5], 2</p>
+
+<p>上面介绍了改变源点进行缩放，下面我们介绍一下如何基于坐标轴进行缩放。<br />
+为实现基于坐标轴缩放，需要调用Transformation.scaling结合三个参数，即X，Y，Z所缩放值，例如，下面代码实现减小X轴的一半，扩大Y轴的3倍，保持Z轴不变。</p>
+
+<p>t = Geom::Transformation.scaling 0.5, 3, 1</p>
+
+<p>示意图为</p>
+
+<p><img src="https://img.it610.com/image/info8/9b2c0935d9fc486bafad4a5d29ebea7d.jpg" alt="" /><br />
+scaling最后一种用法是结合以上三种，即，改变源点和x,y,z的缩放值，例如，设置源点为（5,5,5），相对于源点，实现减小X轴的一半，扩大Y轴的3倍，保持Z轴不变代码如下。</p>
+
+<p>t = Geom::Transformation.scaling [5, 5, 5], 0.5, 3, 1</p>
+
+<p>总结：</p>
+
+<p>在本节中我们实现了平移、旋转和缩放功能，下一节中我将简单介绍将三种方法结合使用。<br />
+————————————————<br />
+版权声明：本文为CSDN博主「李涛_华电」的原创文章，遵循 CC 4.0 BY-SA 版权协议，转载请附上原文出处链接及本声明。<br />
+原文链接：<a href="https://blog.csdn.net/litaosdau/article/details/38611081">https://blog.csdn.net/litaosdau/article/details/38611081</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

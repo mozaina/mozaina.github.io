@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本分析服务器性能 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本分析服务器性能 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本分析服务器性能">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%88%86%E6%9E%90%E6%9C%8D%E5%8A%A1%E5%99%A8%E6%80%A7%E8%83%BD/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本分析服务器性能</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="概述"><strong>概述</strong></h2>
+
+<p><strong>我们原先在服务器上想分析性能指标，需要执行一系列的linux命令。对于linux命令不熟悉的人来说，比较困难</strong></p>
+
+<p><strong>现在有一套集成的shell脚本，把常用的linux命令都包含在里面，一键式分析性能瓶颈</strong></p>
+
+<h2 id="脚本功能"><strong>脚本功能</strong></h2>
+
+<p>1、查看CPU利用率与负载（top、vmstat、sar）</p>
+
+<p>2、查看磁盘、Inode利用率与I/O负载（df、iostat、iotop、sar、dstat）</p>
+
+<p>3、查看内存利用率（free、vmstat）</p>
+
+<p>4、查看TCP连接状态（netstat、ss）</p>
+
+<p>5、查看CPU与内存占用最高的10个进程（top、ps）</p>
+
+<p>6、查看网络流量（ifconfig、iftop、iptraf）</p>
+
+<h2 id="脚本如下">脚本如下</h2>
+
+<pre><code>#!/bin/bash
+#
+os_check() {
+        if [ -e /etc/redhat-release ]; then
+                REDHAT=`cat /etc/redhat-release |cut -d' '  -f1`
+        else
+                DEBIAN=`cat /etc/issue |cut -d' ' -f1`
+        fi
+        if [ &quot;$REDHAT&quot; == &quot;CentOS&quot; -o &quot;$REDHAT&quot; == &quot;Red&quot; ]; then
+                P_M=yum
+        elif [ &quot;$DEBIAN&quot; == &quot;Ubuntu&quot; -o &quot;$DEBIAN&quot; == &quot;ubutnu&quot; ]; then
+                P_M=apt-get
+        else
+                Operating system does not support.
+                exit 1
+        fi
+}
+if [ $LOGNAME != root ]; then
+    echo &quot;Please use the root account operation.&quot;
+    exit 1
+fi
+if ! which vmstat &amp;&gt;/dev/null; then
+        echo &quot;vmstat command not found, now the install.&quot;
+        sleep 1
+        os_check
+        $P_M install procps -y
+        echo &quot;-----------------------------------------------------------------------&quot;
+fi
+if ! which iostat &amp;&gt;/dev/null; then
+        echo &quot;iostat command not found, now the install.&quot;
+        sleep 1
+        os_check
+        $P_M install sysstat -y
+        echo &quot;-----------------------------------------------------------------------&quot;
+fi
+
+while true; do
+    select input in cpu_load disk_load disk_use disk_inode mem_use tcp_status cpu_top10 mem_top10 traffic quit; do
+        case $input in
+            cpu_load)
+                #CPU利用率与负载
+                echo &quot;---------------------------------------&quot;
+                i=1
+                while [[ $i -le 3 ]]; do
+                    echo -e &quot;\033[32m  参考值${i}\033[0m&quot;
+                    UTIL=`vmstat |awk '{if(NR==3)print 100-$15&quot;%&quot;}'`
+                    USER=`vmstat |awk '{if(NR==3)print $13&quot;%&quot;}'`
+                    SYS=`vmstat |awk '{if(NR==3)print $14&quot;%&quot;}'`
+                    IOWAIT=`vmstat |awk '{if(NR==3)print $16&quot;%&quot;}'`
+                    echo &quot;Util: $UTIL&quot;
+                    echo &quot;User use: $USER&quot;
+                    echo &quot;System use: $SYS&quot;
+                    echo &quot;I/O wait: $IOWAIT&quot;
+                    i=$(($i+1))
+                    sleep 1
+                done
+                echo &quot;---------------------------------------&quot;
+                break
+                ;;
+            disk_load)
+                #硬盘I/O负载
+                echo &quot;---------------------------------------&quot;
+                i=1
+                while [[ $i -le 3 ]]; do
+                    echo -e &quot;\033[32m  参考值${i}\033[0m&quot;
+                    UTIL=`iostat -x -k |awk '/^[v|s]/{OFS=&quot;: &quot;;print $1,$NF&quot;%&quot;}'`
+                    READ=`iostat -x -k |awk '/^[v|s]/{OFS=&quot;: &quot;;print $1,$6&quot;KB&quot;}'`
+                    WRITE=`iostat -x -k |awk '/^[v|s]/{OFS=&quot;: &quot;;print $1,$7&quot;KB&quot;}'`
+                    IOWAIT=`vmstat |awk '{if(NR==3)print $16&quot;%&quot;}'`
+                    echo -e &quot;Util:&quot;
+                    echo -e &quot;${UTIL}&quot;
+                    echo -e &quot;I/O Wait: $IOWAIT&quot;
+                    echo -e &quot;Read/s:\n$READ&quot;
+                    echo -e &quot;Write/s:\n$WRITE&quot;
+                    i=$(($i+1))
+                    sleep 1
+                done
+                echo &quot;---------------------------------------&quot;
+                break
+                ;;
+            disk_use)
+                #硬盘利用率
+                DISK_LOG=/tmp/disk_use.tmp
+                DISK_TOTAL=`fdisk -l |awk '/^Disk.*bytes/&amp;&amp;/\/dev/{printf $2&quot; &quot;;printf &quot;%d&quot;,$3;print &quot;GB&quot;}'`
+                USE_RATE=`df -h |awk '/^\/dev/{print int($5)}'`
+                for i in $USE_RATE; do
+                    if [ $i -gt 90 ];then
+                        PART=`df -h |awk '{if(int($5)=='''$i''') print $6}'`
+                        echo &quot;$PART = ${i}%&quot; &gt;&gt; $DISK_LOG
+                    fi
+                done
+                echo &quot;---------------------------------------&quot;
+                echo -e &quot;Disk total:\n${DISK_TOTAL}&quot;
+                if [ -f $DISK_LOG ]; then
+                    echo &quot;---------------------------------------&quot;
+                    cat $DISK_LOG
+                    echo &quot;---------------------------------------&quot;
+                    rm -f $DISK_LOG
+                else
+                    echo &quot;---------------------------------------&quot;
+                    echo &quot;Disk use rate no than 90% of the partition.&quot;
+                    echo &quot;---------------------------------------&quot;
+                fi
+                break
+                ;;
+            disk_inode)
+                #硬盘inode利用率
+                INODE_LOG=/tmp/inode_use.tmp
+                INODE_USE=`df -i |awk '/^\/dev/{print int($5)}'`
+                for i in $INODE_USE; do
+                    if [ $i -gt 90 ]; then
+                        PART=`df -h |awk '{if(int($5)=='''$i''') print $6}'`
+                        echo &quot;$PART = ${i}%&quot; &gt;&gt; $INODE_LOG
+                    fi
+                done
+                if [ -f $INODE_LOG ]; then
+                    echo &quot;---------------------------------------&quot;
+                    rm -f $INODE_LOG
+                else
+                    echo &quot;---------------------------------------&quot;
+                    echo &quot;Inode use rate no than 90% of the partition.&quot;
+                    echo &quot;---------------------------------------&quot;
+                fi
+                break
+                ;;
+            mem_use)
+                #内存利用率
+                echo &quot;---------------------------------------&quot;
+                MEM_TOTAL=`free -m |awk '{if(NR==2)printf &quot;%.1f&quot;,$2/1024}END{print &quot;G&quot;}'`
+                USE=`free -m |awk '{if(NR==3) printf &quot;%.1f&quot;,$3/1024}END{print &quot;G&quot;}'`
+                FREE=`free -m |awk '{if(NR==3) printf &quot;%.1f&quot;,$4/1024}END{print &quot;G&quot;}'`
+                CACHE=`free -m |awk '{if(NR==2) printf &quot;%.1f&quot;,($6+$7)/1024}END{print &quot;G&quot;}'`
+                echo -e &quot;Total: $MEM_TOTAL&quot;
+                echo -e &quot;Use: $USE&quot;
+                echo -e &quot;Free: $FREE&quot;
+                echo -e &quot;Cache: $CACHE&quot;
+                echo &quot;---------------------------------------&quot;
+                break
+                ;;
+            tcp_status)
+                #网络连接状态
+                echo &quot;---------------------------------------&quot;
+                COUNT=`netstat -antp |awk '{status[$6]++}END{for(i in status) print i,status[i]}'`
+                echo -e &quot;TCP connection status:\n$COUNT&quot;
+                echo &quot;---------------------------------------&quot;
+                ;;
+            cpu_top10)
+                #占用CPU高的前10个进程
+                echo &quot;---------------------------------------&quot;
+                CPU_LOG=/tmp/cpu_top.tmp
+                i=1
+                while [[ $i -le 3 ]]; do
+                    #ps aux |awk '{if($3&gt;0.1)print &quot;CPU: &quot;$3&quot;% --&gt;&quot;,$11,$12,$13,$14,$15,$16,&quot;(PID:&quot;$2&quot;)&quot; |&quot;sort -k2 -nr |head -n 10&quot;}' &gt; $CPU_LOG
+                    ps aux |awk '{if($3&gt;0.1){{printf &quot;PID: &quot;$2&quot; CPU: &quot;$3&quot;% --&gt; &quot;}for(i=11;i&lt;=NF;i++)if(i==NF)printf $i&quot;\n&quot;;else printf $i}}' |sort -k4 -nr |head -10 &gt; $CPU_LOG
+                    #循环从11列（进程名）开始打印，如果i等于最后一行，就打印i的列并换行，否则就打印i的列
+                    if [[ -n `cat $CPU_LOG` ]]; then
+                       echo -e &quot;\033[32m  参考值${i}\033[0m&quot;
+                       cat $CPU_LOG
+                       &gt; $CPU_LOG
+                    else
+                        echo &quot;No process using the CPU.&quot; 
+                        break
+                    fi
+                    i=$(($i+1))
+                    sleep 1
+                done
+                echo &quot;---------------------------------------&quot;
+                break
+                ;;
+            mem_top10)
+                #占用内存高的前10个进程
+                echo &quot;---------------------------------------&quot;
+                MEM_LOG=/tmp/mem_top.tmp
+                i=1
+                while [[ $i -le 3 ]]; do
+                    #ps aux |awk '{if($4&gt;0.1)print &quot;Memory: &quot;$4&quot;% --&gt;&quot;,$11,$12,$13,$14,$15,$16,&quot;(PID:&quot;$2&quot;)&quot; |&quot;sort -k2 -nr |head -n 10&quot;}' &gt; $MEM_LOG
+                    ps aux |awk '{if($4&gt;0.1){{printf &quot;PID: &quot;$2&quot; Memory: &quot;$3&quot;% --&gt; &quot;}for(i=11;i&lt;=NF;i++)if(i==NF)printf $i&quot;\n&quot;;else printf $i}}' |sort -k4 -nr |head -10 &gt; $MEM_LOG
+                    if [[ -n `cat $MEM_LOG` ]]; then
+                        echo -e &quot;\033[32m  参考值${i}\033[0m&quot;
+                        cat $MEM_LOG
+                        &gt; $MEM_LOG
+                    else
+                        echo &quot;No process using the Memory.&quot;
+                        break
+                    fi
+                    i=$(($i+1))
+                    sleep 1
+                done
+                echo &quot;---------------------------------------&quot;
+                break
+                ;;
+            traffic)
+                #查看网络流量
+                while true; do
+                    read -p &quot;Please enter the network card name(eth[0-9] or em[0-9]): &quot; eth
+                    #if [[ $eth =~ ^eth[0-9]$ ]] || [[ $eth =~ ^em[0-9]$ ]] &amp;&amp; [[ `ifconfig |grep -c &quot;\&quot;` -eq 1 ]]; then
+                    if [ `ifconfig |grep -c &quot;\&quot;` -eq 1 ]; then
+                            break
+                    else
+                        echo &quot;Input format error or Don't have the card name, please input again.&quot;
+                    fi
+                done
+                echo &quot;---------------------------------------&quot;
+                echo -e &quot; In ------ Out&quot;
+                i=1
+                while [[ $i -le 3 ]]; do
+                    #OLD_IN=`ifconfig $eth |awk '/RX bytes/{print $2}' |cut -d: -f2`
+                    #OLD_OUT=`ifconfig $eth |awk '/RX bytes/{print $6}' |cut -d: -f2`
+                    OLD_IN=`ifconfig $eth |awk -F'[: ]+' '/bytes/{if(NR==8)print $4;else if(NR==5)print $6}'`
+                    #CentOS6和CentOS7 ifconfig输出进出流量信息位置不同，CentOS6中RX与TX行号等于8，CentOS7中RX行号是5，TX行号是5，所以就做了个判断.       
+                    OLD_OUT=`ifconfig $eth |awk -F'[: ]+' '/bytes/{if(NR==8)print $9;else if(NR==7)print $6}'`
+                    sleep 1
+                    NEW_IN=`ifconfig $eth |awk -F'[: ]+' '/bytes/{if(NR==8)print $4;else if(NR==5)print $6}'`
+                    NEW_OUT=`ifconfig $eth |awk -F'[: ]+' '/bytes/{if(NR==8)print $9;else if(NR==7)print $6}'`
+                    IN=`awk 'BEGIN{printf &quot;%.1f\n&quot;,'$((${NEW_IN}-${OLD_IN}))'/1024/128}'`
+                    OUT=`awk 'BEGIN{printf &quot;%.1f\n&quot;,'$((${NEW_OUT}-${OLD_OUT}))'/1024/128}'`
+                    echo &quot;${IN}MB/s ${OUT}MB/s&quot;
+                    i=$(($i+1))
+                    sleep 1
+                done
+                echo &quot;---------------------------------------&quot;
+                break
+                ;;
+                        quit)
+                                exit 0
+                                ;;
+               *)
+                    echo &quot;---------------------------------------&quot;
+                    echo &quot;Please enter the number.&quot; 
+                    echo &quot;---------------------------------------&quot;
+                    break
+                    ;;
+        esac
+    done
+done
+</code></pre>
+
+<h2 id="运行效果如下"><strong>运行效果如下</strong></h2>
+
+<p><strong># sh show_sys_info.sh</strong></p>
+
+<p><strong><a href="https://img.it610.com/image/info8/0e1694d7370e495b8ccdd251394073f0.png"><img src="https://img.it610.com/image/info8/0e1694d7370e495b8ccdd251394073f0.png" alt="Shell脚本分析服务器性能_第1张图片" /></a></strong></p>
+
+<h3 id="1-cpu-load-分析cpu"><strong>1）cpu_load：分析cpu</strong></h3>
+
+<p><strong><a href="https://img.it610.com/image/info8/e4fe3751131b489282c8bd6fe0da9619.png"><img src="https://img.it610.com/image/info8/e4fe3751131b489282c8bd6fe0da9619.png" alt="Shell脚本分析服务器性能_第2张图片" /></a></strong></p>
+
+<p>util：cpu已使用百分比</p>
+
+<p>user use：用户使用cpu百分比</p>
+
+<p>system use：系统使用cpu百分比</p>
+
+<p>I/O wait：I/O等待百分比</p>
+
+<p>三次刷新，间隔时间1s</p>
+
+<p><strong>2）disk_load 分析磁盘</strong></p>
+
+<p><strong><a href="https://img.it610.com/image/info8/cff276fe263d4945a9716947d5d5800c.png"><img src="https://img.it610.com/image/info8/cff276fe263d4945a9716947d5d5800c.png" alt="Shell脚本分析服务器性能_第3张图片" /></a></strong></p>
+
+<p>Util：每秒磁盘处理的百分比<br />
+vda：<br />
+I/O Wait：IO等待时间<br />
+Read/s：每秒磁盘读数据量<br />
+vda：<br />
+Write/s：每秒磁盘写数据量<br />
+vda：</p>
+
+<h3 id="3-disk-use-磁盘使用情况"><strong>3）disk_use 磁盘使用情况</strong></h3>
+
+<p><strong><a href="https://img.it610.com/image/info8/f26deada02a849b28f72513706c02950.png"><img src="https://img.it610.com/image/info8/f26deada02a849b28f72513706c02950.png" alt="Shell脚本分析服务器性能_第4张图片" /></a></strong></p>
+
+<h3 id="disk-total-打印磁盘数量和磁盘分区使用情况"><strong>disk total：打印磁盘数量和磁盘分区使用情况</strong></h3>
+
+<h3 id="4-disk-inode-如果有磁盘inodo超过90-这里会打印出来"><strong>4）disk_inode 如果有磁盘inodo超过90%，这里会打印出来</strong></h3>
+
+<h3 id="5-mem-use-内存占用情况"><strong>5）mem_use 内存占用情况</strong></h3>
+
+<p>*<strong><em><a href="https://img.it610.com/image/info8/23b65b9b0676466aadecf0eceffa0288.png"><img src="https://img.it610.com/image/info8/23b65b9b0676466aadecf0eceffa0288.png" alt="Shell脚本分析服务器性能_第5张图片" /></a></em></strong>*</p>
+
+<p>Total：总内存</p>
+
+<p>use：已使用内存</p>
+
+<p>free：剩余内存</p>
+
+<p>cache：缓存占用内存</p>
+
+<h3 id="6-tcp-status-tcp状态"><strong>6）tcp_status tcp状态</strong></h3>
+
+<p><strong><a href="https://img.it610.com/image/info8/bee03287997c4f1c9eaad5dd095e8689.png"><img src="https://img.it610.com/image/info8/bee03287997c4f1c9eaad5dd095e8689.png" alt="Shell脚本分析服务器性能_第6张图片" /></a></strong></p>
+
+<h3 id="7-cpu-top10-占用cpu最大的十个进程">**7）cpu_top10 占用cpu最大的十个进程</h3>
+
+<p>**</p>
+
+<h3 id="8-mem-top10-占用内存最大的十个进程"><strong>8）mem_top10 占用内存最大的十个进程</strong></h3>
+
+<h3 id="9-traffic-查看网卡进出流量"><strong>9）traffic 查看网卡进出流量</strong></h3>
+
+<p><strong><a href="https://img.it610.com/image/info8/a9c1afb88ccc4f7592878b4c0d8444a8.png"><img src="https://img.it610.com/image/info8/a9c1afb88ccc4f7592878b4c0d8444a8.png" alt="Shell脚本分析服务器性能_第7张图片" /></a></strong></p>
+
+<p>转载于:<a href="https://www.cnblogs.com/Zfc-Cjk/p/11490648.html">https://www.cnblogs.com/Zfc-Cjk/p/11490648.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>LinuxC语言实现自己的shell命令 | 开发者问答集锦</title>
+    <meta property="og:title" content="LinuxC语言实现自己的shell命令 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="LinuxC语言实现自己的shell命令">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxc%E8%AF%AD%E8%A8%80%E5%AE%9E%E7%8E%B0%E8%87%AA%E5%B7%B1%E7%9A%84shell%E5%91%BD%E4%BB%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">LinuxC语言实现自己的shell命令</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="引言">引言</h1>
+
+<p>在暑假留校的第二周,我们的项目是学习 <strong>进程</strong>
+并切实现自己的<code>shell</code>;关于什么是<code>shell</code>请大家自行百度,简单来说<code>shell</code>就是指一个面向用户的命令接口，表现形式就是一个可以由用户录入的界面，这个界面也可以反馈运行信息;</p>
+
+<h1 id="不是目录的目录">不是目录的目录</h1>
+
+<ol>
+<li>项目需求</li>
+<li>如何实现</li>
+<li>源代码</li>
+</ol>
+
+<hr />
+
+<h2 id="1-项目需求">1.项目需求</h2>
+
+<p><a href="https://img.it610.com/image/info8/54e12275c443429c83397993660d44dc.jpg"><img src="https://img.it610.com/image/info8/54e12275c443429c83397993660d44dc.jpg" alt="Linux
+C语言实现自己的shell命令_第1张图片" /></a><br />
+关于进阶需求我们只讲述管道的实现,对与后面三个,全部都是调用<code>readline</code>这个库我们不做概述</p>
+
+<h2 id="2-1有一个好看的shell界面">2.1有一个好看的shell界面</h2>
+
+<pre><code>//打印提示符
+void print_prompt()
+{
+    struct passwd *usrname;
+    usrname = getpwuid(getuid());
+    char buf[256];
+    memset(buf,0,sizeof(buf));
+    printf(&quot;my_shell:%s&quot;,getcwd(buf,256));
+    if(strcmp(usrname-&gt;pw_name,&quot;root&quot;)==0)
+        printf(&quot;#&quot;);
+    else
+        printf(&quot;$&quot;);
+}
+</code></pre>
+
+<p>我们为了和终端真实的界面差不多,所以在这里花费了一些心思;<br />
+首先是通过<code>getcwd()</code>获得了当前所在目录;<br />
+然后通过<code>getpwuid(getuid())</code>获得了当前的实际用户是<code>root</code>还是一般用户;</p>
+
+<h2 id="2-２内建命令cd的实现">2.２内建命令cd的实现</h2>
+
+<p>这是我实现的第一个需求,因为内建命令不需要开进程,所以我选择先实现cd命令,实现了进阶功能<code>cd -</code>;<br />
+关于<code>cd -</code>的实现本来我想使用队列来解决,但是其实只有两个数据,所以我采用了<code>if - else</code>来进行简单实现;</p>
+
+<pre><code>struct dd{
+    char haha[2][256];
+    int ha;
+}cd;
+
+//内置命令直接执行
+void in_cd(char list[100][256],int cont)
+{
+    if(strcmp(list[0],&quot;cd&quot;) != 0)
+        return;
+    char buf[256];
+    struct passwd *usrname;
+    usrname = getpwuid(getuid());
+    getcwd(cd.haha[cd.ha],sizeof(cd.haha[cd.ha]));
+    if(cd.ha == 0)
+        cd.ha++;
+    else
+        cd.ha--;
+    if(strcmp(list[1],&quot;~&quot;)==0)
+    {
+        if(strcmp(usrname-&gt;pw_name,&quot;xzwb&quot;)==0)
+            strcpy(buf,&quot;/home/xzwb/&quot;);
+        else if(strcmp(usrname-&gt;pw_name,&quot;root&quot;)==0)
+            strcpy(buf,&quot;/root/&quot;);   
+    }
+    else if(strcmp(list[1],&quot;-&quot;)==0)
+        strcpy(buf,cd.haha[cd.ha]);
+    else
+        strcpy(buf,list[1]);
+    chdir(buf);
+}
+</code></pre>
+
+<p>上面就是<code>cd</code>命令的实现;</p>
+
+<h2 id="2-3重定向和管道和后台运行部分的实现">2.3重定向和管道和后台运行部分的实现</h2>
+
+<ol>
+<li>关于重定向的实现相对来说也挺简单的,就是判断你是不是重定向然后找到你重定向的文件,通过<code>dup2()</code>这个函数可以将重定向文件的文件描述符修改为<code>0,1</code>来实现输入输出重定向;</li>
+<li>关于管道的实现就是先开一个进程执行管道的前一部分,存入文件中,然后再开一个进程执行后一部分将前一部分文件中的东西,使用<code>dup2</code>修改为标准输入;</li>
+
+<li><p>后台运行命令是我觉得最简单的一部分,就是主进程要不要阻塞住等待子进程执行完毕;</p>
+
+<p>//实现除了cd以外的外部命令
+void in_command(char list[100][256] , int cont)
+{
+    int background = 0; //标识是否有后台运行符&amp;
+    int how = 0; //用于标识是否有&gt;
+    pid_t pid;
+    int i;
+    int fd;
+    int he;
+    int statu;
+    char *arg[256];
+    char *arg2[256];
+    char <em>file;
+    for(i=0;i&lt;cont;i++)
+        arg[i] = (char</em>)list[i];
+    arg[cont] = NULL;
+    for(i=0;i<cont;i++)
+    {
+        if(strcmp(arg[i],">&rdquo;)==0)
+        {
+            file = arg[i+1];
+            how += 1;
+            he = i;
+        }
+        if(strcmp(arg[i],&ldquo;)==0)
+        {
+            file = arg[i+1];
+            how += 2;
+            he = i;
+        }
+        if(strcmp(arg[i],&ldquo;&gt;&gt;&rdquo;)==0)
+        {
+            file = arg[i+1];
+            how += 11;
+            he = i;
+        }
+        if(strcmp(arg[i],&rdquo;&lt;)==0)
+        {
+            file = arg[i+1];
+            how += 22;
+            he = i;
+        }
+        if(strcmp(arg[i],&ldquo;|&rdquo;)==0)
+        {
+            int c = 0;
+            for(int j = i+1 ; j &lt; cont;j++,c++)
+                arg2[c] = arg[j];
+            arg2[c] = NULL;
+            how += 4;
+            he = i;
+        }
+        if(strcmp(arg[i],&rdquo;&amp;&ldquo;)==0)
+        {
+            arg[i] = NULL;
+            background += 1;
+        }
+    }
+    if(how!=0)
+        arg[he] = NULL;
+    if(background == 1 &amp;&amp; strcmp(list[cont-1],&rdquo;&amp;&ldquo;) != 0)
+        background&ndash;;
+    if((pid = fork())&lt;0)
+        perror(&ldquo;fork error\n&rdquo;);
+    if(pid == 0)
+    {
+        switch(how)
+        {
+            case 0:
+                {
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 1:
+                {
+                    fd = open(file,O_RDWR|O_CREAT|O_TRUNC,S_IRWXU);
+                    dup2(fd,1);
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 2:
+                {
+                    if((fd = open(file,O_RDONLY,0644)) &lt; 0)
+                        printf(&ldquo;openfile falsh\n&rdquo;);
+                    close(0);
+                    dup2(fd,0);
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 11:
+                {
+                    fd = open(file,O_RDWR|O_CREAT|O_APPEND,S_IRWXU);
+                    dup2(fd,1);
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 22:
+                {
+                    if((fd = open(file,O_RDONLY)) &lt; 0)
+                        perror(&ldquo;open&rdquo;);
+                    dup2(fd,0);
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 4:
+                {
+                    int pid2;
+                    int satu;
+                    int fd2;
+                    if((pid2 = fork()) &lt; 0)
+                        perror(&ldquo;fork error&rdquo;);
+                    if(pid2 == 0)
+                    {
+                        if((fd2 = open(&ldquo;/tmp/1.txt&rdquo;,O_WRONLY|O_CREAT|O_TRUNC,0644)) &lt; 0)
+                            perror(&ldquo;open&rdquo;);
+                        dup2(fd2,1);
+                        execvp(arg[0],arg);
+                        exit(0);
+                    }
+                    waitpid(pid2,&amp;satu,0);
+                    close(fd2);
+                    fd2 = open(&ldquo;/tmp/1.txt&rdquo;,O_RDONLY);
+                    dup2(fd2,0);
+                    execvp(arg2[0],arg2);
+                    if(remove(&ldquo;/tmp/1.txt&rdquo;) &lt; 0)
+                        perror(&ldquo;remove error&rdquo;);
+                    exit(0);
+                    break;
+                }
+            default:printf(&ldquo;输入错误!\n&rdquo;);
+        }
+    }
+    if(background == 1)
+        return;
+    if(background == 0)
+        waitpid(pid,&amp;statu,0);
+}</p>
+
+<p>static void mask_ctrl_c(int signo)
+{
+    printf(&rdquo;\n&rdquo;);
+    print_prompt();
+    fflush(stdout);
+}</p></li>
+</ol>
+
+<h2 id="3-源代码">3.源代码</h2>
+
+<pre><code>#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+
+struct dd{
+    char haha[2][256];
+    int ha;
+}cd;
+
+struct history{
+    char a[100];
+    struct history *next;
+};
+
+//打印提示符
+void print_prompt()
+{
+    struct passwd *usrname;
+    usrname = getpwuid(getuid());
+    char buf[256];
+    memset(buf,0,sizeof(buf));
+    printf(&quot;my_shell:%s&quot;,getcwd(buf,256));
+    if(strcmp(usrname-&gt;pw_name,&quot;root&quot;)==0)
+        printf(&quot;#&quot;);
+    else
+        printf(&quot;$&quot;);
+}
+
+//获得命令行输入
+void get_input(char *buf)
+{
+    int len = 0;
+    char ch;
+    ch = getchar();
+    while(len &lt; 256 &amp;&amp; ch != '\n')
+    {
+        buf[len++] = ch;
+        ch = getchar();
+    }
+    if(len == 256)
+    {
+        printf(&quot;command is too long\n&quot;);
+        exit(1);
+    }
+    buf[len] = '\n';
+    buf[++len] = '\0';
+}
+
+//解析命令行
+void explain_input(char *buf , int *cont , char list[100][256]) 
+{
+    int i=0;
+    *cont = 0;
+    int j;
+    while(1)
+    {
+        if(buf[i] == ' ')
+        {
+            i++;
+            continue;
+        }
+        if(buf[i] == '\n')
+            break;
+        else
+        {
+            j = 0;
+            while(buf[i] != ' ' &amp;&amp; buf[i] != '\n')
+            {
+                list[*cont][j] = buf[i];
+                j++;
+                i++;
+            }   
+            list[*cont][j] = '\0';
+            *cont += 1;
+        }
+    }
+}
+
+//内置命令直接执行
+void in_cd(char list[100][256],int cont)
+{
+    if(strcmp(list[0],&quot;cd&quot;) != 0)
+        return;
+    char buf[256];
+    struct passwd *usrname;
+    usrname = getpwuid(getuid());
+    getcwd(cd.haha[cd.ha],sizeof(cd.haha[cd.ha]));
+    if(cd.ha == 0)
+        cd.ha++;
+    else
+        cd.ha--;
+    if(strcmp(list[1],&quot;~&quot;)==0)
+    {
+        if(strcmp(usrname-&gt;pw_name,&quot;xzwb&quot;)==0)
+            strcpy(buf,&quot;/home/xzwb/&quot;);
+        else if(strcmp(usrname-&gt;pw_name,&quot;root&quot;)==0)
+            strcpy(buf,&quot;/root/&quot;);   
+    }
+    else if(strcmp(list[1],&quot;-&quot;)==0)
+        strcpy(buf,cd.haha[cd.ha]);
+    else
+        strcpy(buf,list[1]);
+    chdir(buf);
+}
+
+//实现除了cd以外的外部命令
+void in_command(char list[100][256] , int cont)
+{
+    int background = 0; //标识是否有后台运行符&amp;
+    int how = 0; //用于标识是否有&gt;
+    pid_t pid;
+    int i;
+    int fd;
+    int he;
+    int statu;
+    char *arg[256];
+    char *arg2[256];
+    char *file;
+    for(i=0;i&lt;cont;i++)
+        arg[i] = (char*)list[i];
+    arg[cont] = NULL;
+    for(i=0;i&lt;cont;i++)
+    {
+        if(strcmp(arg[i],&quot;&gt;&quot;)==0)
+        {
+            file = arg[i+1];
+            how += 1;
+            he = i;
+        }
+        if(strcmp(arg[i],&quot;)==0)
+        {
+            file = arg[i+1];
+            how += 2;
+            he = i;
+        }
+        if(strcmp(arg[i],&quot;&gt;&gt;&quot;)==0)
+        {
+            file = arg[i+1];
+            how += 11;
+            he = i;
+        }
+        if(strcmp(arg[i],&quot;&lt;)==0)
+        {
+            file = arg[i+1];
+            how += 22;
+            he = i;
+        }
+        if(strcmp(arg[i],&quot;|&quot;)==0)
+        {
+            int c = 0;
+            for(int j = i+1 ; j &lt; cont;j++,c++)
+                arg2[c] = arg[j];
+            arg2[c] = NULL;
+            how += 4;
+            he = i;
+        }
+        if(strcmp(arg[i],&quot;&amp;&quot;)==0)
+        {
+            arg[i] = NULL;
+            background += 1;
+        }
+    }
+    if(how!=0)
+        arg[he] = NULL;
+    if(background == 1 &amp;&amp; strcmp(list[cont-1],&quot;&amp;&quot;) != 0)
+        background--;
+    if((pid = fork())&lt;0)
+        perror(&quot;fork error\n&quot;);
+    if(pid == 0)
+    {
+        switch(how)
+        {
+            case 0:
+                {
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 1:
+                {
+                    fd = open(file,O_RDWR|O_CREAT|O_TRUNC,S_IRWXU);
+                    dup2(fd,1);
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 2:
+                {
+                    if((fd = open(file,O_RDONLY,0644)) &lt; 0)
+                        printf(&quot;openfile falsh\n&quot;);
+                    close(0);
+                    dup2(fd,0);
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 11:
+                {
+                    fd = open(file,O_RDWR|O_CREAT|O_APPEND,S_IRWXU);
+                    dup2(fd,1);
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 22:
+                {
+                    if((fd = open(file,O_RDONLY)) &lt; 0)
+                        perror(&quot;open&quot;);
+                    dup2(fd,0);
+                    execvp(arg[0],arg);
+                    exit(0);
+                    break;
+                }
+            case 4:
+                {
+                    int pid2;
+                    int satu;
+                    int fd2;
+                    if((pid2 = fork()) &lt; 0)
+                        perror(&quot;fork error&quot;);
+                    if(pid2 == 0)
+                    {
+                        if((fd2 = open(&quot;/tmp/1.txt&quot;,O_WRONLY|O_CREAT|O_TRUNC,0644)) &lt; 0)
+                            perror(&quot;open&quot;);
+                        dup2(fd2,1);
+                        execvp(arg[0],arg);
+                        exit(0);
+                    }
+                    waitpid(pid2,&amp;satu,0);
+                    close(fd2);
+                    fd2 = open(&quot;/tmp/1.txt&quot;,O_RDONLY);
+                    dup2(fd2,0);
+                    execvp(arg2[0],arg2);
+                    if(remove(&quot;/tmp/1.txt&quot;) &lt; 0)
+                        perror(&quot;remove error&quot;);
+                    exit(0);
+                    break;
+                }
+            default:printf(&quot;输入错误!\n&quot;);
+        }
+    }
+    if(background == 1)
+        return;
+    if(background == 0)
+        waitpid(pid,&amp;statu,0);
+}
+
+static void mask_ctrl_c(int signo)
+{
+    printf(&quot;\n&quot;);
+    print_prompt();
+    fflush(stdout);
+}                         
+
+void history_ai(char list[100][256])
+{
+    if(strcmp(list[0],&quot;history&quot;)==0)
+    {
+        read_history(NULL);
+    }
+}
+
+int main()
+{
+    cd.ha = 0;
+    int cont;
+    int len;
+    char list[100][256];
+    signal(SIGINT,mask_ctrl_c);
+    while(1)
+    {
+        char *buf = (char*)malloc(sizeof(256));
+        memset(list,0,sizeof(list));
+        memset(buf,0,sizeof(buf));
+        print_prompt();
+        buf = readline(&quot;myshell&amp;&quot;);
+        add_history(buf);
+        write_history(NULL);
+        buf[strlen(buf)] = '\n';        
+        if(strcmp(buf,&quot;exit\n&quot;) == 0)
+            exit(0);
+        explain_input(buf,&amp;cont,list);
+        in_cd(list,cont);
+        history_ai(list);
+        in_command(list,cont);
+        free(buf);
+    }
+}
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

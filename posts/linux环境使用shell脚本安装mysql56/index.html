@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux环境使用Shell脚本安装Mysql56 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux环境使用Shell脚本安装Mysql56 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux环境使用Shell脚本安装Mysql56">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E7%8E%AF%E5%A2%83%E4%BD%BF%E7%94%A8shell%E8%84%9A%E6%9C%AC%E5%AE%89%E8%A3%85mysql56/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux环境使用Shell脚本安装Mysql56</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="1-前言">1. 前言</h1>
+
+<p>之前在Linux上安装Mysql总是花费很多时间，一行一行执行命令，很是繁琐，所以决定写个脚本提升下效率，这个脚本是基于Mysql5.6版本写的，后续版本不适用，但是如果自己能看懂脚本的可以稍加修改，如果有需要其他版本的自己又不是很熟悉Shell脚本的留言给我。</p>
+
+<h1 id="2-准备工作">2. 准备工作</h1>
+
+<p>到Mysql官网或者到华为软件仓库去下载Mysql安装包</p>
+
+<p>官网链接：<a href="https://dev.mysql.com/downloads/mysql/5.6.html#downloads">https://dev.mysql.com/downloads/mysql/5.6.html#downloads</a></p>
+
+<p><a href="https://img.it610.com/image/info8/aeaa9f0c8403467397cbcdcb0f6001a0.jpg"><img src="https://img.it610.com/image/info8/aeaa9f0c8403467397cbcdcb0f6001a0.jpg" alt="Linux环境使用Shell脚本安装Mysql5.6_第1张图片" /></a></p>
+
+<p>有32位和64位的区分 ，根据需要下载</p>
+
+<p>华为软件仓库：<a href="https://mirrors.huaweicloud.com/mysql/Downloads/MySQL-5.6/">https://mirrors.huaweicloud.com/mysql/Downloads/MySQL-5.6/</a></p>
+
+<p>我下载的版本是mysql-5.6.41-linux-glibc2.12-x86_64.tar.gz</p>
+
+<p>下载好安装包后拷贝到Linux服务器的任意位置上</p>
+
+<p>检查机器上是否安装autoconf，执行命令：rpm -qa|grep autoconf</p>
+
+<p><a href="https://img.it610.com/image/info8/a9d431d7ef224608bcc6dfe0171f8e7b.png"><img src="https://img.it610.com/image/info8/a9d431d7ef224608bcc6dfe0171f8e7b.png" alt="" /></a></p>
+
+<p>若无如上输出，则执行命令安装：yum -y install autoconf</p>
+
+<h1 id="3-配置脚本">3. 配置脚本</h1>
+
+<p>脚本内容如下</p>
+
+<pre><code>#!/bin/bash
+# Mysql安装包所在路径,需要带上包名，示例：PACKAGE_FULL_WAY=/root/mysql-5.6.41-linux-glibc2.12-x86_64.tar.gz
+readonly PACKAGE_FULL_WAY=
+# Mysql安装主目录,示例：INSTALL_HOME=/usr/local/mysql
+readonly INSTALL_HOME=
+# Mysql数据库root用户密码,示例：USER_PASSWD=root
+readonly USER_PASSWD=
+
+#check user
+if [[ &quot;$UID&quot; -ne 0 ]]; then
+    echo &quot;ERROR: the script must run as root&quot;
+    exit 3
+fi
+
+function log_info() {
+    echo &quot;[$(date -d today +&quot;%Y-%m-%d %H:%M:%S %:::z&quot;)] $1&quot;
+}
+
+function log_error() {
+    echo -e &quot;[$(date +&quot;%Y-%m-%d %H:%M:%S %Z%:z&quot;)] [ERROR] $* \n&quot;
+    exit 1
+
+}
+
+function check_result() {
+    local ret_code=$1
+    shift
+    local error_msg=$*
+    if [[ ${ret_code} -ne 0 ]]; then
+        log_error ${error_msg}
+    fi
+}
+
+# 校验参数
+function check_param() {
+    if [[ ! -n ${PACKAGE_FULL_WAY} ]] || [[ ! -n ${INSTALL_HOME} ]] || [[ ! -n ${USER_PASSWD} ]]; then
+        log_error &quot;Param: PACKAGE_FULL_WAY INSTALL_HOME USER_PASSWD can not be null&quot;
+    fi
+    if [[ ! -f ${PACKAGE_FULL_WAY} ]]; then
+        log_error &quot;Please check the config of PACKAGE_FULL_WAY dose config Mysql package name&quot;
+    fi
+}
+
+function check_mysql_process() {
+    local mysql_process_count=`ps -ef |grep ${INSTALL_HOME}|grep -vwE &quot;grep|vi|vim|tail|cat&quot;|wc -l`
+    if [[ ${mysql_process_count} -gt 0 ]]; then
+        log_error &quot;please stop and uninstall the mysql first&quot;
+    fi
+}
+
+# 新建mysql用户
+function add_user() {
+    #create group mysql
+    grep &quot;^mysql&quot; /etc/group &amp;&gt; /dev/null
+    if [[ $? -ne 0 ]]; then
+        groupadd mysql
+    fi
+
+    #create user mysql
+    id mysql &amp;&gt; /dev/null
+    if [[ $? -ne 0 ]]; then
+        useradd -g mysql mysql
+        chage -M 99999 mysql
+    fi
+}
+
+# 安装Mysql
+function install_mysql() {
+    # 创建安装主目录
+    mkdir -p ${INSTALL_HOME}
+    # 解压mysql到安装主目录
+    tar -zxvf ${PACKAGE_FULL_WAY} -C ${INSTALL_HOME} &gt; /dev/null 2&gt;&amp;1
+    check_result $? &quot;unzip Mysql package error&quot;
+    local package_name=`ls ${INSTALL_HOME} |grep mysql`
+    mv ${INSTALL_HOME}/${package_name}/* ${INSTALL_HOME}
+    rm -rf ${INSTALL_HOME}/${package_name}
+    cd ${INSTALL_HOME}
+
+    # 新建数据库目录
+    mkdir -p ${INSTALL_HOME}/data/mysql
+    chown -R mysql:mysql ${INSTALL_HOME}
+
+    # 安装并指定用户和data文件夹位置
+    ./scripts/mysql_install_db --user=mysql --datadir=${INSTALL_HOME}/data/mysql
+
+    # 复制mysql到服务自动启动里面
+    cp -pf ${INSTALL_HOME}/support-files/mysql.server /etc/init.d/mysqld
+    chmod 755 /etc/init.d/mysqld
+    # 复制配置文件到etc下
+    cp -pf ${INSTALL_HOME}/support-files/my-default.cnf /etc/my.cnf
+    chmod 755 /etc/my.cnf
+    # 修改basedir和datadir
+    sed -i &quot;s#^basedir=.*#basedir=${INSTALL_HOME}#&quot; /etc/init.d/mysqld
+    sed -i &quot;s#^datadir=.*#datadir=${INSTALL_HOME}\/data\/mysql#&quot; /etc/init.d/mysqld
+    # 加入环境变量,方便使用mysql命令,但是需要source /etc/profile
+    echo &quot;###MYSQL_PATH_ENV_S&quot; &gt;&gt;/etc/profile
+    echo &quot;export PATH=${INSTALL_HOME}/bin:\$PATH&quot; &gt;&gt; /etc/profile
+    echo &quot;###MYSQL_PATH_ENV_E&quot; &gt;&gt; /etc/profile
+    # 启动Mysql
+    start
+    # 修改Mysql用户root密码
+    ./bin/mysqladmin -u root -h localhost.localdomain password ${USER_PASSWD}
+    cd ${INSTALL_HOME}
+
+# 开启远程登录权限
+./bin/mysql -h127.0.0.1 -uroot -p${USER_PASSWD} &lt;&lt; EOF
+grant all privileges on *.* to root@'%' identified by 'root'; flush privileges;
+EOF
+    chown -R mysql:mysql ${INSTALL_HOME}
+}
+
+# 安装Mysql
+function install() {
+    log_info &quot;+++++++++++ step 1 ++++++++++++++++&quot;
+    check_param
+    log_info &quot;check_param finish&quot;
+
+    log_info &quot;+++++++++++ step 2 ++++++++++++++++&quot;
+    check_mysql_process
+    log_info &quot;check_mysql_process finish&quot;
+
+    log_info &quot;+++++++++++ step 3 ++++++++++++++++&quot;
+    add_user
+    log_info &quot;add_user finish&quot;
+
+    log_info &quot;+++++++++++ step 4 ++++++++++++++++&quot;
+    install_mysql
+    log_info &quot;install_mysql finish&quot;
+}
+
+# 卸载Mysql
+function uninstall() {
+    # 如果Mysql仍启动则停止Msql
+    local mysql_process_count=`ps -ef |grep ${INSTALL_HOME}|grep -vwE &quot;grep|vi|vim|tail|cat&quot;|wc -l`
+    if [[ ${mysql_process_count} -gt 0 ]]; then
+        stop
+    fi
+
+    # 删除创建的文件
+    rm -rf ${INSTALL_HOME}
+    rm -rf /etc/init.d/mysqld
+    rm -rf /etc/my.cnf
+
+    # 删除sock文件
+    if [[ -f /tmp/mysql.sock ]]; then
+        rm -rf /tmp/mysql.sock
+    fi
+
+    # 删除配置的环境变量
+    sed -i '/###MYSQL_PATH_ENV_S/,/###MYSQL_PATH_ENV_E/d' /etc/profile
+
+    #删除用户和用户组
+    id mysql &amp;&gt; /dev/null
+    if [[ $? -eq 0 ]]; then
+        userdel mysql
+    fi
+    log_info &quot;uninstall Mysql success&quot;
+}
+
+# 停止Mysql
+function stop() {
+    su - mysql -c &quot;service mysqld stop&quot;
+}
+
+# 启动Mysql
+function start() {
+    su - mysql -c &quot;service mysqld start&quot;
+}
+
+# Mysql状态检查
+function check_status() {
+    su - mysql -c &quot;service mysqld status&quot;
+}
+
+function usage() {
+    echo &quot;Usage: $PROG_NAME {start|stop|install|uninstall|check_status}&quot;
+    exit 2
+
+}
+
+PROG_NAME=$0
+ACTION=$1
+
+case &quot;$ACTION&quot; in
+    start)
+        start
+    ;;
+    stop)
+        stop
+    ;;
+    restart)
+        stop
+        start
+    ;;
+    install)
+        install
+    ;;
+    uninstall)
+        uninstall
+    ;;
+    check_status)
+        check_status
+    ;;
+    *)
+        usage
+    ;;
+esac
+</code></pre>
+
+<p>使用root用户登录Linxu服务器，在任意目录下执行命令</p>
+
+<p>vim mysql_manager.sh</p>
+
+<p>按一下insert键，复制以上的脚本内容，在机器上右键粘贴进去</p>
+
+<p>复制完成后需要修改脚本最上方的三个配置项</p>
+
+<p>PACKAGE_FULL_WAY</p>
+
+<p>|</p>
+
+<p>Mysql安装包所在路径,需要带上包名</p>
+
+<p>示例：PACKAGE_FULL_WAY=/root/mysql-5.6.41-linux-glibc2.12-x86_64.tar.gz</p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>INSTALL_HOME</p>
+
+<p>|</p>
+
+<p>Mysql安装主目录</p>
+
+<p>示例：INSTALL_HOME=/usr/local/mysql</p>
+
+<p>USER_PASSWD</p>
+
+<p>|</p>
+
+<p>Mysql数据库root用户密码</p>
+
+<p>示例：USER_PASSWD=root</p>
+
+<p>修改完成后按一下Esc键，键盘输入:wq!即可</p>
+
+<p>脚本命令：</p>
+
+<p>sh mysql_manager.sh install</p>
+
+<p>|</p>
+
+<p>安装并启动Mysql</p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>sh mysql_manager.sh start</p>
+
+<p>|</p>
+
+<p>启动Mysql</p>
+
+<p>sh mysql_manager.sh stop</p>
+
+<p>|</p>
+
+<p>关闭Mysql</p>
+
+<p>sh mysql_manager.sh restart</p>
+
+<p>|</p>
+
+<p>重启Mysql</p>
+
+<p>sh mysql_manager.sh check_status</p>
+
+<p>|</p>
+
+<p>Mysql状态检查</p>
+
+<p>sh mysql_manager.sh uninstall</p>
+
+<p>|</p>
+
+<p>卸载Mysql</p>
+
+<p>如果有Shell脚本大神觉得写得不对的地方请留言指正</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

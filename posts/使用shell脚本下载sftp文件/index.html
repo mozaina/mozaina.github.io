@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用shell脚本下载sftp文件 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用shell脚本下载sftp文件 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用shell脚本下载sftp文件">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E8%BD%BDsftp%E6%96%87%E4%BB%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用shell脚本下载sftp文件</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>功能</strong> ：shell脚本实现sftp自动登录并下载文件<br />
+<strong>系统环境</strong> ：centos7</p>
+
+<p><strong>使用到的工具</strong> ：lftp （安装方式 yum -y install lftp）<br />
+<strong>lftp</strong> ：lftp 是一个功能强大的下载工具，它支持访问文件的协议: ftp, ftps, http, https, hftp,
+fish.(其中ftps和https需要在编译的时候包含openssl库)。llftp的界面非常想一个shell:
+有命令补全，历史记录，允许多个后台任务执行等功能，使用起来非常方便。它还有书签、排队、镜像、断点续传、多进程下载等功能。</p>
+
+<p><strong>lftp常用命令</strong></p>
+
+<p><strong>登录</strong> ：<br />
+lftp <a href="ftp://user:password@site:port">ftp://user:password@site:port</a><br />
+lftp user:password@site:port<br />
+lftp site -p port -u user,password<br />
+lftp site:port -u user,password</p>
+
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>含义</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>ls</td>
+<td>显示远端文件列表( !ls 显示本地文件列表 )</td>
+</tr>
+
+<tr>
+<td>cd</td>
+<td>切换远端目录(lcd 切换本地目录)</td>
+</tr>
+
+<tr>
+<td>get</td>
+<td>下载远端文件</td>
+</tr>
+
+<tr>
+<td>mget</td>
+<td>下载远端文件(可以用通配符也就是 *)</td>
+</tr>
+
+<tr>
+<td>mirror</td>
+<td>下载目录 （mirror -R 上传目录）</td>
+</tr>
+
+<tr>
+<td>pget</td>
+<td>使用多个线程来下载远端文件, 预设为五个</td>
+</tr>
+
+<tr>
+<td>put</td>
+<td>上传文件</td>
+</tr>
+
+<tr>
+<td>mput</td>
+<td>上传多个文件(支持通配符)</td>
+</tr>
+
+<tr>
+<td>mv</td>
+<td>移动远端文件(远端文件改名)</td>
+</tr>
+
+<tr>
+<td>rm</td>
+<td>删除远端文件，参数-r,递归删除文件夹</td>
+</tr>
+
+<tr>
+<td>mrm</td>
+<td>删除多个远端文件(支持通配符)</td>
+</tr>
+
+<tr>
+<td>mkdir</td>
+<td>建立远端目录</td>
+</tr>
+
+<tr>
+<td>rmdir</td>
+<td>删除远端目录</td>
+</tr>
+
+<tr>
+<td>pwd</td>
+<td>显示目前远端所在目录(lpwd 显示本地目录)</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>实现代码</strong> ：</p>
+
+<pre><code>#!/bin/bash
+
+#sftp服务器地址
+host=&quot;192.168.149.128&quot;
+#端口
+port=22
+sftp_user=&quot;sftp&quot;
+#密码
+password=&quot;123456&quot;
+
+#下载到本地的目录
+localDir=&quot;/tmp&quot;
+[ ! -d $localDir ] &amp;&amp; mkdir -p $localDir
+#sftp中待下载文件目录
+remoteDir=&quot;/&quot;
+
+#要下载的文件为fileName
+fileName=&quot;data.log&quot;
+lftp -u ${sftp_user},${password} sftp://${host}:${port}&lt;&lt;EOF
+cd ${remoteDir}
+lcd ${localDir} 
+get $fileName
+by
+EOF
+</code></pre>
+
+<p>注意：以上代码实现了针对指定路径中的指定文件的下载，如果需要下载整个目录，需要使用lftp 中的 mirror</p>
+
+<p><strong>mirror的用法：</strong><br />
+mirror [OPTS] [source [target]]</p>
+
+<p>将源文件夹镜像到目标文件夹。如果目标文件夹以 / 结尾，原文件夹名称会被附加到目标文件夹名称之后。源和目标都可以是指向文件夹的URL。</p>
+
+<pre><code>-c,--continue 续传上次的任务
+-e,--delete 删除远程目录上不存在的文件
+   --delete-first 在传输新文件之前删除旧的文件
+   --depth-first 进入下一层目录优先于文件传输
+-s,--allow-suid 根据远程站点设置suid/sgid比特位
+   --allow-chown 尝试将自己设置为文件所有者和所有组
+   --ascii 使用ascii方式传输（隐含了--ignore-size）
+   --ignore-time 决定是否下载时忽略时间因素
+   --ignore-size 决定是否下载时忽略文件大小因素
+   --only-missing 只下载缺少的文件
+   --only-existing 只下载已经存在于目标文件夹中的文件
+-n,--only-newer 只下载新文件（-c参数无法工作）
+   --no-empty-dirs 不创建空文件夹（隐含了--depth-first）
+-r,--no-recursion 不进入子文件夹
+   --no-symlinks 不创建符号链接
+-p,--no-perms 不设置文件权限
+   --no-umask 不使用文件预设权限
+-R,--reverse 反向镜像（上传文件）
+-L,--dereference 将符号链接作为文件下载
+-N,--newer-than=SPEC 只下载比指定时间晚的文件
+   --on-change=CMD 只要有文件或文件夹存在差异就执行命令CMD
+   --older-than=SPEC 只下载比指定时间早的文件
+   --size-range=RANGE 只下载大小在指定区间上的文件
+-P,--parallel[=N] 并行下载N个文件
+   --use-pget[-n=N] 使用pget传输每个文件
+   --loop 循环知道找不到差异
+-i RX,--include RX 包括相匹配的文件
+-x RX,--exclude RX 不包括相匹配的文件
+-I GP,--include-glob GP 包括相匹配的文件
+-X GP,--exclude-glob GP 不包括相匹配的文件
+-v,--verbose[=level] 冗长操作
+   --log=FILE 将执行的lftp命令写入文件FILE
+   --script=FILE 将lftp命令写入文件FILE，但不执行
+   --just-print, --dry-run 与--script=-相同
+   --use-cache 使用缓存目录列表
+--Remove-source-files 传输完成后删除源文件
+-a 与--allow-chown --allow-suid --no-umask相同
+</code></pre>
+
+<p><strong>注意</strong> ：<br />
+当使用 -R 参数时,第一个目录为本地目录,第二个为远程目录<br />
+如果第二项没有填写,则采用第一个个目录的名称<br />
+如果两项都没填写,则采用当前的本地和远程目录</p>
+
+<p>RX是扩展的正则表达式，具体语法可参考egrep命令。</p>
+
+<p>GP是通配符规则，比如*.zip。</p>
+
+<p>包含和不包含选项可以被多次使用。符合以下规则之一的文件将被镜像传输：(1)符合包含规则而不符合之后的不包含规则；(2)不符合任何规则，但第一条为不包含规则。目录匹配时包括结尾的/。</p>
+
+<p>注意：符号链接（软链接）不会被传输到远程服务器上，因为无法被FTP协议传输。要上传链接指向的文件，请使用mirror -RL命令（将符号链接视为普通文件）。</p>
+
+<p>对于–newer-than选项，你可以使用文件或时间作为参数。时间参数的格式同at命令，如now-7days、week
+age等。如果指定为文件，将采用文件的修改时间。</p>
+
+<p><strong>同步sftp文件示例：</strong></p>
+
+<pre><code>#!/bin/bash
+
+#sftp服务器地址
+host=&quot;192.168.149.128&quot;
+#端口
+port=22
+sftp_user=&quot;sftp&quot;
+#密码
+password=&quot;123456&quot;
+
+#下载到本地的目录
+localDir=&quot;/data/logs/sftp_logs&quot;
+[ ! -d $localDir ] &amp;&amp; mkdir -p $localDir
+#sftp中待下载的文件目录
+remoteDir1=&quot;/oslog&quot;
+remoteDir2=&quot;/data&quot;
+
+lftp -u ${sftp_user},${password} sftp://${host}:${port}&lt;&lt;EOF
+cd /
+lcd ${localDir} 
+mirror ${remoteDir1}
+mirror ${remoteDir2}
+by
+EOF
+</code></pre>
+
+<p><strong>将本地文件上传到sftp中</strong></p>
+
+<pre><code>#!/bin/bash
+
+#sftp服务器地址
+host=&quot;192.168.149.128&quot;
+#端口
+port=22
+sftp_user=&quot;sftp&quot;
+#密码
+password=&quot;123456&quot;
+
+#本地的目录
+localDir=&quot;/data/test/&quot;
+localFile=&quot;/data/test/*.zip&quot;
+
+#sftp中的目录
+remoteDir=&quot;/file&quot;
+
+
+lftp -u ${sftp_user},${password} sftp://${host}:${port}&lt;&lt;EOF
+mput ${localFile} #将本地localFile文件上传到sftp中（支持通配符）
+mirror -R -I b*.zip ${localDir} ${remoteDir} #将本地localDir中的b.*zip文件上传到sftp remoteDire中
+mirror -R --only-newer --only-missing -I b*.zip ${localDir} ${remoteDir} #将本地localDir中的b.*zip文件上传到sftp remoteDire中(只上传新文件，貌似默认选项就是)
+by
+EOF
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

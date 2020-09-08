@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>利用LinuxShell脚本实现MySQL自动监控和报警 | 开发者问答集锦</title>
+    <meta property="og:title" content="利用LinuxShell脚本实现MySQL自动监控和报警 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="利用LinuxShell脚本实现MySQL自动监控和报警">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%88%A9%E7%94%A8linuxshell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0mysql%E8%87%AA%E5%8A%A8%E7%9B%91%E6%8E%A7%E5%92%8C%E6%8A%A5%E8%AD%A6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">利用LinuxShell脚本实现MySQL自动监控和报警</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>本文主要研究如何利用 Linux Shell 脚本和飞信 PI 来实现 MySQL 数据库的自动监控和短信报警，使 DBA
+从繁重和重复的监控工作中解脱出来，一边享受马尔代夫的阳光、沙滩，一边实时监控北京的 MySQL数据库。</p>
+
+<p>随着互联网及信息化的迅猛发展，企业运营所产生的数据量越来越大，所以大多数公司选择将重要商业数据存储在数据库中。如果数据库系统突然停机或发生其它故障，必然会影响公司的收入，声誉甚至导致用户投诉，如何保证数据库系统的正常运转，一直是公司关心的核心问题。这就要求
+DBA 对数据库运行的各种状态进行实时监控，在发生故障之前解决它，将隐患消灭在摇篮中。本文给出使用 “MySQL Monitor” Shell 脚本来实现
+MySQL 的实时监控，讨论了如何实现 MySQL的短信报警功能模块，同时结合一个真实应用场景来演示 “MySQL Monitor” 是如何工作的。</p>
+
+<p><strong>背景</strong></p>
+
+<p><strong>南风公司遇到的问题</strong></p>
+
+<p>南风公司是一家互联网公司，该公司在北京网通1区机房有 10 台服务器，2 区机房有 10 台服务器，在上海电信 1 区机房也有 10
+台服务器&hellip;&hellip;，鉴于公司数据的重要性，DBA
+必须实施一系列的监控措施来保证数据库良性运转，设置了包括操作系统磁盘空间检查、数据库表空间检查、数据库表状态检查、双机互备情况检查等 20 个检查点，DBA
+有哪些选择去实施如此宠大的监控方案呢?下面是传统的解决方案：</p>
+
+<p>这是一种低效的串行工作方式，DBA 必须每天从早上 10：00 开始逐台检查数据库服务器的 20个检查点，非常耗时，这种传统的方案会让 DBA</p>
+
+<p>每天重复做机械化的工作，当有几百台被监控服务器时，这个传统的方案对 DBA 的来说就是噩梦，那么如何才能更有效的监控数据库成为 DBA 迫切</p>
+
+<p>需要解决的问题?</p>
+
+<p><strong>南风公司的解决方案</strong></p>
+
+<p>智慧的 MySQL，需要用智慧的方式去驾驭。南风公司的 DBA 开发了一套 “MySQL Monitor” 解决方案，这套方案充分利用了 “Shell</p>
+
+<p>脚本” + “Linux Cron定时器服务” + “中国移动飞信免费发短信 API 接口” 的优势，只有在数据库检查点出现问题时才会向 DBA 发送短信进</p>
+
+<p>行报警，</p>
+
+<p>实现了真正意义上无人值守的大量数据库服务器监控框架，下面是全新的解决方案：</p>
+
+<p>这是一种高效的并行工作方式，为了便于管理，我们先将数据库服务器进行了分组，每组服务器对应一个监控线程，并且这些监控线程部署在“监控</p>
+
+<p>工作站”上，大家 一定注意到“时间轴”消失了，这是因为这些监控线程是每 1 分钟运行一次，“时间轴”已经没有什么意义了。如果有一切正常，这</p>
+
+<p>些监控线程只会写日志，不会有其它的操作;如果当某台数据库服务器有异常情况发生，那么 “监控工作站”会给 DBA 终端发送短信提醒，这样</p>
+
+<p>DBA 就可以在第一时间发现问题解决问题，即使 DBA 身边没有电脑终端也一样可以及时的了解 MySQL 服务器的运行情况。</p>
+
+<p><strong>核心技术</strong></p>
+
+<p>下面我们将简单介绍一下 “Shell” 、 “Cron” 、 “飞信API接口” 。</p>
+
+<p><strong>1、Shell 简介</strong></p>
+
+<p>Shell 是一种具备特殊功能的程序，它为我们和 Linux/Unix 系统之间提供了一个交互的接口。用户既可以输入命令来跟操作系统交互，也</p>
+
+<p>可以通过编写 Shell 脚本，从而完成更加自动化和复杂的操作。因此 Shell 被称作 Linux/Unix 系统的窗口，它的作用就是按照一定的语法规</p>
+
+<p>范将用户指令加以转化并传给系统进行处理。</p>
+
+<p>跟 DOS 可以分为 MS-DOS，PC-DOS，FreeDOS，ROM-DOS 一样，每种 Linux/Unix 操作系统都有它们自已的
+Shell。它可以简单</p>
+
+<p>的理解为一个应用程序，可以在独立于操作系统本身的情况下进行修改、更新或是增删功能。Linux/Unix 操作系统提供了几种不同的 Shell,</p>
+
+<p>如 Bourne Shell(/bin/sh)、Korn Shell(/bin/ksh)、Bourne Again
+Shell(/bin/bash)、Tenex C Shell(tcsh)、C Shell</p>
+
+<p>(/bin/csh) 等，其中 Bourne Again Shell(即bash) 是自由软件基金会(GNU)支持开发的一个 Shell 版本，它是
+Linux 系统中一个默</p>
+
+<p>认的 Shell，</p>
+
+<p>Bash 不但与其它几种 Shell 兼容，而且还继承发扬了它们的优点。</p>
+
+<p>让我们看一个 Shell 代码示例，我们将这个文件命令为 create_folder_daily.sh ：</p>
+
+<p><strong>清单 1. Shell 代码示例</strong></p>
+
+<p>#! / bin / bash<br />
+current_date = <code>date  +% Y % m % d</code><br />
+mkdir $ current_date</p>
+
+<p>这段代码的功能是：在当前目录下创建一下以当前日期(如：20091016)为命名的目录，运行演示如下：</p>
+
+<p><strong>清单 2. Shell 代码运行演示</strong></p>
+
+<hr />
+
+<p>[ root@localhost workdir ] # ll<br />
+总计  4<br />
+- rwxrwxrwx  1 root root  61 10 - 17 07 : 32 create_folder_daily.sh<br />
+[ root@localhost workdir ] # . / create_folder_daily.sh<br />
+[ root@localhost workdir ] # ll<br />
+总计  8<br />
+drwxr - xr - x  2 root root  4096 10 - 17 07 : 46 20091017<br />
+- rwxrwxrwx  1 root root  61 10 - 17 07 : 32 create_folder_daily.sh</p>
+
+<p><strong>2、Linux Cron 定时器服务</strong></p>
+
+<p>********Linux Cron 是一个常驻服务，它提供定时器的功能，让用户在特定的时间得以执行预设的指令或程序。只要用户会编辑计时器的配置文件</p>
+
+<p>，就可以使用定时器的功能。</p>
+
+<p>cron 的配置格式如下：Minute Hour Day Month DayOFWeek [UserName] Command</p>
+
+<table>
+<thead>
+<tr>
+<th>字段名 描述</th>
+</tr>
+</thead>
+
+<tbody>
+</tbody>
+</table>
+
+<p>Minute 分钟，表示每个小时的第几分钟来执行。范围是从 0-59<br />
+Hour 小时，表示从第几个小时来执行，范围是从 0-23<br />
+Day 日期，表示从每个月的第几天执行，范围从 1-31<br />
+Month 月，表示每年的第几个月来执行，范围从 1-12<br />
+DayOFWeek 周，表示每周的第几天执行，范围从 0-6，其中 0 表示星期日<br />
+UserName 用户名，也就是执行程序要通过哪个用户来执行，这个一般可以省略<br />
+Command 要执行的命令(命令可以是 ls /proc &gt;&gt; /tmp/proc 之类的命令，也可以是执行你自行编写的脚本的命令)</p>
+
+<p><strong>配置 cron 任务的语法：</strong> crontab [option] [username]</p>
+
+<table>
+<thead>
+<tr>
+<th>语法</th>
+<th>描述</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>crontab -e [username]</td>
+<td>编辑该用户的计时器设置</td>
+</tr>
+
+<tr>
+<td>crontab -l [username]</td>
+<td>列出该用户的计时器设置</td>
+</tr>
+
+<tr>
+<td>crontab -r [username]</td>
+<td>删除该用户的计时器设置</td>
+</tr>
+
+<tr>
+<td>crontab -v [username]</td>
+<td>列出该用户cron作业的状态</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>清单 3. Crontab 配置演示</strong> 上面的配置将使 create_folder_daily.sh 每天凌晨 1 点钟运行一次，也就是说每天都会在
+/root/</p>
+
+<p>workdir/ 目录下生成一个以当前日期命名的文件夹。</p>
+
+<p>**[ root@localhost workdir]# crontab -l</p>
+
+<p>0 1 * * * /root/workdir/create_folder_daily.sh**</p>
+
+<p><strong>3、中国移动飞信免费发短信 API 接口</strong></p>
+
+<p>飞信是由中国移动通信集团公司推出的一款集商务应用和娱乐功能为一体的，基于手机应用以及与 Internet 深度互通的即时通讯产品，</p>
+
+<p>可免费给好友发送短信。下载中国移动飞信 PC 客户端软件，并注册开通飞信。注册成为飞信用户，下载飞信PC客户端、使用 PC 客户端基</p>
+
+<p>本功能，不收取费用。通过 API 接口，即可免费给飞信好友或给你自己的手机发短信。利用本 API 接口可进行日程提醒、服务器监控、报警</p>
+
+<p>、故障通知或短信自动控制等功能。</p>
+
+<p>它有 2 种调用方式：</p>
+
+<p><strong>清单 4. 浏览器调用方式</strong></p>
+
+<p><a href="https://fetionlib.appspot.com/restlet/fetion/您手机号/您的飞信密码/接收方手机号/短信内容">https://fetionlib.appspot.com/restlet/fetion/您手机号/您的飞信密码/接收方手机号/短信内容</a></p>
+
+<p><strong>清单 5. Linux下调用方式</strong></p>
+
+<p>curl &ldquo;<a href="https://fetionlib.appspot.com/restlet/fetion/您手机号/您的飞信密码/接收方手机号/短信内容&quot;">https://fetionlib.appspot.com/restlet/fetion/您手机号/您的飞信密码/接收方手机号/短信内容&quot;</a></p>
+
+<p><strong>流程设计</strong></p>
+
+<p>程序主要分为 monitor.sh 主监控程序和 monitor_helper.sh 助手程序，下面将分别介绍：</p>
+
+<p><strong>1、monitor.sh</strong></p>
+
+<p>主监控程序，每 1 分钟运行一次，如果发现了某个检查点有问题，程序会自动给 DBA 发送一条短信，这样做是为了保证在出现问题的</p>
+
+<p>时侯 DBA 能在最短的时间内做出反映。</p>
+
+<p><strong>主监控程序流程图，如下：</strong></p>
+
+<p>正如上面展示的，只有某个检查点出现问题的时候，才会给DBA发短信提醒，如果正常的时候只会写日志，不会打扰DBA，这样保证让</p>
+
+<p>DBA更专心的做其它工作。</p>
+
+<p><strong>2、monitor_helper.sh</strong></p>
+
+<p>那么大家想一下，如果主监控进程停掉了怎么办呢?我们会误认为一切监控检查点都是正常的，所以我们需要一个方案来保证主监控程</p>
+
+<p>序正常运转，于是助手程序产生，每天 10 点运行一次，用于辅助主监控程序。它有如下 2 个功能：</p>
+
+<p>监控主程序是否正常运转：它每天扫描日志文件，如果主监控程序当天的日志文件存在，那么说主监控进程是正常工作的，此时助手程序</p>
+
+<p>不做什么动作;如果找不到日志，那么它会给 DBA 发短信提醒主监控进程意外死掉了。</p>
+
+<p>清理日志：由于主监控程序是每分钟调用 1 次，那么随着时间的推移它会产生大量的日志文件，如果不清理，会直接影响机器的存储空间，</p>
+
+<p>所以需要此助手程序进行日志清理的</p>
+
+<p><strong>助手程序流程图，如下：</strong></p>
+
+<p>这样我们即有主监控程序，又有助手程序，所以程序的安全性已经很高了，这回DBA就可以高枕无忧了。</p>
+
+<p><strong>项目实战</strong></p>
+
+<p>我们依然以南风公司为例，但需要将真实的情况缩小为一个便于大家理解的模型，所以我们假设该公司分别在北京和上海各有 1 组服务器</p>
+
+<p>(真实情况有更多组服务器)，北京网通 1 区机房这组服务器里有 2 台服务器(真实情况是每组有更多的服务器)，上海电信 1 区机房也有</p>
+
+<p>2 台服务器(真实情况是每组有更多的服务器)。</p>
+
+<p><strong>程序目录结构及说明如下：</strong></p>
+
+<p><strong>1、.profile文件说明</strong></p>
+
+<p>配置文件，存储常量信息、短信收发方相关信息及数据库服务器配置信息等，具体如下：</p>
+
+<p><strong>清单 6. .profile 文件</strong></p>
+
+<p>[ root@localhost MySQL_Monitor ] $ more .profile<br />
+LOG_DIR = log<br />
+SENDER_ID = <strong>137</strong> ********<br />
+SENDER_PWD = pwd ********<br />
+RECEIVER_LIST = Tom ~ <strong>137</strong> ********<br />
+SERVER_GROUP_CFG_DIR = server_group_cfg<br />
+EXPIRED_DAY = <strong>2</strong></p>
+
+<table>
+<thead>
+<tr>
+<th>变量名</th>
+<th>变量描述</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>LOG_DIR</td>
+<td>表示 monitor.sh 产生的日志文件的路径</td>
+</tr>
+
+<tr>
+<td>SENDER_ID</td>
+<td>短信发送方手机号</td>
+</tr>
+
+<tr>
+<td>SENDER_PWD</td>
+<td>短信发送方飞信密码</td>
+</tr>
+
+<tr>
+<td>RECEIVER_LIST</td>
+<td>短信接收方列表</td>
+</tr>
+
+<tr>
+<td>SERVER_GROUP_CFG_DIR</td>
+<td>服务器组配置文件的路径</td>
+</tr>
+
+<tr>
+<td>EXPIRED_DAY</td>
+<td>用于 monitor_helper.sh 清理日志时用，此处为 2 表示清除 2 天前的日志</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>2、bj_cnc1 文件说明</strong></p>
+
+<p>服务器组配置文件，存储每组服务器中所有数据库的配置信息，具体如下：</p>
+
+<p><strong>清单 7. bj_cnc1 文件</strong></p>
+
+<p>[ root@localhost server_group_cfg ] $ more bj_cnc1<br />
+第100号MySQL: <strong>86.160</strong> . <strong>1.100</strong> : <strong>1521</strong>
+:test_user0:test_pwd0:test_db_100<br />
+第101号MySQL: <strong>86.160</strong> . <strong>1.101</strong> : <strong>1522</strong>
+:test_user1:test_pwd1:test_db_101</p>
+
+<p>表示北京网通1区中所有数据库的配置信息，本例仅以 2 个库为例，每个字段的含义如下：</p>
+
+<table>
+<thead>
+<tr>
+<th>列号</th>
+<th>描述</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>第1列</td>
+<td>数据库的中文描述</td>
+</tr>
+
+<tr>
+<td>第2列</td>
+<td>数据库的 IP 地址</td>
+</tr>
+
+<tr>
+<td>第3列</td>
+<td>数据库的监听端口</td>
+</tr>
+
+<tr>
+<td>第4列</td>
+<td>数据库用户名</td>
+</tr>
+
+<tr>
+<td>第5列</td>
+<td>数据库用户密码</td>
+</tr>
+
+<tr>
+<td>第6列</td>
+<td>服务器的名字</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>3、bj_cnc1_20091017 文件说明</strong></p>
+
+<p>这个是日志文件，表示 2009 年 10 月 17 日北京网通1区 monitor.sh 主监控程序产生的日志。</p>
+
+<p><strong>4、monitor.sh 文件说明</strong></p>
+
+<p>主监控程序，每 1 分钟运行一次，它接受一个输入参数，用于指定监控哪个服务器组(如 monitor.sh -s bj_cnc1，表示</p>
+
+<p>监控“北京网通1区”下的 2 个数据库“第100号MySQL”和“第101号MySQL”)，并将日志写入 log 目录下，并且 log 命名为</p>
+
+<p>“bj_cnc1_20091017”，表示是“北京网通1区”服务器组在 2009 年 10 月 17 日产生的日志。</p>
+
+<p><strong>程序框架，如下：</strong></p>
+
+<p>#! / bin / bash</p>
+
+<h1 id="此处是一些初始化的工作">此处是一些初始化的工作</h1>
+
+<p>function echo_usage(){</p>
+
+<h1 id="打印程序的用法">打印程序的用法</h1>
+
+<p>}<br />
+function send_msg(){</p>
+
+<h1 id="发送短消息">发送短消息</h1>
+
+<p>}<br />
+function check_mysql_instance_status(){</p>
+
+<h1 id="检查点-1-用于检查此数据库监听器是否启动-同时写日志">检查点  <strong>1</strong> , 用于检查此数据库监听器是否启动，同时写日志</h1>
+
+<h1 id="如果失败则调用-send-msg-给-dba-发短信提醒">如果失败则调用“send_msg()”给 DBA 发短信提醒</h1>
+
+<p>}</p>
+
+<h1 id="可以自定义多个检查点">可以自定义多个检查点</h1>
+
+<p>function check_ *** (){</p>
+
+<h1 id="检查点-n-同时写日志">检查点 n，同时写日志</h1>
+
+<h1 id="如果失败则调用-send-msg-给-dba-发短信提醒-1">如果失败则调用“send_msg()”给 DBA 发短信提醒</h1>
+
+<p>}<br />
+function main(){</p>
+
+<h1 id="主函数">主函数</h1>
+
+<p>check_mysql_instance_status</p>
+
+<h1 id="可以调用多个检查点">可以调用多个检查点</h1>
+
+<p>check_ ***<br />
+}</p>
+
+<h1 id="此处检查输入的参数是否合理-如果不合理则调用-echo-usage-并退出程序">此处检查输入的参数是否合理，如果不合理则调用“echo_usage”，并退出程序</h1>
+
+<h1 id="主函数调用">主函数调用</h1>
+
+<p>main</p>
+
+<p><strong>5、monitor_helper.sh 文件说明</strong></p>
+
+<p>由于主监控程序每 1 分钟运行一个，那么如果主监控程序在 2009 年 10 月 17 日是运行的，那么它将在 log 目录下会产生一个</p>
+
+<p>bj_cnc1_20091017，正是这个文件可以代表主监控程序是运行良好的。</p>
+
+<p>助手程序循环读取“server_group_cfg”文件夹下面的文件名(如“bj_cnc1”)，然后在文件名后加上当前日期</p>
+
+<p>(如 “bj_cnc1_20091017”)，再到 log 目录下去找该文件，如果找到则说明正常，如果找不到就说明有主监控程序没有正常运行。</p>
+
+<p><strong>程序框架如下：</strong></p>
+
+<p><strong>清单 9. monitor_helper.sh 文件</strong></p>
+
+<p>#! / bin / bash</p>
+
+<h1 id="此处是一些初始化的工作-1">此处是一些初始化的工作</h1>
+
+<p>function send_msg(){</p>
+
+<h1 id="发送短消息-1">发送短消息</h1>
+
+<p>}<br />
+function check_monitor(){</p>
+
+<h1 id="检查主监控程序是否运行-如果失败则调用-send-msg-给-dba-发短信提醒">检查主监控程序是否运行，如果失败则调用“send_msg()”给 DBA 发短信提醒</h1>
+
+<p>}<br />
+function del_expired_log(){</p>
+
+<h1 id="删除主监控程序产生的过期日志">删除主监控程序产生的过期日志</h1>
+
+<p>}<br />
+function main(){</p>
+
+<h1 id="主函数-1">主函数</h1>
+
+<p>}</p>
+
+<h1 id="主函数调用-1">主函数调用</h1>
+
+<p>main</p>
+
+<p><strong>6、Cron 定时器配置文件说明</strong></p>
+
+<p>我们将主程序和助手程序放到定时器里，他们的运行频率分别是：主监控程序, 每 1 分钟运行一次;助手程序，每天 10 点运行一次;</p>
+
+<p>具体代码如下：</p>
+
+<p><strong>清单 10. Cron 定时器配置文件</strong></p>
+
+<p>*/ <strong>1</strong> * * * * / home / mysql1 / MySQL_Monitor / monitor.sh  - s bj_cnc1<br />
+*/ <strong>1</strong> * * * * / home / mysql1 / MySQL_Monitor / monitor.sh  - s sh_ct1<br />
+<strong>0</strong> <strong>10</strong> * * * / home / mysql1 / MySQL_Monitor / monitor_helper.sh</p>
+
+<p><strong>7、程序运行演示</strong></p>
+
+<p>如果“北京网通1区”的“第100号MySQL”所属实例意外停止了，那么 DBA 会马上收到这样一条短信，如下：</p>
+
+<p><strong>结论</strong></p>
+
+<p>本文对传统的 MySQL 监控工作方式进行了优化和升级，使其搭上了移动互联的快车，让 DBA 可以更高效的工作。</p>
+
+<p>我们需要做的还很多，伴随互联网和移动互联的兴起，将会有更多的技术可以让 MySQL 更加智能，更加方便为用户服务。</p>
+
+<p>本文转自：<a href="http://home.lupaworld.com/home.php?mod=space&amp;uid=328269&amp;do=blog&amp;id=136637">http://home.lupaworld.com/home.php?mod=space&amp;uid=328269&amp;do=blog&amp;id=136637</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

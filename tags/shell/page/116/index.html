@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell | 开发者问答集锦</title>
+    <meta property="og:title" content="shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/tags/shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <link rel="alternate" type="application/rss+xml+xml" href="https://zaina.newban.cn/tags/shell/index.xml" title="开发者问答集锦" />
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <h3 class="archive-title">
+        包含标签
+        <span class="keyword">shell</span>
+        的文章
+    </h3>
+    
+
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/dns%E5%8F%8D%E5%BC%B9shell/">DNS反弹Shell</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            0X01 引子 反弹Shell广泛应用于远程控制下的权限维持，通过反转攻（客户端）和受（服务端）的角色，来实现条件限制，尤其是内网情况下的远程连接。
+反弹Shell的工具和实现方法多种多样，只要能够让被控端通过网络发送数据到控制端，并且实现数据的解析即可完成控制过程。
+最近在继续了解网络协议，于是突然想在DNS数据包中插入一些伪造的命令来实现解析，本来准备自己尝试写一个DNS服务器和DNS请求程序来实现反弹，不过刚动笔就看到了别人开源的程序，于是直接使用别人的程序来学习了。
+https://github.com/ahhh/Reverse_DNS_Shell
+为了运行测试更方便，去掉了程序中的加解密功能，额外的Python包只需要dns和dnslib
+0X02 DNS 为了关联主机和IP地址对应关系而诞生的DNS本身，不需要我在这里赘述了。跳过域名构成、查询过程等可以轻松在网络查询到的内容，我们直接来看看DNS的包构成
+在smtp那篇文章中，我们提过一层一层洋葱状的协议包裹，在这里，我们跳过以太、IP、UDP头，直接到DNS数据的部分。
+ 标志着数据开始的是Tran ID段，所有的问答信息都需要一定的机制来保证对应，这部分应该就是对应机制中的一部分。 紧接着的Flags，0x0100表明了一些查询属性。 Queries中是我们所要查询的host，查询类型。作为A类型查询，得到的是host的IP，这里也是我们做手脚的地方，不过TXT类型可以插入一些附加的信息，更适合我们用来构造命令语句。  服务器回应包如下：
+ 作为回应的Tran ID，它和查询包相同。 Flags中标准回应标志位 重复显示的Queries 回应的Answers信息。通过CNAME查取主机规范名，再通过规范名查取对应IP。  利用这种相互应答的特性，我们初步计划通过以下流程来实现我们的反弹Shell
+0X03 程序 原始的程序可以在上面的github中找到，这里贴出我们去掉加解密的部分程序。
+先说DNS服务器的部分
+这一部分封装了对DNS的应答，payload里是被控端发来的查询信息，也就是上一次命令执行后的回显，而out是我们这一次的命令，封装成了TXT的应答包
+这部分对于被控端的查询包进行解析，从中获取到地址和数据，对于数据，解析出其中的命令回显，并且初始化一个应答包。
+主函数中使用socket监听相关端口，对于监听到的包按照预定流程进行处理。
+再来看看被控端发送的部分
+首先是整个流程一览，从程序中可以很清晰的看到建立连接，解析命令，执行命令，发送回显的过程。
+构造的url，也就是命令回显，对于没有命令的，会返回nxt。利用回显构造查询语句。
+这两段程序对于收到的文本格式的命令进行解析和执行，没有太多的东西可以讲。只是注意格式的截取，并且考虑对Linux和Windows的命令之间转换。
+这部分负责发送DNS查询，按照与服务器约定的格式构造包并且进行发送。
+0X04 测试 我们需要先执行服务器端程序，然后执行被控端程序。我的服务端程序在一台Ubuntu主机上，被控端在我的Win10机器上。
+这是被控端第一次连接时发送的包，因为控制端还没有指令，第一次连接发送的是空包，其中Name的值bnh0就是我之前所说的NXT
+而第二个包就是控制端发送的指令，在TXT中发送的就是指令whoami的base64编码，
+可以对比和我之前实际抓包的不同之处，对照可以看出我们在DNS包的哪些地方做过修改。
+0X05 延伸 其实相关的DNS隧道技术原理应该差不多，都是在本来应该放DNS规定信息的地方放入了其他的东西，来达到一些意想不到的结果。
+当然，RFC还有许多协议可以让我随意构造去做测试，下一步考虑写一个多协议支持的Fuzzing工具 ：）……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/dns%E5%8F%8D%E5%BC%B9shell/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/doallincmdshell/">DoAllinCmdShell</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/doallincmdshell/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/doallincmdshell%E4%B8%80%E5%88%87%E5%B0%BD%E5%9C%A8%E5%91%BD%E4%BB%A4%E8%A1%8C/">DoAllinCmdShell一切尽在命令行</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/doallincmdshell%E4%B8%80%E5%88%87%E5%B0%BD%E5%9C%A8%E5%91%BD%E4%BB%A4%E8%A1%8C/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/dockerexec%E5%91%BD%E4%BB%A4%E4%B8%AD%E7%9A%84command%E5%8F%82%E6%95%B0%E6%9C%89%E5%93%AA%E4%BA%9B%E5%8F%AF%E4%BB%A5%E8%BF%9B%E5%85%A5shell%E5%91%BD%E4%BB%A4%E8%A1%8C/">dockerexec命令中的command参数有哪些可以进入shell命令行</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+             
+在学习docker的时候，发现在执行docker exec的时候，后面跟一个command参数可以进入命令行，那么有哪些参数可以直接进入shell命令行呢？
+Shell，它们各有所长，有的占用资源少，有的支持高级编程功能，有的兼容性好，有的重视用户体验。
+sh sh的全称是Bourne shell，由AT&amp;T公司的Steve Bourne开发，为了纪念他，就用他的名字命名了。
+sh是UNIX上的标准shell，很多UNIX版本都配有sh。sh是第一个流行的Shell。
+csh sh之后另一个广为流传的shell是由柏克莱大学的Bill Joy设计的，这个shell的语法有点类似C语言，所以才得名为C shell ，简称为csh。
+tcsh tcsh是csh的增强版，加入了命令补全功能，提供了更加强大的语法支持。
+ash 一个简单的轻量级的Shell，占用资源少，适合运行于低内存环境，但是与下面讲到的 bash shell 完全兼容。
+bash bash shell是Linux的默认shell，由GNU组织开发，保持了对sh shell的兼容性，是各种Linux发行版默认配置的 shell。尽管如此，bash和sh还是有一些不同之处：
+ 一方面，bash扩展了一些命令和参数；
+ 另一方面，bash并不完全和sh；
+ 兼容，它们有些行为并不一致，但在大多数企业运维的情况下区别不大，特殊场景可以使用bash代替sh。
+  查看 Shell Shell是一个程序，一般都是放在/bin或者/user/bin目录下，当前Linux系统可用的Shell都记录在/etc/shells文件中。/etc/shells是一个纯文本文件，你可以在图形界面下打开它，也可以使用cat命令查看它。
+# cat /etc/shells /bin/sh /bin/bash /sbin/nologin /usr/bin/sh /usr/bin/bash /usr/sbin/nologin /bin/tcsh /bin/csh # echo $SHELL /bin/bash  ……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/dockerexec%E5%91%BD%E4%BB%A4%E4%B8%AD%E7%9A%84command%E5%8F%82%E6%95%B0%E6%9C%89%E5%93%AA%E4%BA%9B%E5%8F%AF%E4%BB%A5%E8%BF%9B%E5%85%A5shell%E5%91%BD%E4%BB%A4%E8%A1%8C/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/dockerfile%E4%B8%AD%E7%9A%84shell%E9%A3%8E%E6%A0%BC%E4%B8%8Ejson%E9%A3%8E%E6%A0%BC%E5%AF%B9%E6%AF%94%E5%8F%8Ashell%E6%8C%87%E4%BB%A4%E8%AF%A6%E8%A7%A3/">Dockerfile中的Shell风格与JSON风格对比及SHELL指令详解</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            1. 在Dockerfile中，有些指令（如RUN,ENTRYPOINT和CMD指令）的定义，可以采用Shell格式，也可以采用JSON格式。
+1) 采用Shell格式定义，示例如下：
+CMD top -b  上述CMD指令，在采用默认SHELL的情况下，实际执行“ /bin/sh -c top -b”。
+2) 采用JSON格式定义，示例如下：
+CMD [&quot;top&quot;, &quot;-b&quot;]  上述CMD指令，不受默认SHELL的影响，实际执行“ top -b”。
+2. Dockerfile中的SHELL指令
+Dockerfile中的SHELL指令用以设置Shell风格下使用的Shell的特性，覆盖默认特性。Shell风格的改变将会影响到所有使用该风格定义的Dockerfile指令，主要是RUN,ENTRYPOINT和CMD。用法如下：
+SHELL [&ldquo;executable&rdquo;, &ldquo;parameters&rdquo;]
+在Linux系统的镜像中，默认SHELL指令如下：
+SHELL [&quot;/bin/sh&quot;, &quot;-c&quot;]  在Windows系统的镜像中，默认SHELL指令如下：
+SHELL [&quot;cmd&quot;, &quot;/S&quot;, &quot;/C&quot;]  SHELL指令多用于Windows系统的镜像中，因为Windows有两个常用但差异巨大的Shells，一个是默认的cmd，另一个是powershell。修改默认Shell如下：
+SHELL [&quot;powershell&quot;, &quot;-command&quot;]  而在 Linux系统的镜像中，如果要使用其他Shell时，如tcsh, csh, zsh等，也可以设置SHELL指令，如：
+SHELL [&quot;/bin/tcsh&quot;, &quot;-c&quot;]  在一个Dockerfile文件中可以出现多个SHELL指令，后者继承前者的设置。
+3.Windows镜像示例
+由于Windows系统的镜像中，默认SHELL指令为SHELL [&ldquo;cmd&rdquo;, &ldquo;/S&rdquo;&ldquo;, &ldquo;/C&rdquo;]
+所以：
+RUN powershell -command Execute-MyCmdlet -param1 &ldquo;c:\foo.txt&rdquo;
+默认等价于
+cmd /S /C powershell -command Execute-MyCmdlet -param1 &ldquo;c:\foo.……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/dockerfile%E4%B8%AD%E7%9A%84shell%E9%A3%8E%E6%A0%BC%E4%B8%8Ejson%E9%A3%8E%E6%A0%BC%E5%AF%B9%E6%AF%94%E5%8F%8Ashell%E6%8C%87%E4%BB%A4%E8%AF%A6%E8%A7%A3/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/dockergitshellnginxopenstack%E5%AD%A6%E4%B9%A0%E8%B5%84%E6%96%99%E5%88%86%E4%BA%AB/">dockergitshellnginxOpenstack学习资料分享</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/dockergitshellnginxopenstack%E5%AD%A6%E4%B9%A0%E8%B5%84%E6%96%99%E5%88%86%E4%BA%AB/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/docker%E4%B8%80%E9%94%AE%E9%83%A8%E7%BD%B2redis%E9%9B%86%E7%BE%A4shell%E8%84%9A%E6%9C%AC/">docker一键部署redis集群shell脚本</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            如下图所示docker 容器下。redis一键集群。  为了新手小伙伴发愁集群创建难，特意写了一个shell脚本。自己技术也很菜，但是我坚信也会有跟我一样菜的小伙伴。。。。哈哈哈
+不多说直接上脚本
+希望有大神更加优化一下，优化后的版本可以分享下。哇 等着你大神，一起交流技术。
+#!/bin/bash docker rm -f `docker ps --filter name=.*redis-700.* -aq` echo &quot;1.请输入您要部署的目录位置&quot; gml=&quot;&quot; while : do read path if [[ &quot;$path&quot; =~ ^([\/]{1}[a-zA-Z]{1,9}){1,5}$ ]];then gml=$path break else echo &quot;$path不符合linux路径标准&quot; echo &quot;输入一个合法的根目录如《/path/path1...》&quot; fi done rm -rf $path/redis mkdir $path cd $gml echo &quot;2.正在创建redis目录&quot; mkdir redis cd redis docker pull redis:5.0.4 echo &quot;3.正在创建redis集群模板&quot; touch redis-cluster.tmpl echo -e &quot;port \${PORT}\n protected-mode no\n cluster-enabled yes\n cluster-config-file nodes.conf\n cluster-node-timeout 5000\n cluster-announce-ip 192.……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/docker%E4%B8%80%E9%94%AE%E9%83%A8%E7%BD%B2redis%E9%9B%86%E7%BE%A4shell%E8%84%9A%E6%9C%AC/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/docker%E4%B8%8Bmysql%E7%9A%84%E5%A4%87%E4%BB%BD%E4%B8%8E%E6%81%A2%E5%A4%8Dshell/">Docker下Mysql的备份与恢复Shell</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            备份脚本 dmb.sh #!/bin/bash #Docker MySql Backup 备份指定容器数据库 function Usage(){ echo &quot;command [-d ] [-c ] [-h 帮助]&quot; exit -1 } while getopts &quot;:c:d:h:&quot; opt do case $opt in c) container=$OPTARG ;; d) dbName=$OPTARG ;; ?) Usage ;; esac done ###########################默认配置#################### container=${container:=&quot;5bd1df2a8edb&quot;} dbName=${dbName:=&quot;dbName&quot;} ###################################################### #确认信息 echo &quot;#================配置检查============================&quot; echo -e &quot;#操作：\t\t 备份MySql&quot; echo -e &quot;#容器：\t\t $container&quot; echo -e &quot;#数据库：\t $dbName&quot; echo -e &quot;#确认【y/n】:\c&quot; read select echo &quot;#============================================&quot; if [ $select = &quot;y&quot; ]; then echo &quot;请输入数据库密码：&quot; read -s password command_backup=&quot;docker exec -it $container mysqldump -uroot -p$password $dbName &gt; $container@${dbName}@$(date +%Y%m%d%H%M%S).……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/docker%E4%B8%8Bmysql%E7%9A%84%E5%A4%87%E4%BB%BD%E4%B8%8E%E6%81%A2%E5%A4%8Dshell/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/docker%E4%BD%BF%E7%94%A8shell%E8%BF%9B%E8%A1%8Chealthcheck/">docker使用shell进行healthcheck</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            起因是公司要逐渐把wmware上tomcat部署的服务 迁移到docker，再到k8s。
+现在由于资源紧张，docker服务器的内存不够，容器又不是以tomcat进程作为1号进程。原因是 需要通过启动脚本传参数进去，对tomcat内存进行限制。最近经常出现容器内tomcat崩掉了，但是容器还是up，需要手动排查是哪个服务的tomcat挂掉了。
+
+创建健康检查的脚本health_check.sh 建议使用curl命令检查页面 因为很多容器里不带ss或者netstat命令 我这里没有统一健康检查页面就偷懒了 哈哈哈
+#!/bin/bash # 检测tomcat端口 细心的小伙伴可以在awk把最后一个:后面的端口取出来 会更准确 netstat -luntp |awk '{print $4}' |grep 8080 if [ $? == 0 ] then echo $? exit 0 else echo $? exit 1 fi  创建Dockerfile 我这里因为启动比较慢 所以设置了容器启动60s之后开始检测
+FROM registry.cn-shanghai.aliyuncs.com/yjk-datag/tomcat:v1 MAINTAINER YJK Enterprise Container Images &lt;xujiamin@hz-health.cn&gt; ENV LANG C.UTF-8 ENV PATH /usr/bin:$PATH RUN mv /srv/tomcat/tomcat8/ /srv/tomcat/tomcat-haozhuo-video ADD ROOT.war /srv/tomcat/tomcat-haozhuo-video/webapps/ ADD health_check.sh /opt/ EXPOSE 8080 20920 HEALTHCHECK --start-period=60s --interval=60s --timeout=5s --retries=3 CMD /bin/bash /opt/health_check.……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/docker%E4%BD%BF%E7%94%A8shell%E8%BF%9B%E8%A1%8Chealthcheck/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/docker%E5%AE%9E%E8%B7%B5shell%E8%84%9A%E6%9C%AC%E8%87%AA%E5%8A%A8%E6%A0%B9%E6%8D%AE%E9%95%9C%E5%83%8F%E5%90%8D%E5%92%8C%E7%AB%AF%E5%8F%A3%E5%90%AF%E5%8A%A8docker%E5%AE%B9%E5%99%A8%E8%BF%90%E8%A1%8Cspringcloud%E9%A1%B9%E7%9B%AE/">Docker实践Shell脚本自动根据镜像名和端口启动docker容器运行springcloud项目</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            文章目录  Shell脚本自动启动docker容器  背景 Shell脚本编写 待完善 相关学习  JAVA资深架构师成长路线-&gt;分布式扩展到微服务架构&gt;Docker    Shell脚本自动启动docker容器 背景 在Docker实践，部署SpringCloud微服务中，是部署SpringCloud项目的流程，微服务构架原因要经常运行4、5个相同镜像的容器来作为集群，达到微服务高可用。
+Shell脚本编写 感觉启动的命令过于复杂，于是编写了个Shell脚本来运行镜像，以下是源码：
+#/bin/bash 根据镜像名和端口，用docker启动容器，运行springcloud项目 #镜像名 IMAGE_NAME=$1 #服务端口号 SERVER_PORT=$2 #Eureka实例的ip IP=$3 while true do if [ ! -n &quot;${IMAGE_NAME}&quot; ];then echo &quot;请输入镜像名：&quot; read IMAGE_NAME fi IMAGE=`echo &quot;${IMAGE_NAME}&quot; | awk -F: '{print $1}'` TAG=`echo &quot;${IMAGE_NAME}&quot; | awk -F: '{print $2}'` if [ ! -n &quot;${TAG}&quot; ];then TAG=&quot;latest&quot; fi IMAGE_NAME=`echo &quot;${IMAGE}:${TAG}&quot;` # echo &quot;1: ${IMAGE_NAME}&quot; EXIT_IMAGE=`docker image ls | awk '{print $1&quot;:&quot;$2}' | grep ${IMAGE_NAME}` # echo &quot;2: ${EXIT_IMAGE}&quot; EXIT_IMAGE_ARR=($EXIT_IMAGE) flag=0; for s in ${EXIT_IMAGE_ARR[@]} do # echo &quot;3: $s&quot; if [ &quot;$s&quot; == &quot;$IMAGE_NAME&quot; ];then flag=1 fi done # echo &quot;4:$flag&quot; if (($flag==0));then echo &quot;镜像名不存在,请重新输入：&quot; read IMAGE_NAME else break fi done #判断端口号是否已被占用 while true do if [ !……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/docker%E5%AE%9E%E8%B7%B5shell%E8%84%9A%E6%9C%AC%E8%87%AA%E5%8A%A8%E6%A0%B9%E6%8D%AE%E9%95%9C%E5%83%8F%E5%90%8D%E5%92%8C%E7%AB%AF%E5%8F%A3%E5%90%AF%E5%8A%A8docker%E5%AE%B9%E5%99%A8%E8%BF%90%E8%A1%8Cspringcloud%E9%A1%B9%E7%9B%AE/">阅读全文</a></p>
+        </div>
+    </article>
+    
+
+    
+
+
+
+<ol class="page-navigator">
+    
+    <li class="prev">
+        <a href="https://zaina.newban.cn/tags/shell/page/115/">上一页</a>
+    </li>
+    
+
+    
+
+    
+        
+        
+    
+    
+
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/">1</a>
+        </li>
+        
+    
+        
+        <li>
+            <span>...</span>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/114/">114</a>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/115/">115</a>
+        </li>
+        
+    
+        
+        
+        <li  class="current">
+            <a href="https://zaina.newban.cn/tags/shell/page/116/">116</a>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/117/">117</a>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/118/">118</a>
+        </li>
+        
+    
+        
+        <li>
+            <span>...</span>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/1621/">1621</a>
+        </li>
+        
+    
+
+    
+    
+
+    <li class="next">
+        <a href="https://zaina.newban.cn/tags/shell/page/117/">下一页</a>
+    </li>
+    
+</ol>
+
+
+
+
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

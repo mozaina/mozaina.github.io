@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>HBaseshellscan命令中filter的使用 | 开发者问答集锦</title>
+    <meta property="og:title" content="HBaseshellscan命令中filter的使用 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="HBaseshellscan命令中filter的使用">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/hbaseshellscan%E5%91%BD%E4%BB%A4%E4%B8%ADfilter%E7%9A%84%E4%BD%BF%E7%94%A8/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">HBaseshellscan命令中filter的使用</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>在hbase shell中使用scan命令时，可以使用filter来过滤记录。<br />
+这儿说明使用SingleColumnValueFilter来进行过滤的情况：</p>
+
+<p>1）使用正则表达式：<br />
+scan ‘tweet0’,
+{FILTER=&gt;”SingleColumnValueFilter(‘info’,’pubtime’,=,’regexstring:2014-11-08.*’)”}<br />
+匹配pubtime的以2014-11-08打头的值的记录。</p>
+
+<p>2）使用上下边界值：<br />
+scan ‘tweet0’,
+{FILTER=&gt;”SingleColumnValueFilter(‘info’,’pubtime’,&gt;=,’binary:2014-11-08
+19:26:27’) AND SingleColumnValueFilter(‘info’,’pubtime’,&lt;=,’binary:2014-11-10
+20:20:00’)”}</p>
+
+<p>3）比较整数值：<br />
+scan ‘tweet0’,
+{FILTER=&gt;”SingleColumnValueFilter(‘emotion’,’PB’,=,’binary:\x00\x00\x00\x05’)”,
+COLUMNS=&gt;[‘emotion:PB’]}<br />
+这是比较整数值5，因为在查询时，这个5显示的也是\x00\x00\x00\x05。</p>
+
+<p>4）参数说明：<br />
+SingleColumnValueFilter
+这个过滤器有6个参数：列族、列名、比较运算符、比较器和两个可选参数：filterIfColumnMissing和setLatestVersionOnly。<br />
+filterIfColumnMissing：如果设置为true，则会把没有过滤器所指定列的行都过滤掉。默认值是false，所以看上去，当没有过滤器所指定的列时，过滤器不起作用。<br />
+setLatestVersionOnly：如果设置为false，则除了检查最新版本，还会检查以前的版本。默认值是true，只检查最新版本的值。<br />
+这两个参数要么一起使用，要么都不使用。</p>
+
+<p>5）比较器：<br />
+前面例子中的regexstring:2014-11-08.*、binary:\x00\x00\x00\x05，这都是比较器。HBase的filter有四种比较器：<br />
+（1）二进制比较器：如’binary:abc’，按字典排序跟’abc’进行比较<br />
+（2）二进制前缀比较器：如’binaryprefix:abc’，按字典顺序只跟’abc’比较前3个字符<br />
+（3）正则表达式比较器：如’regexstring:ab*yz’，按正则表达式匹配以ab开头，以yz结尾的值。这个比较器只能使用=、!=两个比较运算符。<br />
+（4）子串比较器：如’substring:abc123’，匹配以abc123开头的值。这个比较顺也只能使用=、!=两个比较运算符。</p>
+
+<p>6）比较运算符：<br />
+HBase的filter中有7个比较运算符：</p>
+
+<pre><code>1. LESS (=)
+6. GREATER (&gt;)
+7. NO_OP (no operation)（不知道这个怎么用）
+</code></pre>
+
+<p>7）还可以如下写法：<br />
+import org.apache.hadoop.hbase.filter.SingleColumnValueFilter<br />
+import org.apache.hadoop.hbase.filter.CompareFilter<br />
+import org.apache.hadoop.hbase.filter.BinaryComparator<br />
+scan ‘tweet0’, { FILTER =&gt; SingleColumnValueFilter.new(Bytes.toBytes(‘info’),
+Bytes.toBytes(‘id’), CompareFilter::CompareOp.valueOf(‘EQUAL’),
+BinaryComparator.new(Bytes.toBytes(‘1001158684’))), COLUMNS=&gt;[‘info:id’]}</p>
+
+<p>但是，当在比较器中写一个整数时，总是匹配不成功，不知道错在哪儿。如：<br />
+scan ‘tweet0’, { FILTER =&gt;
+SingleColumnValueFilter.new(Bytes.toBytes(‘emotion’), Bytes.toBytes(‘PB’),
+CompareFilter::CompareOp.valueOf(‘EQUAL’),
+BinaryComparator.new(Bytes.toBytes(5))), COLUMNS=&gt;[‘emotion:PB’]}</p>
+
+<p>注意：<br />
+1）如果scan中指定了COLUMNS，则FILTER中所使用的列需要包含在所指定的COLUMNS中，否则，filter不起作用。<br />
+2）HBase中主要的操作对象是一个个的cell，每个cell都可以有多个版本。如果使用过滤器ValueFilter，就会只有那些符合条件的cell被查出来。跟关系数据库的查询不同，关系数据库查出来的结果中各行都有相同的列。而HBase，查出来的结果中，不同的行会有不同的列。<br />
+3）filter不会降低服务方的IO，它会把符合条件的子集传给客户端。即，它是在对查出的结果进行过滤，而不是象原来sql中的where子句。所以，如果要查出的结果中不包含filter需要的列，则filter就不能发挥作用。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

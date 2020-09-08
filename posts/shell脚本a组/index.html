@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本A组 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本A组 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本A组">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%ACa%E7%BB%84/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本A组</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>1,禁止恶意ip访问22端口</p>
+
+<pre><code>#!/bin/bash
+
+#deny ip access test
+#by lijunmin 20171022
+#禁止恶意ip访问22端口
+
+#定义变量
+SEC_FILE=/var/log/secure
+#如下为截取secure文件恶意ip远程登陆22端口，大于等于4次就写入防火墙，禁止以后再登陆服务器的22端口，egrep -o &quot;([0-9]{1,3}\.){3}[0-9]{1,3}&quot;是匹配ip的意思,()表示分组,{3}表示对分组重复操作3次,[]表示只能匹配0-9任意一个自然数,{1,3}表示匹配前面的[0-9]1-3次, \.表示对.符号的转义。
+IP_ADDR=`tail -n 1000 $SEC_FILE |grep &quot;Failed password&quot; |egrep -o &quot;([0-9]{1,3}\.){3}[0-9]{1,3}&quot; |sort -nr |uniq -c |awk ' $1&gt;=4 {print $2}'`
+
+IPTABLE_CONF=/etc/sysconfig/iptables
+for i in `echo $IP_ADDR`
+do
+    #查看iptables配置文件是否含有提取ip的信息
+    cat $IPTABLE_CONF |grep $i &gt;/dev/null
+if
+    [ $? -ne 0 ];then
+    #判断iptables配置文件里面是否存在已拒绝的ip，如果不存在就不再添加相应条目，sed a参数的意思是匹配之后加入行
+    sed -i &quot;/lo/a -A INPUT -s $i -m state --state NEW -m tcp -p tcp --dport 22 -j DROP&quot; $IPTABLE_CONF
+else
+    #如果存在的话就打印提示信息即可
+    echo &quot;this is $i is exist in iptables ,plesase exit ......&quot;
+fi
+done
+
+#最后重启iptables生效
+/etc/init.d/iptables restart
+</code></pre>
+
+<p>2,自动收集服务器硬件系统信息</p>
+
+<pre><code>#!/bin/bash
+#lijunmin 20171026
+#自动收集服务器硬件系统信息脚本
+
+ip_info=`ifconfig em1 |grep &quot;Bcast&quot; |awk -F: '{print $2}' |cut -d&quot; &quot; -f 1`
+cpu_info1=`cat /proc/cpuinfo |grep &quot;model name&quot; |uniq |awk '{print $4,$5,$6,$10}'`
+cpu_info2=`cat /proc/cpuinfo |grep 'physical id' |sort |uniq -c |wc -l`
+disk_info=`fdisk -l |grep &quot;Disk&quot; |grep -v &quot;identifier&quot; |awk '{print $2,$3,$4}' |sed 's/,//g'`
+mem_info=`free -m |grep &quot;Mem&quot; |awk '{print &quot;Total&quot;,$1,$2&quot;M&quot;}'`
+#load_info=`uptime |awk '{print &quot;Current Load:&quot;$(NF-2)$(NF-1)$NF}'`
+load_info1=`uptime |awk '{print $(NF-2)}'|sed 's/,//g'`
+load_info5=`uptime |awk '{print $(NF-1)}'|sed 's/,//g'`
+load_info15=`uptime |awk '{print $NF}'|sed 's/,//g'`
+hostname=`hostname`
+mark_info='Beijing_IDC'
+
+echo -e &quot;\033[32m---------\033[1m&quot;
+echo &quot;IP地址,主机名,CPU配置,磁盘容量,内存容量,负载,标记&quot; &gt;&gt;1.csv
+echo &quot;IP:${ip_info},HOSTNAME:${hostname},CPU_INFO:${cpu_info1} X${cpu_info2},DISK:${disk_info},MEM:${mem_info},LOAD:${load_info1} X${load_info5} X${load_info15},MARK:${mark_info}&quot;
+echo &quot;${ip_info},${hostname},${cpu_info1} X${cpu_info2},${disk_info},${mem_info},${load_info1} X${load_info5} X${load_info15},${mark_info}&quot; &gt;&gt;1.csv
+echo -e &quot;\033[32m---------\033[0m&quot;
+
+echo -e &quot;\033[32mYou want to write the data to the databases? [ yes or no ]\033[0m&quot; ;read ensure
+
+if [ &quot;$ensure&quot; == &quot;yes&quot; -o &quot;$ensure&quot; == &quot;y&quot; -o &quot;$ensure&quot; == &quot;Y&quot; ];then
+    echo &quot;-----------------------&quot;
+#数据库需要先创建库cjk和表device;
+#create database cjk;
+#use cjk;
+#mysql&gt; create table device(id int not null primary key, addr varchar(20),hostname varchar(45),cpu varchar(90),disk varchar(78),men varchar(56),loaddd varchar(99),mark varchar(88));    
+#给主键id增加默认值和自增功能；执行如下命令
+#mysql&gt; alter table device modify id integer auto_increment;
+#mysql -uroot -p123456 -D cjk  -e &quot;insert into device values('','${ip_info}','${hostname}','${cpu_info1} X${cpu_info2}','${disk_info}','${mem_info}','${load_info1} X${load_info5} X${load_info15}','${mark_info}')&quot;
+    echo 'mysql -uroot -p123456 -D databasename  -e '''  &quot;insert into audit_system values('','${ip_info}','${hostname}','${cpu_info1} X${cpu_info2}','${disk_info}','${mem_info}','${load_info}','${mark_info}')&quot; ''' '
+else
+    echo &quot;wait exit......&quot;
+fi
+</code></pre>
+
+<p>3,点名器</p>
+
+<pre><code>#!/bin/bash
+
+#编写一个点名器脚本
+#该脚本，需要提前准备一个use.txt文件
+#该文件中需要包含所有姓名的信息，一行一个姓名，脚本每次随机显示一个姓名
+
+while :
+do
+#统计user文件中有多少用户
+    line=`cat user.txt |wc -l`
+    num=$[RANDOM%line+1]
+    sed -n &quot;${num}p&quot; user.txt
+    sleep 0.2
+#clear
+done
+</code></pre>
+
+<p>4,检查磁盘并发邮件报警</p>
+
+<pre><code>#!/bin/bash
+#by lijunmin 20171031
+#检查磁盘并发邮件报警
+
+rm -fr list.txt
+LIST=`df -h |grep &quot;^/dev/&quot; &gt;&gt;list.txt`
+DATE=`date`
+
+while read line
+do
+    IP_ADDR=`ifconfig eth0 |grep &quot;Bcast&quot; |awk '{print $2}' |cut -d: -f 2`
+    D_name=`echo $line |awk '{print $1,$NF&quot;分区&quot;}'`
+    D_total=`echo $line |awk '{print $2}'`
+    D_avail=`echo $line |awk '{print $4}'`
+    D_percent=`echo $line |awk '{print $5}' |sed 's/%//g'`
+    if [ &quot;$D_percent&quot; -ge 1 ];then
+cat &gt;email.txt &lt;&lt; EOF
+通知类型：故障
+服务：Disk Monitor
+主机：$IP_ADDR
+状态：警告
+日期/时间：$DATE
+额外信息：
+CRITICAL - Disk Monitor:$D_name user more ${D_percent}%
+EOF
+    echo -e &quot;\033[32mThe $D_name has benn used for more than ${D_percent}%,please check...\033[0m&quot;
+    mail -s &quot;$D_name Warning&quot; benngcc@163.com 
+</code></pre>
+
+<p>5,检查内存并发邮件报警</p>
+
+<pre><code>#!/bin/bash
+
+#实时监控本机内存和硬盘剩余空间，剩余内存小于500M、根分区剩余空间小于1000M时，发送报警邮件给benngcc@163.com邮箱
+
+#提取根分区剩余空间
+disk_size=$(df / | awk '/\//{print $4}')
+#提取内存剩余空间
+mem_size=$(free | awk '/Mem/{print $4}')
+#注意内存和磁盘提取的空间都是以kb为单位
+while :
+do
+if [ $disk_size -le 45856888 -a $mem_size -le 7282888 ];then
+    echo &quot;根分区和内存资源不足&quot; |mailx -s Warning benngcc@163.com
+    break
+fi
+done
+
+#定时检查
+#crontab
+#10 * * * * /bak/disk_mem_mail.sh
+</code></pre>
+
+<p>6,实时显示eth0网卡发送的数据包流量</p>
+
+<pre><code>#!/bin/bash
+
+#使用死循环实时显示eth0网卡发送的数据包流量
+while :
+do
+    echo &quot;本地网卡eth0流量信息如下：&quot;
+    ifconfig eth0 |grep &quot;RX pack&quot; |awk &quot;{print $5}&quot;
+    ifconfig eth0 |grep &quot;TX pack&quot; |awk &quot;{print $5}&quot;
+    sleep 1
+done
+</code></pre>
+
+<p>7,自动对虚拟机的vdb磁盘分区格式化</p>
+
+<pre><code>#!/bin/bash
+
+#对虚拟机的vdb磁盘进行分区格式化，使用&lt;&gt;/etc/fstab
+mount -a
+</code></pre>
+
+<p>8,打印斐波那契数列</p>
+
+<pre><code>#!/bin/bash
+
+#打印斐波那契数列（该数字的特点是最后一个数字，永远都是2个数字之和）
+#如：0 2 2 4 6 10 16 ......
+list=(0 1)
+for i in `seq 2 11`
+do
+        list[$i]=`expr ${list[${#list[*]}-1]} + ${list[${#list[*]}-2]}`
+done
+echo ${list[@]}
+</code></pre>
+
+<p>9,for循环计算1-100的和</p>
+
+<pre><code>#!/bin/bash
+
+#for循环计算1-100的和
+a=0
+
+for ((i=1;i&lt;=100;i++))
+    do
+        a=`expr $i + $a`
+done
+    echo $a
+</code></pre>
+
+<p>10,批量压缩</p>
+
+<pre><code>#!/bin/bash
+
+#批量压缩到指定位置
+#for i in `find /data/ -name shell`
+#   do
+#       tar -czvf /data/tar/2016.tar.gz $i
+#done
+
+###########
+for i in `find /data/tar/ -name 2016*.tar.gz`
+    do
+        tar -zxvf $i -C /data/tar
+done
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

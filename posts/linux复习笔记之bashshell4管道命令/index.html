@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linux复习笔记之bashshell4管道命令 | 开发者问答集锦</title>
+    <meta property="og:title" content="linux复习笔记之bashshell4管道命令 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linux复习笔记之bashshell4管道命令">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E5%A4%8D%E4%B9%A0%E7%AC%94%E8%AE%B0%E4%B9%8Bbashshell4%E7%AE%A1%E9%81%93%E5%91%BD%E4%BB%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linux复习笔记之bashshell4管道命令</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>转载请出自出处：<a href="http://eksliang.iteye.com/blog/2105461">http://eksliang.iteye.com/blog/2105461</a></p>
+
+<p>bash命令执行的完毕以后，通常这个命令都会有返回结果，怎么对这个返回的结果做一些操作呢？那就得用管道命令‘|’。</p>
+
+<p>上面那段话，简单说了下管道命令的作用，那什么事管道命令呢？</p>
+
+<p>答：非常的经典的一句话，记住了，何为管道，管道就是将前面命令返回的结果交个管道后面的命令进行处理。正是因为管道后面的命令是用来处理管道前面命令的返回结果，所以管道命令必须要能够接受标准输入，才能称为管道命令。</p>
+
+<p>先看个实例，假设我们想要知道/etc/下面有多少个文件，那么可以用ls
+/etc来查看，不过，因为/etc下面的文件太多，导致一口气就将屏幕塞满了，不知道前面输出的内容是什么，此时我们可以通过less明亮的协作，如下</p>
+
+<pre><code>[root@bogon shell]# ls -al /etc | less
+total 1816
+drwxr-xr-x. 100 root root   4096 Aug 17 19:09 .
+dr-xr-xr-x.  21 root root   4096 Aug 17 18:31 ..
+drwxr-xr-x.   3 root root   4096 Apr 25 08:59 abrt
+</code></pre>
+
+<p>根据上面我对管道的定义，可以看出ls -al /etc
+返回的结果已经被less进行了处理，这样讲是不是如此的简单，但是值得注意的是：&rdquo;|&ldquo;（管道）这个命令仅能处理，前一个命令正确执行没有错误的返回结果，如果管道前面命令发生错误，那就不能处理。</p>
+
+<p>**常用的管道命令<br />
+**</p>
+
+<p><strong>1、选取命令：cut、grep</strong></p>
+
+<p>什么事选取命令呢？说穿了，就是将一段数据经过分析后，取出我们想要的。不过要注意的是，一般来说，选取信息通常是针对”行“来分析的，并不是整篇信息分析的。</p>
+
+<p>【 <strong>cat</strong> 】:这个命令可以将一段信息的某一段“切”出来，处理的信息是以”行“为单位的。</p>
+
+<pre><code>语法：
+cat [-dfc]
+参数：
+-d:后面接分隔符，与-f一起使用；
+-f：依据-d的分隔符将一段信息切成为数段，用-f取出第几段的意思
+-c:以字符的单位取出固定字符区间
+实例一：将PATH取出，取出第五个段
+[root@bogon ~]# echo $PATH
+/usr/java/jdk1.7.0_55/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
+[root@bogon ~]# echo $PATH | cut -d ':' -f 5
+/bin    
+如果要列出3、5段呢？如下所示
+[root@bogon ~]# echo $PATH | cut -d ':' -f 3,5
+/usr/local/bin:/bin
+[root@bogon ~]# 
+
+实例2：将export输出的信息取得第12个字符以后的所有字符
+[root@bogon ~]# export
+declare -x CLASSPATH=&quot;.:/usr/java/jdk1.7.0_55/lib/dt.jar:/usr/java/jdk1.7.0_55/lib/tools.jar&quot;
+declare -x G_BROKEN_FILENAMES=&quot;1&quot;
+declare -x HISTCONTROL=&quot;ignoredups&quot;
+.....!
+[root@bogon ~]# export | cut -c 12-
+CLASSPATH=&quot;.:/usr/java/jdk1.7.0_55/lib/dt.jar:/usr/java/jdk1.7.0_55/lib/tools.jar&quot;
+G_BROKEN_FILENAMES=&quot;1&quot;
+HISTCONTROL=&quot;ignoredups&quot;
+HISTSIZE=&quot;1000&quot;
+....!
+#注意看，每个数据都是排列整齐地输出。如果我们想要要“declare -x”时，就这么做
+
+实例三：用last在显示登录这的信息中仅留下大名
+[root@bogon ~]# last
+root     pts/0        192.168.238.1    Sun Aug 17 19:52   still logged in   
+root     pts/0        192.168.238.1    Sun Aug 17 18:54 - 19:25  (00:30)    
+reboot   system boot  2.6.32-358.el6.i Sun Aug 17 18:31 - 20:02  (01:31)  
+.....!
+[root@bogon ~]# last | cut -d ' ' -f1
+root
+root
+reboot
+.....
+</code></pre>
+
+<p>备注：cut主要的作用，在于将同一行里面的数据进行分解，针对的是行，不过cut在处理多空格相连的数据时，非常的吃力。</p>
+
+<p>【 <strong>grep</strong> 】:刚才的cut命令是在同一行信息当中取出某部分我们想要的，而grep则是分析一行信息，若当中有我们所需要的信息，就将该行拿出来</p>
+
+<pre><code>语法：
+grep [-acinv] [--color=auto] '查找的字符串' fileName
+参数：
+-a:将binary文件已text文件的方式查找数据
+-c：计算找到‘查找的字符串’的个数
+-i:忽略大小写的不同，所以大小写视为相同；（重要）
+-n:顺便输出行号；（重要）
+-v:反向选择，即显示没有找到‘查找的字符串’的那些行（重要）
+--color=auto：可以将找到的关键字部分加上颜色显示  （跟print工具结合起来效果很好）
+
+实例一：当last当中有出现root的行取出
+[root@bogon ~]# last | grep root
+root     pts/0        192.168.238.1    Sun Aug 17 19:52   still logged in   
+root     pts/0        192.168.238.1    Sun Aug 17 18:54 - 19:25  (00:30)    
+root     tty1                          Fri Aug 15 03:00 - down   (00:00)
+......
+
+实例二：当last当中没有有出现root的行就取出
+[root@bogon ~]# last | grep -v root
+reboot   system boot  2.6.32-358.el6.i Sun Aug 17 18:31 - 20:15  (01:43)    
+reboot   system boot  2.6.32-358.el6.i Thu Aug 14 18:16 - 03:00  (08:43)    
+reboot   system boot  2.6.32-358.el6.i Wed Aug 13 22:37 - 03:01  (04:24)    
+......
+
+实例三：在last的输出信息中，只要有root就取出，并且仅取第一列
+[root@bogon ~]# last | grep 'root' | cut -d ' ' -f1 
+root
+root
+root
+......
+
+实例四：将查出的数据加粗显示
+[root@bogon ~]# cat bb.txt | grep --color=auto 'name'
+my **name** is ickes
+</code></pre>
+
+<p><strong>2、排序命令：sort、wc、uniq</strong></p>
+
+<p>很多时候，我们都会去计算一次数据里头的相同类型的数据总数，举例来说，使用last可以查得，这个月份有哪些用户登录了主机者。那么我们可以针对每个用户查出他们登录的总次数吗？此时就得要排序与计算之类的命令来辅助了。</p>
+
+<p><strong>【sort】</strong> :排序命令，可以根据不同的数据类型来排序。</p>
+
+<pre><code>语法：
+sort [-fbMnrtuk] [file or stdin(标准输入)]
+参数：
+-f:忽略大小写的差异，进行排序
+-b:忽略最前面的空格符部分进行排序；
+-M:与月份的名字来进行排序，例如：JAN、DEC等的排序l
+-n：使用纯数字来进行排序（默认是以字符类型来排序的）
+-r:反向排序
+-u:就是uniq的意思，相同数据中，仅选一行作为代表
+-t:分隔符，默认是使用[Tab]键来分割
+-k:以那个区间来进行排序的意思
+实例一：个人账号都记录在/etc/passwd下，将账号进行排序
+#sort默认“以第一个”数据来进行排序，而且是用字符类型进行排序的，所以是a-z的顺序
+[root@bogon ~]# cat /etc/passwd | sort
+abrt:x:173:173::/etc/abrt:/sbin/nologin
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+dbus:x:81:81:System message bus:/:/sbin/nologin
+ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin
+
+实例二：/etc/passwd 内容是以：“:”来分割的，我想以第三列来排序
+[root@bogon ~]# cat /etc/passwd | sort -t ':' -k 3
+root:x:0:0:root:/root:/bin/bash
+uucp:x:10:14:uucp:/var/spool/uucp:/sbin/nologin
+operator:x:11:0:operator:/root:/sbin/nologin
+usbmuxd:x:113:113:usbmuxd user:/:/sbin/nologin
+bin:x:1:1:bin:/bin:/sbin/nologin
+games:x:12:100:games:/usr/games:/sbin/nologin
+....
+#你会发现第三列是数字，但是是无序的，为什么呢？
+#答:原本就是这样的，因为默认是按照字符排序的
+#改成如下就OK了
+[root@bogon ~]# cat /etc/passwd | sort -t ':' -k 3 -n
+root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+adm:x:3:4:adm:/var/adm:/sbin/nologin
+lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+.....
+
+实例三：综合举例，利用last将输出的数据仅取账号，并加以排序
+[root@bogon ~]# last | cut -d ' ' -f1 | sort
+</code></pre>
+
+<p><strong>【uniq】</strong> :如果排序完成了，想要将重复的数据仅列出一个显示（就是去重），怎么弄？那就得用到uniq命令了。</p>
+
+<pre><code>语法：
+uniq [-ic]
+参数：
+-i:忽略大小写字符的不同；
+-c:进行计数
+实例一：使用last将账号列出，仅取出账号列，进行排序后然后去重
+[root@bogon ~]# last | cut -d ' ' -f1 | sort | uniq
+ickes
+reboot
+root
+wtmp
+
+实例二：如果在实例一的基础上，我还要知道每个人登录的次数（也就是去重后，每个出现次数）
+[root@bogon ~]# last | cut -d ' ' -f1 | sort | uniq -c
+      3 ickes
+     71 reboot
+    194 root
+      1 wtmp
+</code></pre>
+
+<p>uniq命令就是如此的简单</p>
+
+<p>【 <strong>wc</strong> 】:这个命令可以帮我们统计出，一个文件中有多少行、多少个字、多少个字符</p>
+
+<pre><code>语法：
+wc [-lwm]
+参数：
+-l:仅列出有多少行
+-w:仅列出有多少个字
+-m:仅列出有多少个字符
+
+实例一：列出，/etc/passwd 这个文件里面到底有多少个字、行、字符数
+[root@bogon ~]# cat /etc/passwd | wc
+     31      45    1432
+#输出的三个数字分别代表的含义是：行、字数、字符数
+</code></pre>
+
+<p><strong>3.字符转换命令：tr、col、join、paste、expand</strong></p>
+
+<p>【 <strong>tr</strong> 】:用来删除一段信息当中的文字，或者是进行文字信息的替换</p>
+
+<pre><code>语法：
+tr [-d] 'set1'...
+参数：
+-d:删除信息当中set1这个字符串
+
+实例一：将/etc/passwd这个文件中“:”删除
+[root@bogon ~]# cat /etc/passwd | tr -d ':'
+rootx00root/root/bin/bash
+binx11bin/bin/sbin/nologin
+daemonx22daemon/sbin/sbin/nologin
+....
+
+实例二：将/etc/passwd这个文件全部转化为大写
+[root@bogon ~]# cat /etc/passwd | tr '[a-z]' '[A-Z]'
+ROOT:X:0:0:ROOT:/ROOT:/BIN/BASH
+BIN:X:1:1:BIN:/BIN:/SBIN/NOLOGIN
+DAEMON:X:2:2:DAEMON:/SBIN:/SBIN/NOLOGIN
+.....
+</code></pre>
+
+<p>【 <strong>col</strong> 】:我用这个命令的唯一需求，就是将tab键转换为对等的空格键，以方便后面命令的处理</p>
+
+<p>使用实例如下：将/etc/man.config这个文件中的tab键转换为对等的空格键</p>
+
+<pre><code>#利用cat -A 显示出所有的特殊按键
+[root@bogon ~]# cat -A /etc/man.config 
+#此时你发现有很多的^I这就是tab键
+
+#利用col将tab将转化为空格键
+[root@bogon ~]# cat  /etc/man.config  | col -x | cat -A
+</code></pre>
+
+<p>【 <strong>join</strong> 】:从字面的意思就可以理解连接的意思，没错他就是用来连接两个文件之间的数据的，而且主要是将两个文件当中有相同数据的那一行加载一起。</p>
+
+<pre><code>语法：
+join [-ti12] file1 file2
+参数：
+-t:join默认以空格符分割数据，并且对比“第一个字段”的数据，
+如果这个字段相等，则将两条数据连成一行，且第一个字段放在第一个；
+-i:忽略大小写的差异
+-1：这个是数字1，代表第一个文件要用那个字段来分析的意思
+-2：代表第二个文件要用那个字段来分析的意思
+
+先看我测试的数据
+[root@bogon bash]# cat aa.txt bb.txt 
+---------------aa.txt
+aa aad
+bb bbd
+cc ccd
+----------------bb.txt
+aa aad1
+bb bbd1
+cc ccd1
+实例一：将aa.txt bb.txt相关数据整合成一列
+[root@bogon bash]# join -t ' ' ./aa.txt ./bb.txt
+aa aad aad1
+bb bbd bbd1
+cc ccd ccd1
+#通过这个操作，我们可以将两个文件的第一个字段相同者整合成一行
+#第二个文件的相同字段并不会显示（因为已经是第一行）
+
+
+实例二：我们知道/etc/passwd的第四个字段是GID，
+        那个GID记录在/etc/group当中的第三个字段，下面这个实例就是整合
+[root@bogon bash]# join -t ':' -1 4 /etc/passwd -2 3 /etc/group
+0:root:x:0:root:/root:/bin/bash:root:x:
+1:bin:x:1:bin:/bin:/sbin/nologin:bin:x:bin,daemon
+......
+</code></pre>
+
+<p><strong>用这个命令，需要特别注意的是，是使用join之前，你所需要处理的文件应该应该事先先经过排序（sort）处理。否则有些对比的项目会被忽略过，我就越到过，搞得数据老是有问题。</strong></p>
+
+<p>【 <strong>past</strong>
+】:这个也是连接两个文件的意思，但是要比join简单多了。相对于join必须要对比两个文件的数据相关性，past就是直接将两行添在一起，且中间用tab键隔开</p>
+
+<pre><code>语法：
+paste [-d] file1 file2
+参数：
+-d:后面可以接分隔字符，默认是以（tab）键来分割
+
+实例：将/etc/passwd 与 /etc/shadow同一行粘贴在一起
+[root@bogon bash]# paste aa.txt bb.txt 
+aa aad  aa aad1
+bb bbd  bb bbd1
+cc ccd  cc ccd1
+[root@bogon bash]# paste -d ':' aa.txt bb.txt 
+aa aad:aa aad1
+bb bbd:bb bbd1
+cc ccd:cc ccd1  
+</code></pre>
+
+<p>【 <strong>expand</strong> 】:这个命令有点意思，就是将tab键转换成空格键，与前面col命令的差别大得很</p>
+
+<p><strong>对比一下expand、col：</strong></p>
+
+<p><strong>expand:是将tab键转换为对等的8个空格键，而col是将tab键转换为一个空格键</strong></p>
+
+<pre><code>语法：
+expand [-t] file
+-t:后面可以接数字。一般来说，一个tab键可以用8个空格键代替。
+我们也可以自定义一个tab键代表多少个字符。
+
+实例一：将/etc/man.config内行首为MANPATH的行取出，仅取前三行
+[root@bogon bash]# grep '^MANPATH' /etc/man.config | head -n 3
+MANPATH /usr/man
+MANPATH /usr/share/man
+MANPATH /usr/local/man
+You have new mail in /var/spool/mail/root
+#^这个符号是行首的标识，这个我会在复习正则表达式时，在分析，很有意思的
+
+实例二：将上例中所有的符号都列出来
+[root@bogon bash]# grep '^MANPATH' /etc/man.config | head -n 3 | cat -A
+MANPATH^I/usr/man$
+MANPATH^I/usr/share/man$
+MANPATH^I/usr/local/man$
+#tab键就是^I
+
+实例三：将上面的tab键用6个空格键来替换
+[root@bogon bash]# grep '^MANPATH' /etc/man.config | head -n 3 | expand -t 6 | cat -A
+MANPATH     /usr/man$
+MANPATH     /usr/share/man$
+MANPATH     /usr/local/man$
+#是不是没有^I了
+</code></pre>
+
+<p><strong>4.切割命令：split</strong></p>
+
+<p><strong>【split】</strong> 这个命令可以将一个大文件依据文件的大小或行数来切分称成小文件</p>
+
+<pre><code>语法：
+split [-bl] file PREFIX
+参数：
+-b:后面可接切割文件的大小，可加单位，例如b、k、m等等
+-l:以行数来进行分割；
+PREFIX：代表前导符，可作为切割文件的前导文字
+
+实例一：我的用户目录下install.log有44k，将他分成10k一个的文件
+[root@bogon ~]# du -sh install.log
+44K     install.log
+
+[root@bogon ~]# split -b 10k ./install.log  split
+[root@bogon ~]# ll -k split*
+-rw-r--r--. 1 root root 10 Aug 18 02:11 splitaa
+-rw-r--r--. 1 root root 10 Aug 18 02:11 splitab
+-rw-r--r--. 1 root root 10 Aug 18 02:11 splitac
+-rw-r--r--. 1 root root  9 Aug 18 02:11 splitad
+#最后的那个split就是前导符，这个时候系统自己会以xxxxaa、xxxxab、xxxxac...来命名
+
+实例二：如果将上面三个小文件合成一个大文件bak.log
+[root@bogon ~]# cat splita* &gt;&gt; bak.log
+#是不是如此的简单，就是用数据流重定向
+
+实例三：使用ls -al / 输出的信息中，每3行记录成一个文件
+[root@bogon bash]# ls -al / | split -l 3 - s
+[root@bogon bash]# wc -l s*
+   3 saa
+   3 sab
+   3 sac
+   3 sad
+   3 sae
+   3 saf
+   3 sag
+   2 sah
+  23 total
+#重点在那个-.一般来说，如果需要stdout（标准输出）/stdin（标准输入）,但偏偏又没有文件，
+#有的只是-时，那么那个-就会被当做stdout或者stout
+</code></pre>
+
+<p><strong>关于-(减号的含义，我下一篇在分析)</strong></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

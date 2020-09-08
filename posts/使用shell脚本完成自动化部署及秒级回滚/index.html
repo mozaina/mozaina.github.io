@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用shell脚本完成自动化部署及秒级回滚 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用shell脚本完成自动化部署及秒级回滚 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用shell脚本完成自动化部署及秒级回滚">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8shell%E8%84%9A%E6%9C%AC%E5%AE%8C%E6%88%90%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2%E5%8F%8A%E7%A7%92%E7%BA%A7%E5%9B%9E%E6%BB%9A/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用shell脚本完成自动化部署及秒级回滚</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>一、部署机代码目录结构</p>
+
+<p>使用www用户进行代码部署，所有部署机上需要创建www用户，并赋予根目录权限，同时配置公私钥认证建立信任关系。</p>
+
+<pre><code>[www@ansible-node1 deploy]$ tree
+.
+├── code
+│?? └── web-demo  #存放代码
+│??     ├── index.html
+│??     └── \351\227\256
+├── config             #存放服务器配置文件
+│?? └── web-demo
+│??     ├── base
+│??     │?? └── config.ini
+│??     └── other
+│??         └── 192.168.226.130.crontab.xml  #不同机器之间的差异匹配值文件
+├── tar  
+└── tmp
+</code></pre>
+
+<p>二、部署节点</p>
+
+<p>ip：192.168.226.130、192.168.226.132 分别模拟两个主机组来部署不同代码</p>
+
+<p>web根目录: /webroot/webdemo、同时赋予www用户权限</p>
+
+<p>历史代码版本保存路径： /opt/webroot、同时赋予www用户权限</p>
+
+<p>三、使用gitlab来管理代码（在此不做介绍）</p>
+
+<p>四、主要作用</p>
+
+<p>通过脚本，模拟线上环境，实现代码的半自动化部署，以及秒级回滚。</p>
+
+<p>五、脚本实现</p>
+
+<p>流程：获取代码（直接拉取）-&mdash;-&gt; 编译（可选）-&mdash;&mdash;&gt; 配置文件 -&mdash;&ndash;&gt;打包 -&mdash;-&gt;
+scp到目标服务器-&mdash;&gt;将目标机服务器移除集群-&mdash;-&gt;解压-&mdash;&gt;放置到webroot&mdash;&ndash;&gt;scp差异文件-&mdash;-&gt;重启（可选）-&mdash;-&gt;测试-&mdash;-&gt;加入集群</p>
+
+<pre><code>[www@ansible-node1 ~]$ cat deploy.sh
+#!/bin/bash
+
+#Node List
+GROUP1_LIST=&quot;192.168.226.130&quot;
+GROUP2_LIST=&quot;192.168.226.132&quot;
+ROLLBACK_LIST=&quot;192.168.226.130 192.168.226.132&quot;
+
+#Date/Time Veriables
+LOG_DATE=`date &quot;+%Y-%m-%d&quot;`
+LOG_CTIME=`date &quot;+%H-%M-%S&quot;`
+
+CDATE=$(date &quot;+%Y-%m-%d&quot;)
+CTIME=$(date &quot;+%H-%M-%S&quot;)
+
+#Shell Env
+SHELL_NAME=&quot;deploy.sh&quot;
+SHELL_DIR=&quot;/home/www/&quot;
+SHELL_LOG=&quot;${SHELL_DIR}/${SHELL_NAME}.log&quot;
+
+#Code Env
+PRO_NAME=&quot;web-demo&quot;
+CODE_DIR=&quot;/deploy/code/web-demo&quot;
+CONFIG_DIR=&quot;/deploy/config/web-demo&quot;
+TMP_DIR=&quot;/deploy/tmp&quot;
+TAR_DIR=&quot;/deploy/tar&quot;
+LOCK_FILE=&quot;/tmp/deploy.lock&quot;
+
+usage(){
+        echo $&quot;Usage: $0 {deploy | rollback  [ list | version]}&quot;
+}
+
+writelog(){
+        LOGINFO=$1
+        echo &quot;${CDATE} ${CTIME}: ${SHELL_NAME} : ${LOGINFO}&quot; &gt;&gt; ${SHELL_LOG}
+}
+
+shell_lock(){
+        touch ${LOCK_FILE}
+}
+
+shell_unlock(){
+        rm -rf ${LOCK_FILE}
+}
+
+code_get(){
+        writelog code_get
+        cd $CODE_DIR &amp;&amp; git pull    #需要提前从git仓库clone代码到部署机代码存放目录$CODE_DIR
+        cp -r ${CODE_DIR} ${TMP_DIR}/
+        API_VERL=$(git show | grep commit  | cut -d ' ' -f2)
+        API_VER=$(echo ${API_VERL:0:6})
+}
+
+code_build(){
+        echo code_build
+}
+
+code_config(){
+        echo code_config
+        /bin/cp -r $CONFIG_DIR/base/* $TMP_DIR/&quot;${PRO_NAME}&quot;
+        PKG_NAME=&quot;${PRO_NAME}_&quot;${API_VER}&quot;_&quot;${CDATE}-${CTIME}&quot;&quot;
+        cd ${TMP_DIR} &amp;&amp; mv ${PRO_NAME} ${PKG_NAME}
+}
+
+code_tar(){
+        writelog &quot;code_tar&quot;
+        cd ${TMP_DIR} &amp;&amp; tar czf ${PKG_NAME}.tar.gz ${PKG_NAME}
+        writelog &quot;${PKG_NAME}.tar.gz&quot;
+}
+
+code_scp(){
+        writelog &quot;code_scp&quot;
+        for node in $GROUP1_LIST;do
+                scp ${TMP_DIR}/${PKG_NAME}.tar.gz  $node:/opt/webroot
+        done
+        for node in $GROUP2_LIST;do
+                scp ${TMP_DIR}/${PKG_NAME}.tar.gz  $node:/opt/webroot
+        done
+
+}
+
+cluster_node_remove(){
+        writelog &quot;iluster_node_remove&quot;
+}
+
+url_test(){
+        URL=$1
+        curl -s --head $URL | grep &quot;200 OK&quot;
+        if [ $? -ne 0 ];then
+                shell_unlock;
+                writelog &quot;test error&quot; &amp;&amp; exit;
+        fi
+}
+
+group1_deploy(){
+        echo code_deploy
+        for node in $GROUP1_LIST;do
+                ssh $node &quot;cd /opt/webroot &amp;&amp; tar zxf ${PKG_NAME}.tar.gz&quot;
+                ssh $node &quot;rm -rf /webroot/web-demo &amp;&amp; ln -sf /opt/webroot/${PKG_NAME} /webroot/web-demo&quot;
+    done
+}
+
+group1_test(){
+        url_test &quot;http://192.168.226.130/index.html&quot;
+        echo &quot;add to cluster&quot;
+}
+group2_deploy(){
+        echo code_deploy
+        for node in $GROUP2_LIST;do
+                ssh $node &quot;cd /opt/webroot &amp;&amp; tar zxf ${PKG_NAME}.tar.gz&quot;
+                ssh $node &quot;rm -rf /webroot/web-demo &amp;&amp; ln -sf /opt/webroot/${PKG_NAME} /webroot/web-demo&quot;
+    done
+}
+
+group2_test(){
+        url_test &quot;http://192.168.226.132/index.html&quot;
+        echo &quot;add to cluster&quot;
+}
+
+config_diff(){
+        echo config_diff
+        scp ${CONFIG_DIR}/other/192.168.226.130.crontab.xml 192.168.226.130:/webroot/web-demo/crontab.xml
+}
+
+code_test(){
+        echo code_test
+}
+
+cluster_node_in(){
+        echo cluster_node
+}
+
+rollback_fun(){
+        for node in $ROLLBACK_LIST;do
+                ssh $node &quot;rm -rf /webroot/web-demo &amp;&amp; ln -sf /opt/webroot/$1 /webroot/web-demo&quot;
+    done
+
+}
+
+rollback(){
+        if [ -z $1 ];then 
+                shell_unlock;
+                echo &quot;Please input rollback version&quot; &amp;&amp; exit
+        fi
+        case $1 in
+                list)
+                        ssh $GROUP1_LIST &quot;ls -l /opt/webroot/*.tar.gz&quot;
+                        ;;
+                *)
+                        rollback_fun $1
+        esac
+}
+
+
+main(){
+        if [ -f $LOCK_FILE ];then
+                echo &quot;Deploy  is running&quot; &amp;&amp; exit;
+        fi
+        DEPLOY_METHOD=$1
+        ROLLBACK_VER=$2
+        case $DEPLOY_METHOD in
+                deploy)
+
+                                shell_lock;
+                                code_get;
+                                code_build;
+                                code_config;
+                                code_tar;
+                                code_scp;
+                                cluster_node_remove;
+                                group1_deploy;
+                                config_diff;
+                                group1_test;
+                                group2_deploy;
+                                group2_test;
+                                cluster_node_in;
+                                shell_unlock;
+                                ;;
+                rollback)
+
+                                shell_lock
+                                rollback $ROLLBACK_VER;
+                                shell_unlock;
+                                ;;
+                *)
+                                usage;
+        esac
+}
+main $1 $2
+</code></pre>
+
+<p>六、执行脚本</p>
+
+<pre><code>[www@ansible-node1 ~]$ bash deploy.sh 
+Usage: deploy.sh {deploy | rollback  [ list | version]}
+[www@ansible-node1 ~]$ bash deploy.sh deploy  #部署代码
+
+[www@ansible-node1 ~]$ bash deploy.sh rollback list  #列出代码版本
+-rw-rw-r-- 1 www www  228 Mar  7 17:03 /opt/webroot/web-demo_123_2018-03-07-17-03-52.tar.gz
+-rw-rw-r-- 1 www www  231 Mar  7 17:05 /opt/webroot/web-demo_123_2018-03-07-17-05-24.tar.gz
+-rw-rw-r-- 1 www www  233 Mar  7 17:07 /opt/webroot/web-demo_123_2018-03-07-17-07-02.tar.gz
+-rw-rw-r-- 1 www www  231 Mar  7 17:10 /opt/webroot/web-demo_123_2018-03-07-17-10-36.tar.gz
+-rw-rw-r-- 1 www www  234 Mar  8 16:24 /opt/webroot/web-demo_123_2018-03-08-16-24-17.tar.gz
+-rw-rw-r-- 1 www www  230 Mar  8 16:26 /opt/webroot/web-demo_123_2018-03-08-16-26-51.tar.gz
+-rw-rw-r-- 1 www www  230 Mar  8 16:30 /opt/webroot/web-demo_123_2018-03-08-16-30-15.tar.gz
+-rw-rw-r-- 1 www www  229 Mar  8 16:31 /opt/webroot/web-demo_123_2018-03-08-16-31-25.tar.gz
+
+
+[www@ansible-node1 ~]$  bash deploy.sh rollback web-demo_3d9c99_2018-03-12-16-27-54  #回滚到指定版本
+</code></pre>
+
+<p>转载于:<a href="https://www.cnblogs.com/lwf-blog/p/8550411.html">https://www.cnblogs.com/lwf-blog/p/8550411.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

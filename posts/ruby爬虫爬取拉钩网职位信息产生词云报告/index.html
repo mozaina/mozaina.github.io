@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>ruby爬虫爬取拉钩网职位信息产生词云报告 | 开发者问答集锦</title>
+    <meta property="og:title" content="ruby爬虫爬取拉钩网职位信息产生词云报告 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="ruby爬虫爬取拉钩网职位信息产生词云报告">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/ruby%E7%88%AC%E8%99%AB%E7%88%AC%E5%8F%96%E6%8B%89%E9%92%A9%E7%BD%91%E8%81%8C%E4%BD%8D%E4%BF%A1%E6%81%AF%E4%BA%A7%E7%94%9F%E8%AF%8D%E4%BA%91%E6%8A%A5%E5%91%8A/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">ruby爬虫爬取拉钩网职位信息产生词云报告</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>思路：1.获取拉勾网搜索到职位的页数</p>
+
+<p><a href="https://img.it610.com/image/info8/a8991c7ec5424405bea228c537ec1391.jpg"><img src="https://img.it610.com/image/info8/a8991c7ec5424405bea228c537ec1391.jpg" alt="ruby
+爬虫爬取拉钩网职位信息，产生词云报告_第1张图片" /></a></p>
+
+<p>2.调用接口获取职位id</p>
+
+<p><a href="https://img.it610.com/image/info8/fe086e7e2a6843618222a3a8371ac018.png"><img src="https://img.it610.com/image/info8/fe086e7e2a6843618222a3a8371ac018.png" alt="ruby
+爬虫爬取拉钩网职位信息，产生词云报告_第2张图片" /></a></p>
+
+<p>3.根据职位id访问页面，匹配出关键字</p>
+
+<p><a href="https://img.it610.com/image/info8/b69bdd4684f94db3960170f2091d92e2.jpg"><img src="https://img.it610.com/image/info8/b69bdd4684f94db3960170f2091d92e2.jpg" alt="ruby
+爬虫爬取拉钩网职位信息，产生词云报告_第3张图片" /></a></p>
+
+<p>url访问采用unirest，由于拉钩反爬虫，短时间内频繁访问会被限制访问，所以没有采用多线程，而且每个页面访问时间间隔设定为10s，通过nokogiri解析页面，正则匹配只获取技能要求中的英文单词，可能存在数据不准确的情况</p>
+
+<p>数据持久化到excel中，采用ruby erb生成word_cloud报告</p>
+
+<p>爬虫代码：</p>
+
+<pre><code>require 'unirest'
+require 'uri'
+require 'nokogiri'
+require 'json'
+require 'win32ole'
+
+@position = '测试开发工程师'
+@city = '杭州'
+
+# 页面访问
+def query_url(method, url, headers:{}, parameters:nil)
+  case method
+    when :get
+      Unirest.get(url, headers:headers).body
+    when :post
+      Unirest.post(url, headers:headers, parameters:parameters).body
+  end
+end
+
+# 获取页数
+def get_page_num(url)
+  html = query_url(:get, url).force_encoding('utf-8')
+  html.scan(/class=&quot;span totalNum&quot;&gt;(\d+)/).first.first
+end
+
+# 获取每页显示的所有职位的id
+def get_positionsId(url, headers:{}, parameters:nil)
+  response = query_url(:post, url, headers:headers, parameters:parameters)
+  positions_id = Array.new
+  response['content']['positionResult']['result'].each{|i| positions_id &lt;&lt; i['positionId']}
+  positions_id
+end
+
+# 匹配职位英文关键字
+def get_skills(url)
+  puts &quot;loading url: #{url}&quot;
+  html = query_url(:get, url).force_encoding('utf-8')
+  doc = Nokogiri::HTML(html)
+  data = doc.css('dd.job_bt')
+  data.text.scan(/[a-zA-Z]+/)
+end
+
+# 计算词频
+def word_count(arr)
+  arr.map!(&amp;:downcase)
+  arr.select!{|i| i.length&gt;1}
+  counter = Hash.new(0)
+  arr.each { |k| counter[k]+=1 }
+  # 过滤num=1的数据
+  counter.select!{|_,v| v &gt; 1}
+  counter2 = counter.sort_by{|_,v| -v}.to_h
+  counter2
+end
+
+# 转换
+def parse(hash)
+  data = Array.new
+  hash.each do |k,v|
+    word = Hash.new
+    word['name'] = k
+    word['value'] = v
+    data &lt;&lt; word
+  end
+  JSON data
+end
+
+# 持久化数据
+def save_excel(hash)
+  excel = WIN32OLE.new('Excel.Application')
+  excel.visible = false
+  workbook = excel.Workbooks.Add()
+  worksheet = workbook.Worksheets(1)
+  # puts hash.size
+  (1..hash.size+1).each do |i|
+    if i == 1
+      # puts &quot;A#{i}:B#{i}&quot;
+      worksheet.Range(&quot;A#{i}:B#{i}&quot;).value = ['关键词', '频次']
+    else
+      # puts i
+      # puts hash.keys[i-2], hash.values[i-2]
+      worksheet.Range(&quot;A#{i}:B#{i}&quot;).value = [hash.keys[i-2], hash.values[i-2]]
+    end
+  end
+  excel.DisplayAlerts = false
+  workbook.saveas(File.dirname(__FILE__)+'\lagouspider.xls')
+  workbook.saved = true
+  excel.ActiveWorkbook.Close(1)
+  excel.Quit()
+end
+
+# 获取页数
+url = URI.encode(&quot;https://www.lagou.com/jobs/list_#@position?city=#@city&amp;cl=false&amp;fromSearch=true&amp;labelWords=&amp;suginput=&quot;)
+num = get_page_num(url).to_i
+puts &quot;存在 #{num} 个信息分页&quot;
+
+skills = Array.new
+(1..num).each do |i|
+  puts &quot;定位在第#{i}页&quot;
+  # 获取positionsid
+  url2 = URI.encode(&quot;https://www.lagou.com/jobs/positionAjax.json?city=#@city&amp;needAddtionalResult=false&quot;)
+  headers = {Referer:url, 'User-Agent':i%2==1?'Mozilla/5.0':'Chrome/67.0.3396.87'}
+  parameters = {first:(i==1), pn:i, kd:@position}
+  positions_id = get_positionsId(url2, headers:headers, parameters:parameters)
+  positions_id.each do |id|
+    # 访问具体职位页面,提取英文技能关键字
+    url3 = &quot;https://www.lagou.com/jobs/#{id}.html&quot;
+    skills.concat get_skills(url3)
+    sleep 10
+  end
+end
+
+count = word_count(skills)
+save_excel(count)
+@data = parse(count)
+</code></pre>
+
+<p>效果展示：</p>
+
+<p><a href="https://img.it610.com/image/info8/136fa807216a4b50ab369b5ae42adad5.png"><img src="https://img.it610.com/image/info8/136fa807216a4b50ab369b5ae42adad5.png" alt="ruby
+爬虫爬取拉钩网职位信息，产生词云报告_第4张图片" /></a>
+<a href="https://img.it610.com/image/info8/ac0f7b535439477b8aca0328aded714f.jpg"><img src="https://img.it610.com/image/info8/ac0f7b535439477b8aca0328aded714f.jpg" alt="ruby
+爬虫爬取拉钩网职位信息，产生词云报告_第5张图片" /></a></p>
+
+<p>转载于:<a href="https://www.cnblogs.com/wf0117/p/9218196.html">https://www.cnblogs.com/wf0117/p/9218196.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

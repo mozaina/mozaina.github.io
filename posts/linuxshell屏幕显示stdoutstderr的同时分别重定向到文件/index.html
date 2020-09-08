@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linuxshell屏幕显示stdoutstderr的同时分别重定向到文件 | 开发者问答集锦</title>
+    <meta property="og:title" content="linuxshell屏幕显示stdoutstderr的同时分别重定向到文件 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linuxshell屏幕显示stdoutstderr的同时分别重定向到文件">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E5%B1%8F%E5%B9%95%E6%98%BE%E7%A4%BAstdoutstderr%E7%9A%84%E5%90%8C%E6%97%B6%E5%88%86%E5%88%AB%E9%87%8D%E5%AE%9A%E5%90%91%E5%88%B0%E6%96%87%E4%BB%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linuxshell屏幕显示stdoutstderr的同时分别重定向到文件</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>I&rsquo;m assuming you want to still see STDERR and STDOUT on the terminal. You
+could go for Josh Kelley&rsquo;s answer, but I find keeping a <code>tail</code> around in the
+background which outputs your log file very hackish and cludgy. Notice how you
+need to keep an exra FD and do cleanup afterward by killing it and technically
+should be doing that in a <code>trap '...' EXIT</code>.</p>
+
+<p>There is a better way to do this, and you&rsquo;ve already discovered it: <code>tee</code>.</p>
+
+<p>Only, instead of just using it for your stdout, have a tee for stdout and one
+for stderr. How will you accomplish this? Process substitution and file
+redirection:</p>
+
+<pre><code>command &gt; &gt;(tee stdout.log) 2&gt; &gt;(tee stderr.log &gt;&amp;2)
+</code></pre>
+
+<p>Let&rsquo;s split it up and explain:</p>
+
+<pre><code>&gt; &gt;(..)
+</code></pre>
+
+<p><code>&gt;(...)</code> (process substitution) creates a FIFO and lets <code>tee</code> listen on it.
+Then, it uses <code>&gt;</code> (file redirection) to redirect the STDOUT of <code>command</code> to
+the FIFO that your first <code>tee</code> is listening on.</p>
+
+<p>Same thing for the second:</p>
+
+<pre><code>2&gt; &gt;(tee stderr.log &gt;&amp;2)
+</code></pre>
+
+<p>We use process substitution again to make a <code>tee</code> process that reads from
+STDIN and dumps it into<code>stderr.log</code>. <code>tee</code> outputs its input back on STDOUT,
+but since its input is our STDERR, we want to redirect <code>tee</code>&rsquo;s STDOUT to our
+STDERR again. Then we use file redirection to redirect <code>command</code>&rsquo;s STDERR to
+the FIFO&rsquo;s input (<code>tee</code>&rsquo;s STDIN).</p>
+
+<p>See <a href="http://mywiki.wooledge.org/BashGuide/InputAndOutput">http://mywiki.wooledge.org/BashGuide/InputAndOutput</a></p>
+
+<p>Process substitution is one of those really lovely things you get as a bonus
+of choosing <code>bash</code> as your shell as opposed to <code>sh</code> (POSIX or Bourne).</p>
+
+<hr />
+
+<p>In <code>sh</code>, you&rsquo;d have to do things manually:</p>
+
+<pre><code>out=&quot;${TMPDIR:-/tmp}/out.$$&quot; err=&quot;${TMPDIR:-/tmp}/err.$$&quot;
+mkfifo &quot;$out&quot; &quot;$err&quot;
+trap 'rm &quot;$out&quot; &quot;$err&quot;' EXIT
+tee stdout.log &lt; &quot;$out&quot; &amp;
+tee stderr.log &lt; &quot;$err&quot; &gt;&amp;2 &amp;
+command &gt;&quot;$out&quot; 2&gt;&quot;$err&quot;
+</code></pre>
+
+<h2 id="6-miscellaneous-operators">6. Miscellaneous Operators</h2>
+
+<p>Aside from the standard I/O operators, bash also provides a few more advanced
+operators that make life on the shell that much nicer.</p>
+
+<h3 id="6-1-process-substitution">6.1. Process Substitution</h3>
+
+<p>A cousin of the pipe is the process substitution operator, which comes in two
+forms: <code>and</code>&gt;()<code>. It's a convenient way to use named pipes without having to
+create temporary files. Whenever you think you need a temporary file to do
+something, process substitution might be a better way to handle things.</code></p>
+
+<p>What it does, is basically run the command inside the parentheses. With the <code>
+operator, the command's output is put in a named pipe (or something similar)
+that's created by bash. The operator itself in your command is replaced by the
+filename of that file. After your whole command finishes, the file is cleaned
+up.</code></p>
+
+<p>Here&rsquo;s how we can put that into action: Imagine a situation where you want to
+see the difference between the output of two commands. Ordinarily, you&rsquo;d have
+to put the two outputs in two files and <code>diff</code> those:</p>
+
+<pre><code>$ head -n 1 .dictionary &gt; file1
+$ tail -n 1 .dictionary &gt; file2
+$ diff -y file1 file2
+Aachen                                                        | zymurgy
+$ rm file1 file2
+</code></pre>
+
+<p>Using the <em>Process Substitution</em> operator, we can do all that with a one-liner
+and no need for manual cleanup:</p>
+
+<pre><code>$ diff -y Aachen                                                        | zymurgy
+</code></pre>
+
+<p>The <code>part is replaced by the temporary FIFO created by bash, so</code>diff<code>
+actually sees something like this:</code></p>
+
+<pre><code>$ diff -y /dev/fd/63 /dev/fd/62
+</code></pre>
+
+<p>Here we see how bash runs <code>diff</code> when we use process substitution. It runs our
+<code>head</code> and <code>tail</code> commands, redirecting their respective outputs to the
+&ldquo;files&rdquo;<code>/dev/fd/63</code> and <code>/dev/fd/62</code>. Then it runs the <code>diff</code> command, passing
+those filenames where originally we had put the process substitution
+operators.</p>
+
+<p>The actual implementation of the temporary files differs from system to
+system. In fact, you can see what the above would actually look like to <code>diff</code>
+on your box by putting an <code>echo</code> in front of our command:</p>
+
+<pre><code>$ echo diff -y diff -y /dev/fd/63 /dev/fd/62
+</code></pre>
+
+<p>The <code>&gt;(..)</code> operator is much like the <code>operator, but instead of redirecting
+the command's output to a file, we redirect the file to the command's input.
+It's used for cases where you're running a command that writes to a file, but
+you want it to write to another command instead:</code></p>
+
+<pre><code>$ tar -cf &gt;(ssh host tar xf -) .
+</code></pre>
+
+<p>zz：<a href="http://stackoverflow.com/questions/692000/how-do-i-write-stderr-to-a-file-">http://stackoverflow.com/questions/692000/how-do-i-write-stderr-to-a-file-</a>
+while-using-tee-with-a-pipe</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

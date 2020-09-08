@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>MySQL57的Linux安装shell脚本之二进制安装 | 开发者问答集锦</title>
+    <meta property="og:title" content="MySQL57的Linux安装shell脚本之二进制安装 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="MySQL57的Linux安装shell脚本之二进制安装">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/mysql57%E7%9A%84linux%E5%AE%89%E8%A3%85shell%E8%84%9A%E6%9C%AC%E4%B9%8B%E4%BA%8C%E8%BF%9B%E5%88%B6%E5%AE%89%E8%A3%85/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">MySQL57的Linux安装shell脚本之二进制安装</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="之前写过一个5-6的安装脚本">之前写过一个5.6的安装脚本</h1>
+
+<p>5.7结构跟5.6略微有一些不同，在5.7上有一些很值得学习的新特征，比如说：</p>
+
+<p>（1）安全性提高</p>
+
+<p>（2）增强了InnoDB引擎的一些功能</p>
+
+<p>（3）支持对在线某个连接直接查看执行计划</p>
+
+<p>（4）新增log_syslog选项，可以把MySQL的日志打印到系统日志文件中</p>
+
+<p>（5）还支持多线程复制</p>
+
+<p>等等等，在这里我就不细说了</p>
+
+<p>所以想在写一个5.7的安装脚本</p>
+
+<p>下面看一下安装过程</p>
+
+<p>按 Ctrl+C 复制代码</p>
+
+<p>按 Ctrl+C 复制代码</p>
+
+<p>安装之前首先检查有没有mysql的进程</p>
+
+<pre><code>mysqlProcessNum=`/bin/ps aux | /bin/grep mysql | /usr/bin/wc -l | /bin/awk '{ print $1 }'`;
+if [ $mysqlProcessNum -gt 3 ]; then
+    echo &quot;已经安装MySQL&quot;
+    exit
+fi
+</code></pre>
+
+<p>然后下载（可以从官网下载，但是个人感觉太慢了，于是就搭建了一个简单的ftp服务器，当然也可以本地上传嘛，在这里我就不细说了）</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code># download mysql package
+yum install libaio   #MySQL的一个依赖包
+/usr/bin/yum install awk wget -y
+mysqlDownloadURL=ftp://。。。。。。。。。/pub/mysql/mysql-5.7.8-rc-linux-glibc2.5-x86_64.tar.gz;
+cd /tmp;
+/bin/rm -rf mysql*.tar.gz
+/usr/bin/wget $mysqlDownloadURL;
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>解压，建立软连接</p>
+
+<p>添加用户和用户组（判断一下，如果没添加就添加一下）</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>packageName=`/bin/ls | /bin/grep mysql*.tar.gz`;
+# unpakcage mysql
+/bin/tar zxvf $packageName -C /usr/local
+mysqlAllNameDir=`/bin/ls -l /usr/local | grep mysql | /bin/awk '{ print $9 }'`
+/bin/ln -s $mysqlAllNameDir /usr/local/mysql
+
+
+userNum=`/bin/cat /etc/passwd | /bin/grep mysql | /bin/awk -F ':' '{ print $1 }' | /usr/bin/wc -l`
+if [ $userNum -lt 1 ];then
+    /usr/sbin/groupadd mysql
+    /usr/sbin/useradd -d /usr/local/mysql -s /sbin/nologin -g mysql mysql
+    echo &quot;成功添加&quot;
+fi
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>检查/etc下面是否有my.cnf文件，有的话就干掉，或者备份</p>
+
+<pre><code>/bin/mv /etc/my.cnf /etc/my.cnf.bak
+</code></pre>
+
+<p>建立mysql-files文件夹并且赋予770权限</p>
+
+<pre><code>/bin/mkdir /usr/local/mysql/mysql-files
+/bin/chmod 770 /usr/local/mysql/mysql-files
+/bin/chown -R mysql /usr/local/mysql/
+/bin/chgrp -R mysql /usr/local/mysql/
+</code></pre>
+
+<p>初始化</p>
+
+<pre><code>/usr/local/mysql/bin/mysql_install_db --user=mysql --datadir=/usr/local/mysql/data
+/usr/local/mysql/bin/mysqld --initialize --user=mysql
+/usr/local/mysql/bin/mysql_ssl_rsa_setup
+</code></pre>
+
+<p>写一份配置文件my.cnf 放到/etc下面</p>
+
+<p>/etc/my.cnf （这里也说明一点，MySQL配置文件有参数替换原则）</p>
+
+<p>顺序是这样的</p>
+
+<p>/etc/my.cnf /etc/mysql/my.cnf /usr/local/mysql/etc/my.cnf ~/.my.cnf</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>[client]
+socket=/usr/local/mysql/mysql-files/mysql.sock
+[mysqld]
+explicit_defaults_for_timestamp=true
+datadir=/usr/local/mysql/data
+socket=/usr/local/mysql/mysql-files/mysql.sock
+user=mysql
+# Disabling symbolic-links is recommended to prevent assorted security risks
+symbolic-links=0
+# LOG
+slow_query_log = 1
+slow_query_log_file = /usr/local/mysql/mysql-files/mysql-slow.log
+long_query_time = 2
+# GENERAL LOG
+#general_log = 1
+#general_log_file = /usr/local/mysql/mysql-files/mysql-general.log
+# BINARY LOG
+server_id=101
+log_bin=/usr/local/mysql/mysql-files/mysql-bin.log
+binlog_format=ROW
+sync_binlog=1
+expire_logs_days=7
+# ERROR LOG
+log_error=/usr/local/mysql/mysql-files/mysql.err
+
+# OTHER
+character_set_server = utf8mb4
+transaction-isolation = READ-COMMITTED
+max_connections = 1000
+log-queries-not-using-indexes
+log_throttle_queries_not_using_indexes = 10
+
+# INNODB
+innodb_strict_mode=1
+innodb_file_format=Barracuda
+innodb_file_format_max=Barracuda
+innodb_read_io_threads=4
+innodb_write_io_threads=8 # 8 ~ 12
+innodb_io_capacity=1000 # HDD:800 ~ 1200 SSD: 10000+
+innodb_adaptive_flushing=1 # SSD: 0
+innodb_flush_log_at_trx_commit=1
+innodb_max_dirty_pages_pct=75
+innodb_buffer_pool_dump_at_shutdown=1
+innodb_buffer_pool_load_at_startup=1
+innodb_flush_neighbors=1 # SSD:0
+innodb_log_file_size=1024M # SSD:4G~8G HDD:1G~2G
+innodb_purge_threads=1 # SSD:4
+innodb_lock_wait_timeout=3
+innodb_print_all_deadlocks=1
+pid-file=/usr/local/mysql/data/mysqld/mysqld.pid
+
+[mysqld_safe]
+log-error=/var/log/mysqld.log
+pid-file=/usr/local/mysql/data/mysqld/mysqld.pid
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>修改使用权限</p>
+
+<pre><code>/bin/chown -R root .
+/bin/chown -R mysql /usr/local/mysql/data /usr/local/mysql/mysql-files
+</code></pre>
+
+<p>以safe 方式启动</p>
+
+<pre><code>/usr/local/mysql/bin/mysqld_safe --user=mysql &amp;
+</code></pre>
+
+<p>mysql5.7会生成一个初始化密码，而在之前的版本首次登陆不需要登录。</p>
+
+<pre><code>#重启mysqld
+#cd /usr/local/mysql
+#./bin/mysqld restart
+#mysql5.7有默认密码
+cat /root/.mysql_secret
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>[root@db mysql]# cat /root/.mysql_secret 
+# Password set for user 'root@localhost' at 2016-11-16 19:10:59 
+ny8(ko+lhtPu
+[root@db mysql]# ./bin/mysql -uroot -p
+Enter password: 
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 2
+Server version: 5.7.8-rc-log
+
+Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql&gt;
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>下面上完整的脚本</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>#!/bin/bash
+# mysql install script, the home directory is /usr/local/mysql-VERSION and the soft link is /usr/local/mysql
+yum install libaio
+/usr/bin/yum install awk wget -y
+config=`/bin/pwd`
+mysqlProcessNum=`/bin/ps aux | /bin/grep mysql | /usr/bin/wc -l | /bin/awk '{ print $1 }'`;
+if [ $mysqlProcessNum -gt 3 ];then
+    echo &quot;已经安装MySQL&quot;
+fi
+
+# download mysql package
+mysqlDownloadURL=ftp://222.26.224.236/pub/mysql/mysql-5.7.8-rc-linux-glibc2.5-x86_64.tar.gz;
+cd /tmp;
+/bin/rm -rf mysql*.tar.gz
+/usr/bin/wget $mysqlDownloadURL;
+packageName=`/bin/ls | /bin/grep mysql*.tar.gz`;
+# unpakcage mysql
+/bin/tar zxvf $packageName -C /usr/local
+mysqlAllNameDir=`/bin/ls -l /usr/local | grep mysql | /bin/awk '{ print $9 }'`
+/bin/ln -s $mysqlAllNameDir /usr/local/mysql
+userNum=`/bin/cat /etc/passwd | /bin/grep mysql | /bin/awk -F ':' '{ print $1 }' | /usr/bin/wc -l`
+if [ $userNum -lt 1 ];then
+    /usr/sbin/groupadd mysql
+    /usr/sbin/useradd -d /usr/local/mysql -s /sbin/nologin -g mysql mysql
+    echo &quot;成功添加&quot;
+fi
+#/bin/mv /etc/my.cnf /etc/my.cnf.bak
+/bin/mkdir /usr/local/mysql/mysql-files
+/bin/chmod 770 /usr/local/mysql/mysql-files
+/bin/chown -R mysql /usr/local/mysql/
+/bin/chgrp -R mysql /usr/local/mysql/
+
+/usr/local/mysql/bin/mysql_install_db --user=mysql --datadir=/usr/local/mysql/data
+/usr/local/mysql/bin/mysqld --initialize --user=mysql
+/usr/local/mysql/bin/mysql_ssl_rsa_setup
+#我的配置文件放到root目录下面了
+/bin/cp $config/my.cnf /etc/　　　　
+
+/bin/chown -R root .
+/bin/chown -R mysql /usr/local/mysql/data /usr/local/mysql/mysql-files
+/usr/local/mysql/bin/mysqld_safe --user=mysql &amp;
+#重启mysqld
+cd /usr/local/mysql
+./bin/mysqld restart
+#mysql5.7有默认密码
+
+cat /root/.mysql_secret 
+
+#cp /usr/local/mysql/support-files/mysql.server /etc/init.d/mysqld
+#chmod 755 /etc/init.d/mysqld
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>加油</p>
+
+<p>转载于:<a href="https://my.oschina.net/u/2507227/blog/789327">https://my.oschina.net/u/2507227/blog/789327</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

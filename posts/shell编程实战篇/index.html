@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell编程实战篇 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell编程实战篇 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell编程实战篇">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E7%BC%96%E7%A8%8B%E5%AE%9E%E6%88%98%E7%AF%87/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell编程实战篇</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="一-shell实现100台服务器的公钥的批量分发-lld规划-100台服务器ip为-192-168-42-101-201-root密码-123456">一、shell实现100台服务器的公钥的批量分发；LLD规划：100台服务器ip为：192.168.42.101-201，root密码：123456</h1>
+
+<p><strong>考虑因素：</strong><br />
+1.如何创建秘钥<br />
+2.检查与服务器之间的通讯<br />
+3.分发秘钥</p>
+
+<pre><code>[root@backup ~]# cat keypir.sh 
+#!/bin/bash
+password=123456
+
+#创建秘钥对---(ssh-keygen),写入指定文件
+CreateKeyPair(){                         
+ssh-keygen -f /root/.ssh/id_rsa -P &quot;&quot;    #-P:创建的秘钥是否设置密码，此处不设置密码。
+}
+
+#检查100台服务器网络是否畅通
+CHECK(){                                 
+ping -c 1 192.168.42.$i &amp;&gt;/dev/null
+if [ $? -eq 0 ]                          #$? 返回为0时，说明网络畅通
+then
+return 1
+else
+return 0
+fi
+}
+
+#分发秘钥
+TRACE(){
+which sshpass &amp;&gt;/dev/null     #确定sshpass是否安装，对方服务器可能没有安装
+if [ $? -ne 0 ]               #通过which命令判断sshpass是否安装，安装了echo $?则返回0
+then                          #$?不为0时，则说明没有安装
+yum install sshpass -y
+#sshpass -p $password ssh-copy-id -o StrictKeyHostChecking  192.168.42.$i
+sshpass -p $password scp -p -o StrictHostKeyChecking=no /root/.ssh/id_rsa.pub 192.168.42.$i:/tmp/               
+ #使用sshpass工具和-o参数实现避免交互输入yes和密码
+ #将本地/root/.ssh/id_rsa.pub（生成的秘钥文件），传输到对应服务器上/tmp/目录下，此时不能直接传到/root/.ssh目录下，避免其他机器同样操作覆盖文件。
+sshpass -p $password ssh -o StrictHostKeyChecking=no 192.168.42.$i &quot;cat /tmp/id_rsa.pub &gt;&gt; /root/.ssh/authorized_keys&quot;           
+#ssh连接服务器，将/tmp/下密码文件写如入/root/.ssh/authorized_keys
+sshpass -p $password ssh -o StrictHostKeyChecking=no 192.168.42.$i &quot;chmod 600 /root/.ssh/authorized_keys&quot;           #修改文件权限
+sshpass -p $password ssh -o StrictHostKeyChecking=no 192.168.42.$i &quot;rm -rf /tmp/id_rsa.pub&quot;                      #由于是秘钥文件，为了安全起见，用完删除
+
+else                                  #如果sshpass工具安装，则直接执行。
+#sshpass -p $password ssh-copy-id 192.168.42.$i
+sshpass -p $password scp -p -o StrictHostKeyChecking=no /root/.ssh/id_rsa.pub 192.168.42.$i:/tmp/
+sshpass -p $password ssh -o StrictHostKeyChecking=no 192.168.42.$i &quot;cat /tmp/id_rsa.pub &gt;&gt; /root/.ssh/authorized_keys&quot; 
+sshpass -p $password ssh -o StrictHostKeyChecking=no 192.168.42.$i &quot;chmod 600 /root/.ssh/authorized_keys&quot;
+sshpass -p $password ssh -o StrictHostKeyChecking=no 192.168.42.$i &quot;rm -rf /tmp/id_rsa.pub&quot;
+fi
+}
+
+#主函数，调用上方定义的函数，实现功能
+MAIN(){                
+for i in {101..201}
+do
+CHECK
+if [ $? -eq 1 ]                     #调用CHECK检查网络是否畅通，return=1时（畅通）
+then
+    if [ -f /root/.ssh/id_rsa.pub ]  #畅通的话，检查秘钥文件是否存在
+    then
+       TRACE                         #执行TRACE函数，分发秘钥
+    else
+       CreateKeyPair                  #创建秘钥
+       TRACE                          #分发秘钥
+    fi
+else                  #不通时
+echo &quot; 192.168.42.$i is unreachable...&quot;
+
+fi
+done 
+}
+
+MAIN
+</code></pre>
+
+<h1 id="二-设计一个shell-程序-在每天凌晨压缩打包-etc-目录下的所有内容-存放在-root-bak">二、设计一个shell 程序，在每天凌晨压缩打包/etc 目录下的所有内容，存放在/root/bak</h1>
+
+<p>目录里，且文件名为如下形式yymmdd_etc.tar.gz(yy为年，mm为月，dd为日),该目录保存7天内容；每天凌晨3点增量同步到备份服务器/backup目录下，每周六凌晨3点全量同步到备份服务的/backup目录下；备份服务器/backup下保留一个月的备份文件。</p>
+
+<p><strong>考虑因素：</strong><br />
+（1）打包/etc目录,并存放在/root/bak目录里，按要求命名。<br />
+(2) /root/backup中只保存7天内容。<br />
+（3）增量备份，全量备份。<br />
+(4)备份服务器保存一个月文件。</p>
+
+<pre><code>#!/bin/bash
+#定义变量
+back_file_name=`date +%Y%m%d`.tar.gz     //文件名
+back_file_dir=/root/bak                  //压缩打包路径
+backup_server_user=rsync_backup          //备份服务器用户
+backup_server_pass=123456                //备份服务器密码
+root_pass=123456                         //备份主机root密码
+backup_server_IP=192.168.42.159          //备份服务器IP
+mail_owner=ljwenjie66@163.com            //邮箱地址
+mail_topic=&quot;web data backup&quot;            // 
+
+data_tar(){                                           #定义用于压缩函数
+    [ -d $back_file_dir ] || mkdir -p $back_file_dir  #判断/root/bak备份的目录是否存在，不存在就创建。
+    tar -czf $back_file_dir/$back_file_name /etc/*    #将/etc下所有内容进行打包/root/bak/下以时间命名。
+}
+
+data_trace(){                                         #进行增量备份
+rsync -avz $back_file_dir $backup_server_user@$backup_server_IP::backup --password-file=/etc/rsync.password
+}       #rsync将本地/root/bak新增的文件备份到备份主机上
+        #--password-file中存储了rsync的密码，避免了交互输入密码
+
+data_trace_all(){    #实现全量备份
+    sshpass -p $root_pass scp -o StrictHostKeyChecking=no -rp $back_file_dir/* root@192.168.42.159:/backup
+#sshappss -p 123456 scp -rp $back_file_dir root@192.168.42.138:/backup/
+}        #sshpass工具实现了自动输入密码
+         #-o StrictHostKeyChecking参数实现了自动输入yes or no，避免了人机交互
+         #利用scp将/root/bak下所有内容进行备份，以root身份备份到对应主机的/backup目录下
+
+clean_over_localdata(){   #清除本地7天前的的所有文件
+    find $back_file_dir -mtime +7 -exec rm {} -rf \;
+}
+
+clean_over_remodata(){ #利用ssh连接备份服务器，将服务器中一个月之前的文件删除
+    sshpass -p $backup_server_pass ssh -o StrictHostKeyChecking=no $backup_server_IP &quot;find /backup/ -mtime +30 -exec rm {} -rf \;&quot;
+}
+
+case $1 in
+    data_tar)
+        data_tar
+        ;;
+    trace_all)
+        data_trace_all
+        ;;
+    data_trace)
+        data_trace
+        ;;
+    clean_over_localdata)
+        clean_over_lcoaldata
+        ;;
+    clean_remodata)
+        clean_over_remodata
+        ;;
+    *)
+        echo &quot;please input true paramater...&quot;   #如果输入的不是有效参数，则输出*
+
+esac
+</code></pre>
+
+<h1 id="三-shell开发运维管理工具">三、shell开发运维管理工具。</h1>
+
+<p>要求：用户交互，当用户输入菜单号时，打印相关内容。<br />
+菜单</p>
+
+<ol>
+<li>磁盘分区</li>
+<li>CPU负载</li>
+<li>剩余内存</li>
+
+<li><p>退出<br />
+输入：1<br />
+输出：（主机名，系统版本，分区情况）<br />
+hostname:<br />
+system:系统版本<br />
+-&mdash;&mdash;&ndash;分区一&mdash;&mdash;&mdash;&ndash;（分区变量输出）<br />
+path：分区一<br />
+size：大小<br />
+file_os:分区文件系统类型<br />
+mount_on：分区挂载点<br />
+-&mdash;&mdash;&mdash;分区二&mdash;&mdash;&mdash;-<br />
+path：分区二<br />
+size：大小<br />
+file_os:分区文件系统类型<br />
+mount_on：分区挂载点<br />
+输入：2<br />
+输出：<br />
+1分钟平均负载：<br />
+5分钟平均负载：<br />
+15分钟平均负载：<br />
+输入：3<br />
+输出：<br />
+目前可用内存：<br />
+可用Swap分区：<br />
+输入：4<br />
+输出：<br />
+Bey…</p>
+
+<p>#!/bin/bash
+while true
+do
+#格式化输出以下菜单
+cat &lt;<EOF        
+              -------------------菜单---------------------
+              -              1.查看磁盘分区              -
+              -              2.CPU负载                   -
+              -              3.剩余内存                  -
+              -              4.退出                      -  
+              --------------------------------------------
+EOF
+#接受用户输入的一个值
+read -p "请输入你要执行的操作：>&gt;&gt;&rdquo; num
+#实现第一个功能：查看磁盘分区
+PART(){<br />
+  echo &ldquo;hostname:$HOSTNAME&rdquo;                            #获取主机名
+  echo &ldquo;system: <code>cat /etc/redhat-release</code>&rdquo;             #获取系统内核版本
+  #定义数组，获取磁盘分区放入其中。
+  array1=(<code>lsblk -l |awk '/sd[a-z][0-9]/{print $1}'</code>)  #磁盘名
+  array2=(<code>lsblk -l |awk '/sd[a-z][0-9]/{print $4}'</code>)  #大小
+  array3=(<code>lsblk -l |awk '/sd[a-z][0-9]/{print $6}'</code>)  #类型
+  array4=(<code>lsblk -l |awk '/sd[a-z][0-9]/{print $7}'</code>)  #挂载点
+  #遍历数组
+  num=<code>echo $((${#array1[@]}-1))</code>  #获取数组长度-1的值，给num（这里是3）
+  for i in <code>seq 0 $num</code>            #i:0-3
+  do
+ #循环输出数组1中0到3位置值
+cat &lt;&lt;EOF
+                                   &mdash;&mdash;&mdash;${array1[$i]}&mdash;&mdash;&mdash;&ndash;
+                                        path: ${array1[$i]}
+                                        size: ${array2[$i]}
+                                        file_os: ${array3[$i]}
+                                        mount_on：${array4[$i]}
+EOF
+done
+}
+#实现第二个功能：查看cpu负载
+LOADING(){                          #通过uptime命令，和awk,获取平均负载。
+uptime |awk -F [:,] &lsquo;{print &ldquo;一分钟平均负载:&ldquo;,$(NF-2)&rdquo;\n&rdquo;&ldquo;五分钟平均分在:&ldquo;,$(NF-1)&rdquo;\n&rdquo;&ldquo;十五分钟平均负载:&ldquo;,$NF}&rsquo;
+}                                  #$NF:从最后一列开始取。
+#实现第三个功能：查看内存和swap
+MEM(){
+var=(&ldquo;目前可用内存:&rdquo; &ldquo;可用swap分区:&ldquo;)
+n=0
+for i in <code>free -h |awk '/^[^[:space:]]/ {print $4}'</code>    #取出内存和swap,进行遍历
+do
+echo ${var[$n]} $i            #为满足题目要求，（说明+内容），将说明放入数组依次输出+内容
+let n++                       #n从0开始自加，实现数组依次输出。
+done
+}
+#利用case语句捕获用户键入的值。
+#模式匹配成功，则执行相应函数。
+case $num in
+   1)<br />
+   PART
+   ;;
+   2)
+   LOADING
+   ;;
+   3)
+   MEM
+   ;;
+   4)
+   exit 0
+   ;;
+   *)
+   echo &ldquo;please input true list&hellip;&rdquo;
+esac</p>
+
+<p>done</p></li>
+</ol>
+
+<h1 id="优秀内容推荐">优秀内容推荐：</h1>
+
+<p>（1）LVS-NAT的配置及运用<br />
+（2）LVS-DR的配置及运用<br />
+（3）Redis集群搭建<br />
+（4）LNMP架构介绍及部署实践<br />
+（5）Linux系统上安装MySQL数据库接描述</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

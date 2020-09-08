@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell实现文件改名 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell实现文件改名 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell实现文件改名">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%AE%9E%E7%8E%B0%E6%96%87%E4%BB%B6%E6%94%B9%E5%90%8D/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell实现文件改名</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>修改文件名可以有不同的命令方式，mv 可以实现,但是使用rename 这种专业的改名字很好</p>
+
+<p>对于单个的文件，可以直接使用以上的命令，那如果有大量的类似格式的文件名需要修改成其他格式的，该如何呢？</p>
+
+<p>创建测试文件: touch hell_world<em>hi</em>{1..5}_OO.jpg</p>
+
+<p>这一百个文件需要在前面添加前缀变成类似hell_world<em>hi</em>{1..5}_nihao.jpg，如果你使用那啥一个一个来,太不运维了</p>
+
+<p>**当前文件夹下，文件修改 <strong>有4种方式</strong>**</p>
+
+<p><strong>1. 使用while Loop加 ${//}来实现OO到 nihao 的替换</strong></p>
+
+<pre><code>#!/bin/bash
+#################################################
+#    File Name: name01.sh
+#       Author: kingle
+#         Mail: kingle_work@163.com
+#     Function:
+# Created Time: 2018年11月06日 星期二 15时27分18秒
+#################################################
+ls hell_*|while read files
+do
+    REN=${files/OO/nihao}
+    mv $files $REN
+done
+</code></pre>
+
+<p><strong>2. 充分利用 awk的分隔符功能来实现</strong></p>
+
+<p>在完成前应该先来学学awk的OFS的神操作</p>
+
+<pre><code>[root@kingle ~]# echo &quot;abc&quot; | awk '{ OFS=&quot;.&quot; } { NF=NF; print NF,$0}'
+1.abc
+</code></pre>
+
+<p>首先，修改 FS和 OFS，输入和输出的分隔符</p>
+
+<pre><code>[root@kingle conpa]# ls hell_world_hi_*|awk 'BEGIN{FS=&quot;nihao&quot;;OFS=&quot;enen&quot;}{printf &quot;mv &quot;$0 &quot; &quot;;$1=$1;print $0}'|bash
+</code></pre>
+
+<p>其次，使用 awk中的命令，拼接 mv hell_world_hi_1_nihao.jpg hell_world_hi_1_enen.jpg”这条命令<br />
+最后，使用|bash来执行一个 shell命令来完成 mv动作</p>
+
+<p>其中，$1=$1是必须的，这个是完成hell_world_hi_1_nihao.jpg===&gt;
+hell_world_hi_1_enen.jpg的关键（其实是可以使用 $2=$2等来替换，只要一个赋值动作而已）<br />
+奇怪的是，难道没有赋值动作，分隔符的改变就不能检测出来么？？</p>
+
+<p><strong>3. 使用 awk的内置命令，gsub和 system来实现替换和命令执行</strong></p>
+
+<p>[root@kingle conpa]# ls hell* | awk &lsquo;{org=$0;gsub(&ldquo;nihao&rdquo;, &ldquo;enen&rdquo;);system(&ldquo;mv
+&ldquo;org&rdquo; &ldquo;$0)}&rsquo;</p>
+
+<p>首先保存原始的数据<br />
+其次修改 nihao为 enne<br />
+最后通过awk内置执行mv动作</p>
+
+<p>其中，最后system命令”mv “org” “需要使用”“来标记，<br />
+而且 org也需要”“，并且不能使用$org<br />
+1. 对于 awk命令中的变量，不需要用 $来引用<br />
+2. 在system（）中，变量需要使用&rdquo;&ldquo;来标识，否则就被当成字符串来处理<br />
+3. 如果对变量进行 $来进行引用，就会出现两种情况<br />
+3.1 正常情况下，可以被当成位置参数来引用。比如 NF表示当前行的记录个数。比如</p>
+
+<p>[root@kingle conpa]# echo &ldquo;a b c d&rdquo; | awk &lsquo;{print NF, $NF}&rsquo; 4 d</p>
+
+<p>这个会打印两个变量，第一个是 NF本身，其值为4；第二个是第四个位置参数，也就是 $4，也就是 d<br />
+3.2 非正常情况下：<br />
+3.2.1 如果变量本身就是个字符串。比如</p>
+
+<p>[root@kingle conpa]# echo &ldquo;a b c d&rdquo; | awk &lsquo;{va=&ldquo;varA&rdquo;;print va, $va}&rsquo;</p>
+
+<p>varA a b c d</p>
+
+<p>因为后一个参数$va，由于va是个字符串，因此 $va打印的就是 $0<br />
+3.2.2 如果变量本身就是个数字，但是该值大于 NF。 比如</p>
+
+<p>1 [root@kingle conpa]# echo &ldquo;a b c d&rdquo; | awk &lsquo;{va=&ldquo;varA&rdquo;;vb=6;print va, $va,
+vb, $vb, 1}&rsquo;</p>
+
+<p>2 varA a b c d 6 1</p>
+
+<p>因为 $vb相当于是 $6，但是位置参数 $6没有，因此打印的就是个空字符</p>
+
+<p><strong>4. 使用 sed中的 s来进行替换，然后使用e命令来执行</strong></p>
+
+<pre><code>[root@kingle conpa]#  ls hell_world_* | sed -r -n 's/(.*)hi(.*)/mv &amp; \1hello\2/e'
+</code></pre>
+
+<p>关于sed的选项，使用 -r和 -n<br />
+-r 来启用后续可以使用 command，比如 mv<br />
+-n 来关闭 patten space中内容的显示</p>
+
+<p>关于sed的 command，使用e。如此在使用s命令完成 pattern space中hi到 hello的修改后，启动shell来执行 pattern
+space中的 mv指令<br />
+如果这里使用 p，标记仅仅显示 pattern space中的指令而已</p>
+
+<p><strong>如果对于某目录下的所有文件，进行文件名修改，有3中方式</strong></p>
+
+<p>1. 汇集awk的 FS/OFS和 gsub/system来实现。有点类似于综合上述2,3两种方式</p>
+
+<p>为了实现所有目录下的文件名进行修改，但是又不影响路径上文件夹名<br />
+首先，标记FS和OFS都为 ”/“<br />
+其次，使用gsub时候，指定仅仅修改当前行中最后一个记录，使用 $NF来指定</p>
+
+<p>当然，对于FS和 OFS的指定，可以不放置在 BEGIN中实现，比如：</p>
+
+<pre><code>[root@kingle conpa]# find . -name &quot;*world*&quot; -type f | awk 'BEGIN{FS=&quot;/&quot;;OFS=&quot;/&quot;}{org=$0;gsub(&quot;hello&quot;, &quot;hi&quot;, $NF);system(&quot;echo &quot;org&quot; &quot;$0)}'
+./hell_world_hello_5_enen.jpg ./hell_world_hi_5_enen.jpg
+./hell_world_hello_1_enen.jpg ./hell_world_hi_1_enen.jpg
+./hell_world_hello_3_enen.jpg ./hell_world_hi_3_enen.jpg
+./hell_world_hello_4_enen.jpg ./hell_world_hi_4_enen.jpg
+./hell_world_hello_2_enen.jpg ./hell_world_hi_2_enen.jpg
+
+
+[root@kingle conpa]# find . -name &quot;*world*&quot; -type f | awk 'BEGIN{FS=&quot;/&quot;;OFS=&quot;/&quot;}{org=$0;gsub(&quot;hello&quot;, &quot;hi&quot;, $NF);system(&quot;mv &quot;org&quot; &quot;$0)}'
+</code></pre>
+
+<p>2. 或者使用 sed</p>
+
+<pre><code>[root@kingle conpa]#  find . -name &quot;*hell*&quot; -type f | sed -r -n 's/(.*)([^\/]*)hi([^\/]*)$/mv &amp; \1\2hello\3/e'
+</code></pre>
+
+<p>3,专业修</p>
+
+<pre><code>[root@kingle conpa]# rename hello hi *.jpg
+
+
+-rw-r--r-- 1 root root   0 11月  6 15:24 hell_world_hi_1_enen.jpg
+-rw-r--r-- 1 root root   0 11月  6 15:24 hell_world_hi_2_enen.jpg
+-rw-r--r-- 1 root root   0 11月  6 15:24 hell_world_hi_3_enen.jpg
+-rw-r--r-- 1 root root   0 11月  6 15:24 hell_world_hi_4_enen.jpg
+-rw-r--r-- 1 root root   0 11月  6 15:24 hell_world_hi_5_enen.jpg
+</code></pre>
+
+<p>4,去除某个不需要的重复名字</p>
+
+<pre><code>#!/bin/bash
+#################################################
+#    File Name: name02.sh
+#       Author: kingle
+#         Mail: kingle_work@163.com
+#     Function:
+# Created Time: 2018年11月06日 星期二 16时06分16秒
+#################################################
+for file in `ls *world*.jpg`
+do
+    mv $file `echo ${file//_hi/}`
+done
+</code></pre>
+
+<p>改</p>
+
+<p>转载于:<a href="https://www.cnblogs.com/kingle-study/p/9913165.html">https://www.cnblogs.com/kingle-study/p/9913165.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

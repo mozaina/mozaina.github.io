@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>靶机渗透测试实战一拿下shell之后的操作SUID的解释 | 开发者问答集锦</title>
+    <meta property="og:title" content="靶机渗透测试实战一拿下shell之后的操作SUID的解释 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="靶机渗透测试实战一拿下shell之后的操作SUID的解释">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E9%9D%B6%E6%9C%BA%E6%B8%97%E9%80%8F%E6%B5%8B%E8%AF%95%E5%AE%9E%E6%88%98%E4%B8%80%E6%8B%BF%E4%B8%8Bshell%E4%B9%8B%E5%90%8E%E7%9A%84%E6%93%8D%E4%BD%9Csuid%E7%9A%84%E8%A7%A3%E9%87%8A/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">靶机渗透测试实战一拿下shell之后的操作SUID的解释</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="理论基础">理论基础：</h2>
+
+<h4 id="1-使用arp-scan-l命令进行主机扫描-确定主机ip">1、使用arp-scan -l命令进行主机扫描，确定主机ip；</h4>
+
+<blockquote>
+<ul>
+<li>arp-scan是一个用来进来系统发现和指纹识别的命令行工具。它可以构建并发送ARP请求到指定的IP地址，并且显示返回的任何响应。</li>
+<li>arp-scan是Kali
+Linux自带的一款ARP扫描工具。该工具可以进行单一目标扫描，也可以进行批量扫描。批量扫描的时候，用户可以通过CIDR、地址范围或者列表文件的方式指定。该工具允许用户定制ARP包，构建非标准数据包。同时，该工具会自动解析Mac地址，给出MAC对应的硬件厂商，帮助用户确认目标。</li>
+</ul>
+</blockquote>
+
+<h6 id="1-1-arp-scan可以实现的目标">1.1&gt; arp-scan可以实现的目标：</h6>
+
+<ul>
+<li>使用一个可以配置的输出带宽或者包速率，发送ARP包到任意多个目标主机；</li>
+<li>对于系统发现，这是非常有用的，你可能需要扫描大量的地址空间；</li>
+<li>以灵活的方式构建并传出ARP报文；</li>
+<li>arp-scan可以控制ARP包中所有的字段以及以太网帧的头部；</li>
+<li>解码并且显示任何返回的数据包；</li>
+<li>arp-scan可以解码显示返回的任何ARP数据包，并且使用MAC地址查找供应商；</li>
+<li>使用arp-指纹工具采集IP主机的指纹。</li>
+</ul>
+
+<h6 id="1-2-arp的相关知识">1.2&gt; ARP的相关知识：</h6>
+
+<ul>
+<li>ARP（地址解析协议）是一种协议，决定了链路层（第2层）地址，对于一个给定的网络层（第三层）地址。 ARP协议在RFC826以太网地址解析协议定义；</li>
+<li>ARP协议被设计成允许被用于任何链路层和网络层协议。然而在实际中它仅用于以太网（包括802.11无线）和IPv4，我们假定在整个文档中，这些协议。 IPv6使用NDP（邻居发现协议）来代替，这是一种不同的协议；</li>
+<li>ARP是一个不可路由的协议，因此只能在同一个以太网网络上的系统之间使用。</li>
+</ul>
+
+<h6 id="1-3-arp-scan相关知识">1.3&gt; arp-scan相关知识：</h6>
+
+<blockquote>
+<ul>
+<li>arp-scan可用来发现本地网络上的IP主机。它可以发现的所有主机，包括那些已经阻止所有IP访问，如已经打开防火墙和系统入口过滤器的主机；</li>
+<li>arp-
+scan适用于以太网和802.11无线网络。它也可以与令牌环网和FDDI工作，但他们并没有经过测试。它不支持串行链路如PPP或SLIP，因为ARP不支持他们;</li>
+<li>运行arp-scan需要root权限，或arp-scan必须是SUID root。因为它使用的读取和写入的以太网数据包的功能需要root权限;</li>
+<li>arp-scan向局域网中所有可能的ip地址发出arp请求包，如果得到arp回应，就证明局域网中某台主机使用了该ip。</li>
+</ul>
+</blockquote>
+
+<h4 id="2-使用nmap扫描">2、使用nmap扫描：</h4>
+
+<blockquote>
+<ul>
+<li>nmap是一个网络连接端扫描软件，用来扫描网上电脑开放的网络连接端。确定哪些服务运行在哪些连接端，并且推断计算机运行哪个操作系统（这是亦称
+fingerprinting）。它是网络管理员必用的软件之一，以及用以评估网络系统安全。</li>
+</ul>
+</blockquote>
+
+<h5 id="2-1-nmap扫描技术">2.1&gt; NMAP扫描技术：</h5>
+
+<ol>
+<li>在这里我将展示用于扫描网络/主机的基本技巧。</li>
+<li>端口状态:扫描后,你可能会看到一些结果，端口状态是过滤,打开,关闭,等等。让我解释这一点。</li>
+</ol>
+
+<blockquote>
+<ul>
+<li><strong>开放（Open）：</strong> 这表明一个应用程序侦听此端口上的连接；</li>
+<li><strong>关闭（Close）：</strong> 这表明收到了探头，但没有应用程序监听次端口；</li>
+<li><strong>已过滤（）：</strong> 这表明探针没有收到，无法建立连接。它也表明探针被某些筛选给丢弃；<br />
+<strong>未过滤（）：</strong> 这表明探针接收但无法建立连接；<br />
+<strong>打开/过滤（）：</strong> 这表示该端口进行过滤或打开，但NMAP的无法建立连接；<br />
+<strong>关闭/过滤（）：</strong> 这表示该端口进行过滤或关闭，但NMAP的无法建立连接；</li>
+</ul>
+</blockquote>
+
+<h2 id="实验环境">实验环境：</h2>
+
+<ul>
+<li>靶机，IP地址：IP地址未知</li>
+<li>测试机，kali，IP地址：192.168.85.135</li>
+</ul>
+
+<h2 id="实验步骤">实验步骤：</h2>
+
+<h3 id="1-信息收集-主机发现和端口扫描">1、信息收集（主机发现和端口扫描）</h3>
+
+<h5 id="1-1-主机发现">1.1&gt; 主机发现</h5>
+
+<p>注意：因为只是在局域网中，所以使用内网扫描；</p>
+
+<p><strong>命令1：arp-scan -l</strong></p>
+
+<p><strong>命令2：netdiscover -i eth0 -r 192.168.85.0/24</strong></p>
+
+<ul>
+<li>netdiscover -i eth0 -r 192.168.37.0/24</li>
+</ul>
+
+<p>1.1.1&gt; arp-scan命令<br />
+<a href="https://img.it610.com/image/info8/ab075f239d5c40888dcff2a55ad08d40.jpg"><img src="https://img.it610.com/image/info8/ab075f239d5c40888dcff2a55ad08d40.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第1张图片" /></a><br />
+1.1.2&gt; netdiscover命令；<br />
+<a href="https://img.it610.com/image/info8/d366ffb3f91548539b026c6b275dbc0a.jpg"><img src="https://img.it610.com/image/info8/d366ffb3f91548539b026c6b275dbc0a.jpg" alt="在这里插入图片描述" /></a><br />
+<a href="https://img.it610.com/image/info8/cb9672b3cfab41d2bc5d0755d9e1b70a.jpg"><img src="https://img.it610.com/image/info8/cb9672b3cfab41d2bc5d0755d9e1b70a.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第2张图片" /></a></p>
+
+<h5 id="1-2-端口扫描">1.2&gt; 端口扫描：</h5>
+
+<h6 id="2-1-1-nmap命令-扫描端口详细信息">2.1.1&gt; nmap命令——扫描端口详细信息</h6>
+
+<ul>
+<li>nmap -sS -Pn -A -p- -n IP地址</li>
+<li>nmap -sV -p- IP地址</li>
+</ul>
+
+<p><em><strong>NMAP的相关参数：</strong></em></p>
+
+<ul>
+<li>-sV —— 用来扫描目标主机和端口上运行的软件的版本；</li>
+<li>-p 80 —— 指定80端口；</li>
+<li>-p- —— 扫描0-65535全部端口；</li>
+<li>-sS/sT/sA/sW/sM——指定使用 TCP SYN/Connect()/ACK/Window/Maimon scans的方式来对目标主机进行扫描；</li>
+<li>-PN选项——指示NMAP跳过默认的发现检查并对执行对目标的完整端口扫描。当扫描被阻止ping探针的防火墙保护的主机时，这是非常有用的；</li>
+<li>-PS——选项进行TCP SYN Ping；</li>
+<li>-PA——对指定主机进行TCP Ack Ping扫描；</li>
+<li>-P——对指定主机进行UDP Ack Ping扫描；</li>
+<li>-n——用于禁用反向DNS解析；</li>
+<li>-A —— 全面系统检测、启用脚本检测、扫描等；</li>
+</ul>
+
+<p>（1） <strong>命令：root@kali:~# nmap -sS -Pn -A -p- -n 192.168.85.136</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/ed3817d43645440bb8d6607e88debf82.jpg"><img src="https://img.it610.com/image/info8/ed3817d43645440bb8d6607e88debf82.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第3张图片" /></a><em><strong>注意：</strong></em></p>
+
+<blockquote>
+<ul>
+<li>111端口是SUN公司的RPC（Remote Procedure
+Call，远程过程调用）服务所开放的端口，主要用于分布式系统中不同计算机的内部进程通信，RPC在多种网络服务中都是很重要的组件。常见的RPC服务有rpc．mountd、NFS、rpc．statd、rpc．csmd、rpc．ttybd、amd等等。在Microsoft的Windows中，同样也有RPC服务，如Dirb、Masscan、Netdiscover。</li>
+</ul>
+</blockquote>
+
+<p>靶机操作系统信息：</p>
+
+<p><a href="https://img.it610.com/image/info8/3cd71c6190384595a8127957db16456d.jpg"><img src="https://img.it610.com/image/info8/3cd71c6190384595a8127957db16456d.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第4张图片" /></a><br />
+扫描到的端口版本信息：</p>
+
+<p><a href="https://img.it610.com/image/info8/ee385bd527eb4915bad1561321c46656.jpg"><img src="https://img.it610.com/image/info8/ee385bd527eb4915bad1561321c46656.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第5张图片" /></a><em><strong>关于以上的说明：</strong></em></p>
+
+<blockquote>
+<ul>
+<li>其中：-T4指定扫描过程中使用的时序（分为0-5等级）；</li>
+<li>-sV扫描版本的信息和开启的服务；</li>
+<li>也可以选择带-A参数，详细扫描开放端口的具体服务；</li>
+<li>与masscan相比，namp更详细，但是速度较慢（可以通过masscan快速扫描，再使用nmap扫描具体开放的端口）；</li>
+<li>可以发现192.168.85.136主机开启了22（ssh服务），80（Apache服务）；
+*
+在这里注意几个端口：22（ssh服务），139/445（smaba共享服务），80（Apache服务），3306（MySQL服务）和6667（icrd互联网中继聊天守护进程）端口；</li>
+</ul>
+</blockquote>
+
+<h6 id="2-1-2-masscan命令-扫描端口">2.1.2&gt; masscan命令——扫描端口</h6>
+
+<p>命令：root@kali:/var/www/html# masscan &ndash;rate=10000 &ndash;ports 0-65535
+192.168.85.136</p>
+
+<ul>
+<li>masscan &ndash;rate=每秒多少个数据包 &ndash;ports 端口范围 IP地址/IP地址段</li>
+</ul>
+
+<blockquote>
+<ul>
+<li>Masscan扫描速度快，为了防止漏扫，可以多扫描几次；</li>
+</ul>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/cc1020bf99f74a48be5fa6ee7a278f16.jpg"><img src="https://img.it610.com/image/info8/cc1020bf99f74a48be5fa6ee7a278f16.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第6张图片" /></a></p>
+
+<h5 id="1-3-扫描主机和端口后总结如下-我们以80-端口为突破口">1.3&gt; 扫描主机和端口后总结如下——&gt;我们以80 端口为突破口：</h5>
+
+<p><a href="https://img.it610.com/image/info8/0e49070d6c054015b0d4225943a2e317.jpg"><img src="https://img.it610.com/image/info8/0e49070d6c054015b0d4225943a2e317.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第7张图片" /></a></p>
+
+<h3 id="2-发现攻击机web服务的内容管理系统框架">2、发现攻击机web服务的内容管理系统框架</h3>
+
+<h5 id="2-1-通过访问web服务登录发掘">2.1&gt; 通过访问Web服务登录发掘；</h5>
+
+<blockquote>
+<p>Drupal是使用PHP语言编写的开源内容管理框架（CMF），它由内容管理系统（CMS）和PHP开发框架（Framework）共同构成。</p>
+</blockquote>
+
+<p>通过扫描到的IP（192.168.85.136）登录Web服务；</p>
+
+<p><a href="https://img.it610.com/image/info8/3e22982716194f3a8f9063c553dbef02.jpg"><img src="https://img.it610.com/image/info8/3e22982716194f3a8f9063c553dbef02.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第8张图片" /></a></p>
+
+<h5 id="2-2-通过nmap扫描发掘">2.2&gt; 通过nmap扫描发掘；</h5>
+
+<p><a href="https://img.it610.com/image/info8/3adf7204df5043fc972b0f59d46f9831.jpg"><img src="https://img.it610.com/image/info8/3adf7204df5043fc972b0f59d46f9831.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第9张图片" /></a><br />
+结论：我们可以发现该网站的CMS（内容管理系统），这样我们就可以直接在网上搜索这个CMS的漏洞利用方式。</p>
+
+<h5 id="2-3-确定web服务的内容管理框架后-就可以通过以下思路找到一些突破口">2.3&gt; 确定Web服务的内容管理框架后，就可以通过以下思路找到一些突破口；</h5>
+
+<pre><code>1、  直接访问敏感文件  robots.txt
+2、  扫目录
+3、  用户名  密码爆破
+4、  Whatweb扫描
+5、  看网页源码   看有没有信息可利用
+6、  Powered by  drupal     
+7、  扫描备份文件
+8、  密码重置
+</code></pre>
+
+<h3 id="3-漏洞的查询">3、漏洞的查询</h3>
+
+<h5 id="3-1-使用浏览器搜索漏洞">3.1&gt; 使用浏览器搜索漏洞；</h5>
+
+<p><a href="https://img.it610.com/image/info8/6caf0b11f3814a25839af21985134d9b.jpg"><img src="https://img.it610.com/image/info8/6caf0b11f3814a25839af21985134d9b.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第10张图片" /></a></p>
+
+<h5 id="3-2-使用metasploit进行漏洞查询">3.2&gt; 使用Metasploit进行漏洞查询</h5>
+
+<blockquote>
+<p>Metasploit是一款开源的安全漏洞检测工具。它可以帮助用户识别安全问题，验证漏洞的缓解措施，并对某些软件进行安全性评估，提供真正的安全风险情报。当用户第一次接触Metasploit渗透测试框架软件（MSF）时，可能会被它提供如此多的接口、选项、变量和模块所震撼，而感觉无所适从。Metasploit软件为它的基础功能提供了多个用户接口，包括终端、命令行和图形化界面等。</p>
+</blockquote>
+
+<h6 id="1-metasploit的基本配置">（1）Metasploit的基本配置：</h6>
+
+<ul>
+<li>第一步：启动postgresql数据库 ——&gt; 命令：/etc/init.d/postgresql start；或者 service postgresql start；</li>
+<li>第二步：初始化MSF数据库（关键步骤！）——&gt; 命令：msfdb init；</li>
+<li>第三步：运行msfconsole ——&gt; 命令：msfconsole；</li>
+<li>第四部：在msf中查看数据库连接状态 ——&gt; 命令：db_status；</li>
+<li>第五步：更新metasploit ——&gt; 命令：msfupdate；</li>
+<li>第六步：设置启动 自动启动msf和postgresql ——&gt; update-rc.d postgresql enable或者 update-rc.d metasploit enable；</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/1a5f5f8e49834026834d630a438300d5.jpg"><img src="https://img.it610.com/image/info8/1a5f5f8e49834026834d630a438300d5.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第11张图片" /></a></p>
+
+<h6 id="2-搜索这个类cms在msf中能进行利用的方法">（2）搜索这个类cms在msf中能进行利用的方法</h6>
+
+<p>命令：msf5 &gt; search drupal</p>
+
+<blockquote>
+<p>以上有数个攻击模块，哪一个能用，就需要一个一个进行尝试了。</p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/46c7c4ff726b47b1b410873102d6b2cf.jpg"><img src="https://img.it610.com/image/info8/46c7c4ff726b47b1b410873102d6b2cf.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第12张图片" /></a>同时选择攻击模块；</p>
+
+<p><a href="https://img.it610.com/image/info8/5248d6fdb0124d30b80878aad65e8b75.jpg"><img src="https://img.it610.com/image/info8/5248d6fdb0124d30b80878aad65e8b75.jpg" alt="在这里插入图片描述" /></a></p>
+
+<h6 id="3-查看使用这个模块需要设置的配置参数">（3）查看使用这个模块需要设置的配置参数；</h6>
+
+<p><a href="https://img.it610.com/image/info8/6c81677252734881b47a538779fe1339.jpg"><img src="https://img.it610.com/image/info8/6c81677252734881b47a538779fe1339.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第13张图片" /></a></p>
+
+<h6 id="4-设置目标-攻击-这里直接反弹一shell">（4）设置目标，攻击；这里直接反弹一shell</h6>
+
+<p><em>方法一：</em><br />
+<a href="https://img.it610.com/image/info8/403c5b1479c749f7a5d018a992311317.jpg"><img src="https://img.it610.com/image/info8/403c5b1479c749f7a5d018a992311317.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第14张图片" /></a><em>方法二：</em></p>
+
+<p>注意：有时候反弹shell需要的时间比较长，需要等待几分钟，因此我么可以使用另外一个命令后台等待shell；</p>
+
+<p>1、 <strong>命令：exploit -j —— &gt; 在后台等在其shell</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/79b6d461da3f41bc9750dfcce828968d.jpg"><img src="https://img.it610.com/image/info8/79b6d461da3f41bc9750dfcce828968d.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第15张图片" /></a></p>
+
+<p>2、 当成功利用后，我们可以在Kali的MSF终端下，反弹回一个会话：</p>
+
+<p>命令：msf5 &gt; sessions -i</p>
+
+<blockquote>
+<p>会话连接为：192.168.85.135:4444 -&gt; 192.168.85.136:34377 (192.168.85.136)</p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/de27e67de09c4e0688cfe357518d9c89.jpg"><img src="https://img.it610.com/image/info8/de27e67de09c4e0688cfe357518d9c89.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第16张图片" /></a><br />
+3、接着，我们选择会话 3 ，与其建立连接即可！</p>
+
+<p>命令：sessions -i 3</p>
+
+<p><a href="https://img.it610.com/image/info8/5a9ae6047d38408ca59227e18f2edbba.jpg"><img src="https://img.it610.com/image/info8/5a9ae6047d38408ca59227e18f2edbba.jpg" alt="在这里插入图片描述" /></a></p>
+
+<h6 id="5-切换成反弹式的shell">（5）切换成反弹式的shell；</h6>
+
+<ul>
+<li>命令：meterpreter &gt; shell</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/18b6a51c16814eec94b7a2064f7587c5.jpg"><img src="https://img.it610.com/image/info8/18b6a51c16814eec94b7a2064f7587c5.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第17张图片" /></a></p>
+
+<h6 id="4-使用python-切成交互式的shell">（4）使用python，切成交互式的shell；</h6>
+
+<p>命令：python -c ‘import pty;pty.spawn(&ldquo;/bin/bash&rdquo;)’</p>
+
+<p><a href="https://img.it610.com/image/info8/e88d23c77f194e2ca7ffad98970d516c.jpg"><img src="https://img.it610.com/image/info8/e88d23c77f194e2ca7ffad98970d516c.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第18张图片" /></a></p>
+
+<h6 id="5-发现flag1-txt文件-并查看该文件-提示为查看cms的config文件">（5）发现flag1.txt文件，并查看该文件，提示为查看cms的config文件；</h6>
+
+<p><a href="https://img.it610.com/image/info8/78700ba81ec84b59907b156d45c446bd.jpg"><img src="https://img.it610.com/image/info8/78700ba81ec84b59907b156d45c446bd.jpg" alt="在这里插入图片描述" /></a></p>
+
+<h6 id="6-搜索drupal的配置文件">（6）搜索drupal的配置文件</h6>
+
+<ul>
+<li>通过浏览器搜索drupal的配置文件，可以看到配置文件为：/sites/default/settings.php</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/7f6bd1aa13ff4c949e0cd10b5d15b3cb.jpg"><img src="https://img.it610.com/image/info8/7f6bd1aa13ff4c949e0cd10b5d15b3cb.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第19张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/41b54bde59c64ec88b00bdb1f0bbeaaa.jpg"><img src="https://img.it610.com/image/info8/41b54bde59c64ec88b00bdb1f0bbeaaa.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第20张图片" /></a></p>
+
+<h6 id="7-使用suid提权-找到一个属于root的具有s权限的文件">（7）使用suid提权，找到一个属于root的具有s权限的文件；</h6>
+
+<p>命令1：find / -user root -perm 4000 -print 2&gt;/dev/null<br />
+命令2：find / -perm -u=s -type f 2&gt;/dev/null</p>
+
+<p><a href="https://img.it610.com/image/info8/0585297bbcca4bd29112c851aecc1668.jpg"><img src="https://img.it610.com/image/info8/0585297bbcca4bd29112c851aecc1668.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第21张图片" /></a><br />
+查看find命令的权限；</p>
+
+<p><a href="https://img.it610.com/image/info8/348689847e5349fead735393881eab39.jpg"><img src="https://img.it610.com/image/info8/348689847e5349fead735393881eab39.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第22张图片" /></a></p>
+
+<h6 id="8-提权">（8）提权；</h6>
+
+<p><a href="https://img.it610.com/image/info8/f5f123e1ab8e45b8a24836e5897f4bb0.jpg"><img src="https://img.it610.com/image/info8/f5f123e1ab8e45b8a24836e5897f4bb0.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第23张图片" /></a></p>
+
+<h2 id="知识总结">知识总结：</h2>
+
+<h4 id="一-拿下shell之后的操作">一、拿下shell之后的操作：</h4>
+
+<p>1、 查看基本信息：</p>
+
+<ul>
+<li>whoami ——&gt; 用于显示自身用户名称；</li>
+<li>pwd ——&gt; 显示当前所在工作目录的全路径;</li>
+<li>uname -a ——&gt; 输出所有系统信息；</li>
+<li>/etc/issue ——&gt; 是Linux终端登录的欢迎语句存储文件（系统信息、内核版本）；</li>
+<li>lsb_release -a ——&gt; 分行罗列出显示LSB和特定版本的相关信息；</li>
+</ul>
+
+<p>2、看当前目录文件，配置文件（数据库配置文件）；<br />
+3、查看/etc/password；<br />
+4、查看具有 s 权限，可执行二进制文件；</p>
+
+<ul>
+<li>定时任务文件</li>
+<li>Sudo</li>
+<li>上传检测脚本（）</li>
+</ul>
+
+<h4 id="二-考虑suid提权-查找正在系统上运行的所有suid可执行文件-可用命令为">二、考虑suid提权，查找正在系统上运行的所有SUID可执行文件，可用命令为</h4>
+
+<pre><code>find / -user root -perm -4000 -print 2&gt;/dev/null
+find / -perm -u=s -type f 2&gt;/dev/null
+find / -user root -perm -4000 -exec ls -ldb {} \;
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/b796d5271644479f8130964309a1be0b.jpg"><img src="https://img.it610.com/image/info8/b796d5271644479f8130964309a1be0b.jpg" alt="靶机渗透测试实战（一）——拿下shell之后的操作、SUID的解释_第24张图片" /></a><br />
+以上所有的二进制文件都将以root用户权限来执行，准确的说，这个命令将从/目录中查找具有SUID权限位一切属主为root的文件并输出它们，然而将所有错误重定向到/dev/null，从而仅列出该用户具有访问权限的那些二进制文件。因为它们的权限中包含“s”，并且它们的属主为root。</p>
+
+<p>SUID（设置用户ID）是赋予文件的一种权限，它会出现在文件拥有者权限的执行位上，具有这种权限的文件会在其执行时，使调用者暂时获得该文件拥有者的权限。那么，为什么要给Linux二进制文件设置这种权限呢？其实原因有很多，例如，程序ping需要root权限才能打开网络套接字，但执行该程序的用户通常都是由普通用户，来验证与其他主机的连通性。<br />
+但是，如果某些现有的二进制文件和实用程序具有SUID权限的话，就可以在执行时将权限提升为root。其中，大家熟知的具有提权功能的Linux可执行文件包括：<br />
+Nmap<br />
+Vim<br />
+find<br />
+Bash<br />
+More<br />
+Less<br />
+Nano<br />
+cp</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

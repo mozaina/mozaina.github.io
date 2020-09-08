@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本调用阿里云API实现DDNS动态域名解析 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本调用阿里云API实现DDNS动态域名解析 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本调用阿里云API实现DDNS动态域名解析">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E8%B0%83%E7%94%A8%E9%98%BF%E9%87%8C%E4%BA%91api%E5%AE%9E%E7%8E%B0ddns%E5%8A%A8%E6%80%81%E5%9F%9F%E5%90%8D%E8%A7%A3%E6%9E%90/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本调用阿里云API实现DDNS动态域名解析</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<pre><code>* 前言
+* 申请AccessKey
+  * 创建用户
+  * 创建用户组
+  * 用户组添加成员
+  * 用户组添加权限
+* Shell脚本
+</code></pre>
+
+<h2 id="前言">前言</h2>
+
+<p>由于服务器的外网是动态拨号，每次获取的外网IP都不同。手头上刚好有阿里云的域名。为此，想通过编写一个Shell脚本，定期通过互联网服务获取当前机器所在网络的外部IP地址，并将新的IP地址通过阿里云提供的API，更新到对应的域名解析记录。</p>
+
+<h2 id="申请accesskey">申请AccessKey</h2>
+
+<p>登陆阿里云官网，在控制台的右上角，将鼠标移动到头像上，会出现如下列表：<br />
+<a href="https://img.it610.com/image/info8/36d4ef5b735c4f83abbc3b8dcb362af4.jpg"><img src="https://img.it610.com/image/info8/36d4ef5b735c4f83abbc3b8dcb362af4.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第1张图片" /></a><br />
+选择AccessKey管理，会弹出如下提示：<br />
+<a href="https://img.it610.com/image/info8/b910549e53344ef4bb5b9ccf25bbf691.jpg"><img src="https://img.it610.com/image/info8/b910549e53344ef4bb5b9ccf25bbf691.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第2张图片" /></a><br />
+选择<code>开始使用子用户AccessKey</code>，这里不选择<code>继续使用AccessKey</code>，原因是当前进入的页面是主账号，拥有所有的权限，建议通过使用子账户来配置，控制权限。</p>
+
+<h3 id="创建用户">创建用户</h3>
+
+<p><a href="https://img.it610.com/image/info8/3831b771b3194c388d0da78eb64a1096.jpg"><img src="https://img.it610.com/image/info8/3831b771b3194c388d0da78eb64a1096.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第3张图片" /></a><br />
+填写要创建的登陆名称和显示名称，这里可以按照需要进行填写，然后点击<code>确定</code>完成创建用户。如果弹出要验证短信，则按提示完成即可。<br />
+<a href="https://img.it610.com/image/info8/9e9c5c7e6f3346868cc981f96617de4e.jpg"><img src="https://img.it610.com/image/info8/9e9c5c7e6f3346868cc981f96617de4e.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第4张图片" /></a><br />
+创建完成后，默认账户没有<code>AccessKey ID</code>和<code>AccessKey Secret</code>。<br />
+选择左侧用户列表，点击新创建的用户名，出现如下设置：<br />
+<a href="https://img.it610.com/image/info8/7d53932989eb4850a7c83866e5db9e5c.jpg"><img src="https://img.it610.com/image/info8/7d53932989eb4850a7c83866e5db9e5c.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第5张图片" /></a><br />
+选择<code>创建AccessKey</code><br />
+<a href="https://img.it610.com/image/info8/04a21351127a42c2b33ae10acbc87b3f.jpg"><img src="https://img.it610.com/image/info8/04a21351127a42c2b33ae10acbc87b3f.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第6张图片" /></a><br />
+保存创建好的<code>AccessKey ID</code>和<code>AccessKey Secret</code>，注意<code>AccessKey
+Secret</code>只会在这一次显示，后续无法在此查看。如果忘记了，只能删除掉重新添加新的。</p>
+
+<h3 id="创建用户组">创建用户组</h3>
+
+<p>点击用户组，选择<code>创建用户组</code>，并填写用户组的相关信息。<br />
+<a href="https://img.it610.com/image/info8/db421ef210064cf9ad41a585ce2a2b3d.jpg"><img src="https://img.it610.com/image/info8/db421ef210064cf9ad41a585ce2a2b3d.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第7张图片" /></a><br />
+点击<code>确定</code>，创建用户组。</p>
+
+<h3 id="用户组添加成员">用户组添加成员</h3>
+
+<p><a href="https://img.it610.com/image/info8/e6bb0c1a1433446a854f95b9f4e95258.jpg"><img src="https://img.it610.com/image/info8/e6bb0c1a1433446a854f95b9f4e95258.jpg" alt="添加组成员入口" /></a><br />
+在用户组后面选择<code>添加组成员</code><br />
+<a href="https://img.it610.com/image/info8/36a9926184b643d48a9602e97f036a48.jpg"><img src="https://img.it610.com/image/info8/36a9926184b643d48a9602e97f036a48.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第8张图片" /></a><br />
+选择要添加的用户进行添加，然后点击<code>确定</code>。</p>
+
+<h3 id="用户组添加权限">用户组添加权限</h3>
+
+<p><a href="https://img.it610.com/image/info8/b366ce3fdb1b48988077f85b7f508b08.jpg"><img src="https://img.it610.com/image/info8/b366ce3fdb1b48988077f85b7f508b08.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第9张图片" /></a><br />
+在用户组后面选择<code>添加权限</code><br />
+<a href="https://img.it610.com/image/info8/28b5da8a73b44f758a5935ef95e821a0.jpg"><img src="https://img.it610.com/image/info8/28b5da8a73b44f758a5935ef95e821a0.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第10张图片" /></a><br />
+点击<code>确定</code>，添加权限。<br />
+<a href="https://img.it610.com/image/info8/2ec0b3681ddd47958c9b52c8acf8fca5.jpg"><img src="https://img.it610.com/image/info8/2ec0b3681ddd47958c9b52c8acf8fca5.jpg" alt="Shell脚本调用阿里云API实现DDNS动态域名解析_第11张图片" /></a><br />
+到这里，子账户的创建及权限配置就已经完成。</p>
+
+<h2 id="shell脚本">Shell脚本</h2>
+
+<pre><code>#!/bin/bash
+echo &quot;[$(date &quot;+%G/%m/%d %H:%M:%S&quot;)] AliDDNS.sh start...&quot;
+
+while true
+do
+
+# 设置需要DDNS的地址，格式为 AliDDNS_SubDomainName.AliDDNS_DomainName ,
+# 例如 AliDDNS_DomainName 为 example.com, AliDDNS_SubDomainName 为 ddns ,
+# 连接起来就是 ddns.example.com
+#
+# 设置需要DDNS的域名 
+AliDDNS_DomainName=&quot;&quot;
+# 设置需要DDNS的子域名 
+AliDDNS_SubDomainName=&quot;&quot;
+# 设置域名记录的TTL (生存周期)
+# 免费版产品最低为600(10分钟)~86400(1天), 付费版(企业版)包括以上范围, 还可以按照购买产品配置设置为：
+# 600(10分钟)、120(2分钟)、60(1分钟)、10(10秒)、5(5秒)、1(1秒), 
+# 请按照自己的产品配置和DDNS解析速度需求妥善配置TTL值, 免费版设置低于600的TTL将会报错。
+AliDDNS_TTL=&quot;600&quot;
+
+# 设置阿里云的AccessKeyId/AccessKeySecret,
+# 可在 https://ak-console.aliyun.com/ 处获取 ,
+# 推荐使用 https://ram.console.aliyun.com/#/user/list 生成的AK/SK, 更安全
+#
+# 设置阿里云的Access Key
+AliDDNS_AK=&quot;&quot;
+# 设置阿里云的Secret Key
+AliDDNS_SK=&quot;&quot;
+
+# 设置获取本机IP需要执行的命令 (用于nslookup命令获取DDNS域名的当前IP)
+AliDDNS_LocalIP=&quot;curl -s whatismyip.akamai.com&quot;
+# 设置解析使用的DNS服务器 (推荐使用 223.5.5.5/223.6.6.6 , 毕竟都是阿里家的东西)
+AliDDNS_DomainServerIP=&quot;223.5.5.5&quot;
+
+# 防止用户忘记设置参数导致程序报错，部分参数如果检测到空值，自动使用默认值
+[ &quot;$AliDDNS_LocalIP&quot; = &quot;&quot; ] &amp;&amp; AliDDNS_LocalIP=&quot;curl -s whatismyip.akamai.com&quot;
+[ &quot;$AliDDNS_DomainServerIP&quot; = &quot;&quot; ] &amp;&amp; $AliDDNS_DomainServerIP=&quot;223.5.5.5&quot;
+[ &quot;$AliDDNS_TTL&quot; = &quot;&quot; ] &amp;&amp; AliDDNS_TTL=&quot;600&quot;
+# 获取本机公网IP
+AliDDNS_LocalIP=`$AliDDNS_LocalIP 2&gt;&amp;1` || die &quot;$AliDDNS_LocalIP&quot;
+# 获取DDNS域名当前解析记录IP
+AliDDNS_DomainIP=`nslookup $AliDDNS_SubDomainName.$AliDDNS_DomainName $AliDDNS_DomainServerIP 2&gt;&amp;1`
+# 判断上一条命令的执行是否成功
+if [ &quot;$?&quot; -eq &quot;0&quot; ]
+then
+    # 如果执行成功，分离出结果中的IP地址
+    AliDDNS_DomainIP=`echo &quot;$AliDDNS_DomainIP&quot; | grep 'Address:' | tail -n1 | awk '{print $NF}'`
+    # 进行判断，如果本次获取的新IP和旧IP相同，则进行休眠一分钟后再继续判断
+    if [ &quot;$AliDDNS_LocalIP&quot; = &quot;$AliDDNS_DomainIP&quot; ]
+    then
+        echo &quot;[$(date &quot;+%G/%m/%d %H:%M:%S&quot;)] Local IP ($AliDDNS_LocalIP) is the same with Domain IP ($AliDDNS_DomainIP)&quot;
+        echo &quot;[$(date &quot;+%G/%m/%d %H:%M:%S&quot;)] No change modified ...&quot;
+    sleep 60
+    continue
+    fi 
+fi
+# 如果IP发生变动，开始进行修改
+# 生成时间戳
+timestamp=`date -u &quot;+%Y-%m-%dT%H%%3A%M%%3A%SZ&quot;`
+# URL加密函数
+urlencode() {
+    # urlencode 
+    out=&quot;&quot;
+    while read -n1 c
+    do
+        case $c in
+            [a-zA-Z0-9._-]) out=&quot;$out$c&quot; ;;
+            *) out=&quot;$out`printf '%%%02X' &quot;'$c&quot;`&quot; ;;
+        esac
+    done
+    echo -n $out
+}
+# URL加密命令
+enc() {
+    echo -n &quot;$1&quot; | urlencode
+}
+# 发送请求函数
+send_request() {
+    local args=&quot;AccessKeyId=$AliDDNS_AK&amp;Action=$1&amp;Format=json&amp;$2&amp;Version=2015-01-09&quot;
+    local hash=$(echo -n &quot;GET&amp;%2F&amp;$(enc &quot;$args&quot;)&quot; | openssl dgst -sha1 -hmac &quot;$AliDDNS_SK&amp;&quot; -binary | openssl base64)
+    curl -s &quot;http://alidns.aliyuncs.com/?$args&amp;Signature=$(enc &quot;$hash&quot;)&quot;
+}
+# 获取记录值 (RecordID)
+get_recordid() {
+    grep -Eo '&quot;RecordId&quot;:&quot;[0-9]+&quot;' | cut -d':' -f2 | tr -d '&quot;'
+}
+# 请求记录值 (RecordID)
+query_recordid() {
+    send_request &quot;DescribeSubDomainRecords&quot; &quot;SignatureMethod=HMAC-SHA1&amp;SignatureNonce=$timestamp&amp;SignatureVersion=1.0&amp;SubDomain=$AliDDNS_SubDomainName.$AliDDNS_DomainName&amp;Timestamp=$timestamp&quot;
+}
+# 更新记录值 (RecordID)
+update_record() {
+    send_request &quot;UpdateDomainRecord&quot; &quot;RR=$AliDDNS_SubDomainName&amp;RecordId=$1&amp;SignatureMethod=HMAC-SHA1&amp;SignatureNonce=$timestamp&amp;SignatureVersion=1.0&amp;TTL=$AliDDNS_TTL&amp;Timestamp=$timestamp&amp;Type=A&amp;Value=$AliDDNS_LocalIP&quot;
+}
+# 添加记录值 (RecordID)
+add_record() {
+    send_request &quot;AddDomainRecord&amp;DomainName=$AliDDNS_DomainName&quot; &quot;RR=$AliDDNS_SubDomainName&amp;SignatureMethod=HMAC-SHA1&amp;SignatureNonce=$timestamp&amp;SignatureVersion=1.0&amp;TTL=$AliDDNS_TTL&amp;Timestamp=$timestamp&amp;Type=A&amp;Value=$AliDDNS_LocalIP&quot;
+}
+
+# 判断RecordIP是否为空
+if [ &quot;$AliDDNS_RecordID&quot; = &quot;&quot; ]
+then
+    AliDDNS_RecordID=`query_recordid | get_recordid`
+fi
+if [ &quot;$AliDDNS_RecordID&quot; = &quot;&quot; ]
+then
+    AliDDNS_RecordID=`add_record | get_recordid`
+    echo &quot;[$(date &quot;+%G/%m/%d %H:%M:%S&quot;)] Added RecordID : $AliDDNS_RecordID&quot;
+else
+    update_record $AliDDNS_RecordID
+    echo &quot;[$(date &quot;+%G/%m/%d %H:%M:%S&quot;)] Updated RecordID : $AliDDNS_RecordID&quot;
+fi
+
+# 输出最终结果
+if [ &quot;$AliDDNS_RecordID&quot; = &quot;&quot; ]; then
+    # 输出失败结果 (因为没有获取到RecordID)
+    echo &quot;[$(date &quot;+%G/%m/%d %H:%M:%S&quot;)] DDNS Update Failed !&quot;
+else
+    # 输出成功结果
+    echo &quot;[$(date &quot;+%G/%m/%d %H:%M:%S&quot;)] DDNS Update Success, New IP is : $AliDDNS_LocalIP&quot;
+fi
+
+sleep 30
+done
+</code></pre>
+
+<p>填入要管理的域名和对应的子域名，并将上一步获得的<code>AccessKey ID</code>和<code>AccessKey
+Secret</code>填入。运行脚本即可定时检测当前外网IP，并更新到对应的子域名记录里面。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

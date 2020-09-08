@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>MySQLShell实用导入程序 | 开发者问答集锦</title>
+    <meta property="og:title" content="MySQLShell实用导入程序 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="MySQLShell实用导入程序">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/mysqlshell%E5%AE%9E%E7%94%A8%E5%AF%BC%E5%85%A5%E7%A8%8B%E5%BA%8F/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">MySQLShell实用导入程序</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="简介">简介</h1>
+
+<p>MySQL Shell的导入程序<code>util.loadDump(url[, options])</code>，在MySQL Shell
+8.0.21中引入，支持导入MySQL并行导入数据、进度状态跟踪、恢复和重置功能。</p>
+
+<blockquote>
+<p>备注：</p>
+
+<ol>
+<li>导入工具使用的是<code>LOAD DATA LOCAL INFILE</code>语法，所以需要设置<code>local_infile</code>参数为ON，设置方式：<code>set
+global local_infile=ON;</code>
+2.
+<code>sql_require_primary_key</code>系统变量如果ON，且导入的表中存在没有主键的表，则导入会报错，默认这个值为OFF，查看方式：<code>show
+variables like 'sql_require_primary_key';</code></li>
+<li>导入程序不会将源MySQL实例中的gtid_executed
+GTID集应用到目标MySQL实例上。如果要在目标MySQL实例上保留这些gtid以供复制使用，请将转储加载实用程序的skipBinlog选项设置为true，以便在导入时防止生成新的gtid。导入之后，使用主gtid_executed更新目标MySQL实例上的gtid_purged
+GTID集，设置方式为：<code>\sql SET @@GLOBAL.gtid_purged= &quot;+*gtidExecuted_set*&quot;;</code></li>
+</ol>
+</blockquote>
+
+<p>MySQL Shell的<code>util.loadDump(url[, options])</code>使用通过<code>util.dumpInstance()</code>
+和<code>util.dumpSchemas()</code>导出的ddl文件以及<code>.tsv</code>的数据文件，然后在目标MySQL实例中设置服务器Instance或Schema，然后加载数据。</p>
+
+<ul>
+<li>可以选择要导入或从导入中排除的单个表或schema。</li>
+<li>用户以及角色的授权默认不会导入</li>
+<li>可以为目标MySQL实例中的数据指定与备份文件中不同的字符集。</li>
+<li>即使已经加载了数据，也可以更新<code>ANALYZE TABLE</code> 直方图。</li>
+<li>导入时可以选择跳过binlog，需要设置<code>SET sql_log_bin=0</code></li>
+</ul>
+
+<p>导入的过程是存储在持久化文件中的，记录了整体成功/失败的进度，这个文件默认是备份目录下的<code>loadprogress.server_uuid.json</code>，也可以配置不同的目录以及文件名，在恢复或重试导入时，导入程序会引用进度状态文件，并跳过完成的步骤。对部分加载的表自动管理重复数据删除。如果您使用<code>Ctrl
++ C</code>中断正在进行的转储，那么在第一次使用该组合键时，该导入程序不会启动新的任务，但现有的任务会继续执行。再次按下<code>Ctrl +
+C</code>将停止现有的任务，并产生错误信息。在这两种情况下，实用程序仍然可以从停止导入的地方恢复导入。</p>
+
+<p>可以选择重置进度状态，并重新导入，但是在这种情况下，导入程序不会跳过已经创建的对象，也不会删除重复数据。如果重新导入，为了确保正确的导入，必须手动从目标MySQL实例中删除所有之前导入的对象，包括schema、表、用户、视图、触发器、例程和事件。否则，如果导入的文件中的对象已经存在于目标MySQL实例中，导入将停止并出现错误。在适当的注意下，您可以使用ignoreExistingObjects选项来让导入程序报告重复的对象，但是跳过会它们并继续导入。请注意，该导入程序不会检查目标MySQL实例中的对象内容和转储文件中的对象内容是否不同，因此结果导入可能包含不正确或无效的数据。</p>
+
+<p>DDL文件的加载是单线程的，后续的导入数据操作才是并行的。为了进一步提高数据加载性能，从MySQL
+8.0.21开始，你可以在导入过程中在目标MySQL实例上禁用InnoDB重做日志。注意，这应该只在新的MySQL服务器实例(而不是生产系统)上执行</p>
+
+<h1 id="示例">示例</h1>
+
+<p>恢复单schema</p>
+
+<pre><code># mysqlsh连接目标实例
+# mysqlsh 127.0.0.1:3306
+# /tmp/sbtest是使用util.dumpSchemas()导出的
+# 开启local_infile参数;
+ MySQL  127.0.0.1:3306  JS &gt; \sql set global local_infile=ON;
+# 为了加快可以临时关闭redo log
+ MySQL  127.0.0.1:3306  JS &gt; \sql ALTER INSTANCE DISABLE INNODB REDO_LOG;
+# 查看redo log是否关闭成功
+ MySQL  127.0.0.1:3306  JS &gt; \sql SHOW GLOBAL STATUS LIKE 'Innodb_redo_log_enabled';
+# 使用util.loadDump()导入数据，并行度为4
+ MySQL  127.0.0.1:3306  JS &gt; util.loadDump(&quot;/tmp/sbtest&quot;, {&quot;threads&quot;: 4})
+# 如果需要重置导入进程可以使用util.loadDump(&quot;/tmp/sbtest&quot;, {&quot;threads&quot;: 4,resetProgress:true})
+# 打开redo log
+ MySQL  127.0.0.1:3306  JS &gt; \sql ALTER INSTANCE ENABLE INNODB REDO_LOG;
+# # 查看redo log是否开启成功
+ MySQL  127.0.0.1:3306  JS &gt; \sql SHOW GLOBAL STATUS LIKE 'Innodb_redo_log_enabled';
+</code></pre>
+
+<blockquote>
+<p>恢复实例也是一样的操作，大同小异。其中redo log的关闭非必要操作，只是能更快执行完成</p>
+</blockquote>
+
+<h1 id="参考文档">参考文档</h1>
+
+<ul>
+<li><a href="https://dev.mysql.com/doc/mysql-shell/8.0/en/mysql-shell-utilities-load-dump.html">https://dev.mysql.com/doc/mysql-shell/8.0/en/mysql-shell-utilities-load-dump.html</a></li>
+</ul>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

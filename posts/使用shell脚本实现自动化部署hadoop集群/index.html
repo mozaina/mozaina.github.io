@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用shell脚本实现自动化部署hadoop集群 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用shell脚本实现自动化部署hadoop集群 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用shell脚本实现自动化部署hadoop集群">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2hadoop%E9%9B%86%E7%BE%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用shell脚本实现自动化部署hadoop集群</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>有四台Linux服务器，其中一台为主，其它为从。服务器使用的是CentOS6.5，jdk选择1.6，hadoop选择1.0.4版本。要到实际环境中应用还要根据实际情况做修改。</p>
+
+<p>如果是 <strong>新装好的系统</strong> ，要先配置好ip，shell脚本如下：</p>
+
+<ol>
+<li><p>#!bin/bash</p></li>
+
+<li><p>read &ldquo;input ip:&rdquo; ip</p></li>
+
+<li><p>echo &lsquo;the default hostname is master&rsquo;</p></li>
+
+<li><p>sed -i &lsquo;$aIPADDR=&rsquo;$ip /etc/sysconfig/network-scripts/ifcfg-eth0</p></li>
+
+<li><p>sed -i &lsquo;/BOOTPROTO/cBOOTPROTO=&ldquo;no&rdquo;&rsquo; /etc/sysconfig/network-scripts/ifcfg-eth0</p></li>
+
+<li><p>sed -i &lsquo;/IPV6INIT/cIPV6INIT=&ldquo;no&rdquo;&rsquo; /etc/sysconfig/network-scripts/ifcfg-eth0</p></li>
+
+<li><p>sed -i &lsquo;/NM_CONTROLLED/cNM_CONTROLLED=&ldquo;no&rdquo;&rsquo; /etc/sysconfig/network-scripts/ifcfg-eth0</p></li>
+
+<li><p>service network restart</p></li>
+
+<li><p>chkconfig network on</p></li>
+
+<li><p>service iptables stop</p></li>
+
+<li><p>chkconfig iptables off</p></li>
+
+<li><p>setenforce 0</p></li>
+
+<li><p>hostname master</p></li>
+
+<li><p>sed -i &lsquo;/HOSTNAME/cHOSTNAME=master&rsquo; /etc/sysconfig/network</p></li>
+</ol>
+
+<p>集群的ip配置如下，在实际环境中可以自己作调整。首先检查通信，通信成功才能下一步进行，否则安装终止。如果通信成功，才会执行接下来的步骤，则修改/etc/hosts文件和ssh_conf，然后重启ssh服务。密码要根据实际环境修改。</p>
+
+<ol>
+<li><p>masterip=192.168.2.254</p></li>
+
+<li><p>slave1ip=192.168.2.11</p></li>
+
+<li><p>slave2ip=192.168.2.2</p></li>
+
+<li><p>slave3ip=192.168.2.3</p></li>
+
+<li><p>if [ -e ip.txt ];then</p></li>
+
+<li><p>rm -rf ip.txt</p></li>
+
+<li><p>fi</p></li>
+
+<li><p>touch ip.txt</p></li>
+
+<li><p>echo $masterip &gt;&gt;ip.txt</p></li>
+
+<li><p>echo $slave1ip &gt;&gt;ip.txt</p></li>
+
+<li><p>echo $slave2ip &gt;&gt;ip.txt</p></li>
+
+<li><p>echo $slave3ip &gt;&gt;ip.txt</p></li>
+
+<li><p>NEWPASS=123456</p></li>
+
+<li><p>NETWORK=TRUE</p></li>
+
+<li><p>echo &ldquo;before you install,please make sure network is ok!!!&rdquo;</p></li>
+
+<li><p>echo &ldquo;now test the network&rdquo;</p></li>
+
+<li><p>for ip in $(cat ip.txt)</p></li>
+
+<li><p>do</p></li>
+
+<li><p>ping $ip -c 5 &amp;&gt;/dev/null</p></li>
+
+<li><p>if [ $? == 0 ] ;then</p></li>
+
+<li><p>echo &ldquo;${ip} is ok&rdquo;</p></li>
+
+<li><p>else</p></li>
+
+<li><p>echo &ldquo;${ip} conn&rsquo;t connected&rdquo;</p></li>
+
+<li><p>NETWORK=FALSE</p></li>
+
+<li><p>fi</p></li>
+
+<li><p>done</p></li>
+
+<li><p>echo $NETWORK</p></li>
+
+<li><p>if [ $NETWORK != FALSE ];then</p></li>
+
+<li><p>&hellip;&hellip;&hellip;</p></li>
+
+<li><p>fi</p></li>
+</ol>
+
+<p>为了方便说明，笔者在此处做了步骤拆分.</p>
+
+<p>使用root用户实现master的root用户能够免秘钥ssh登陆其他主机。这样root用户就可以很方便的管理其他主机了。</p>
+
+<ol>
+<li><p>PASS=123456</p></li>
+
+<li><p>yum -y install tcl &ndash;nogpgcheck</p></li>
+
+<li><p>yum -y install expect &ndash;nogpgcheck</p></li>
+
+<li><p>expect &lt;</p></li>
+
+<li><p>spawn ssh-keygen</p></li>
+
+<li><p>expect &ldquo;Enter file in which to save the key (/root/.ssh/id_rsa):&rdquo;</p></li>
+
+<li><p>send &ldquo;\r&rdquo;</p></li>
+
+<li><p>expect &ldquo;Enter passphrase (empty for no passphrase):&rdquo;</p></li>
+
+<li><p>send &ldquo;\r&rdquo;</p></li>
+
+<li><p>expect &ldquo;Enter same passphrase again:&rdquo;</p></li>
+
+<li><p>send &ldquo;\r&rdquo;</p></li>
+
+<li><p>expect eof</p></li>
+
+<li><p>EOF</p></li>
+
+<li><p>for ip in $(cat ip.txt)</p></li>
+
+<li><p>do</p></li>
+
+<li><p>expect &lt;</p></li>
+
+<li><p>spawn ssh-copy-id root@${ip}</p></li>
+
+<li><p>expect &ldquo;(yes/no)?&rdquo;</p></li>
+
+<li><p>send &ldquo;yes\r&rdquo;</p></li>
+
+<li><p>expect &ldquo;password:&rdquo;</p></li>
+
+<li><p>send &ldquo;${PASS}\r&rdquo;</p></li>
+
+<li><p>expect eof</p></li>
+
+<li><p>EOF</p></li>
+
+<li><p>done</p></li>
+
+<li><p>expect &lt;</p></li>
+
+<li><p>spawn ssh-copy-id hadoop@master</p></li>
+
+<li><p>expect &ldquo;(yes/no)?&rdquo;</p></li>
+
+<li><p>send &ldquo;yes\r&rdquo;</p></li>
+
+<li><p>expect &ldquo;password:&rdquo;</p></li>
+
+<li><p>send &ldquo;${PASS}\r&rdquo;</p></li>
+
+<li><p>expect eof</p></li>
+
+<li><p>EOF</p></li>
+</ol>
+
+<p>完成root无秘钥登陆其他主机后，各个主机添加hadoop用户，并修改/etc/hosts文件，主机上修改sshd的配置文件并重新启动服务。</p>
+
+<ol>
+<li><p>for ip in $(cat ip.txt)</p></li>
+
+<li><p>do</p></li>
+
+<li><p>ssh root@$ip &ldquo;useradd hadoop&rdquo;</p></li>
+
+<li><p>ssh root@$ip &ldquo;echo &lsquo;123456&rsquo; | passwd &ndash;stdin hadoop&rdquo;</p></li>
+
+<li><p>ssh root@$ip &ldquo;echo $masterip&rsquo; master&rsquo; &gt;&gt;/etc/hosts&rdquo;</p></li>
+
+<li><p>ssh root@$ip &ldquo;echo $slave1ip&rsquo; slave1&rsquo; &gt;&gt;/etc/hosts&rdquo;</p></li>
+
+<li><p>ssh root@$ip &ldquo;echo $slave2ip&rsquo; slave2&rsquo; &gt;&gt;/etc/hosts&rdquo;</p></li>
+
+<li><p>ssh root@$ip &ldquo;echo $slave3ip&rsquo; slave3&rsquo; &gt;&gt;/etc/hosts&rdquo;</p></li>
+
+<li><p>done</p></li>
+
+<li><p>cp ip.txt /home/hadoop</p></li>
+
+<li><p>cp hadoopsshconf.sh /home/hadoop</p></li>
+
+<li><p>chown hadoop:hadoop /home/hadoop/ip.txt</p></li>
+
+<li><p>chown hadoop:hadoop /home/hadoop/hadoopsshconf.sh</p></li>
+
+<li></li>
+
+<li><p>ssh hadoop@localhost &ldquo;sh hadoopsshconf.sh&rdquo;</p></li>
+
+<li></li>
+
+<li><p>sed -i &lsquo;/#RSAAuthentication yes/cRSAAuthentication yes&rsquo; /etc/ssh/sshd_config</p></li>
+
+<li><p>sed -i &lsquo;/#PubkeyAuthentication yes/cPubkeyAuthentication yes&rsquo; /etc/ssh/sshd_config</p></li>
+
+<li><p>sed -i &lsquo;/#AuthorizedKeysFile .ssh/authorized_keys/AuthorizedKeysFile .ssh/authorized_keysc&rsquo; /etc/ssh/sshd_config</p></li>
+
+<li><p>service sshd restart</p></li>
+
+<li><p>chkconfig sshd on</p></li>
+</ol>
+
+<p>只有root用户能够免秘钥登陆其他主机是不够的，还要本机的hadoop用户能够免密钥登陆其他hadoop用户，上面的脚本中已经将脚本hadoopsshconf.sh拷贝到hadoop用户下方，使用ssh远程命令以hadoop用户执行即可。hadoopsshconf.sh如下：</p>
+
+<ol>
+<li><p>#!/bin/bash</p></li>
+
+<li><p>PASS=123456</p></li>
+
+<li><p>expect &lt;</p></li>
+
+<li><p>spawn ssh-keygen</p></li>
+
+<li><p>expect &ldquo;Enter file in which to save the key (/root/.ssh/id_rsa):&rdquo;</p></li>
+
+<li><p>send &ldquo;\r&rdquo;</p></li>
+
+<li><p>expect &ldquo;Enter passphrase (empty for no passphrase):&rdquo;</p></li>
+
+<li><p>send &ldquo;\r&rdquo;</p></li>
+
+<li><p>expect &ldquo;Enter same passphrase again:&rdquo;</p></li>
+
+<li><p>send &ldquo;\r&rdquo;</p></li>
+
+<li><p>expect eof</p></li>
+
+<li><p>EOF</p></li>
+
+<li><p>cat ~/.ssh/id_rsa.pub &gt;&gt;~/.ssh/authorized_keys</p></li>
+
+<li><p>chmod 600 ~/.ssh/authorized_keys</p></li>
+
+<li><p>for ip in $(cat ip.txt)</p></li>
+
+<li><p>do</p></li>
+
+<li><p>expect &lt;</p></li>
+
+<li><p>spawn ssh-copy-id hadoop@${ip}</p></li>
+
+<li><p>expect &ldquo;(yes/no)?&rdquo;</p></li>
+
+<li><p>send &ldquo;yes\r&rdquo;</p></li>
+
+<li><p>expect &ldquo;password:&rdquo;</p></li>
+
+<li><p>send &ldquo;${PASS}\r&rdquo;</p></li>
+
+<li><p>expect eof</p></li>
+
+<li><p>EOF</p></li>
+
+<li><p>done</p></li>
+</ol>
+
+<p>安装jdk1.6脚本，首先清除掉系统上已经安装的jdk，避免版本冲突。</p>
+
+<ol>
+<li><p>#!/bin/bash</p></li>
+
+<li><p>rm -rf tmp.txt</p></li>
+
+<li><p>rpm -qa | grep java* &gt; tmp.txt</p></li>
+
+<li><p>line=$(cat tmp.txt)</p></li>
+
+<li><p>for i in $line</p></li>
+
+<li><p>do</p></li>
+
+<li><p>rpm -e $i &ndash;nodeps</p></li>
+
+<li><p>done</p></li>
+
+<li><p>mkdir -p /usr/java</p></li>
+
+<li><p>cp ./jdk-6u32-linux-x64.bin /usr/java/</p></li>
+
+<li><p>cd /usr/java/</p></li>
+
+<li><p>./jdk-6u32-linux-x64.bin</p></li>
+
+<li><p>rm -rf jdk-6u32-linux-x64.bin</p></li>
+
+<li><p>echo &lsquo;export JAVA_HOME=/usr/java/jdk1.6.0_32&rsquo; &gt;&gt;/etc/profile</p></li>
+
+<li><p>echo &lsquo;export CLASSPATH=.:$CLASSPATH:$JAVA_HOME/lib:$JAVA_HOME/jre/lib&rsquo; &gt;&gt;/etc/profile</p></li>
+
+<li><p>echo &lsquo;export PATH=$PATH:$JAVA_HOME/bin:$JAVA_HOME/jre/bin&rsquo; &gt;&gt;/etc/profile</p></li>
+
+<li><p>source /etc/profile</p></li>
+
+<li><p>java -version</p></li>
+
+<li><p>cd -</p></li>
+</ol>
+
+<p>接下来安装hadoop1.4.0,安装在/usr下边。脚本内容包括/etc/profile的修改，hadoop配置文件，hadop-
+env.sh,conre-site.xml,hdfs-site.xml,mapred-
+site.xml，masters和slaves的配置文件修改,兵拷贝到其他机子上去。</p>
+
+<ol>
+<li><p>mkdir -p /usr/hadoop</p></li>
+
+<li><p>tar -zxf hadoop-1.0.4.tar.gz -C /usr/hadoop</p></li>
+
+<li><p>mv /usr/hadoop/hadoop-1.0.4 /usr/hadoop/hadoop1</p></li>
+
+<li><p>chown -R hadoop:hadoop /usr/hadoop</p></li>
+
+<li><p>echo &lsquo;export HADOOP_HOME=/usr/hadoop/hadoop1&rsquo; &gt;&gt; /etc/profile</p></li>
+
+<li><p>echo &lsquo;export PATH=$PATH:$HADOOP_HOME/bin&rsquo; &gt;&gt;/etc/profile</p></li>
+
+<li><p>source /etc/profile</p></li>
+
+<li><ol>
+<li>10. echo &lsquo;export JAVA_HOME=/usr/java/jdk1.6.0_32&rsquo; &gt;&gt; /usr/hadoop/hadoop1/conf/hadoop-env.sh</li>
+</ol></li>
+
+<li><p>echo &lsquo;export HADOOP_PID_DIR=/usr/hadoop/hadoop1/pids&rsquo; &gt;&gt;/usr/hadoop/hadoop1/conf/hadoop-env.sh</p></li>
+
+<li></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/core-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\thdfs://master:9000&rsquo; /usr/hadoop/hadoop1/conf/core-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tfs.default.name&rsquo; /usr/hadoop/hadoop1/conf/core-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/core-site.xml</p></li>
+
+<li></li>
+
+<li></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tfalse&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tdfs.permissions&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t/usr/hadoop/hadoop1/tmp/&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\thadoop.tmp.dir&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t/usr/hadoop/hadoop1/data/&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tdfs.data.dir&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t/usr/hadoop/hadoop1/namenode/&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tdfs.name.dir&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t3&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tdfs.replication&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/hdfs-site.xml</p></li>
+
+<li></li>
+
+<li></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t2&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tmapred.tasktracker.reduce.tasks.maximum&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t2&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tmapred.tasktracker.map.tasks.maximum&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tmaster:9001&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\tmapred.job.tracker&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li><p>sed -i &lsquo;6a\\t&rsquo; /usr/hadoop/hadoop1/conf/mapred-site.xml</p></li>
+
+<li></li>
+
+<li></li>
+
+<li></li>
+
+<li><p>echo &lsquo;master&rsquo; &gt;&gt; /usr/hadoop/hadoop1/conf/masters</p></li>
+
+<li></li>
+
+<li></li>
+
+<li><p>sed -i &lsquo;1d&rsquo; /usr/hadoop/hadoop1/conf/slaves</p></li>
+
+<li><p>echo &lsquo;slave1&rsquo; &gt;&gt; /usr/hadoop/hadoop1/conf/slaves</p></li>
+
+<li><p>echo &lsquo;slave2&rsquo; &gt;&gt; /usr/hadoop/hadoop1/conf/slaves</p></li>
+
+<li><p>echo &lsquo;slave3&rsquo; &gt;&gt; /usr/hadoop/hadoop1/conf/slaves</p></li>
+
+<li></li>
+
+<li></li>
+
+<li></li>
+
+<li><p>mkdir -p /usr/hadoop/hadoop1/data/</p></li>
+
+<li><p>mkdir -p /usr/hadoop/hadoop1/tmp/</p></li>
+
+<li><p>chown -R hadoop:hadoop /usr/hadoop/</p></li>
+
+<li><p>chmod -R 755 /usr/hadoop/hadoop1/data/</p></li>
+
+<li><p>chmod -R 755 /usr/hadoop/hadoop1/tmp/</p></li>
+
+<li><p>for i in $(seq 3)</p></li>
+
+<li><p>do</p></li>
+
+<li><p>ssh slave$i &ldquo;mkdir -p /usr/hadoop&rdquo;</p></li>
+
+<li><p>done</p></li>
+
+<li><p>scp -r /usr/hadoop/hadoop1 root@slave1:/usr/hadoop</p></li>
+
+<li><p>scp -r /usr/hadoop/hadoop1 root@slave2:/usr/hadoop</p></li>
+
+<li><p>scp -r /usr/hadoop/hadoop1 root@slave3:/usr/hadoop</p></li>
+
+<li><p>for i in $(seq 3)</p></li>
+
+<li><p>do</p></li>
+
+<li><p>ssh slave$i &ldquo;chown -R hadoop:hadoop /usr/hadoop&rdquo;</p></li>
+
+<li><p>ssh slave$i &ldquo;chmod -R 755 /usr/hadoop/hadoop1/data/&rdquo;</p></li>
+
+<li><p>ssh slave$i &ldquo;chmod -R 755 /usr/hadoop/hadoop1/tmp/&rdquo;</p></li>
+
+<li><p>done</p></li>
+</ol>
+
+<p>这样就完成了hadoop集群的自动化安装。然后就是格式化，启动并验证了</p>
+
+<p>转载于:<a href="https://blog.51cto.com/8879567/1587388">https://blog.51cto.com/8879567/1587388</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

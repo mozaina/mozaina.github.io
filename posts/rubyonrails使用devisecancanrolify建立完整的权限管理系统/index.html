@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>RubyonRails使用devisecancanrolify建立完整的权限管理系统 | 开发者问答集锦</title>
+    <meta property="og:title" content="RubyonRails使用devisecancanrolify建立完整的权限管理系统 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="RubyonRails使用devisecancanrolify建立完整的权限管理系统">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/rubyonrails%E4%BD%BF%E7%94%A8devisecancanrolify%E5%BB%BA%E7%AB%8B%E5%AE%8C%E6%95%B4%E7%9A%84%E6%9D%83%E9%99%90%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">RubyonRails使用devisecancanrolify建立完整的权限管理系统</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>为什么80%的码农都做不了架构师？&gt;&gt;&gt;
+<img src="https://img.it610.com/image/info8/35bf71b4b7ad4a72bcb9c6561b5679b1.jpg" alt="hot3.png" /></p>
+
+<p>原文中有些问题，我按自己的实践稍稍做了些修改。不知到是不是Gem升级到最新的缘故，不过还是解决了。</p>
+
+<p>devise、cancan和rolify这三个组件结合，可以建立完整而强大的用户权限模型。</p>
+
+<ul>
+<li>devise介绍，负责用户注册、登录、退出、找回密码等操作。细节参考devise on github</li>
+<li>cancan介绍， 负责角色建立、对角色授权、在页面中根据授权是否显示元素，以及模型中超出授权时抛出异常。细节参考rolify on github</li>
+<li>rolify介绍，负责将用户与角色关联。细节参考rolify on github</li>
+</ul>
+
+<p><strong>下面就简单介绍下这三者结合使用的方法，比较浅，深层次的大家自己去看文档挖掘，这里仅仅介绍最基本的使用。</strong></p>
+
+<h1 id="运行环境">运行环境</h1>
+
+<p>这里我用的是ruby 1.9.3-p484 rails 3.2.16</p>
+
+<h1 id="新建一个项目">新建一个项目</h1>
+
+<p>rails new demo &ndash;skip-bundle #跳过bundle</p>
+
+<p>在Gemfile里面添加如下Gem包</p>
+
+<pre><code># add a perfect user verify system
+gem 'devise'
+gem 'cancan'
+gem 'rolify'
+</code></pre>
+
+<p><strong>然后运行bundle install</strong></p>
+
+<h3 id="执行devise初始化">执行devise初始化</h3>
+
+<pre><code>$ rails generate devise:install
+</code></pre>
+
+<p>这句命令会产生一个用户指南，告诉你该做的几件事请，以下是内容翻译（已经去除heroku部署的那一条，增加了登录退出选项的说明）：</p>
+
+<p>1) 确定你的环境中有一个缺省的URL，config/environments/development.rb:</p>
+
+<pre><code>config.action_mailer.default_url_options = { :host =&gt; 'localhost:3000' }
+</code></pre>
+
+<p>如果在production环境, :host 必须设置成应用的真实主机名。</p>
+
+<p>2) 确定已经在config/routes.rb中定义了root_url（注意删除public下面的index.html）, 例如：</p>
+
+<pre><code>root :to =&gt; &quot;home#index&quot;
+</code></pre>
+
+<p>可以使用下面命令生成一个home#index的页面：</p>
+
+<pre><code>rails g controller home index
+</code></pre>
+
+<p>3) 在app/views/layouts/application.html.erb中增加消息提醒，例如：</p>
+
+<pre><code> notice %&gt;  
+
+ alert %&gt;   
+</code></pre>
+
+<hr />
+
+<p>4) 很多时候还需要增加登录、退出的选项：</p>
+
+<pre><code>    
+       :delete) %&gt; |
+
+
+       |
+</code></pre>
+
+<p>5) 如果要定制Devise的view模型，可以再执行以下语句：</p>
+
+<pre><code>$ rails g devise:views
+</code></pre>
+
+<h3 id="生成用户模型-你可以使用其他名称代替user-并执行数据迁移"><strong>生成用户模型（你可以使用其他名称代替User）,并执行数据迁移</strong></h3>
+
+<pre><code>$ rails g devise User
+$ rake db:migrate
+</code></pre>
+
+<h3 id="在controller中增加认证过滤-即可在访问该模型页面时转向用户登录页面-这自行没验证">在Controller中增加认证过滤，即可在访问该模型页面时转向用户登录页面（这自行没验证）</h3>
+
+<p>在需要认证的模型中，如HomeController，增加下面代码：</p>
+
+<pre><code>before_filter :authenticate_user!
+</code></pre>
+
+<h1 id="集成cancan和rolify">集成cancan和rolify</h1>
+
+<p>cancan提供对资源的授权控制。例如，在视图中使用can?方法来决定是否显示某个页面元素。如果系统角色非常简单，那么cancan还在代码中直接指定常量就可以支持，具体操作可以参考官方文档。但要提供复杂的角色管理，最好的方案，还是在devise基础上再集成cancan+rolify。</p>
+
+<h3 id="1-修改gemfile-并再次运行bundle-install">1. 修改Gemfile，并再次运行bundle install</h3>
+
+<pre><code>gem 'cancan'
+gem 'rolify'
+</code></pre>
+
+<h3 id="2-创建cancan的ability和rolify的role">2. 创建cancan的Ability和rolify的Role</h3>
+
+<pre><code>$ rails generate cancan:ability
+$ rails generate rolify Role User
+$ rake db:migrate
+</code></pre>
+
+<h3 id="3-定制devise用户注册事件-可以在注册时赋予用户rolify角色-例如-下面的代码为首个用户赋予admin角色">3. 定制devise用户注册事件，可以在注册时赋予用户rolify角色，例如，下面的代码为首个用户赋予admin角色：</h3>
+
+<pre><code>class ApplicationController &lt; ActionController::Base
+      def after_sign_in_path_for(resource)
+        if resource.is_a?(User)
+          if User.count == 1
+            resource.add_role 'admin'
+          end
+          resource
+        end
+        root_path
+      end
+    end
+</code></pre>
+
+<h3 id="4">4.</h3>
+
+<p>使用cancan可以为rolify中建立的角色分配授权资源，例如我们为允许admin角色的用户分配针对所有控制类的”manage”资源，而其他用户分配”read”资源：</p>
+
+<pre><code>class Ability
+      include CanCan::Ability
+      def initialize(user)
+        if user.has_role? :admin
+          can :manage, :all
+        else
+          can :read, :all
+        end
+      end
+    end
+</code></pre>
+
+<h3 id="5-以上已经实现了-用户-角色-权限-的三层权限模型-在view中就可以使用了-例如-在home-index页面中增加如下代码">5. 以上已经实现了“用户－角色－权限”的三层权限模型，在view中就可以使用了。例如，在Home#index页面中增加如下代码：</h3>
+
+<pre><code>The user is loged in.
+</code></pre>
+
+<p>(完）</p>
+
+<p>转载于:<a href="https://my.oschina.net/zoker/blog/204772">https://my.oschina.net/zoker/blog/204772</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

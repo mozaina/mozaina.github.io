@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>HadoopHDFS概述和ShellAPI操作 | 开发者问答集锦</title>
+    <meta property="og:title" content="HadoopHDFS概述和ShellAPI操作 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="HadoopHDFS概述和ShellAPI操作">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/hadoophdfs%E6%A6%82%E8%BF%B0%E5%92%8Cshellapi%E6%93%8D%E4%BD%9C/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">HadoopHDFS概述和ShellAPI操作</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<ul>
+<li>一、HDFS概述
+
+<ul>
+<li>1.1 HDFS定义</li>
+<li>1.2 HDFS优缺点</li>
+<li>1.3 HDFS组成架构</li>
+<li>1.4 HDFS 文件块大小</li>
+</ul></li>
+<li>二、HFDS的Shell操作</li>
+<li>三、HFDS客户端操作</li>
+</ul>
+
+<h1 id="一-hdfs概述">一、HDFS概述</h1>
+
+<blockquote>
+<p>随着数据量越来越大，在一个操作系统存不下所有的数据，那么就分配到更多的操作系统管理的磁盘中，但是不方便管理和维护，迫切需要一种系统来管理多台机器上的文件，这就是分布式文件管理系统。<code>HDFS</code>只是分布式文件管理系统中的一种</p>
+</blockquote>
+
+<h2 id="1-1-hdfs定义">1.1 HDFS定义</h2>
+
+<p><code>HDFS</code> (<code>Hadoop Distributed File System</code>)，
+它是一个文件系统，用于存储文件，通过目录树来定位文件；其次，它是分布式的，由很多服务器联合起来实现其功能，集群中的服务器有各自的角色。</p>
+
+<p><code>HDFS</code>的使用场景:适合一次写入，多次读出的场景，且不支持文件的修改。适合用来做数据分析，并不适合用来做网盘应用。</p>
+
+<h2 id="1-2-hdfs优缺点">1.2 HDFS优缺点</h2>
+
+<p><strong>优点：</strong></p>
+
+<ol>
+<li><p>高容错性<br />
+数据自动保存多个副本。它通过增加副本的形式，提高容错性。<br />
+某一个副本丢失以后，它可以自动恢复。</p></li>
+
+<li><p>适合大数据处理<br />
+数据规模：能够处理数据规模达到<code>GB</code>、<code>TB</code>、甚至<code>PB</code>级别的数据<br />
+文件规模：能够处理百万规模以上的文件数量，数量相当之大</p></li>
+
+<li><p>流式数据访问，它能保证数据的一致性</p></li>
+
+<li><p>可构建在廉价机器上，通过多副本机制，提高可靠性</p></li>
+</ol>
+
+<p><strong>缺点：</strong></p>
+
+<ol>
+<li>不适合低延时数据访问，比如毫秒级的存储数据，是做不到的</li>
+
+<li><p>无法高效的对大量小文件进行存储<br />
+存储大量小文件的话，它会占用<code>NameNode</code>大量的内存来存储文件、目录和块信息。这样是不可取的，因为<code>NameNode</code>的内存总是有限的<br />
+小文件存储的寻道时间会超过读取时间，它违反了<code>HDFS</code>的设计目标</p></li>
+
+<li><p>并发写入、文件随机修改<br />
+一个文件只能有一个写，不允许多个线程同时写<br />
+仅支持数据<code>append</code>（追加），不支持文件的随机修改</p></li>
+</ol>
+
+<h2 id="1-3-hdfs组成架构">1.3 HDFS组成架构</h2>
+
+<p><a href="https://img.it610.com/image/info8/8ef33afba6b84d8d91abf5a480a7ba56.jpg"><img src="https://img.it610.com/image/info8/8ef33afba6b84d8d91abf5a480a7ba56.jpg" alt="Hadoop：HDFS概述和Shell、API操作_第1张图片" /></a><br />
+<strong>①Client:客户端</strong></p>
+
+<ol>
+<li>文件切分。文件上传<code>HDFS</code>的时候，<code>Client</code>将文件切分成一个一个的<code>Block</code>，然后进行存储</li>
+<li>与<code>NameNode</code>交互，获取文件的位置信息</li>
+<li>与<code>DataNode</code>交互，读取或者写入数据</li>
+<li><code>Client</code>提供一些命令来管理<code>HDFS</code>，比如启动或者关闭<code>HDFS</code></li>
+<li><code>Client</code>可以通过一些命令来访问<code>HDFS</code></li>
+</ol>
+
+<p><strong>②NameNode(Master):主管、管理者</strong></p>
+
+<ol>
+<li>管理<code>HDFS</code>的名称空间’</li>
+<li>管理数据块（<code>Block</code>）映射信息</li>
+<li>配置副本策略</li>
+<li>处理客户端读写请求</li>
+</ol>
+
+<p><strong>③DataNode(Slave):NameNode下达命令，DataNode执行实际的操作</strong></p>
+
+<ol>
+<li>存储实际的数据块</li>
+<li>执行数据块的读/写操作</li>
+</ol>
+
+<p><strong>④Secondary NameNode：并非NameNode的热备。当NameNode挂掉的时候，它并不能马上替换NameNode并提供服务</strong></p>
+
+<ol>
+<li>辅助<code>NameNode</code>，分担其工作量</li>
+<li>定期合并<code>Fsimage</code>和<code>Edits</code>，并推送给<code>NameNode</code></li>
+<li>在紧急情况下，可辅助恢复<code>NameNode</code></li>
+</ol>
+
+<h2 id="1-4-hdfs-文件块大小">1.4 HDFS 文件块大小</h2>
+
+<p><code>HDFS</code>中的文件在物理上是分块存储（<code>block</code>），块的大小可以通过配置参数(<code>dfs.blocksize</code>)来规定，默认大小在<code>hadoop2.x</code>版本中是<code>128M</code>，老版本中是<code>64M</code>。</p>
+
+<p>如果寻址时间约为10<code>ms</code>，而传输速率为100<code>MB/s</code>，为了使寻址时间仅占传输时间的1%，我们要将块大小设置约为100<code>MB</code>（10<code>ms</code>/1%<code>*</code>100<code>M/s</code>
+= 100<code>M</code>）,默认的块大小128<code>MB</code>。</p>
+
+<p><strong>为什么块的大小不能设置太小，也不能设置太大?</strong></p>
+
+<ul>
+<li><code>HDFS</code>的块设置太小，会增加寻址时间，程序一直在找块的开始位置</li>
+<li>如果块设置的太大,从磁盘传输数据的时间会明显大于定位这个块开始位置所需的时间。导致程序在处理这块数据时，会非常慢。</li>
+</ul>
+
+<p><strong>总结：<code>HDFS</code>块的大小设置主要取决于磁盘传输速率</strong>。</p>
+
+<h1 id="二-hfds的shell操作">二、HFDS的Shell操作</h1>
+
+<p>基本语法：<code>hadoop fs 具体命令</code>或<code>hdfs dfs 具体命令</code></p>
+
+<p><strong>①-help：输出这个命令参数</strong></p>
+
+<pre><code>[root@hadoop100 hadoop-2.7.2]# hadoop fs -help rm
+-rm [-f] [-r|-R] [-skipTrash] &lt;src&gt; ... :
+  Delete all files that match the specified file pattern. Equivalent to the Unix
+  command &quot;rm &quot;
+
+  -skipTrash  option bypasses trash, if enabled, and immediately deletes &lt;src&gt;   
+  -f          If the file does not exist, do not display a diagnostic message or 
+              modify the exit status to reflect an error.                        
+  -[rR]       Recursively deletes directories                                    
+</code></pre>
+
+<p><strong>②-ls: 显示目录信息</strong></p>
+
+<pre><code>[root@hadoop100 hadoop-2.7.2]# hadoop fs -ls /
+Found 3 items
+drwxr-xr-x   - root supergroup          0 2020-05-21 19:54 /output
+drwxr-xr-x   - root supergroup          0 2020-05-21 19:50 /test
+drwx------   - root supergroup          0 2020-05-21 19:54 /tmp
+</code></pre>
+
+<p><strong>③-mkdir：在HDFS上创建目录</strong></p>
+
+<pre><code>[root@hadoop100 hadoop-2.7.2]# hadoop fs -mkdir -p /user/hucheng
+</code></pre>
+
+<p><strong>④-moveFromLocal：从本地剪切粘贴到HDFS</strong></p>
+
+<pre><code>[root@hadoop100 hadoop-2.7.2]# hadoop fs -moveFromLocal ./jpsall.sh /user/hucheng
+</code></pre>
+
+<p><strong>⑤-appendToFile ：追加一个文件到已经存在的文件末尾</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -appendToFile test.txt /user/hucheng/jpsall.sh
+</code></pre>
+
+<p><strong>⑥-cat：显示文件内容</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -cat /user/hucheng/jpsall.sh
+</code></pre>
+
+<p><strong>⑦-chgrp 、-chmod、-chown修改文件所属权限</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs  -chmod  +x /user/hucheng/jpsall.sh
+</code></pre>
+
+<p><strong>⑧-copyFromLocal：从本地文件系统中拷贝文件到HDFS路径去</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -copyFromLocal README.txt /user/hucheng
+</code></pre>
+
+<p><strong>⑨-copyToLocal:从HDFS拷贝到本地</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -copyToLocal /user/hucheng/jpsall.sh ./
+</code></pre>
+
+<p><strong>⑩-cp ：从HDFS的一个路径拷贝到HDFS的另一个路径</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -cp /user/hucheng/jpsall.sh /
+</code></pre>
+
+<p><strong>⑪-mv：在HDFS目录中移动文件</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -mv /readme.txt /user/hucheng
+</code></pre>
+
+<p><strong>⑫-get：等同于copyToLocal，就是从HDFS下载文件到本地</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -get /user/hucheng/jpsall.sh ./
+</code></pre>
+
+<p><strong>⑬-getmerge：合并下载多个文件</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -getmerge /user/hucheng/logs/* ./logs.txt
+</code></pre>
+
+<p><strong>⑭-put：等同于copyFromLocal</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -put ./jpsall.sh /user/hucheng
+</code></pre>
+
+<p><strong>⑮-tail：显示一个文件的末尾</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -tail /user/hucheng/jpsall.sh
+</code></pre>
+
+<p><strong>⑯-rm：删除文件或文件夹</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -rm /user/hucheng/jpsall.sh
+</code></pre>
+
+<p><strong>⑰-rmdir：删除空目录</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -rmdir /test
+</code></pre>
+
+<p><strong>⑱-du统计文件夹的大小信息</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -du -h /user/hucheng
+171  /user/hucheng/jpsall.sh
+</code></pre>
+
+<p><strong>⑲-setrep：设置HDFS中文件的副本数量</strong></p>
+
+<pre><code>[root@hadoop100 ~]# hadoop fs -setrep 10 /user/hucheng/jpsall.sh
+</code></pre>
+
+<p>这里设置的副本数只是记录在<code>NameNode</code>的元数据中，是否真的会有这么多副本，还得看<code>DataNode</code>的数量。因为目前只有3台设备，最多也就3个副本，只有节点数的增加到10台时，副本数才能达到10</p>
+
+<h1 id="三-hfds客户端操作">三、HFDS客户端操作</h1>
+
+<p><strong>①配置HDFS客户端环境</strong></p>
+
+<p>配置<code>HADOOP_HOME</code>和<code>PATH</code></p>
+
+<p><strong>②引入依赖</strong></p>
+
+<pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;junitgroupId&gt;
+    &lt;artifactId&gt;junitartifactId&gt;
+    &lt;version&gt;RELEASEversion&gt;
+dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.logging.log4jgroupId&gt;
+    &lt;artifactId&gt;log4j-coreartifactId&gt;
+    &lt;version&gt;2.8.2version&gt;
+dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.hadoopgroupId&gt;
+    &lt;artifactId&gt;hadoop-commonartifactId&gt;
+    &lt;version&gt;2.7.2version&gt;
+dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.hadoopgroupId&gt;
+    &lt;artifactId&gt;hadoop-clientartifactId&gt;
+    &lt;version&gt;2.7.2version&gt;
+dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.hadoopgroupId&gt;
+    &lt;artifactId&gt;hadoop-hdfsartifactId&gt;
+    &lt;version&gt;2.7.2version&gt;
+dependency&gt;
+</code></pre>
+
+<p><strong>③API操作</strong></p>
+
+<pre><code>public class HdfsClientTest {
+
+    private FileSystem fileSystem;
+
+    @Before
+    public void before() throws URISyntaxException, IOException, InterruptedException {
+        //这个user需要是在HDFS上有操作权限的用户
+        fileSystem = FileSystem.get(new URI(&quot;hdfs://hadoop100:9000&quot;), new Configuration(), &quot;root&quot;);
+    }
+
+    @After
+    public void after() throws IOException {
+        fileSystem.close();
+    }
+
+    /**
+     * 上传
+     */
+    @Test
+    public void testUpload() throws IOException {
+        fileSystem.copyFromLocalFile(new Path(&quot;d:/HelloDFS.txt&quot;), new Path(&quot;/test&quot;));
+    }
+
+    /**
+     * 创建文件夹
+     */
+    @Test
+    public void testMkdirs() throws IOException {
+        //获取文件配置
+        fileSystem.mkdirs(new Path(&quot;/test2&quot;));
+    }
+
+    /**
+     * 删除文件夹
+     */
+    @Test
+    public void testDelDirs() throws IOException {
+        fileSystem.delete(new Path(&quot;/test2&quot;), true);
+    }
+
+    /**
+     * 更改文件名
+     */
+    @Test
+    public void testRenameFile() throws IOException {
+        fileSystem.rename(new Path(&quot;/test/HelloDFS.txt&quot;), new Path(&quot;/test/hello.txt&quot;));
+    }
+
+    /**
+     * 获取文件详情
+     */
+    @Test
+    public void testFileDetail() throws IOException {
+        RemoteIterator&lt;LocatedFileStatus&gt; files = fileSystem.listFiles(new Path(&quot;/test&quot;), true);
+        while (files.hasNext()) {
+            LocatedFileStatus fileStatus = files.next();
+            //判断是否是文件
+            System.out.println(fileStatus.isFile());
+            //文件名
+            System.out.println(fileStatus.getPath().getName());
+            //长度
+            System.out.println(fileStatus.getLen());
+            //权限
+            System.out.println(fileStatus.getPermission());
+            //分组
+            System.out.println(fileStatus.getGroup());
+            //获取存储块信息
+            BlockLocation[] blockLocations = fileStatus.getBlockLocations();
+            for (BlockLocation blockLocation : blockLocations) {
+                String[] hosts = blockLocation.getHosts();
+                for (String host : hosts) {
+                    System.out.print(host + &quot; &quot;);
+                }
+                System.out.println();
+            }
+        }
+
+    }
+}
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

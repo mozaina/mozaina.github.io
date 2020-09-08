@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell命令行中用sbt打包scala程序为jar包并发布到集群中测试 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell命令行中用sbt打包scala程序为jar包并发布到集群中测试 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell命令行中用sbt打包scala程序为jar包并发布到集群中测试">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%91%BD%E4%BB%A4%E8%A1%8C%E4%B8%AD%E7%94%A8sbt%E6%89%93%E5%8C%85scala%E7%A8%8B%E5%BA%8F%E4%B8%BAjar%E5%8C%85%E5%B9%B6%E5%8F%91%E5%B8%83%E5%88%B0%E9%9B%86%E7%BE%A4%E4%B8%AD%E6%B5%8B%E8%AF%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell命令行中用sbt打包scala程序为jar包并发布到集群中测试</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="1-sbt安装"><strong>1. sbt安装</strong></h3>
+
+<p>下载sbt文件，并在Linux中解压二进制的sbt软件包，这里提供下载地址 <a href="https://www.scala-sbt.org/download.html">https://www.scala-sbt.org/download.html</a></p>
+
+<p>在解压后进入目录，然后执行./bin/sbt，第一次执行时会从网上下载依赖的JAR包，并保存到~/.sbt：</p>
+
+<pre><code>[elon@hadoop ~]$ tar xf sbt-1.1.1.tgz
+[elon@hadoop ~]$ cd sbt/
+[elon@hadoop sbt]$ ./bin/sbt
+</code></pre>
+
+<p>为了方便使用，可以加入到PATH路径中去:</p>
+
+<pre><code>[elon@hadoop sbt]$ mv bin/ conf/ ~/
+[elon@hadoop sbt]$ export PATH=&quot;$PATH:$HOME/bin&quot;
+</code></pre>
+
+<h3 id="2-编写sbt配置文件"><strong>2. 编写sbt配置文件</strong></h3>
+
+<p>一个典型的Spark程序的sbt配置文件如下，这里将其命名为wordCount.sbt:</p>
+
+<pre><code>name := &quot;WordCount&quot;
+
+version := &quot;0.1&quot;
+
+scalaVersion := &quot;2.11.8&quot;
+
+// https://mvnrepository.com/artifact/org.apache.spark/spark-core
+libraryDependencies += &quot;org.apache.spark&quot; %% &quot;spark-core&quot; % &quot;2.2.1&quot;
+</code></pre>
+
+<p>wordCount.sbt本身也是Scala代码，如果使用了其他组件，可以在libraryDependencies中继续添加。<br />
+为了让sbt正常工作，sbt文件和程序源码需要满足一定的目录结构，应该是这样：</p>
+
+<pre><code>[elon@hadoop wordcount]$ find .
+.
+./src
+./src/main
+./src/main/scala
+./src/main/scala/WordCount.scala
+./wordCount.sbt
+</code></pre>
+
+<h3 id="3-编译-链接-打包"><strong>3. 编译、链接、打包</strong></h3>
+
+<p>相关命令如下：</p>
+
+<pre><code>[elon@hadoop wordcount]$sbt package
+[info] Updated file /home/elon/workspace/wordcount/project/build.properties: set sbt.version to 1.1.1
+[info] Loading project definition from /home/elon/workspace/wordcount/project
+[info] Updating ProjectRef(uri(&quot;file:/home/elon/workspace/wordcount/project/&quot;), &quot;wordcount-build&quot;)
+...
+[info] Compiling 1 Scala source to /home/elon/workspace/wordcount/target/scala-2.11/classes ...
+[info] Done compiling.
+[info] Packaging /home/elon/workspace/wordcount/target/scala-2.11/wordcount_2.11-0.1.jar ...
+[info] Done packaging.
+[success] Total time: 62 s, completed 2018-2-22 1:26:33
+</code></pre>
+
+<p>初次执行也比较慢，因为需要下载依赖的Spark相关的JAR包。</p>
+
+<h3 id="4-提交"><strong>4. 提交</strong></h3>
+
+<p>打包之后，就可以提交至集群上运行了，提交任务的基本形式如下：</p>
+
+<pre><code>[elon@hadoop spark]$ ./bin/spark-submit \
+--class WordCount \
+--master local \
+~/workspace/wordcount/target/scala-2.11/wordcount_2.11-0.1.jar
+
+
+
+Using Spark's default log4j profile: org/apache/spark/log4j-defaults.properties
+18/02/22 01:33:27 INFO SparkContext: Running Spark version 2.2.1
+18/02/22 01:33:28 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+18/02/22 01:33:28 INFO SparkContext: Submitted application: WordCount
+18/02/22 01:33:28 INFO SecurityManager: Changing view acls to: elon
+18/02/22 01:33:28 INFO SecurityManager: Changing modify acls to: elon
+18/02/22 01:33:28 INFO SecurityManager: Changing view acls groups to: 
+18/02/22 01:33:28 INFO SecurityManager: Changing modify acls groups to: 
+18/02/22 01:33:28 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users  with view permissions: Set(elon); groups with view permissions: Set(); users  with modify permissions: Set(elon); groups with modify permissions: Set()
+18/02/22 01:33:29 INFO Utils: Successfully started service 'sparkDriver' on port 40258.
+18/02/22 01:33:29 INFO SparkEnv: Registering MapOutputTracker
+18/02/22 01:33:29 INFO SparkEnv: Registering BlockManagerMaster
+18/02/22 01:33:29 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+18/02/22 01:33:29 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+18/02/22 01:33:30 INFO DiskBlockManager: Created local directory at /tmp/blockmgr-618a12c1-361a-4bd1-b81e-4b523ebad17e
+18/02/22 01:33:30 INFO MemoryStore: MemoryStore started with capacity 413.9 MB
+18/02/22 01:33:30 INFO SparkEnv: Registering OutputCommitCoordinator
+18/02/22 01:33:30 INFO Utils: Successfully started service 'SparkUI' on port 4040.
+18/02/22 01:33:31 INFO SparkUI: Bound SparkUI to 0.0.0.0, and started at http://192.168.1.115:4040
+18/02/22 01:33:31 INFO SparkContext: Added JAR file:/home/elon/workspace/wordcount/target/scala-2.11/wordcount_2.11-0.1.jar at spark://192.168.1.115:40258/jars/wordcount_2.11-0.1.jar with timestamp 1519234411259
+18/02/22 01:33:31 INFO Executor: Starting executor ID driver on host localhost
+18/02/22 01:33:31 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 39799.
+18/02/22 01:33:31 INFO NettyBlockTransferService: Server created on 192.168.1.115:39799
+18/02/22 01:33:31 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+18/02/22 01:33:31 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, 192.168.1.115, 39799, None)
+18/02/22 01:33:31 INFO BlockManagerMasterEndpoint: Registering block manager 192.168.1.115:39799 with 413.9 MB RAM, BlockManagerId(driver, 192.168.1.115, 39799, None)
+18/02/22 01:33:31 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, 192.168.1.115, 39799, None)
+18/02/22 01:33:31 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, 192.168.1.115, 39799, None)
+18/02/22 01:33:34 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 236.5 KB, free 413.7 MB)
+18/02/22 01:33:35 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 22.9 KB, free 413.7 MB)
+18/02/22 01:33:35 INFO BlockManagerInfo: Added broadcast_0_piece0 in memory on 192.168.1.115:39799 (size: 22.9 KB, free: 413.9 MB)
+18/02/22 01:33:35 INFO SparkContext: Created broadcast 0 from textFile at WordCount.scala:9
+18/02/22 01:33:35 INFO FileInputFormat: Total input paths to process : 1
+wordCounts: 
+18/02/22 01:33:35 INFO SparkContext: Starting job: collect at WordCount.scala:14
+18/02/22 01:33:36 INFO DAGScheduler: Registering RDD 3 (map at WordCount.scala:11)
+18/02/22 01:33:36 INFO DAGScheduler: Got job 0 (collect at WordCount.scala:14) with 1 output partitions
+18/02/22 01:33:36 INFO DAGScheduler: Final stage: ResultStage 1 (collect at WordCount.scala:14)
+18/02/22 01:33:36 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 0)
+18/02/22 01:33:36 INFO DAGScheduler: Missing parents: List(ShuffleMapStage 0)
+18/02/22 01:33:36 INFO DAGScheduler: Submitting ShuffleMapStage 0 (MapPartitionsRDD[3] at map at WordCount.scala:11), which has no missing parents
+18/02/22 01:33:36 INFO MemoryStore: Block broadcast_1 stored as values in memory (estimated size 4.7 KB, free 413.7 MB)
+18/02/22 01:33:36 INFO MemoryStore: Block broadcast_1_piece0 stored as bytes in memory (estimated size 2.7 KB, free 413.7 MB)
+18/02/22 01:33:36 INFO BlockManagerInfo: Added broadcast_1_piece0 in memory on 192.168.1.115:39799 (size: 2.7 KB, free: 413.9 MB)
+18/02/22 01:33:36 INFO SparkContext: Created broadcast 1 from broadcast at DAGScheduler.scala:1006
+18/02/22 01:33:36 INFO DAGScheduler: Submitting 1 missing tasks from ShuffleMapStage 0 (MapPartitionsRDD[3] at map at WordCount.scala:11) (first 15 tasks are for partitions Vector(0))
+18/02/22 01:33:36 INFO TaskSchedulerImpl: Adding task set 0.0 with 1 tasks
+18/02/22 01:33:36 INFO TaskSetManager: Starting task 0.0 in stage 0.0 (TID 0, localhost, executor driver, partition 0, PROCESS_LOCAL, 4839 bytes)
+18/02/22 01:33:36 INFO Executor: Running task 0.0 in stage 0.0 (TID 0)
+18/02/22 01:33:36 INFO Executor: Fetching spark://192.168.1.115:40258/jars/wordcount_2.11-0.1.jar with timestamp 1519234411259
+18/02/22 01:33:36 INFO TransportClientFactory: Successfully created connection to /192.168.1.115:40258 after 105 ms (0 ms spent in bootstraps)
+18/02/22 01:33:37 INFO Utils: Fetching spark://192.168.1.115:40258/jars/wordcount_2.11-0.1.jar to /tmp/spark-dec8c0aa-5af4-43fb-ab29-a3bd6273e561/userFiles-0ea2f549-1a97-4276-acc6-cf3c07948ccb/fetchFileTemp4497605578776580420.tmp
+18/02/22 01:33:37 INFO Executor: Adding file:/tmp/spark-dec8c0aa-5af4-43fb-ab29-a3bd6273e561/userFiles-0ea2f549-1a97-4276-acc6-cf3c07948ccb/wordcount_2.11-0.1.jar to class loader
+18/02/22 01:33:37 INFO HadoopRDD: Input split: file:/home/elon/spark/README.md:0+3809
+18/02/22 01:33:38 INFO Executor: Finished task 0.0 in stage 0.0 (TID 0). 1197 bytes result sent to driver
+18/02/22 01:33:38 INFO TaskSetManager: Finished task 0.0 in stage 0.0 (TID 0) in 1510 ms on localhost (executor driver) (1/1)
+18/02/22 01:33:38 INFO TaskSchedulerImpl: Removed TaskSet 0.0, whose tasks have all completed, from pool 
+18/02/22 01:33:38 INFO DAGScheduler: ShuffleMapStage 0 (map at WordCount.scala:11) finished in 1.594 s
+18/02/22 01:33:38 INFO DAGScheduler: looking for newly runnable stages
+18/02/22 01:33:38 INFO DAGScheduler: running: Set()
+18/02/22 01:33:38 INFO DAGScheduler: waiting: Set(ResultStage 1)
+18/02/22 01:33:38 INFO DAGScheduler: failed: Set()
+18/02/22 01:33:38 INFO DAGScheduler: Submitting ResultStage 1 (ShuffledRDD[4] at reduceByKey at WordCount.scala:12), which has no missing parents
+18/02/22 01:33:38 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 3.2 KB, free 413.7 MB)
+18/02/22 01:33:38 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 1957.0 B, free 413.7 MB)
+18/02/22 01:33:38 INFO BlockManagerInfo: Added broadcast_2_piece0 in memory on 192.168.1.115:39799 (size: 1957.0 B, free: 413.9 MB)
+18/02/22 01:33:38 INFO SparkContext: Created broadcast 2 from broadcast at DAGScheduler.scala:1006
+18/02/22 01:33:38 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 1 (ShuffledRDD[4] at reduceByKey at WordCount.scala:12) (first 15 tasks are for partitions Vector(0))
+18/02/22 01:33:38 INFO TaskSchedulerImpl: Adding task set 1.0 with 1 tasks
+18/02/22 01:33:38 INFO TaskSetManager: Starting task 0.0 in stage 1.0 (TID 1, localhost, executor driver, partition 0, ANY, 4621 bytes)
+18/02/22 01:33:38 INFO Executor: Running task 0.0 in stage 1.0 (TID 1)
+18/02/22 01:33:38 INFO ShuffleBlockFetcherIterator: Getting 1 non-empty blocks out of 1 blocks
+18/02/22 01:33:38 INFO ShuffleBlockFetcherIterator: Started 0 remote fetches in 31 ms
+18/02/22 01:33:38 INFO Executor: Finished task 0.0 in stage 1.0 (TID 1). 7866 bytes result sent to driver
+18/02/22 01:33:38 INFO TaskSetManager: Finished task 0.0 in stage 1.0 (TID 1) in 318 ms on localhost (executor driver) (1/1)
+18/02/22 01:33:38 INFO DAGScheduler: ResultStage 1 (collect at WordCount.scala:14) finished in 0.316 s
+18/02/22 01:33:38 INFO TaskSchedulerImpl: Removed TaskSet 1.0, whose tasks have all completed, from pool 
+18/02/22 01:33:38 INFO DAGScheduler: Job 0 finished: collect at WordCount.scala:14, took 3.083995 s
+(package,1)
+(For,3)
+(Programs,1)
+(processing.,1)
+(Because,1)
+(The,1)
+(page](http://spark.apache.org/documentation.html).,1)
+(cluster.,1)
+(its,1)
+([run,1)
+(than,1)
+(APIs,1)
+(have,1)
+(Try,1)
+(computation,1)
+(through,1)
+(several,1)
+(This,2)
+(graph,1)
+(Hive,2)
+(storage,1)
+([&quot;Specifying,1)
+(To,2)
+(&quot;yarn&quot;,1)
+(Once,1)
+([&quot;Useful,1)
+(prefer,1)
+(SparkPi,2)
+(engine,1)
+(version,1)
+(file,1)
+(documentation,,1)
+(processing,,1)
+(the,24)
+(are,1)
+(systems.,1)
+(params,1)
+(not,1)
+(different,1)
+(refer,2)
+(Interactive,2)
+(R,,1)
+(given.,1)
+(if,4)
+(build,4)
+(when,1)
+(be,2)
+(Tests,1)
+(Apache,1)
+(thread,1)
+(programs,,1)
+(including,4)
+(./bin/run-example,2)
+(Spark.,1)
+(package.,1)
+(1000).count(),1)
+(Versions,1)
+(HDFS,1)
+(Data.,1)
+(&gt;&gt;&gt;,1)
+(Maven,1)
+(programming,1)
+(Testing,1)
+(module,,1)
+(Streaming,1)
+(environment,1)
+(run:,1)
+(Developer,1)
+(clean,1)
+(1000:,2)
+(rich,1)
+(GraphX,1)
+(Please,4)
+(is,6)
+(guide](http://spark.apache.org/contributing.html),1)
+(run,7)
+(URL,,1)
+(threads.,1)
+(same,1)
+(MASTER=spark://host:7077,1)
+(on,7)
+(built,1)
+(against,1)
+([Apache,1)
+(tests,2)
+(examples,2)
+(at,2)
+(optimized,1)
+(3&quot;](https://cwiki.apache.org/confluence/display/MAVEN/Parallel+builds+in+Maven+3).,1)
+(usage,1)
+(development,1)
+(Maven,,1)
+(graphs,1)
+(talk,1)
+(Shell,2)
+(class,2)
+(abbreviated,1)
+(using,5)
+(directory.,1)
+(README,1)
+(computing,1)
+(overview,1)
+(`examples`,2)
+(example:,1)
+(##,9)
+(N,1)
+(set,2)
+(use,3)
+(Hadoop-supported,1)
+(running,1)
+(find,1)
+(contains,1)
+(project,1)
+(Pi,1)
+(need,1)
+(or,3)
+(Big,1)
+(high-level,1)
+(Java,,1)
+(uses,1)
+(,1)
+(Hadoop,,2)
+(available,1)
+(requires,1)
+((You,1)
+(more,1)
+(see,3)
+(Documentation,1)
+(of,5)
+(tools,1)
+(using:,1)
+(cluster,2)
+(must,1)
+(supports,2)
+(built,,1)
+(tests](http://spark.apache.org/developer-tools.html#individual-tests).,1)
+(system,1)
+(build/mvn,1)
+(Hadoop,3)
+(this,1)
+(Version&quot;](http://spark.apache.org/docs/latest/building-spark.html#specifying-the-hadoop-version),1)
+(particular,2)
+(Python,2)
+(Spark,16)
+(general,3)
+(YARN,,1)
+(pre-built,1)
+([Configuration,1)
+(locally,2)
+(library,1)
+(A,1)
+(locally.,1)
+(sc.parallelize(1,1)
+(only,1)
+(Configuration,1)
+(following,2)
+(basic,1)
+(#,1)
+(changed,1)
+(More,1)
+(which,2)
+(learning,,1)
+(first,1)
+(./bin/pyspark,1)
+(also,4)
+(info,1)
+(should,2)
+(for,12)
+([params]`.,1)
+(documentation,3)
+([project,1)
+(mesos://,1)
+(Maven](http://maven.apache.org/).,1)
+(setup,1)
+(,1)
+(latest,1)
+(your,1)
+(MASTER,1)
+(example,3)
+([&quot;Parallel,1)
+(scala&gt;,1)
+(DataFrames,,1)
+(provides,1)
+(configure,1)
+(distributions.,1)
+(can,7)
+(About,1)
+(instructions.,1)
+(do,2)
+(easiest,1)
+(no,1)
+(project.,1)
+(how,3)
+(`./bin/run-example,1)
+(started,1)
+(Note,1)
+(by,1)
+(individual,1)
+(spark://,1)
+(It,2)
+(tips,,1)
+(Scala,2)
+(Alternatively,,1)
+(an,4)
+(variable,1)
+(submit,1)
+(-T,1)
+(machine,1)
+(thread,,1)
+(them,,1)
+(detailed,2)
+(stream,1)
+(And,1)
+(distribution,1)
+(review,1)
+(return,2)
+(Thriftserver,1)
+(developing,1)
+(./bin/spark-shell,1)
+(&quot;local&quot;,1)
+(start,1)
+(You,4)
+(Spark](#building-spark).,1)
+(one,3)
+(help,1)
+(with,4)
+(print,1)
+(Spark&quot;](http://spark.apache.org/docs/latest/building-spark.html).,1)
+(data,1)
+(Contributing,1)
+(in,6)
+(-DskipTests,1)
+(downloaded,1)
+(versions,1)
+(online,1)
+(Guide](http://spark.apache.org/docs/latest/configuration.html),1)
+(builds,1)
+(comes,1)
+(Tools&quot;](http://spark.apache.org/developer-tools.html).,1)
+([building,1)
+(Python,,2)
+(Many,1)
+(building,2)
+(Running,1)
+(from,1)
+(way,1)
+(Online,1)
+(site,,1)
+(other,1)
+(Example,1)
+([Contribution,1)
+(analysis.,1)
+(sc.parallelize(range(1000)).count(),1)
+(you,4)
+(runs.,1)
+(Building,1)
+(higher-level,1)
+(protocols,1)
+(guidance,2)
+(a,8)
+(guide,,1)
+(name,1)
+(fast,1)
+(SQL,2)
+(that,2)
+(will,1)
+(IDE,,1)
+(to,17)
+(get,1)
+(,71)
+(information,1)
+(core,1)
+(web,1)
+(&quot;local[N]&quot;,1)
+(programs,2)
+(option,1)
+(MLlib,1)
+([&quot;Building,1)
+(contributing,1)
+(shell:,2)
+(instance:,1)
+(Scala,,1)
+(and,9)
+(command,,2)
+(package.),1)
+(./dev/run-tests,1)
+(sample,1)
+18/02/22 01:33:38 INFO SparkContext: Invoking stop() from shutdown hook
+18/02/22 01:33:38 INFO SparkUI: Stopped Spark web UI at http://192.168.1.115:4040
+18/02/22 01:33:38 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+18/02/22 01:33:38 INFO MemoryStore: MemoryStore cleared
+18/02/22 01:33:38 INFO BlockManager: BlockManager stopped
+18/02/22 01:33:38 INFO BlockManagerMaster: BlockManagerMaster stopped
+18/02/22 01:33:38 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+18/02/22 01:33:38 INFO SparkContext: Successfully stopped SparkContext
+18/02/22 01:33:38 INFO ShutdownHookManager: Shutdown hook called
+18/02/22 01:33:38 INFO ShutdownHookManager: Deleting directory /tmp/spark-dec8c0aa-5af4-43fb-ab29-a3bd6273e561
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

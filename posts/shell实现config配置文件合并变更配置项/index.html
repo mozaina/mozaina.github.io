@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell实现config配置文件合并变更配置项 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell实现config配置文件合并变更配置项 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell实现config配置文件合并变更配置项">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%AE%9E%E7%8E%B0config%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E5%90%88%E5%B9%B6%E5%8F%98%E6%9B%B4%E9%85%8D%E7%BD%AE%E9%A1%B9/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell实现config配置文件合并变更配置项</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<pre><code>* 前言
+* 为什么采用增量配置conf文件？
+* 增量变更配置的几种类型
+  * 新增[section]
+  * 修改配置项
+  * 删除配置项
+  * 新增配置项
+  * 混合变更配置
+* shell实现config配置文件的增量变更
+</code></pre>
+
+<h2 id="前言">前言</h2>
+
+<p>通常在项目中会使用config文件作为项目的配置文件，config文件一般由<code>[section]</code>和<code>name=value</code>组成。当然分隔符<code>=</code>或者<code>:</code>是可以根据自己来定的。<br />
+文件的格式通常如下:</p>
+
+<pre><code>[DEFAULT]
+service_phone=18888888888
+# 资源路径
+resource_dir=/xxx/xxx/xxx/
+# 服务端口
+server_port=xxx
+
+#WEB配置
+[HTTP-SERVER]
+host=0.0.0.0
+http_port=xxx
+</code></pre>
+
+<p>对于该格式文件的解析，Python3有专门的库处理：<code>configparser</code>,通过导入<code>import configparser</code>就可以解析使用了。</p>
+
+<h2 id="为什么采用增量配置conf文件">为什么采用增量配置conf文件？</h2>
+
+<p>回到主题，既然config文件是用来保存项目配置的，那么什么时候会合并A配置文件到B配置文件呢？比如：发布项目的时候，项目release_1.0.0的版本已经发布，项目上的配置文件已经存在，在发布release_2.0.0的版本的时候，为了防止原配置文件的配置会被覆盖，导致原配置丢失，所以使用增量配置的方式来更改配置文件。<br />
+比如：<br />
+release_1.0.0版本的文件app.conf文件如下：</p>
+
+<pre><code>[SYS_CONFIG]
+# 服务端口
+server_port=8888
+# 资源路径
+resource_dir=/home/zhangsan/resource/
+
+[USER_INFO]
+# 姓名
+name=张三
+# 电话
+phone=18888888888
+# 住址
+address=马栏山马栏坡马栏屯123号
+</code></pre>
+
+<p>然后该项目需要发布release_2.0.0版本，并且配置文件如下：</p>
+
+<pre><code>[SYS_CONFIG]
+# 服务端口
+server_port=8080
+# 资源路径
+resource_dir=/home/zhangsan/resource2/
+</code></pre>
+
+<p>由于发布版本时，开发人员可能只是想更改<code>[SYS_CONFIG]</code>部分的配置，但是不小心把<code>[USER_INFO]</code>部分的配置删除了，导致发布2.0版本之后线上配置文件被直接覆盖删除，导致出现问题。为了让每次发布只需要关心配置文件需要更改的部分，而不关心未更改的配置，解决配置文件轻易被覆盖删除的问题，那么采用增量配置的方式更加的稳妥。<br />
+比如接着上面的例子，发布2.0版本的配置文件只会关心发布更改的配置文件项，由于只列出了<code>[SYS_CONFIG]</code>的配置，所以只会更改线上原配置文件中的<code>[SYS_CONFIG]</code>中的配置，原配置文件的<code>[USER_INFO]</code>的配置依然存在不变。</p>
+
+<h2 id="增量变更配置的几种类型">增量变更配置的几种类型</h2>
+
+<p>分几种变更场景</p>
+
+<h3 id="新增-section">新增[section]</h3>
+
+<p>A.conf</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=valueA
+opentionA_2=valueA
+</code></pre>
+
+<p>B.conf</p>
+
+<pre><code>[SECTION_B]
+opentionB_1=valueB
+opentionB_2=valueB
+</code></pre>
+
+<p>合并B.conf到A.conf之后的内容:</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=valueA
+opentionA_2=valueA
+[SECTION_B]
+opentionB_1=valueB
+opentionB_2=valueB
+</code></pre>
+
+<h3 id="修改配置项">修改配置项</h3>
+
+<p>A.conf</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=valueA
+opentionA_2=valueA
+</code></pre>
+
+<p>B.conf</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=被修改了
+</code></pre>
+
+<p>合并B.conf到A.conf之后的内容:</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=被修改了
+opentionA_2=valueA
+</code></pre>
+
+<h3 id="删除配置项">删除配置项</h3>
+
+<p>删除配置项为了稳妥起见，采用将value值去除变为空值的方式，起到删除的作用。<br />
+A.conf</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=valueA
+opentionA_2=valueA
+</code></pre>
+
+<p>B.conf</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=
+</code></pre>
+
+<p>合并B.conf到A.conf之后的内容:</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=
+opentionA_2=valueA
+</code></pre>
+
+<h3 id="新增配置项">新增配置项</h3>
+
+<p>A.conf</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=valueA
+opentionA_2=valueA
+</code></pre>
+
+<p>B.conf</p>
+
+<pre><code>[SECTION_A]
+opentionA_3=新增配置项3
+</code></pre>
+
+<p>合并B.conf到A.conf之后的内容:</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=valueA
+opentionA_2=valueA
+opentionA_3=新增配置项3
+</code></pre>
+
+<h3 id="混合变更配置">混合变更配置</h3>
+
+<p>A.conf</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=valueA
+opentionA_2=valueA
+</code></pre>
+
+<p>B.conf</p>
+
+<pre><code>[SECTION_A]
+opentionA_3=新增配置项3
+opentionA_1=被修改了
+opentionA_2=
+
+[SECTION_B]
+opentionB_1=valueB
+opentionB_2=valueB
+</code></pre>
+
+<p>合并B.conf到A.conf之后的内容:</p>
+
+<pre><code>[SECTION_A]
+opentionA_1=被修改了
+opentionA_2=
+opentionA_3=新增配置项3
+
+[SECTION_B]
+opentionB_1=valueB
+opentionB_2=valueB
+</code></pre>
+
+<h2 id="shell实现config配置文件的增量变更">shell实现config配置文件的增量变更</h2>
+
+<p>shell实现的核心是使用awk命令读取分析A文件和B文件的内容，并确定B文件的每个配置项分别变更了A文件的哪一行配置或者在哪一行后面新增配置。然后将变更信息生成sed脚本，最后直接用sed命令替换配置内容。最后的sed命令采用流式编辑文件，因此非常的高效。</p>
+
+<p>mconf.sh</p>
+
+<pre><code>#!/bin/bash
+
+fcf_path=$1    # 配置文件路径
+to_mcf_path=$2 # 合并目标文件
+sed_script=$3  # sed脚本
+
+#awk 分别读取两个配置文件
+#比较文件，找出每项配置合并到mcf的增删改并写入到sed文件
+#使用sed将mcf文件变更
+
+# 遇到section插入
+
+if [ ! -f &quot;$fcf_path&quot; ]; then
+  echo &quot;配置文件不存在:${fcf_path}&quot;
+  exit 1
+fi
+if [ ! -f &quot;$to_mcf_path&quot; ]; then
+  echo &quot;目标配置文件不存在:${to_mcf_path}&quot;
+  exit 1
+fi
+
+# linux环境中去除Windows中的\r符号
+sed -i 's/\r//g' &quot;$fcf_path&quot;
+sed -i 's/\r//g' &quot;$to_mcf_path&quot;
+
+cat /dev/null &gt;&quot;$sed_script&quot; # 清空sed脚本文件
+
+function cf_append() {
+  # 附加插入  格式: 行号a\换行 附加内容
+  local row_num=$1 #行号
+  local content=$2 #附加内容
+  {
+    echo &quot;${row_num}a\\&quot;
+    echo &quot;${content}&quot;
+    echo &quot;&quot; #还需要一个空行，否则附加内容之后的内容会在一行
+  } &gt;&gt;&quot;$sed_script&quot;
+}
+
+function cf_change() {
+  # 更新配置   格式: 行号s/模式匹配/替换内容/g  模式匹配最好采用整行匹配xx=.*
+  local row_num=$1 #行号
+  local pattern=$2 #匹配字符串
+  local content=$3 #替换内容
+  if [[ $content == */* ]]; then
+    {
+      echo &quot;${row_num}s!${pattern}!${content}!g&quot; &gt;&gt;&quot;$sed_script&quot;
+    }
+  else
+    {
+      echo &quot;${row_num}s/${pattern}/${content}/g&quot; &gt;&gt;&quot;$sed_script&quot;
+    }
+  fi
+
+}
+
+function act_sed() {
+  # 触发sed操作
+  if [ ! -s &quot;$to_mcf_path&quot; ]; then
+    echo -n &quot;#head&quot; &gt;&gt;&quot;$to_mcf_path&quot; # 如果文件为空，则需要添加一个头部内容才能用sed命令,否则sed命令无效
+  fi
+  sed -i -f &quot;$sed_script&quot; &quot;$to_mcf_path&quot;
+}
+
+function match_tconf() {
+  # 匹配目标项的配置,如果有多个相同配置则去最后的配置
+  local key=$1
+  local IFS_OLD=$IFS
+  match_rows=$(awk -F= '{if ($1 == key) print NR,$1,$2}' key=&quot;$key&quot; &quot;$to_mcf_path&quot;)
+  if [ -z &quot;$match_rows&quot; ]; then #如果没有匹配项
+    echo &quot;&quot;
+    return
+  fi
+  IFS=$'\n'
+  amatch_rows=($match_rows)
+  local last_row=${amatch_rows[((${#amatch_rows[*]})) - 1]} #获取最后一行
+  echo &quot;$last_row&quot;
+  IFS=$IFS_OLD
+}
+
+function compare_conf() {
+  #比较配置文件，并生成sed脚本
+  f_rows=$(awk -F= '{print $0}' &quot;$fcf_path&quot;)
+  IFS_OLD=$IFS
+  IFS=$'\n'
+
+  last_section_num=0 #最近一次的section行号,$为最后一行。因为流式处理配置文件，所以所有项一定是按序处理
+  for frow in $f_rows; do
+    if [ -z &quot;$frow&quot; ]; then
+      continue
+    fi
+    IFS=$'='
+    fcolumns=($frow)
+    local key=${fcolumns[0]}
+    local fvalue=${fcolumns[1]}
+
+    match_row=$(match_tconf &quot;$key&quot;) #匹配目标配置文件中的内容
+    IFS=$' '
+    amatch_column=($match_row) #行号 key value
+    if ((${#amatch_column[*]} == 2)); then
+      amatch_column=($amatch_column &quot;&quot;)
+    fi
+    if [[ $key == [* ]]; then #如果是section
+      if [ -z &quot;$match_row&quot; ]; then #如果section未在目标配置中找到，则表示为新增section
+        cf_append '$' &quot;&quot;
+        cf_append '$' &quot;$key&quot;
+        last_section_num='$'
+      else
+        local lnum=${amatch_column[0]} #section处在目标配置中的行号
+        last_section_num=$lnum
+      fi
+      continue #继续循环
+    fi
+
+    if [ -z &quot;$match_row&quot; ]; then # 如果没有找到匹配项
+      # 新增
+      if [[ $frow != *=* ]]; then #如果非配置项
+        if [[ $frow != [* ]]; then
+          continue
+        fi
+        cf_append &quot;$last_section_num&quot; &quot;$key&quot;
+      else
+        cf_append &quot;$last_section_num&quot; &quot;$key=$fvalue&quot;
+      fi
+    elif [ &quot;${amatch_column[((${#amatch_column[*]})) - 1]}&quot; != &quot;$fvalue&quot; ]; then
+      # 修改
+      local lnum=${amatch_column[0]} #目标文件匹配的行号
+      cf_change &quot;$lnum&quot; &quot;$key=.*&quot; &quot;$key=$fvalue&quot;
+    fi
+  done
+  IFS=$IFS_OLD
+}
+
+compare_conf
+act_sed
+</code></pre>
+
+<p>脚本执行:<br />
+<code>./mconf.sh ./b.conf ./a.conf ./m.sed</code><br />
+最终会生成会将b.conf文件合并到a.conf文件，并且生成m.sed文件,m.sed文件会作为<code>sed</code>命令的<code>-f</code>参数传入并执行。</p>
+
+<blockquote>
+<p>注意如果你是macOS，那么sed命令后面需要带上-i ‘’ ，因为mac系统强制需要你传入备份文件名。</p>
+</blockquote>
+
+<p>脚本中读取配置文件采用的分隔符分隔的方式，可以使用while-read的方式会更好。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

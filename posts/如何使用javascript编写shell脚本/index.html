@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>如何使用JavaScript编写Shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="如何使用JavaScript编写Shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="如何使用JavaScript编写Shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8javascript%E7%BC%96%E5%86%99shell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">如何使用JavaScript编写Shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><em>“如何使用JavaScript编写Shell脚本”是我们最新的JavaScript新闻通讯的社论，您可以在此处订阅 。</em></p>
+
+<p>这周我不得不升级客户的网站以使用SSL。 这本身并不是一项艰巨的任务-安装证书只是单击一个按钮-但是一旦我进行了切换，就留下了很多混合内容警告 。
+修复这些问题的一部分意味着，我必须浏览主题目录（这是一个WordPress网站），并确定所有通过HTTP包含资产的文件。</p>
+
+<p>以前，我会使用一个小的Ruby脚本来自动执行此操作。 Ruby是我学习的第一门编程语言，非常适合此类任务。
+但是，我们最近发表了一篇有关使用Node创建命令行界面的文章 。 这篇文章提醒我，JavaScript早已超越了浏览器，并且可以（除其他外）用于桌面脚本。</p>
+
+<p>在本文的其余部分中，我将说明如何使用JavaScript递归地遍历目录中的文件并识别出现的任何指定字符串。
+我还将简要介绍如何使用JavaScript编写Shell脚本，并带您逐步编写自己的脚本。</p>
+
+<h3 id="设定">设定</h3>
+
+<p>这里唯一的先决条件是Node.js。 如果您尚未安装此文件，则可以转到其网站并下载二进制文件之一 。 或者，您可以使用版本管理器，例如nvm。
+我们在这里有一个教程。</p>
+
+<h2 id="您的第一个shell脚本">您的第一个Shell脚本</h2>
+
+<p>那么从哪里开始呢？ 我们需要做的第一件事是遍历主题目录中的所有文件。 幸运的是，Node的本机文件系统模块带有一个readdir方法，我们可以使用该方法。
+它以目录路径和回调函数为参数。 回调有两个参数（ <code>err</code>和<code>entries</code>
+），其中<code>entries</code>是目录中<code>entries</code>名称的数组，不包括<code>.</code> 和<code>..</code> —分别是当前目录和父目录。</p>
+
+<pre><code>const fs = require('fs');
+
+function buildTree(startPath) {
+  fs.readdir(startPath, (err, entries) =&gt; {
+    console.log(entries);
+  });
+}
+
+buildTree('/home/jim/Desktop/theme');
+</code></pre>
+
+<p><em>如果要遵循此步骤，请将以上内容保存在名为<code>search_and_replace.js</code>的文件中，并使用<code>node
+search_and_replace.js</code>从命令行运行它。</em> <em>您还需要将路径调整到所使用的目录。</em></p>
+
+<h2 id="添加递归">添加递归</h2>
+
+<p>到目前为止，一切都很好！ 上面的脚本将目录的顶级条目记录到控制台，但是我的主题文件夹包含子目录，这些子目录也包含需要处理的文件。
+这意味着我们需要遍历条目数组，并让函数针对遇到的任何目录调用自身。</p>
+
+<p>为此，如果要处理目录，首先需要确定。 幸运的是，文件系统模块也有一个方法： lstatSync 。
+这将返回一个fs.Stats对象，该对象本身具有<code>isDirectory</code>方法。 此方法相应地返回<code>true</code>或<code>false</code> 。</p>
+
+<p>请注意，这里我们使用的是<code>lstat</code>的同步版本。 这对于一次性脚本来说很好，但是如果性能很重要，则应首选异步版本。</p>
+
+<pre><code>const fs = require('fs');
+
+function buildTree(startPath) {
+  fs.readdir(startPath, (err, entries) =&gt; {
+    console.log(entries);
+    entries.forEach((file) =&gt; {
+      const path = `${startPath}/${file}`;
+
+      if (fs.lstatSync(path).isDirectory()) {
+        buildTree(path);
+      }
+    });
+  });
+}
+
+buildTree('/home/jim/Desktop/theme');
+</code></pre>
+
+<p><em>如果运行该脚本，现在将看到它为当前目录及其包含的每个子目录打印文件和文件夹的列表。</em> <em>成功！</em></p>
+
+<h2 id="识别要处理的文件">识别要处理的文件</h2>
+
+<p>接下来，我们需要添加一些逻辑来识别任何PHP文件，打开它们并在其中搜索我们要查找的任何字符串。 这可以通过使用简单的正则表达式来检查以“
+.php”结尾的文件名来完成，然后在满足该条件的情况下调用<code>processFile</code>函数，并将当前路径作为参数传递给它。</p>
+
+<p>让我们对路径名的构造方式进行一些小的改进。 到现在为止，我们一直在使用字符串插值，但是由于正斜杠，这只能在Unix环境中使用。
+但是，Node的路径模块提供了join方法 ，该方法将考虑分隔符。</p>
+
+<pre><code>const fs = require('fs');
+const Path = require('path');
+
+function processFile(path) {
+  console.log(path);
+}
+
+function buildTree(startPath) {
+  fs.readdir(startPath, (err, entries) =&gt; {
+    entries.forEach((file) =&gt; {
+      const path = Path.join(startPath, file);
+
+      if (fs.lstatSync(path).isDirectory()) {
+        buildTree(path);
+      } else if (file.match(/\.php$/)) {
+        processFile(path);
+      }
+    });
+  });
+}
+
+buildTree('/home/jim/Desktop/theme');
+</code></pre>
+
+<p><em>如果您在此时运行脚本，它应该递归目录树并打印出可能找到的任何php文件的路径。</em></p>
+
+<h2 id="在文件中搜索文本">在文件中搜索文本</h2>
+
+<p>剩下要做的就是打开脚本找到的文件并进行处理。 这可以使用Node的readFileSync方法完成，该方法接受文件路径及其编码（可选）作为参数。
+如果指定了编码，则此函数返回一个字符串。 否则，它将返回一个缓冲区。</p>
+
+<p>现在，我们可以将文件的内容读取到一个变量中，然后可以在每个换行符上进行拆分并遍历结果数组。
+然后，使用JavaScript的match方法查找所需的单词或短语是一个简单的问题：</p>
+
+<pre><code>function processFile(path) {
+  const text = fs.readFileSync(path, 'utf8');
+  text.split(/\r?\n/).forEach((line) =&gt; {
+    if (line.match('http:\/\/')) {
+      console.log(line.replace(/^\s+/, ''));
+      console.log(`${path}\n`);
+    }
+  });
+}
+</code></pre>
+
+<p><em>如果您现在运行脚本，它将打印出找到匹配项的每一行以及文件名。</em></p>
+
+<h2 id="进一步发展">进一步发展</h2>
+
+<p>在我的特定情况下，这就足够了。 该脚本吐出了少量的“ http”，我可以手动修复。 任务完成！
+但是，使用<code>replace()</code>和fs.writeFileSync更改每次出现的情况并将新内容写回到文件中来自动化该过程将很简单。
+您还可以使用child_process.exec打开Sublime中的文件以供编辑：</p>
+
+<pre><code>const exec = require('child_process').exec;
+...
+exec(`subl ${path}`)
+</code></pre>
+
+<p>这种脚本可以完成很多任务，而不仅仅是处理文本文件。 例如，也许您想批量重命名一堆音乐曲目，或从目录中删除每个<code>Thumbs.db</code>文件。
+也许您想从远程API获取数据，解析CSV文件或即时生成文件。 清单继续&hellip;</p>
+
+<p>您还可以将JavaScript文件设置为可执行文件，以便在单击它们时运行它们。 Axel Rauschmayer在他的文章中谈到了这一点。
+通过Node.js用JavaScript编写Shell脚本 。</p>
+
+<h2 id="结论">结论</h2>
+
+<p>我们终于得到它了。 我已经演示了如何使用JavaScript遍历目录树并处理其中包含的文件的子集。
+这是一个简单的示例，但是它强调了JavaScript可用于浏览器之外的全部任务这一点，其中桌面脚本就是其中之一。</p>
+
+<p>现在结束了。 您是否使用JavaScript自动执行脚本任务？ 如果不是，您是否使用其他偏好的语言，或者您是bash纯粹主义者？ 您可以自动执行哪些任务？
+在下面的评论中让我知道。</p>
+
+<p>From: <a href="https://www.sitepoint.com/shell-scripts-javascript/">https://www.sitepoint.com/shell-scripts-javascript/</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

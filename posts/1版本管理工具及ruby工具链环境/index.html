@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>1版本管理工具及Ruby工具链环境 | 开发者问答集锦</title>
+    <meta property="og:title" content="1版本管理工具及Ruby工具链环境 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="1版本管理工具及Ruby工具链环境">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/1%E7%89%88%E6%9C%AC%E7%AE%A1%E7%90%86%E5%B7%A5%E5%85%B7%E5%8F%8Aruby%E5%B7%A5%E5%85%B7%E9%93%BE%E7%8E%AF%E5%A2%83/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">1版本管理工具及Ruby工具链环境</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><a href="https://img.it610.com/image/info8/3c18ec740adf456982b83749666e0a9a.jpg"><img src="https://img.it610.com/image/info8/3c18ec740adf456982b83749666e0a9a.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第1张图片" /></a></p>
+
+<blockquote>
+<p><strong>CocoaPods 历险记</strong> 这个专题是 <strong>Edmond</strong> 和 <strong>冬瓜</strong> 共同撰写，对于 iOS / macOS 工程中版本管理工具
+CocoaPods 的实现细节、原理、源码、实践与经验的分享记录，旨在帮助大家能够更加了解这个依赖管理工具，而不仅局限于 <code>pod install</code> 和
+<code>pod update</code>。</p>
+</blockquote>
+
+<h1 id="本文知识目录">本文知识目录</h1>
+
+<p><a href="https://img.it610.com/image/info8/06a65334cd68424cbb9112cde08ce732.jpg"><img src="https://img.it610.com/image/info8/06a65334cd68424cbb9112cde08ce732.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第2张图片" /></a>
+版本管理工具及 Ruby 工具链</p>
+
+<h1 id="背景">背景</h1>
+
+<p><code>CocoaPods</code> 作为业界标准，各位 iOS 开发同学应该都不陌生。不过很多同学对 <code>CocoaPods</code> 的使用基本停留在 <code>pod
+install</code> 和 <code>pod update</code> 上。一旦项目组件化，各业务线逻辑拆分到独立的 <code>Pod</code> 中后，光了解几个简单 <code>Pod</code>
+命令是无法满足需求的，同时还面临开发环境的一致性，<code>Pod</code> 命令执行中的各种异常错误，都要求我们对其有更深层的认知和 ????。</p>
+
+<p>关于 <code>CocoaPods</code> 深入的文章有很多，推荐 ObjC China 的这篇，深入理解 CocoaPods[1]，而本文希望从依赖管理工具的角度来谈谈
+<code>CocoaPods</code> 的管理理念。</p>
+
+<h1 id="version-control-system-vcs">Version Control System (VCS)</h1>
+
+<blockquote>
+<p>Version control systems are a category of software tools that help a
+software team manage changes to source code over time. Version control
+software keeps track of every modification to the code in a special kind of
+database.</p>
+</blockquote>
+
+<p>软件工程中，版本控制系统是敏捷开发的重要一环，为后续的持续集成提供了保障。<code>Source Code Manager</code> (SCM) 源码管理就属于 VCS
+的范围之中，熟知的工具有如 <code>Git</code> 。而 <code>CocoaPods</code> 这种针对各种语言所提供的 <code>Package Manger (PM)</code>也可以看作是
+SCM 的一种。</p>
+
+<p>而像 <code>Git</code> 或 <code>SVN</code> 是针对项目的单个文件的进行版本控制，而 PM 则是以每个独立的 Package 作为最小的管理单元。包管理工具都是结合
+<code>SCM</code> 来完成管理工作，对于被 PM 接管的依赖库的文件，通常会在 <code>Git</code> 的 <code>.ignore</code> 文件中选择忽略它们。</p>
+
+<p>例如：在 <code>Node</code> 项目中一般会把 <code>node_modules</code> 目录下的文件 ignore 掉，在 iOS / macOS 项目则是 <code>Pods</code>。</p>
+
+<h2 id="git-submodule">Git Submodule</h2>
+
+<p><a href="https://img.it610.com/image/info8/110be2cc3c7d4846aa4d7ad1bc2fbb4f.jpg"><img src="https://img.it610.com/image/info8/110be2cc3c7d4846aa4d7ad1bc2fbb4f.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第3张图片" /></a>
+Git Submodule</p>
+
+<blockquote>
+<p>Git submodules allow you to keep a git repository as a subdirectory of
+another git repository. Git submodules are simply a reference to another
+repository at a particular snapshot in time. Git submodules enable a Git
+repository to incorporate and track version history of external code.</p>
+</blockquote>
+
+<p><strong><code>Git Submodules</code> 可以算是 PM 的“青春版”，它将单独的 git 仓库以子目录的形式嵌入在工作目录中</strong>。它不具备 PM
+工具所特有的语义化版本[2]管理、无法处理依赖共享与冲突等。只能保存每个依赖仓库的文件状态。</p>
+
+<p><code>Git</code> 在提交更新时，会对所有文件制作一个快照并将其存在数据库中。Git 管理的文件存在 3 种状态：</p>
+
+<ul>
+<li><p><strong>working director：</strong> 工作目录，即我们肉眼可见的文件</p></li>
+
+<li><p><strong>stage area：</strong> 暂存区 (或称 <code>index area</code> )，存在 <code>.git/index</code> 目录下，保存的是执行 <code>git add</code> 相关命令后从工作目录添加的文件。</p></li>
+
+<li><p><strong>commit history：</strong> 提交历史，存在 <code>.git/</code> 目录下，到这个状态的文件改动算是入库成功，基本不会丢失了。</p></li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/c2bd9d79e56342e1ad17acaad8491cbe.jpg"><img src="https://img.it610.com/image/info8/c2bd9d79e56342e1ad17acaad8491cbe.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第4张图片" /></a></p>
+
+<p>Git submodule 是依赖 <code>.gitmodules</code> 文件来记录子模块的。</p>
+
+<pre><code>[submodule &quot;ReactNative&quot;]
+ path = ReactNative
+ url = https://github.com/facebook/ReactNative.git
+</code></pre>
+
+<p><code>.gitmodules</code> 仅记录了 path 和 url 以及模块名称的基本信息， 但是我们还需要记录每个 Submodule Repo 的 commit
+信息，而这 commit 信息是记录在 <code>.git/modules</code> 目录下。同时被添加到 <code>.gitmodules</code> 中的 path 也会被 git 直接
+ignore 掉。</p>
+
+<h2 id="package-manger">Package Manger</h2>
+
+<p>作为 Git Submodule 的强化版，PM
+基本都具备了语义化的版本检查能力，依赖递归查找，依赖冲突解决，以及针对具体依赖的构建能力和二进制包等。简单对比如下：</p>
+
+<table>
+<thead>
+<tr>
+<th><strong>Key File</strong></th>
+<th><strong>Git submodule</strong></th>
+<th><strong>CocoaPods</strong></th>
+<th><strong>SPM</strong></th>
+<th><strong>npm</strong></th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td><strong>描述文件</strong></td>
+<td>.gitmodules</td>
+<td>Podfile</td>
+<td>Package.swift</td>
+<td>Package.json</td>
+</tr>
+
+<tr>
+<td><strong>锁存文件</strong></td>
+<td>.git/modules</td>
+<td>Podfile.lock</td>
+<td>Package.resolved</td>
+<td>package-lock.json</td>
+</tr>
+</tbody>
+</table>
+
+<p>从 ???? 可见，PM 工具基本围绕这个两个文件来现实包管理：</p>
+
+<ul>
+<li><p><strong>描述文件</strong> ：声明了项目中存在哪些依赖，版本限制；</p></li>
+
+<li><p><strong>锁存文件（Lock 文件）</strong> ：记录了依赖包最后一次更新时的全版本列表。</p></li>
+</ul>
+
+<p>除了这两个文件之外，中心化的 PM 一般会提供依赖包的托管服务，比如 npm 提供的 npmjs.com[3] 可以集中查找和下载 npm
+包。如果是去中心化的 PM 比如 <code>iOS</code> 的 <code>Carthage</code> 和 <code>SPM</code> 就只能通过 Git 仓库的地址了。</p>
+
+<h2 id="cocoapods">CocoaPods</h2>
+
+<p><a href="https://img.it610.com/image/info8/642c277d92c14f7284dc0fac8427442e.jpg"><img src="https://img.it610.com/image/info8/642c277d92c14f7284dc0fac8427442e.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第5张图片" /></a>
+image.png</p>
+
+<p><strong><code>CocoaPods</code> 是开发 iOS/macOS 应用程序的一个第三方库的依赖管理工具。</strong> 利用
+<code>CocoaPods</code>，可以定义自己的依赖关系（简称 <code>Pods</code>），以及在整个开发环境中对第三方库的版本管理非常方便。</p>
+
+<p>下面我们以 <code>CocoaPods</code> 为例。</p>
+
+<p><a href="https://img.it610.com/image/info8/fb62a6d08b6b4cdfb16f9e8a94fa2ada.jpg"><img src="https://img.it610.com/image/info8/fb62a6d08b6b4cdfb16f9e8a94fa2ada.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第6张图片" /></a></p>
+
+<h3 id="podfile"><code>Podfile</code></h3>
+
+<p><code>Podfile</code> 是一个文件，以 DSL（其实直接用了 Ruby
+的语法）来描述依赖关系，用于定义项目所需要使用的第三方库。该文件支持高度定制，你可以根据个人喜好对其做出定制。更多相关信息，请查阅 Podfile
+指南[4]。</p>
+
+<h3 id="podfile-lock"><code>Podfile.lock</code></h3>
+
+<p>这是 <code>CocoaPods</code> 创建的最重要的文件之一。它记录了需要被安装的 Pod 的每个已安装的版本。如果你想知道已安装的 <code>Pod</code>
+是哪个版本，可以查看这个文件。推荐将 <code>Podfile.lock</code> 文件加入到版本控制中，这有助于整个团队的一致性。</p>
+
+<h3 id="manifest-lock"><code>Manifest.lock</code></h3>
+
+<p>这是每次运行 <code>pod install</code> 命令时创建的 <code>Podfile.lock</code> 文件的副本。如果你遇见过这样的错误
+<strong>沙盒文件与<code>Podfile.lock</code> 文件不同步 (The sandbox is not in sync with the
+<code>Podfile.lock</code>)</strong>，这是因为 <code>Manifest.lock</code> 文件和 <code>Podfile.lock</code> 文件不一致所引起。由于 <code>Pods</code>
+所在的目录并不总在版本控制之下，这样可以保证开发者运行 App 之前都能更新他们的 <code>Pods</code>，否则 App 可能会
+crash，或者在一些不太明显的地方编译失败。</p>
+
+<h3 id="master-specs-repo">Master Specs Repo</h3>
+
+<blockquote>
+<p>Ultimately, the goal is to improve discoverability of, and engagement in,
+third party open-source libraries, by creating a more centralized ecosystem.</p>
+</blockquote>
+
+<p>作为包管理工具，<code>CocoaPods</code>
+的目标是为我们提供一个更加集中的生态系统，来提高依赖库的可发现性和参与度。本质上是为了提供更好的检索和查询功能，可惜成为了它的问题之一。因为
+<code>CocoaPods</code> 通过官方的 Spec 仓库来管理这些注册的依赖库。随着不断新增的依赖库导致 Spec 的更新和维护成为了使用者的包袱。</p>
+
+<p>好在这个问题在 1.7.2 版本中已经解决了，<code>CocoaPods</code> 提供了 Mater Repo CDN[5] ，可以直接 CDN 到对应的 Pod
+地址而无需在通过本地的 Spec 仓库了。同时在 1.8 版本中，官方默认的 Spec 仓库已替换为 CDN，其地址为
+<a href="https://cdn.cocoapods.org[6]。">https://cdn.cocoapods.org[6]。</a></p>
+
+<p><a href="https://img.it610.com/image/info8/64a2af91d80545f8a0d021bccecb932e.jpg"><img src="https://img.it610.com/image/info8/64a2af91d80545f8a0d021bccecb932e.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第7张图片" /></a>
+Spec 仓静态页</p>
+
+<h1 id="ruby-生态及工具链">Ruby 生态及工具链</h1>
+
+<p>对于一部分仅接触过 <code>CocoaPods</code> 的同学，其 PM 可能并不熟悉。其实 <code>CocoaPods</code> 的思想借鉴了其他语言的 PM
+工具，例：<code>RubyGems</code>[7], <code>Bundler</code>[8], <code>npm</code>[9] 和 <code>Gradle</code>[10]。</p>
+
+<p>我们知道 <code>CocoaPods</code> 是通过 Ruby 语言实现的。它本身就是一个 <code>Gem</code> 包。理解了 Ruby 的依赖管理有助于我们更好的管理不同版本的
+<code>CocoaPods</code> 和其他 <code>Gem</code>。同时能够保证团队中的所有同事的工具是在同一个版本，这也算是敏捷开发的保证吧。</p>
+
+<h2 id="rvm-rbenv"><code>RVM</code> &amp; <code>rbenv</code></h2>
+
+<p><a href="https://img.it610.com/image/info8/ff0c4ba4d6d34f0bb5cad9a18b11b06c.jpg"><img src="https://img.it610.com/image/info8/ff0c4ba4d6d34f0bb5cad9a18b11b06c.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第8张图片" /></a>
+RVM vs rbenv</p>
+
+<p><strong><code>RVM</code> [11] 和 <code>rbenv</code>[12] 都是管理多个 Ruby 环境的工具，它们都能提供不同版本的 Ruby 环境管理和切换。</strong></p>
+
+<blockquote>
+<p><strong>具体哪个更好要看个人习惯。</strong> 当然 <code>rbenv</code> 官方是这么说的 Why rbenv[13] 。本文后续的实验也都是是使用 <code>rbenv</code>
+进行演示。</p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/088afd108c134267aeddd51028671f3d.jpg"><img src="https://img.it610.com/image/info8/088afd108c134267aeddd51028671f3d.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第9张图片" /></a>
+层级关系</p>
+
+<h2 id="rubygems">RubyGems</h2>
+
+<p><a href="https://img.it610.com/image/info8/01bf23ad48ae4cecb30041edcbb88ee9.jpg"><img src="https://img.it610.com/image/info8/01bf23ad48ae4cecb30041edcbb88ee9.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第10张图片" /></a>
+RubyGems</p>
+
+<blockquote>
+<p>The RubyGems software allows you to easily download, install, and use ruby
+software packages on your system. The software package is called a “gem”
+which contains a packaged Ruby application or library.</p>
+</blockquote>
+
+<p><strong>RubyGems [14] 是 Ruby 的一个包管理工具，这里面管理着用 Ruby 编写的工具或依赖我们称之为 Gem。</strong></p>
+
+<p>并且 RubyGems 还提供了 Ruby 组件的托管服务，可以集中式的查找和安装 library 和 apps。当我们使用 <code>gem install
+xxx</code> 时，会通过 <code>rubygems.org</code> 来查询对应的 Gem Package。而 iOS 日常中的很多工具都是 Gem
+提供的，例：<code>Bundler</code>，<code>fastlane</code>，<code>jazzy</code>，<code>CocoaPods</code> 等。</p>
+
+<p>在默认情况下 Gems 总是下载 library 的最新版本，这无法确保所安装的 library 版本符合我们预期。因此我们还缺一个工具。</p>
+
+<h2 id="bundler">Bundler</h2>
+
+<p><a href="https://img.it610.com/image/info8/b9ef47ef43504c3c9e58c1e7b5dd7ce6.png"><img src="https://img.it610.com/image/info8/b9ef47ef43504c3c9e58c1e7b5dd7ce6.png" alt="1. 版本管理工具及 Ruby
+工具链环境_第11张图片" /></a>
+Bundler</p>
+
+<p><strong>Bundler [15] 是管理 Gem 依赖的工具，可以隔离不同项目中 Gem 的版本和依赖环境的差异，也是一个 Gem。</strong></p>
+
+<p>Bundler 通过读取项目中的依赖描述文件 <code>Gemfile</code> ，来确定各个 Gems 的版本号或者范围，来提供了稳定的应用环境。当我们使用
+<code>bundle install</code> 它会生成 <code>Gemfile.lock</code> 将当前 librarys 使用的具体版本号写入其中。之后，他人再通过
+<code>bundle install</code> 来安装 libaray 时则会读取 <code>Gemfile.lock</code> 中的 librarys、版本信息等。</p>
+
+<h3 id="gemfile"><code>Gemfile</code></h3>
+
+<p><strong>可以说<code>CocoaPods</code> 其实是 iOS 版的 RubyGems + Bundler 组合。Bundler 依据项目中的 <code>Gemfile</code>
+文件来管理 Gem，而 <code>CocoaPods</code> 通过 Podfile 来管理 Pod。</strong></p>
+
+<p>Gemfile[16] 配置如下：</p>
+
+<pre><code>source 'https://gems.example.com' do
+  gem 'cocoapods', '1.8.4'是管理 Gem 依赖的工具
+  gem 'another_gem', :git =&gt; 'https://looseyi.github.io.git', :branch =&gt; 'master'
+end
+</code></pre>
+
+<p>可见，Podfile 的 DSL 写法和 Gemfile 如出一辙。那什么情况会用到 Gemfile 呢 ？</p>
+
+<p><code>CocoaPods</code> 每年都会有一些重大版本的升级，前面聊到过 <code>CocoaPods</code> 在 <code>install</code> 过程中会对项目的 <code>.xcodeproj</code>
+文件进行修改，不同版本其有所不同，这些在变更都可能导致大量 <code>conflicts</code>，处理不好，项目就不能正常运行了。我想你一定不愿意去修改
+<code>.xcodeproj</code> 的冲突。</p>
+
+<p>如果项目是基于 <code>fastlane</code> 来进行持续集成的相关工作以及 App 的打包工作等，也需要其版本管理等功能。</p>
+
+<h1 id="如何安装一套可管控的-ruby-工具链">如何安装一套可管控的 Ruby 工具链？</h1>
+
+<p>讲完了这些工具的分工，然后来说说实际的运用。 <strong>我们可以使用<code>homebrew</code> + <code>rbenv</code> + <code>RubyGems</code> +
+<code>Bundler</code> 这一整套工具链来控制一个工程中 Ruby 工具的版本依赖。</strong></p>
+
+<p>以下是我认为比较可控的 Ruby 工具链分层管理图。下面我们逐一讲述每一层的管理方式，以及实际的操作方法。</p>
+
+<p><a href="https://img.it610.com/image/info8/c1e84bd8527f41fa8c9aa441f1e517bf.jpg"><img src="https://img.it610.com/image/info8/c1e84bd8527f41fa8c9aa441f1e517bf.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第12张图片" /></a>
+可管控工具链的分层结构</p>
+
+<h2 id="1-使用-homebrew-安装-rbenv">1. 使用 <code>homebrew</code> 安装 <code>rbenv</code></h2>
+
+<pre><code>$ brew install rbenv
+</code></pre>
+
+<p>安装成功后输入 <code>rbenv</code> 就可以看到相关提示：</p>
+
+<pre><code>$ rbenv
+
+rbenv 1.1.2
+Usage: rbenv  []
+
+Some useful rbenv commands are:
+   commands    List all available rbenv commands
+   local       Set or show the local application-specific Ruby version
+   global      Set or show the global Ruby version
+   shell       Set or show the shell-specific Ruby version
+   install     Install a Ruby version using ruby-build
+   uninstall   Uninstall a specific Ruby version
+   rehash      Rehash rbenv shims (run this after installing executables)
+   version     Show the current Ruby version and its origin
+   versions    List installed Ruby versions
+   which       Display the full path to an executable
+   whence      List all Ruby versions that contain the given executable
+
+See `rbenv help ' for information on a specific command.
+For full documentation, see: https://github.com/rbenv/rbenv#readme
+</code></pre>
+
+<h2 id="2-使用-rbenv-管理-ruby-版本">2. 使用 <code>rbenv</code> 管理 Ruby 版本</h2>
+
+<p>使用 <code>rbenv</code> 来安装一个 Ruby 版本，这里我使用刚刚 release Ruby 2.7：</p>
+
+<pre><code>$ rbenv install 2.7.0
+</code></pre>
+
+<p>这个安装过程有些长，因为要下载 <code>openssl</code> 和 Ruby 的解释器，大概要 20 分钟左右。</p>
+
+<p>安装成功后，我们让其在本地环境中生效：</p>
+
+<pre><code>$ rbenv shell 2.7.0
+</code></pre>
+
+<blockquote>
+<p>输入上述命令后，可能会有报错。<code>rbenv</code> 提示我们在 <code>.zshrc</code> 中增加一行 <code>eval &quot;$(rbenv init -)&quot;</code> 语句来对
+<code>rbenv</code> 环境进行初始化。如果报错，我们增加并重启终端即可。</p>
+</blockquote>
+
+<pre><code>$ ruby --version
+ruby 2.7.0p0 (2019-12-25 revision 647ee6f091) [x86_64-darwin19]
+$ which ruby
+/Users/gua/.rbenv/shims/ruby
+</code></pre>
+
+<p>切换之后我们发现 Ruby 已经切换到 <code>rbenv</code> 的管理版本，并且其启动 <code>PATH</code> 也已经变成 <code>rbenv</code> 管理下的
+Ruby。并且我们可以看一下 Ruby 捆绑的 <code>Gem</code> 的 <code>PATH</code> ：</p>
+
+<pre><code>$ which gem
+/Users/bytedance/.rbenv/shims/gem
+</code></pre>
+
+<p>对应的 <code>Gem</code> 也已经变成 <code>rbenv</code> 中的 <code>PATH</code> 。</p>
+
+<h2 id="3-查询系统级-gem-依赖">3. 查询系统级 <code>Gem</code> 依赖</h2>
+
+<p>如此，我们使用 <code>rbenv</code> 已经对 Ruby 及其 <code>Gem</code> 环境在版本上进行了环境隔离。我们可以通过 <code>gem list</code>
+命令来查询当前系统环境下所有的 <code>Gem</code> 依赖：</p>
+
+<pre><code>$ gem list
+
+*** LOCAL GEMS ***
+
+activesupport (4.2.11.3)
+...
+claide (1.0.3)
+cocoapods (1.9.3)
+cocoapods-core (1.9.3)
+cocoapods-deintegrate (1.0.4)
+cocoapods-downloader (1.3.0)
+cocoapods-plugins (1.0.0)
+cocoapods-search (1.0.0)
+cocoapods-stats (1.1.0)
+cocoapods-trunk (1.5.0)
+cocoapods-try (1.2.0)
+</code></pre>
+
+<p>记住这里的 <code>CocoaPods</code> 版本，我们后面项目中还会查询。</p>
+
+<p>如此我们已经完成了全部的 Ruby、Gem 环境的配置，我们通过一张流程图再来梳理一下：</p>
+
+<p><a href="https://img.it610.com/image/info8/189b3b69ccf64f87a786226d444e2584.jpg"><img src="https://img.it610.com/image/info8/189b3b69ccf64f87a786226d444e2584.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第13张图片" /></a>
+操作安装流程</p>
+
+<h1 id="如何使用-bundler-管理工程中的-gem-环境">如何使用 Bundler 管理工程中的 Gem 环境</h1>
+
+<p>下面我们来实践一下，如何使用 <code>Bundler</code> 来锁定项目中的 <code>Gem</code> 环境，从而让整个团队统一 <code>Gem</code> 环境中的所有 Ruby
+工具版本。从而避免文件冲突和不必要的错误。</p>
+
+<p>下面是在工程中对于 <code>Gem</code> 环境的层级图，我们可以在项目中增加一个 <code>Gemfile</code> 描述，从而锁定当前项目中的 <code>Gem</code> 依赖环境。</p>
+
+<p><a href="https://img.it610.com/image/info8/d911070c30d4452f9ed325e3ec72f8ba.jpg"><img src="https://img.it610.com/image/info8/d911070c30d4452f9ed325e3ec72f8ba.jpg" alt="1. 版本管理工具及 Ruby
+工具链环境_第14张图片" /></a>
+工程中独立 Gem 环境示意图</p>
+
+<p>以下也会逐一讲述每一层的管理方式，以及实际的操作方法。</p>
+
+<h2 id="1-在-ios-工程中初始化-bundler-环境">1. 在 iOS 工程中初始化 <code>Bundler</code> 环境</h2>
+
+<p>首先我们有一个 iOS Demo 工程 - <code>GuaDemo</code> ：</p>
+
+<pre><code>$ ls -al
+total 0
+drwxr-xr-x   4 gua  staff   128 Jun 10 14:47 .
+drwxr-xr-x@ 52 gua  staff  1664 Jun 10 14:47 ..
+drwxr-xr-x   8 gua  staff   256 Jun 10 14:47 GuaDemo
+drwxr-xr-x@  5 gua  staff   160 Jun 10 14:47 GuaDemo.xcodeproj
+</code></pre>
+
+<p>首先先来初始化一个 <code>Bundler</code> 环境（其实就是自动创建一个 <code>Gemfile</code> 文件）：</p>
+
+<pre><code>$ bundle init
+
+Writing new Gemfile to /Users/Gua/GuaDemo/Gemfile
+</code></pre>
+
+<h2 id="2-在-gemfile-中声明使用的-cocoapods-版本并安装">2. 在 <code>Gemfile</code> 中声明使用的 <code>CocoaPods</code> 版本并安装</h2>
+
+<p>之后我们编辑一下这个 <code>Gemfile</code> 文件，加入我们当前环境中需要使用 <code>CocoaPods 1.5.3</code> 这个版本，则使用 <code>Gemfile</code> 的
+DSL 编写以下内容：</p>
+
+<pre><code># frozen_string_literal: true
+
+source &quot;https://rubygems.org&quot;
+
+git_source(:github) {|repo_name| &quot;https://github.com/#{repo_name}&quot; }
+
+# gem &quot;rails&quot;
+gem &quot;cocoapods&quot;, &quot;1.5.3&quot;
+</code></pre>
+
+<p>编写之后执行一下 <code>bundle install</code> ：</p>
+
+<pre><code>$ bundle install
+Fetching gem metadata from https://gems.ruby-china.com/............
+Resolving dependencies...
+...
+Fetching cocoapods 1.5.3
+Installing cocoapods 1.5.3
+Bundle complete! 1 Gemfile dependency, 30 gems now installed.
+</code></pre>
+
+<p>发现 <code>CocoaPods 1.5.3</code> 这个指定版本已经安装成功，并且还保存了一份 <code>Gemfile.lock</code> 文件用来锁存这次的依赖结果。</p>
+
+<h2 id="3-使用当前环境下的-cocoapods-版本操作-ios-工程">3. 使用当前环境下的 <code>CocoaPods</code> 版本操作 iOS 工程</h2>
+
+<p>此时我们可以检查一下当前 <code>Bundler</code> 环境下的 <code>Gem</code> 列表：</p>
+
+<pre><code>$ bundle exec gem list
+
+*** LOCAL GEMS ***
+
+activesupport (4.2.11.3)
+atomos (0.1.3)
+bundler (2.1.4)
+CFPropertyList (3.0.2)
+claide (1.0.3)
+cocoapods (1.5.3)
+...
+</code></pre>
+
+<p>发现相比于全局 <code>Gem</code> 列表，这个列表精简了许多，并且也只是基础 <code>Gem</code> 依赖和 <code>CocoaPods</code> 的 <code>Gem</code> 依赖。此时我们使用
+<code>bundle exec pod install</code> 来执行 Install 这个操作，就可以使用 <code>CocoaPods 1.5.3</code> 版本来执行 <code>Pod</code>
+操作了（当然，前提是你还需要写一个 <code>Podfile</code> ，大家都是 iOSer 这里就略过了）。</p>
+
+<pre><code>$ bundle exec pod install
+Analyzing dependencies
+Downloading dependencies
+Installing SnapKit (5.0.1)
+Integrating client project
+[!] Please close any current Xcode sessions and use `GuaDemo.xcworkspace` for this project from now on.
+Sending stats
+Pod installation complete! There is 1 dependency from the Podfile and 1 total pod installed.
+</code></pre>
+
+<p>可以再来看一下 <code>Podfile.lock</code> 文件：</p>
+
+<pre><code>cat Podfile.lock
+PODS:
+  - SnapKit (5.0.1)
+
+DEPENDENCIES:
+  - SnapKit (~&gt; 5.0.0)
+
+SPEC REPOS:
+  https://github.com/cocoapods/specs.git:
+    - SnapKit
+
+SPEC CHECKSUMS:
+  SnapKit: 97b92857e3df3a0c71833cce143274bf6ef8e5eb
+
+PODFILE CHECKSUM: 1a4b05aaf43554bc31c90f8dac5c2dc0490203e8
+
+COCOAPODS: 1.5.3
+</code></pre>
+
+<p>发现使用的 <code>CocoaPods</code> 的版本确实是 <code>1.5.3</code> 。而当我们不使用 <code>bundle exec</code> 执行前缀，则会使用系统环境中的
+<code>CocoaPods</code> 版本。如此我们也就验证了工程中的 <code>Gem</code> 环境和系统中的环境可以通过 <code>Bundler</code> 进行隔离。</p>
+
+<h1 id="总结">总结</h1>
+
+<ul>
+<li><p>通过版本管理工具演进的角度可以看出，CocoaPods 的诞生并非一蹴而就，也是不断地借鉴其他管理工具的优点，一点点的发展起来的。VCS 工具从早期的 <code>SVN</code>、<code>Git</code>，再细分出 <code>Git Submodule</code>，再到各个语言的 <code>Package Manager</code> 也是一直在发展的。</p></li>
+
+<li><p>虽然 <code>CocoaPods</code> 作为包管理工具控制着 iOS 项目的各种依赖库，但其自身同样遵循着严格的版本控制并不断迭代。希望大家可以从本文中认识到版本管理的重要性。</p></li>
+
+<li><p>通过实操 <code>Bundler</code> 管理工程的全流程，学习了 <code>Bundler</code> 基础，并学习了如何控制一个项目中的 <code>Gem</code> 版本信息。</p></li>
+</ul>
+
+<p>后续我们将会围绕 <code>CocoaPods</code> ，从工具链逐渐深入到细节，根据我们的使用经验，逐一讲解。</p>
+
+<h1 id="知识点问题梳理">知识点问题梳理</h1>
+
+<p>这里罗列了几个问题用来考察你是否已经掌握了这篇文章，如果没有建议你 <strong>加入</strong> <strong>收藏</strong> 再次阅读：</p>
+
+<ol>
+<li><p><code>PM</code> 是如何进行依赖库的版本管理？</p></li>
+
+<li><p><code>Ruby</code> 和 <code>RVM/rbenv</code> 之间的关系是什么？</p></li>
+
+<li><p><code>Gem</code>、<code>Bundler</code> 和 <code>CocaPods</code> 之间的关系是什么？</p></li>
+
+<li><p>如何通过 <code>Bundler</code> 来管理工程中的 <code>Gem</code> 环境？</p></li>
+
+<li><p>如何锁死工程内部的 <code>CocoaPods</code> 版本？</p></li>
+</ol>
+
+<h3 id="参考资料">参考资料</h3>
+
+<p>[1]</p>
+
+<p>深入理解 CocoaPods: <em><a href="https://objccn.io/issue-6-4/">https://objccn.io/issue-6-4/</a></em></p>
+
+<p>[2]</p>
+
+<p>语义化版本: <em><a href="https://semver.org/">https://semver.org/</a></em></p>
+
+<p>[3]</p>
+
+<p>npmjs.com: <em><a href="https://www.npmjs.com/">https://www.npmjs.com/</a></em></p>
+
+<p>[4]</p>
+
+<p>Podfile 指南: <em><a href="http://guides.cocoapods.org/syntax/podfile.html">http://guides.cocoapods.org/syntax/podfile.html</a></em></p>
+
+<p>[5]</p>
+
+<p>Mater Repo CDN: <em><a href="http://blog.cocoapods.org/CocoaPods-1.7.2/">http://blog.cocoapods.org/CocoaPods-1.7.2/</a></em></p>
+
+<p>[6]</p>
+
+<p><a href="https://cdn.cocoapods.org:">https://cdn.cocoapods.org:</a> <em><a href="https://cdn.cocoapods.org">https://cdn.cocoapods.org</a></em></p>
+
+<p>[7]</p>
+
+<p><code>RubyGems</code>: <em><a href="https://rubygems.org/">https://rubygems.org/</a></em></p>
+
+<p>[8]</p>
+
+<p><code>Bundler</code>: <em><a href="https://bundler.io/">https://bundler.io/</a></em></p>
+
+<p>[9]</p>
+
+<p><code>npm</code>: <em><a href="https://www.npmjs.com/">https://www.npmjs.com/</a></em></p>
+
+<p>[10]</p>
+
+<p><code>Gradle</code>: <em><a href="https://gradle.org/">https://gradle.org/</a></em></p>
+
+<p>[11]</p>
+
+<p><code>RVM</code>: <em><a href="https://rvm.io/">https://rvm.io/</a></em></p>
+
+<p>[12]</p>
+
+<p><code>rbenv</code>: <em><a href="https://github.com/rbenv/rbenv">https://github.com/rbenv/rbenv</a></em></p>
+
+<p>[13]</p>
+
+<p>Why rbenv: <em><a href="https://github.com/rbenv/rbenv/wiki/Why-rbenv%3F">https://github.com/rbenv/rbenv/wiki/Why-rbenv%3F</a></em></p>
+
+<p>[14]</p>
+
+<p>RubyGems: <em><a href="https://rubygems.org/">https://rubygems.org/</a></em></p>
+
+<p>[15]</p>
+
+<p>Bundler: <em><a href="https://bundler.io/">https://bundler.io/</a></em></p>
+
+<p>[16]</p>
+
+<p>Gemfile: <em><a href="https://bundler.io/v2.0/gemfile.html">https://bundler.io/v2.0/gemfile.html</a></em></p>
+
+<p>往期推荐</p>
+
+<p>iOS 渲染原理解析</p>
+
+<p>一次关于 Swift 在 iOS 生态圈里的现状调研</p>
+
+<p>为什么使用汇编可以 Hook objc_msgSend（上）- 汇编基础</p>
+
+<p><img src="https://img.it610.com/image/info8/039d13d541e5438c94c19c7ce1aee264.jpg" alt="" /></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

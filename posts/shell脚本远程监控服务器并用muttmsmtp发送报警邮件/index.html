@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本远程监控服务器并用muttmsmtp发送报警邮件 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本远程监控服务器并用muttmsmtp发送报警邮件 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本远程监控服务器并用muttmsmtp发送报警邮件">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E8%BF%9C%E7%A8%8B%E7%9B%91%E6%8E%A7%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%B9%B6%E7%94%A8muttmsmtp%E5%8F%91%E9%80%81%E6%8A%A5%E8%AD%A6%E9%82%AE%E4%BB%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本远程监控服务器并用muttmsmtp发送报警邮件</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>前段时间公司有个小需求：远程监控服务器，分两部分：</p>
+
+<p>一个监控服务器是否“活着”；<br />
+另一个监控程序是否在运行以及服务器基本性能，超过预警值需要给相关人员发邮件提醒</p>
+
+<h1 id="一-安装linux下面的一个邮件客户端msmtp软件-类似于一个foxmail的工具">一、 <strong>安装linux下面的一个邮件客户端msmtp软件(类似于一个foxmail的工具)</strong></h1>
+
+<h2 id="1-下载安装">1、下载安装：</h2>
+
+<h4 id="1-下载源码包-解压安装">1）下载源码包，解压安装</h4>
+
+<p>wget
+<a href="http://sourceforge.net/projects/msmtp/files/msmtp/1.4.31/msmtp-1.4.31.tar.bz2/download">http://sourceforge.net/projects/msmtp/files/msmtp/1.4.31/msmtp-1.4.31.tar.bz2/download</a></p>
+
+<pre><code>tar -jxvf msmtp-1.4.31.tar.bz2
+cd msmtp-1.4.31
+./configure --prefix=/usr/local/msmtp 
+make 
+make install 
+</code></pre>
+
+<h4 id="2-或者用yum安装">2）或者用yum安装</h4>
+
+<pre><code>yum -y install msmtp
+</code></pre>
+
+<h2 id="2-创建msmtp配置文件和日志文件-host为邮件域名-邮件用户名xxx-密码xxxx">2、创建msmtp配置文件和日志文件（host为邮件域名，邮件用户名xxx，密码xxxx）</h2>
+
+<pre><code>cd /usr/local/msmtp/ 
+mkdir etc #配置文件目录和配置文件都要自己建 
+cd etc 
+vim msmtprc
+</code></pre>
+
+<p>新增的msmtprc内容如下：</p>
+
+<pre><code>#Set default values for all following accounts.
+defaults
+logfile ~/msmtp.log
+#The SMTP server of the provider.
+account test
+#SMTP server
+host smtp.163.com
+#from Email
+from xxx@163.com
+#auth login
+auth login
+#login account
+user xxx
+#login password
+password *****
+#Set a default account
+account default: test
+</code></pre>
+
+<p>注意：password是明文的</p>
+
+<h2 id="3-mutt安装配置-一般linux下有默认安装mutt">3、mutt安装配置：（一般linux下有默认安装mutt）</h2>
+
+<p>如果没有安装，则使用yum安装</p>
+
+<pre><code>yum -y install mutt
+
+修改配置文件
+vi /etc/Muttrc
+
+set from=&quot;发送邮件地址&quot;
+set sendmail=&quot;/usr/bin/msmtp&quot;
+set use_from=yes
+set realname=&quot;发件人&quot;
+set editor=&quot;vi&quot;
+</code></pre>
+
+<h2 id="4-邮件发送测试-s邮件标题-a表加附件">4、邮件发送测试（-s邮件标题，-a表加附件）</h2>
+
+<pre><code>echo &quot;邮件内容123456&quot; | mutt -s &quot;邮件标题测试邮件&quot; -a /scripts/test.txt  ***@xxxx.com（-s:主题 -a:附件）
+</code></pre>
+
+<h1 id="二-完成监控脚本"><strong>二、完成监控脚本</strong></h1>
+
+<p><strong>监控服务器性能：cpu、内存、磁盘</strong></p>
+
+<pre><code>#!/bin/bash
+
+MAILLIST=&quot;xxxxx@xxx.cn&quot;    #emailist
+
+MEM_CORDON=100   #内存使用大于这个值报警
+SWAP_CORDON=50  #交换区使用值大于这个报警  
+CPU_CORDON=5    #cpu空闲小于这个值报警
+DISK_CORDON=85  #磁盘占用大于这个值报警
+HOSTNAME=`hostname`
+DATA=`date`
+
+send_warning()
+{
+    echo $MESSAGE | mutt -s &quot;$TITLE&quot; &quot;$MAILLIST&quot;
+}
+
+if [ $# -ne 0 ];then
+    DISK_DIR=$1
+else
+    DISK_DIR=&quot;/dev/sdb1&quot;
+fi
+
+#MEM|SWAP check
+MEMSTATUS=`free | grep &quot;Mem&quot; | awk '{printf(&quot;%d&quot;, $3*100/$2)}'`
+SWAPSTATUS=`free | grep &quot;Swap&quot; | awk '{printf(&quot;%d&quot;, $3*100/$2)}'`
+
+if [ $MEMSTATUS -ge $MEM_CORDON ];then
+    TITLE=&quot;[bad_news]:$HOSTNAME mem usage&quot;
+    MESSAGE=&quot;Time:${DATA},Mem_used:${MEMSTATUS}%,Swap_used:${SWAPSTATUS}%&quot;
+    send_warning
+fi
+
+if [ $SWAPSTATUS -ge $SWAP_CORDON ];then
+    TITLE=&quot;[bad_news]:$HOSTNAME Swap usage&quot;
+    MESSAGE=&quot;Time:${DATA},Mem_used:${MEMSTATUS}%,Swap_used:${SWAPSTATUS}%&quot;
+    send_warning
+fi   
+
+#cpu
+
+CPUSTATUS=`vmstat | awk '{print $15}' | tail -1`
+
+if [ $CPUSTATUS -le $CPU_CORDON ];then
+    TITLE=&quot;[bad_news]:$HOSTNAME cpu usage&quot;
+    MESSAGE=&quot;Time:${DATA},MCpu_free:${CPUSTATUS}%&quot;
+fi
+
+#disk use n%
+
+DISKSTATUS=`df -h $DISK_DIR | awk '{print $5}' | tail -1 | tr -d %`
+
+if [ $DISKSTATUS -ge $DISK_CORDON ];then
+    TITLE=&quot;[bad_news]:$HOSTNAME disk usage&quot;
+    MESSAGE=&quot;Time:${DATA},Disk_used:${DISKSTATUS}%&quot;
+    send_warning
+fi
+
+httpdnum=`ps aux | grep 'httpd' | wc -l`  
+if [ $httpdnum -le 1 ]  
+then  
+    TITLE=&quot;[bad_news]:$HOSTNAME &quot;
+    MESSAGE=&quot;Time:${DATA},apache prograss is ended&quot;
+    send_warning
+fi  
+
+tomcatnum=`ps aux | grep 'tomcat' | wc -l`  
+if [ $tomcatnum -le 1 ]  
+then  
+    TITLE=&quot;[bad_news]:$HOSTNAME &quot;
+    MESSAGE=&quot;Time:${DATA},tomcat prograss is ended&quot;
+    send_warning
+fi   
+</code></pre>
+
+<p><strong>监控tomcat是否运行</strong></p>
+
+<pre><code>#! /bin/bash 
+TomcatID=$(ps -ef |grep tomcat |grep -w 'apache-tomcat-7.0.67'|grep -v 'grep'|grep -v 'catalina.sh'|awk '{print $2}')
+if [[ $TomcatID ]]   
+then  
+    echo &quot;tomcat is running&quot;  
+else  
+    TITLE=&quot;[bad_news]:$HOSTNAME &quot;
+    MESSAGE=&quot;Time:${DATA},Tomcat prograss is ended&quot;
+    send_warning  
+fi  
+</code></pre>
+
+<p><strong>监控数据库：</strong></p>
+
+<pre><code>#! /bin/bash  
+#MySQL running这个字符串根据数据库版本正常运行时status显示的信息确定  
+/sbin/service mysql status | grep &quot;MySQL running&quot; &gt; /dev/null  
+
+if [ $? -eq 0 ]  
+then  
+    #状态正常检查3306端口是否正常监听  
+    netstat -ntp | grep 3306 &gt; /dev/null  
+    if [ $? -ne 0 ]  
+    then  
+            /sbin/service mysql restart  
+            sleep 3  
+            /sbin/service mysql status | grep &quot; MySQL running&quot; &gt; /dev/null  
+            if [ $? -ne 0 ]  
+            then  
+                   TITLE=&quot;[bad_news]:$HOSTNAME mysql state&quot;
+                    MESSAGE=&quot;Time:${DATA},mysql service has stoped ,Automatic startup failure, please start it manually!&quot;
+                    send_warning
+
+             fi  
+
+    fi  
+else  
+    /sbin/service mysql start  
+     sleep 2;  
+     /sbin/service mysql status | grep &quot;MySQL running&quot; &gt; /dev/null  
+     if [ $? -ne 0 ]  
+     then  
+             TITLE=&quot;[bad_news]:$HOSTNAME mysql state&quot;
+                     MESSAGE=&quot;Time:${DATA},mysql service has stoped ,Automatic startup failure, please start it manually!&quot;
+                     send_warning
+
+     fi  
+fi  
+</code></pre>
+
+<p><strong>监控服务器是否“活着”：看是否能够ping通</strong></p>
+
+<pre><code>#!/bin/bash
+LANG=C
+
+server_all_list=(119.29.119.199:80 119.29.119.255:80)
+date=$(date -d &quot;today&quot; +&quot;%Y-%m-%d_%H:%M:%S&quot;)
+
+server_all_len=${#server_all_list[*]}
+
+i=0
+while [ $i -lt $server_all_len ]
+do
+server_ip=$(echo ${server_all_list[$i]} | awk -F ':' '{print $1}')
+
+server_port=$(echo ${server_all_list[$i]} | awk -F ':' '{print $2}')
+
+if ping -c 1 $server_ip
+then
+echo &quot;The server ${server_ip} can be connected!&quot;
+else
+echo &quot;The server ${server_ip} can not be connected!&quot;
+echo &quot;Time: ${date} The server ${server_ip} can not be connected!&quot; | mutt -s &quot;[bad_news]:${server_ip}&quot; 190133124@qq.com lmx_190133124@yeah.net
+
+fi
+let i++
+done
+</code></pre>
+
+<p><strong>给脚本添加执行权限</strong></p>
+
+<pre><code>chmod +x /mydata/monitor/*.sh
+</code></pre>
+
+<h1 id="三-添加定时启动"><strong>三、添加定时启动</strong></h1>
+
+<p>定时启动：每隔1分钟执行</p>
+
+<pre><code> vi /etc/crontab
+</code></pre>
+
+<p>将需要执行的脚本添加在crontab最后一行：<br />
+* * * * * root /mydata/system_backup/monitor/monitor.sh<br />
+* * * * * root /mydata/system_backup/monitor/monitor_ping.sh</p>
+
+<p><strong>若没有安装crontab，则使用yum安装</strong></p>
+
+<pre><code>yum install vixie-cron
+</code></pre>
+
+<p><strong>重启crontab服务</strong></p>
+
+<pre><code> service crond start
+ service crond stop
+ service crond restart
+</code></pre>
+
+<p>加入开机自动启动:</p>
+
+<pre><code> chkconfig --level 35 crond on
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

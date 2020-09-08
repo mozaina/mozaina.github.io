@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本实现文件的互斥访问 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本实现文件的互斥访问 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本实现文件的互斥访问">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0%E6%96%87%E4%BB%B6%E7%9A%84%E4%BA%92%E6%96%A5%E8%AE%BF%E9%97%AE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本实现文件的互斥访问</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="1-前言">1.前言</h1>
+
+<p>Shell中似乎不存在通用的文件互斥访问机制。Linux下有flock命令，但Solaris没有。</p>
+
+<p>通过一番调查，笔者找到了一个简单易行的方法来弥补Shell的这一不足。</p>
+
+<h1 id="2-原理">2.原理</h1>
+
+<p>原理比较简单。主要是以下两个命令的配合使用：</p>
+
+<p>命令A：</p>
+
+<p>set -o noclobber</p>
+
+<hr />
+
+<p>命令B：</p>
+
+<p>echo XXX &gt; filename.lock</p>
+
+<hr />
+
+<p>命令A启用Shell的“禁用重定向覆盖”功能，命令B是重定向操作。</p>
+
+<p>filename.lock不存在时，不考虑访问权限的限制，命令B总是能正常结束。</p>
+
+<p>filename.lock已经存在时，使用了命令A之后的命令B将会异常结束。而不使用命令A时命令B会将原来的filename.lock覆盖掉然后正常结束。</p>
+
+<p>要达到互斥的效果，必须具备的条件是，命令B的执行过程中，从判断文件是否存在到生成文件的过程是原子的(CPU不能被其他进程抢占)。否则即使有判断文件是否存在的功能，也不能阻止以下的情况发生。</p>
+
+<p>处理顺序</p>
+
+<p>|</p>
+
+<p>进程A</p>
+
+<p>|</p>
+
+<p>进程B</p>
+
+<p>|</p>
+
+<p>文件状态</p>
+
+<p>&mdash;|&mdash;|&mdash;|&mdash;</p>
+
+<p>1</p>
+
+<p>|</p>
+
+<p>判断文件是否存在</p>
+
+<p>|</p>
+
+<p>—</p>
+
+<p>|</p>
+
+<p>不存在</p>
+
+<p>2</p>
+
+<p>|</p>
+
+<p>—（CPU被抢占）</p>
+
+<p>|</p>
+
+<p>判断文件是否存在</p>
+
+<p>|</p>
+
+<p>不存在</p>
+
+<p>3</p>
+
+<p>|</p>
+
+<p>生成文件</p>
+
+<p>|</p>
+
+<p>—（CPU被抢占）</p>
+
+<p>|</p>
+
+<p>存在（由A生成）</p>
+
+<p>4</p>
+
+<p>|</p>
+
+<p>—</p>
+
+<p>|</p>
+
+<p>生成文件</p>
+
+<p>|</p>
+
+<p>存在（由B生成，覆盖A生成的）</p>
+
+<p>命令A和命令B的配合使用，能否满足上述的必要条件？</p>
+
+<p>官方文档中找不到相关的说明，于是进行了一番调查。过程如下。</p>
+
+<h1 id="3-调查过程">3.调查过程</h1>
+
+<h2 id="3-1-命令b对应的系统调用">3.1 命令B对应的系统调用</h2>
+
+<p>首先考虑命令B执行过程中是否使用了加锁类型的系统调用。</p>
+
+<p>使用truss命令可以查看进程所使用的系统调用。例如：</p>
+
+<p>truss -a -e -f -d -p</p>
+
+<hr />
+
+<p>或者</p>
+
+<p>#将命令内容写在cmd.sh中</p>
+
+<p>truss -a -e -f -d ./cmd.sh</p>
+
+<hr />
+
+<p>发现命令B最主要的两个系统调用如下</p>
+
+<p>stat64(&ldquo;xxx&rdquo;, xxx)</p>
+
+<p>open64(&ldquo;xxx&rdquo;, O_WRONLY|O_CREAT| <strong>O_EXCL</strong> , 0666)</p>
+
+<hr />
+
+<p>stat用于判断文件是否存在，open用于生成文件。</p>
+
+<h2 id="3-2-命令a对命令b的影响">3.2 命令A对命令B的影响</h2>
+
+<p>命令A如何实现“禁用重定向覆盖”的？在系统调用级别很可能会有答案。</p>
+
+<p>果然，在没有使用命令A时，命令B没有调用stat64。并且，open64的参数发生了变化：</p>
+
+<p>open64(&ldquo;xxx&rdquo;, O_WRONLY|O_CREAT| <strong>O_TRUNC</strong> , 0666)</p>
+
+<hr />
+
+<p>以下，针对stat的有无，和open的参数的不同，分别进行调查。</p>
+
+<h2 id="3-3-stat和open是否原子操作">3.3 stat和open是否原子操作</h2>
+
+<p>stat和open前后并没有加锁/解锁的系统调用，它们两者并没有组合成原子操作。因此，有没有stat，并不影响“互斥”的结果。</p>
+
+<p>通过实验，在两个进程循环冲突2万次左右时，发生了一次同时通过stat验证，并都返回“文件不存在”之后，同时执行open，试图同时创建文件的情况。</p>
+
+<p>这也证明，单纯的判断文件有无不能确保“互斥”效果。</p>
+
+<h2 id="3-4-open是否原子操作">3.4 open是否原子操作</h2>
+
+<p>上述实验中两个进程同时执行了open，但其中一个进程以”EEXIST”出错退出，另一个则正常结束。</p>
+
+<p>solaris上的“man open”的结果证实了这不是偶然：</p>
+
+<p>O_EXCL</p>
+
+<p>If O_CREAT and O_EXCL are set, open() fails if the</p>
+
+<p>file exists. The check for the existence of the file</p>
+
+<p>and the creation of the file if it does not exist is</p>
+
+<p>atomic with respect to other processes executing</p>
+
+<p>^^^^^^</p>
+
+<p>open() naming the same filename in the same directory</p>
+
+<p>with O_EXCL and O_CREAT set. If O_CREAT is not set,</p>
+
+<p>the effect is undefined.</p>
+
+<hr />
+
+<p>写的很明白了。“O_EXCL
+”模式的open内部的文件存在性判断和文件生成操作是一组原子操作。多个进程同时调用open创建同一个文件时，可以确保仅有一个进程能成功创建文件。</p>
+
+<p>除非shell的内部实现发生变化，一般的软件可以放心使用命令A和命令B的组合来实现互斥了。对于要求极高，不能出任何差错的软件，可以考虑自行开发应用程序，通过“O_EXCL
+”模式的open系统调用来实现严格的互斥功能。</p>
+
+<h1 id="4-脚本示例">4.脚本示例</h1>
+
+<p>myflock.sh:</p>
+
+<p>#!/bin/bash</p>
+
+<p>######### return code ######################################</p>
+
+<h1 id="0-normal">0 : normal</h1>
+
+<h1 id="1-error-invalid-option-or-file-not-exist">1 : error (invalid option or file not exist)</h1>
+
+<h1 id="2-locked-by-other-process-wait-100-ms-and-exit">2 : locked by other process (wait 100 ms and exit)</h1>
+
+<h1 id="3-fail-to-unlock-the-file-locked-by-other-process">3 : fail to unlock the file locked by other process</h1>
+
+<p>############################################################</p>
+
+<h1 id="flag-to-show-debug-messeages">flag to show debug messeages</h1>
+
+<p>DEBUG=1</p>
+
+<p>######### sub func ########</p>
+
+<p>print_usage()</p>
+
+<p>{</p>
+
+<p>echo &ldquo;Usage : myflock.sh LOCK|UNLOCK  PID&rdquo;</p>
+
+<p>}</p>
+
+<p>print_debug()</p>
+
+<p>{</p>
+
+<p>if [ $DEBUG = 1 ]; then</p>
+
+<p>echo $1</p>
+
+<p>fi</p>
+
+<p>}</p>
+
+<p>######### main ########</p>
+
+<p>if [ $# -ne 3 ]; then</p>
+
+<p>print_usage</p>
+
+<p>exit 1</p>
+
+<p>fi</p>
+
+<p>case $1 in</p>
+
+<p>LOCK)</p>
+
+<p>if [ -f $2 ]; then</p>
+
+<p>DIRNAME=<code>dirname $2</code></p>
+
+<p>FILENAME=<code>basename $2</code></p>
+
+<p>FILENAME=&ldquo;${DIRNAME}/${FILENAME}.lock&rdquo;</p>
+
+<p>else</p>
+
+<p>echo &ldquo;File doesn’t exist : $2&rdquo;</p>
+
+<p>exit 1</p>
+
+<p>fi</p>
+
+<h1 id="use-set-o-noclobber-to-control-multi-creation-of-file">use &ldquo;set -o noclobber&rdquo; to control multi creation of file</h1>
+
+<p>set -o noclobber</p>
+
+<p>echo $3 &gt; ${FILENAME}</p>
+
+<p>if [ $? -ne 0 ]; then</p>
+
+<p>CURLOCKPID=<code>cat ${FILENAME}</code></p>
+
+<h1 id="check-if-locked-by-itself">check if locked by itself</h1>
+
+<p>if [ $3 = $CURLOCKPID ]; then</p>
+
+<p>print_debug &ldquo;debug 1 locked by itself&rdquo;</p>
+
+<p>exit 0</p>
+
+<p>fi</p>
+
+<h1 id="fail-to-lock-file">fail to lock file</h1>
+
+<h1 id="check-if-the-file-is-locked-by-existing-process">check if the file is locked by existing process</h1>
+
+<p>print_debug &ldquo;debug 2 CURLOCKPID=$CURLOCKPID&rdquo;</p>
+
+<p>ps -ef |awk &lsquo;{print $2}&rsquo; | grep $CURLOCKPID &gt; /dev/null</p>
+
+<p>if [ $? -ne 0 ]; then</p>
+
+<h1 id="process-doesn-t-exist-delete-the-lockfile">process doesn’t exist. delete the lockfile</h1>
+
+<p>print_debug &ldquo;debug 3 process $CURLOCKPID doesn’t exist. delete the lockfile
+${FILENAME}&rdquo;</p>
+
+<p>rm -f ${FILENAME}</p>
+
+<p>fi</p>
+
+<h1 id="sleep-100-ms">sleep 100 ms</h1>
+
+<p>./mysleepms 100</p>
+
+<p>exit 2</p>
+
+<p>fi</p>
+
+<p>exit 0</p>
+
+<p>;;</p>
+
+<p>UNLOCK)</p>
+
+<p>if [ -f $2 ]; then</p>
+
+<p>DIRNAME=<code>dirname $2</code></p>
+
+<p>FILENAME=<code>basename $2</code></p>
+
+<p>FILENAME=&ldquo;${DIRNAME}/${FILENAME}.lock&rdquo;</p>
+
+<p>else</p>
+
+<p>echo &ldquo;File doesn’t exist : $2&rdquo;</p>
+
+<p>exit 1</p>
+
+<p>fi</p>
+
+<h1 id="check-if-locked">check if locked</h1>
+
+<p>if [ -f ${FILENAME} ]; then</p>
+
+<p>CURLOCKPID=<code>cat ${FILENAME}</code></p>
+
+<p>if [ $3 -ne $CURLOCKPID ]; then</p>
+
+<h1 id="fail-to-unlock-file-which-is-locked-by-other-user">fail to unlock file which is locked by other user</h1>
+
+<p>echo &ldquo;Fail to unlock file which is locked by process $CURLOCKPID&rdquo;</p>
+
+<p>exit 3</p>
+
+<p>fi</p>
+
+<p>rm -f ${FILENAME}</p>
+
+<p>exit 0</p>
+
+<p>else</p>
+
+<p>print_debug &ldquo;debug 4 lockfile doesn&rsquo;t exist : ${FILENAME}&rdquo;</p>
+
+<p>exit 0</p>
+
+<p>fi</p>
+
+<p>;;</p>
+
+<p>*)</p>
+
+<p>print_usage</p>
+
+<p>exit 1</p>
+
+<p>;;</p>
+
+<p>esac</p>
+
+<hr />
+
+<p>mysleepms:</p>
+
+<p>// mysleepms  (ms)</p>
+
+<p>#include</p>
+
+<p>#include</p>
+
+<p>int main(int argc, char ** argv){</p>
+
+<p>if(argc &lt; 2){</p>
+
+<p>usleep(100000);</p>
+
+<p>}</p>
+
+<p>else{</p>
+
+<p>int num=atoi(argv[1]);</p>
+
+<p>if(num &lt;= 0)return 0;</p>
+
+<p>usleep(num*1000);</p>
+
+<p>}</p>
+
+<p>return 0;</p>
+
+<p>}</p>
+
+<hr />
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>运维中的日志切割操作梳理Logrotatepythonshell脚本实现 | 开发者问答集锦</title>
+    <meta property="og:title" content="运维中的日志切割操作梳理Logrotatepythonshell脚本实现 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="运维中的日志切割操作梳理Logrotatepythonshell脚本实现">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E8%BF%90%E7%BB%B4%E4%B8%AD%E7%9A%84%E6%97%A5%E5%BF%97%E5%88%87%E5%89%B2%E6%93%8D%E4%BD%9C%E6%A2%B3%E7%90%86logrotatepythonshell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">运维中的日志切割操作梳理Logrotatepythonshell脚本实现</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>对于Linux系统安全来说，日志文件是极其重要的工具。不知为何，我发现很多运维同学的服务器上都运行着一些诸如每天切分Nginx日志之类的CRON脚本，大家似乎遗忘了Logrotate，争相发明自己的轮子，这真是让人沮丧啊！就好比明明身边躺着现成的性感美女，大家却忙着自娱自乐，罪过！logrotate程序是一个日志文件管理工具。用于分割日志文件，删除旧的日志文件，并创建新的日志文件，起到“转储”作用。可以节省磁盘空间。下面就对logrotate日志轮转操作做一梳理记录：</p>
+
+<p>1）配置文件介绍<br />
+Linux系统默认安装logrotate工具，它默认的配置文件在：<br />
+/etc/logrotate.conf<br />
+/etc/logrotate.d/</p>
+
+<p>logrotate.conf 才主要的配置文件，logrotate.d
+是一个目录，该目录里的所有文件都会被主动的读入/etc/logrotate.conf中执行。<br />
+另外，如果 /etc/logrotate.d/ 里面的文件中没有设定一些细节，则会以/etc/logrotate.conf这个文件的设定来作为默认值。</p>
+
+<p>Logrotate是基于CRON来运行的，其脚本是/etc/cron.daily/logrotate，日志轮转是系统自动完成的。<br />
+实际运行时，Logrotate会调用配置文件/etc/logrotate.conf。<br />
+可以在/etc/logrotate.d目录里放置自定义好的配置文件，用来覆盖Logrotate的缺省值。</p>
+
+<pre><code>[root@huanqiu_web1 ~]# cat /etc/cron.daily/logrotate 
+#!/bin/sh
+
+/usr/sbin/logrotate /etc/logrotate.conf &gt;/dev/null 2&gt;&amp;1
+EXITVALUE=$?
+if [ $EXITVALUE != 0 ]; then
+    /usr/bin/logger -t logrotate &quot;ALERT exited abnormally with [$EXITVALUE]&quot;
+fi
+exit 0
+</code></pre>
+
+<p>如果等不及cron自动执行日志轮转，想手动强制切割日志，需要加-f参数；不过正式执行前最好通过Debug选项来验证一下（-d参数），这对调试也很重要</p>
+
+<h1 id="usr-sbin-logrotate-f-etc-logrotate-d-nginx">/usr/sbin/logrotate -f /etc/logrotate.d/nginx</h1>
+
+<h1 id="usr-sbin-logrotate-d-f-etc-logrotate-d-nginx">/usr/sbin/logrotate -d -f /etc/logrotate.d/nginx</h1>
+
+<p>logrotate命令格式：<br />
+logrotate [OPTION&hellip;]<br />
+-d, &ndash;debug ：debug模式，测试配置文件是否有错误。<br />
+-f, &ndash;force ：强制转储文件。<br />
+-m, &ndash;mail=command ：压缩日志后，发送日志到指定邮箱。<br />
+-s, &ndash;state=statefile ：使用指定的状态文件。<br />
+-v, &ndash;verbose ：显示转储过程。</p>
+
+<p>根据日志切割设置进行操作，并显示详细信息<br />
+[root@huanqiu_web1 ~]# /usr/sbin/logrotate -v /etc/logrotate.conf<br />
+[root@huanqiu_web1 ~]# /usr/sbin/logrotate -v /etc/logrotate.d/php</p>
+
+<p>根据日志切割设置进行执行，并显示详细信息,但是不进行具体操作，debug模式<br />
+[root@huanqiu_web1 ~]# /usr/sbin/logrotate -d /etc/logrotate.conf<br />
+[root@huanqiu_web1 ~]# /usr/sbin/logrotate -d /etc/logrotate.d/nginx</p>
+
+<p>查看各log文件的具体执行情况<br />
+[root@fangfull_web1 ~]# cat /var/lib/logrotate.status</p>
+
+<p>2）切割介绍<br />
+比如以系统日志/var/log/message做切割来简单说明下：<br />
+第一次执行完rotate(轮转)之后，原本的messages会变成messages.1，而且会制造一个空的messages给系统来储存日志；<br />
+第二次执行之后，messages.1会变成messages.2，而messages会变成messages.1，又造成一个空的messages来储存日志！<br />
+如果仅设定保留三个日志（即轮转3次）的话，那么执行第三次时，则
+messages.3这个档案就会被删除，并由后面的较新的保存日志所取代！也就是会保存最新的几个日志。<br />
+日志究竟轮换几次，这个是根据配置文件中的rotate参数来判定的。</p>
+
+<p>看下logrotate.conf配置：</p>
+
+<h1 id="cat-etc-logrotate-conf">cat /etc/logrotate.conf</h1>
+
+<h1 id="底下的设定是-logrotate-的默认值-如果別的文件设定了其他的值">底下的设定是 &ldquo;logrotate 的默认值&rdquo; ，如果別的文件设定了其他的值，</h1>
+
+<h1 id="就会以其它文件的设定为主">就会以其它文件的设定为主</h1>
+
+<p>weekly //默认每一周执行一次rotate轮转工作<br />
+rotate 4 //保留多少个日志文件(轮转几次).默认保留四个.就是指定日志文件删除之前轮转的次数，0 指没有备份<br />
+create //自动创建新的日志文件，新的日志文件具有和原来的文件相同的权限；因为日志被改名,因此要创建一个新的来继续存储之前的日志<br />
+dateext
+//这个参数很重要！就是切割后的日志文件以当前日期为格式结尾，如xxx.log-20131216这样,如果注释掉,切割出来是按数字递增,即前面说的
+xxx.log-1这种格式<br />
+compress  //是否通过gzip压缩转储以后的日志文件，如xxx.log-20131216.gz ；如果不需要压缩，注释掉就行</p>
+
+<p>include /etc/logrotate.d</p>
+
+<h1 id="将-etc-logrotate-d-目录中的所有文件都加载进来">将 /etc/logrotate.d/ 目录中的所有文件都加载进来</h1>
+
+<p>/var/log/wtmp { //仅针对 /var/log/wtmp 所设定的参数<br />
+monthly  //每月一次切割,取代默认的一周<br />
+minsize 1M //文件大小超过 1M 后才会切割<br />
+create 0664 root utmp  //指定新建的日志文件权限以及所属用户和组<br />
+rotate 1  //只保留一个日志.<br />
+}</p>
+
+<h1 id="这个-wtmp-可记录用户登录系统及系统重启的时间">这个 wtmp 可记录用户登录系统及系统重启的时间</h1>
+
+<h1 id="因为有-minsize-的参数-因此不见得每个月一定会执行一次喔-要看文件大小">因为有 minsize 的参数，因此不见得每个月一定会执行一次喔.要看文件大小。</h1>
+
+<p>由这个文件的设定可以知道/etc/logrotate.d其实就是由/etc/logrotate.conf
+所规划出来的目录，虽然可以将所有的配置都写入/etc/logrotate.conf
+，但是这样一来这个文件就实在是太复杂了，尤其是当使用很多的服务在系统上面时，
+每个服务都要去修改/etc/logrotate.conf的设定也似乎不太合理了。<br />
+所以，如果独立出来一个目录，那么每个要切割日志的服务， 就可以独自成为一个文件，并且放置到 /etc/logrotate.d/ 当中</p>
+
+<p>其他重要参数说明<br />
+-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;<br />
+compress 通过gzip 压缩转储以后的日志<br />
+nocompress 不做gzip压缩处理<br />
+copytruncate 用于还在打开中的日志文件，把当前日志备份并截断；是先拷贝再清空的方式，拷贝和清空之间有一个时间差，可能会丢失部分日志数据。<br />
+nocopytruncate 备份日志文件不过不截断<br />
+create mode owner group 轮转时指定创建新文件的属性，如create 0777 nobody nobody<br />
+nocreate 不建立新的日志文件<br />
+delaycompress 和compress 一起使用时，转储的日志文件到下一次转储时才压缩<br />
+nodelaycompress 覆盖 delaycompress 选项，转储同时压缩。<br />
+missingok 如果日志丢失，不报错继续滚动下一个日志<br />
+errors address 专储时的错误信息发送到指定的Email 地址<br />
+ifempty 即使日志文件为空文件也做轮转，这个是logrotate的缺省选项。<br />
+notifempty 当日志文件为空时，不进行轮转<br />
+mail address 把转储的日志文件发送到指定的E-mail 地址<br />
+nomail 转储时不发送日志文件<br />
+olddir directory 转储后的日志文件放入指定的目录，必须和当前日志文件在同一个文件系统<br />
+noolddir 转储后的日志文件和当前日志文件放在同一个目录下<br />
+sharedscripts 运行postrotate脚本，作用是在所有日志都轮转后统一执行一次脚本。如果没有配置这个，那么每个日志轮转后都会执行一次脚本<br />
+prerotate 在logrotate转储之前需要执行的指令，例如修改文件的属性等动作；必须独立成行<br />
+postrotate 在logrotate转储之后需要执行的指令，例如重新启动 (kill -HUP) 某个服务！必须独立成行<br />
+daily 指定转储周期为每天<br />
+weekly 指定转储周期为每周<br />
+monthly 指定转储周期为每月<br />
+rotate count 指定日志文件删除之前转储的次数，0 指没有备份，5 指保留5 个备份<br />
+dateext 使用当期日期作为命名格式<br />
+dateformat .%s 配合dateext使用，紧跟在下一行出现，定义文件切割后的文件名，必须配合dateext使用，只支持 %Y %m %d %s
+这四个参数<br />
+size(或minsize) log-size 当日志文件到达指定的大小时才转储，log-size能指定bytes(缺省)及KB
+(sizek)或MB(sizem).<br />
+当日志文件 &gt;= log-size 的时候就转储。 以下为合法格式：（其他格式的单位大小写没有试过）<br />
+size = 5 或 size 5 （&gt;= 5 个字节就转储）<br />
+size = 100k 或 size 100k<br />
+size = 100M 或 size 100M</p>
+
+<p>小示例：下面一个切割nginx日志的配置</p>
+
+<pre><code>[root@master-server ~]# vim /etc/logrotate.d/nginx 
+/usr/local/nginx/logs/*.log {
+daily
+rotate 7 
+missingok
+notifempty
+dateext
+sharedscripts
+postrotate
+    if [ -f /usr/local/nginx/logs/nginx.pid ]; then
+        kill -USR1 `cat /usr/local/nginx/logs/nginx.pid`
+    fi
+endscript
+}
+</code></pre>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-分享一例曾经使用过的nginx日志切割处理脚本&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;<br />
+1）logrotate日志分割配置：</p>
+
+<pre><code>[root@bastion-IDC ~# vim /etc/logrotate.d/nginx
+/data/nginx_logs/*.access_log         
+{
+nocompress                                    
+daily                                   
+copytruncate                                   
+create                               
+ifempty                                    
+olddir /data/nginx_logs/days            
+rotate 0                                         
+}
+</code></pre>
+
+<p>2）日志分割脚本</p>
+
+<pre><code>[root@bastion-IDC ~# vim /usr/local/sbin/logrotate-nginx.sh
+#!/bin/bash
+#创建转储日志压缩存放目录
+mkdir -p /data/nginx_logs/days
+#手工对nginx日志进行切割转换
+/usr/sbin/logrotate -vf /etc/logrotate.d/nginx
+#当前时间
+time=$(date -d &quot;yesterday&quot; +&quot;%Y-%m-%d&quot;)
+#进入转储日志存放目录
+cd /data/nginx_logs/days
+#对目录中的转储日志文件的文件名进行统一转换
+for i in $(ls ./ | grep &quot;^\(.*\)\.[[:digit:]]$&quot;)
+do
+mv ${i} ./$(echo ${i}|sed -n 's/^\(.*\)\.\([[:digit:]]\)$/\1/p')-$(echo $time)
+done
+#对转储的日志文件进行压缩存放，并删除原有转储的日志文件，只保存压缩后的日志文件。以节约存储空间
+for i in $(ls ./ | grep &quot;^\(.*\)\-\([[:digit:]-]\+\)$&quot;)
+do
+tar jcvf ${i}.bz2 ./${i}
+rm -rf ./${i}
+done
+#只保留最近7天的压缩转储日志文件
+find /data/nginx_logs/days/* -name &quot;*.bz2&quot; -mtime 7 -type f -exec rm -rf {} \;
+</code></pre>
+
+<p>3）crontab定时执行</p>
+
+<pre><code>[root@bastion-IDC ~# crontab -e
+#logrotate
+0 0 * * * /bin/bash -x /usr/local/sbin/logrotate-nginx.sh &gt; /dev/null 2&gt;&amp;1 
+</code></pre>
+
+<p>手动执行脚本，测试下看看：</p>
+
+<pre><code>[root@bastion-IDC ~# /bin/bash -x /usr/local/sbin/logrotate-nginx.sh
+[root@bastion-IDC ~# cd /data/nginx_logs/days 
+[root@bastion-IDC days# ls
+huantest.access_log-2017-01-18.bz2
+</code></pre>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;php脚本切割一例&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<pre><code>[root@huanqiu_web1 ~]# cat /etc/logrotate.d/php 
+/Data/logs/php/*log {
+    daily
+    rotate 365
+    missingok
+    notifempty
+    compress
+    dateext
+    sharedscripts
+    postrotate
+        if [ -f /Data/app/php5.6.26/var/run/php-fpm.pid ]; then
+            kill -USR1 `cat /Data/app/php5.6.26/var/run/php-fpm.pid`
+        fi
+    endscript
+    postrotate
+        /bin/chmod 644 /Data/logs/php/*gz
+    endscript
+}
+
+[root@huanqiu_web1 ~]# ll /Data/app/php5.6.26/var/run/php-fpm.pid 
+-rw-r--r-- 1 root root 4 Dec 28 17:03 /Data/app/php5.6.26/var/run/php-fpm.pid
+
+[root@huanqiu_web1 ~]# cd /Data/logs/php
+[root@huanqiu_web1 php]# ll
+total 25676
+-rw-r--r-- 1 root   root         0 Jun  1  2016 error.log
+-rw-r--r-- 1 nobody nobody     182 Aug 30  2015 error.log-20150830.gz
+-rw-r--r-- 1 nobody nobody     371 Sep  1  2015 error.log-20150901.gz
+-rw-r--r-- 1 nobody nobody     315 Sep  7  2015 error.log-20150907.gz
+.........
+.........
+</code></pre>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;nginx日志切割一例&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</p>
+
+<pre><code>[root@huanqiu_web1 ~]# cat /etc/logrotate.d/nginx 
+/Data/logs/nginx/*/*log {
+    daily
+    rotate 365
+    missingok
+    notifempty
+    compress
+    dateext
+    sharedscripts
+    postrotate
+    /etc/init.d/nginx reload
+    endscript
+}
+
+[root@huanqiu_web1 ~]# ll /Data/logs/nginx/www.huanqiu.com/
+..........
+-rw-r--r-- 1 root root      1652 Jan  1 00:00 error.log-20170101.gz
+-rw-r--r-- 1 root root      1289 Jan  2 00:00 error.log-20170102.gz
+-rw-r--r-- 1 root root      1633 Jan  3 00:00 error.log-20170103.gz
+-rw-r--r-- 1 root root      3239 Jan  4 00:00 error.log-20170104.gz
+</code></pre>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;系统日志切割一例&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</p>
+
+<pre><code>[root@huanqiu_web1 ~]# cat /etc/logrotate.d/syslog 
+/var/log/cron
+/var/log/maillog
+/var/log/messages
+/var/log/secure
+/var/log/spooler
+{
+    sharedscripts
+    postrotate
+    /bin/kill -HUP `cat /var/run/syslogd.pid 2&gt; /dev/null` 2&gt; /dev/null || true
+    endscript
+}
+
+[root@huanqiu_web1 ~]# ll /var/log/messages*
+-rw------- 1 root root 34248975 Jan 19 18:42 /var/log/messages
+-rw------- 1 root root 51772994 Dec 25 03:11 /var/log/messages-20161225
+-rw------- 1 root root 51800210 Jan  1 03:05 /var/log/messages-20170101
+-rw------- 1 root root 51981366 Jan  8 03:36 /var/log/messages-20170108
+-rw------- 1 root root 51843025 Jan 15 03:40 /var/log/messages-20170115
+[root@huanqiu_web1 ~]# ll /var/log/cron*
+-rw------- 1 root root 2155681 Jan 19 18:43 /var/log/cron
+-rw------- 1 root root 2932618 Dec 25 03:11 /var/log/cron-20161225
+-rw------- 1 root root 2939305 Jan  1 03:06 /var/log/cron-20170101
+-rw------- 1 root root 2951820 Jan  8 03:37 /var/log/cron-20170108
+-rw------- 1 root root 3203992 Jan 15 03:41 /var/log/cron-20170115
+[root@huanqiu_web1 ~]# ll /var/log/secure*
+-rw------- 1 root root  275343 Jan 19 18:36 /var/log/secure
+-rw------- 1 root root 2111936 Dec 25 03:06 /var/log/secure-20161225
+-rw------- 1 root root 2772744 Jan  1 02:57 /var/log/secure-20170101
+-rw------- 1 root root 1115543 Jan  8 03:26 /var/log/secure-20170108
+-rw------- 1 root root  731599 Jan 15 03:40 /var/log/secure-20170115
+[root@huanqiu_web1 ~]# ll /var/log/spooler*
+-rw------- 1 root root 0 Jan 15 03:41 /var/log/spooler
+-rw------- 1 root root 0 Dec 18 03:21 /var/log/spooler-20161225
+-rw------- 1 root root 0 Dec 25 03:11 /var/log/spooler-20170101
+-rw------- 1 root root 0 Jan  1 03:06 /var/log/spooler-20170108
+-rw------- 1 root root 0 Jan  8 03:37 /var/log/spooler-20170115
+</code></pre>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;tomcat日志切割一例&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</p>
+
+<pre><code>[root@huanqiu-backup ~]# cat /etc/logrotate.d/tomcat 
+/Data/app/tomcat-7-huanqiu/logs/catalina.out { 
+rotate 14 
+daily 
+copytruncate 
+compress 
+notifempty 
+missingok 
+} 
+
+[root@huanqiu-backup ~]# ll /Data/app/tomcat-7-huanqiu/logs/catalina.*
+-rw-r--r--. 1 root root     0 Jan 19 19:11 /Data/app/tomcat-7-huanqiu/logs/catalina.out
+-rw-r--r--. 1 root root 95668 Jan 19 19:11 /Data/app/tomcat-7-huanqiu/logs/catalina.out.1.gz
+</code></pre>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;早期用过的nginx日志处理一例&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<pre><code>[root@letv-backup ~]# vim /letv/sh/cut_nginx_log.sh
+#!/bin/bash
+# 你的日志文件存放目录
+logs_path=&quot;/letv/logs/&quot;
+# 日志文件的名字，多个需要空格隔开
+logs_names=(error access pv_access)
+dates=`date -d &quot;yesterday&quot; +&quot;%Y%m%d&quot;`
+mkdir -p ${logs_path}$dates/
+num=${#logs_names[@]}
+for((i=0;i /dev/null 2&gt;$1
+</code></pre>
+
+<p>3）尝试解决logrotate无法自动轮询日志的办法<br />
+现象说明：<br />
+使用logrotate轮询nginx日志，配置好之后，发现nginx日志连续两天没被切割，这是为什么呢？？<br />
+然后开始检查日志切割的配置文件是否有问题，检查后确定配置文件一切正常。<br />
+于是怀疑是logrotate预定的cron没执行，查看了cron的日志，发现有一条Dec 7 04:02:01 www crond[18959]:
+(root) CMD (run-parts
+/etc/cron.daily)这样的日志，证明cron在04:02分时已经执行/etc/cron.daily目录下的程序。<br />
+接着查看/etc /cron.daily/logrotate（这是logrotate自动轮转的脚本）的内容：</p>
+
+<pre><code>[root@huanqiu_test ~]# cat /etc/cron.daily/logrotate
+#!/bin/sh
+
+/usr/sbin/logrotate /etc/logrotate.conf &gt;/dev/null 2&gt;&amp;1
+EXITVALUE=$?
+if [ $EXITVALUE != 0 ]; then
+    /usr/bin/logger -t logrotate &quot;ALERT exited abnormally with [$EXITVALUE]&quot;
+fi
+exit 0
+</code></pre>
+
+<p>没有发现异常，配置好的日志轮转操作都是由这个脚本完成的，一切运行正常，脚本应该就没问题。<br />
+直接执行命令：<br />
+[root@huanqiu_test ~]# /usr/sbin/logrotate /etc/logrotate.conf<br />
+这些系统日志是正常轮询了，但nginx日志却还是没轮询</p>
+
+<p>接着强行启动记录文件维护操作，纵使logrotate指令认为没有需要，应该有可能是logroate认为nginx日志太小，不进行轮询。<br />
+故需要强制轮询，即在/etc/cron.daily/logrotate脚本中将 -t 参数替换成 -f 参数</p>
+
+<pre><code>[root@huanqiu_test ~]# cat /etc/cron.daily/logrotate
+#!/bin/sh
+
+/usr/sbin/logrotate /etc/logrotate.conf &gt;/dev/null 2&gt;&amp;1
+EXITVALUE=$?
+if [ $EXITVALUE != 0 ]; then
+    /usr/bin/logger -f logrotate &quot;ALERT exited abnormally with [$EXITVALUE]&quot;
+fi
+exit 0
+</code></pre>
+
+<p>最后最后重启下cron服务：<br />
+[root@huanqiu_test ~]# /etc/init.d/crond restart<br />
+Stopping crond: [ OK ]<br />
+Starting crond: [ OK ]</p>
+
+<p><strong>===============logrotate默认自动切割生效时间==============</strong></p>
+
+<pre><code>Logrotate是基于CRON来运行的，其脚本是/etc/cron.daily/logrotate，实际运行时，Logrotate会调用配置文件/etc/logrotate.conf。
+[root@test ~]# cat /etc/cron.daily/logrotate
+#!/bin/sh
+
+/usr/sbin/logrotate /etc/logrotate.conf
+EXITVALUE=$?
+if [ $EXITVALUE != 0 ]; then
+    /usr/bin/logger -t logrotate &quot;ALERT exited abnormally with [$EXITVALUE]&quot;
+fi
+exit 0
+
+
+Logrotate是基于CRON运行的，所以这个时间是由CRON控制的，具体可以查询CRON的配置文件/etc/anacrontab（老版本的文件是/etc/crontab）
+[root@test ~]# cat /etc/anacrontab
+# /etc/anacrontab: configuration file for anacron
+
+# See anacron(8) and anacrontab(5) for details.
+
+SHELL=/bin/sh
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=root
+# the maximal random delay added to the base delay of the jobs
+RANDOM_DELAY=45                                                                  //这个是随机的延迟时间，表示最大45分钟
+# the jobs will be started during the following hours only
+START_HOURS_RANGE=3-22                                                           //这个是开始时间
+
+#period in days   delay in minutes   job-identifier   command
+1 5 cron.daily    nice run-parts /etc/cron.daily
+7 25  cron.weekly   nice run-parts /etc/cron.weekly
+@monthly 45 cron.monthly    nice run-parts /etc/cron.monthly
+
+第一个是Recurrence period
+第二个是延迟时间
+所以cron.daily会在3:22+(5,45)这个时间段执行，/etc/cron.daily是个文件夹
+
+通过默认/etc/anacrontab文件配置，会发现logrotate自动切割日志文件的默认时间是凌晨3点多。
+
+==================================================================================================
+现在需要将切割时间调整到每天的晚上12点，即每天切割的日志是前一天的0-24点之间的内容。
+操作如下：
+[root@kevin ~]# mv /etc/anacrontab /etc/anacrontab.bak          //取消日志自动轮转的设置
+
+[root@G6-bs02 logrotate.d]# cat nstc_nohup.out 
+/data/nstc/nohup.out {
+rotate 30
+dateext
+daily
+copytruncate
+compress
+notifempty
+missingok
+}
+
+[root@G6-bs02 logrotate.d]# cat syslog 
+/var/log/cron
+/var/log/maillog
+/var/log/messages
+/var/log/secure
+/var/log/history
+{
+    sharedscripts
+    compress
+    rotate 30
+    daily
+    dateext
+    postrotate
+    /bin/kill -HUP `cat /var/run/syslogd.pid 2&gt; /dev/null` 2&gt; /dev/null || true
+    endscript
+}
+
+结合crontab进行自定义的定时轮转操作
+[root@kevin ~]# crontab -l
+#log logrotate
+59 23 * * * /usr/sbin/logrotate -f /etc/logrotate.d/syslog &gt;/dev/null 2&gt;&amp;1
+59 23 * * * /usr/sbin/logrotate -f /etc/logrotate.d/nstc_nohup.out &gt;/dev/null 2&gt;&amp;1
+
+[root@G6-bs02 ~]# ll /data/nstc/nohup.out*
+-rw------- 1 app app 33218 1月  25 09:43 /data/nstc/nohup.out
+-rw------- 1 app app 67678 1月  25 23:59 /data/nstc/nohup.out-20180125.gz
+</code></pre>
+
+<p><strong>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</strong></p>
+
+<p><strong>除了利用自带的Logrotate工具实现日志切割之外，还可以编写python脚本或shell脚本以实现日志切割。下面就简单列出几个实例说明下：</strong></p>
+
+<p><strong>一、Python脚本实现日志切割</strong></p>
+
+<pre><code>实例1：对jumpserver日志进行切割
+[root@test-vm01 mnt]# cat log_rotate.py 
+#!/usr/bin/env python
+
+import datetime,os,sys,shutil
+
+log_path = '/opt/jumpserver/logs/'
+log_file = 'jumpserver.log'
+
+yesterday = (datetime.datetime.now() - datetime.timedelta(days = 1))
+
+try:
+    os.makedirs(log_path + yesterday.strftime('%Y') + os.sep + \
+                yesterday.strftime('%m'))
+
+except OSError,e:
+    print
+    print e
+    sys.exit()
+
+
+shutil.move(log_path + log_file,log_path \
+            + yesterday.strftime('%Y') + os.sep \
+            + yesterday.strftime('%m') + os.sep \
+            + log_file + '_' + yesterday.strftime('%Y%m%d') + '.log')
+
+
+os.popen(&quot;sudo /opt/jumpserver/service.sh restart&quot;)
+
+手动执行这个脚本：
+[root@test-vm01 mnt]# chmod 755 log_rotate.py
+[root@test-vm01 mnt]# python log_rotate.py
+
+查看日志切割后的效果：
+[root@test-vm01 mnt]# ls /opt/jumpserver/logs/
+2017  jumpserver.log  
+[root@test-vm01 mnt]# ls /opt/jumpserver/logs/2017/
+09
+[root@test-vm01 mnt]# ls /opt/jumpserver/logs/2017/09/
+jumpserver.log_20170916.log
+
+然后做每日的定时切割任务：
+[root@test-vm01 mnt]# crontab -e
+30 1 * * * /usr/bin/python /mnt/log_rotate.py &gt; /dev/null 2&gt;&amp;1
+
+--------------------------------------------------------------------------------------
+实例2:对nginx日志进行切割
+[root@test-vm01 mnt]# vim log_rotate.py
+#!/usr/bin/env python
+
+import datetime,os,sys,shutil
+
+log_path = '/app/nginx/logs/'
+log_file = 'www_access.log'
+
+yesterday = (datetime.datetime.now() - datetime.timedelta(days = 1))
+
+try:
+    os.makedirs(log_path + yesterday.strftime('%Y') + os.sep + \
+                yesterday.strftime('%m'))
+
+except OSError,e:
+    print
+    print e
+    sys.exit()
+
+
+shutil.move(log_path + log_file,log_path \
+            + yesterday.strftime('%Y') + os.sep \
+            + yesterday.strftime('%m') + os.sep \
+            + log_file + '_' + yesterday.strftime('%Y%m%d') + '.log')
+
+
+os.popen(&quot;sudo kill -USR1 `cat /app/nginx/logs/nginx.pid`&quot;)
+
+--------------------------------------------------------------------------------------
+其他业务日志的切割脚本跟上面做法相同
+</code></pre>
+
+<p><strong>二、shell脚本实现日志切割</strong></p>
+
+<pre><code>[root@qd-vpc-op-consumer01 ~]# cat /app/script/log_rotate.sh 
+#!/bin/sh
+
+function rotate() {
+logs_path=$1
+
+echo Rotating Log: $1
+cp ${logs_path} ${logs_path}.$(date -d &quot;yesterday&quot; +&quot;%Y%m%d&quot;)
+&gt; ${logs_path}
+    rm -f ${logs_path}.$(date -d &quot;7 days ago&quot; +&quot;%Y%m%d&quot;)
+}
+
+for i in $*
+do
+        rotate $i
+done
+
+--------------------------------------------------------------------------------------------------------------
+每天定时切割日志的任务制定（比如对python的一个业务/data/log/xcspam/下的日志进行切割，0K的日志不进行切割）：
+[root@qd-vpc-op-consumer01 ~]# crontab -e
+#xcspam 日志切割
+30 0 * * * find /data/log/xcspam/ -size +0 -name '*.log' | xargs /app/script/log_rotate.sh
+
+手动执行切割：
+[root@qd-vpc-op-consumer01 ~]# find /data/log/xcspam/ -size +0 -name '*.log' | xargs /app/script/log_rotate.sh
+
+切割后的日志效果：
+[root@qd-vpc-op-consumer01 ~]# ls /data/log/xcspam/
+xcspam_error.log  xcspam_error.log-20170926
+
+--------------------------------------------------------------------------------------------------------------
+比如对maridb日志进行切割
+[root@qd-vpc-op-consumer01 ~]# crontab -e
+#xcspam 日志切割
+30 0 * * * find /var/log/mariadb/ -size +0 -name '*.log' | xargs /app/script/log_rotate.sh
+
+[root@qd-vpc-op-consumer01 ~]# find /var/log/mariadb/ -size +0 -name '*.log' | xargs /app/script/log_rotate.sh
+[root@qd-vpc-op-consumer01 ~]# ll /var/log/mariadb/
+总用量 8
+-rw-r-----. 1 mysql mysql    0 9月  17 20:31 mariadb.log
+-rw-r-----. 1 root  root  4532 9月  17 20:31 mariadb.log.20170916
+--------------------------------------------------------------------------------------------------------------
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

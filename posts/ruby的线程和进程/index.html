@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>ruby的线程和进程 | 开发者问答集锦</title>
+    <meta property="og:title" content="ruby的线程和进程 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="ruby的线程和进程">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/ruby%E7%9A%84%E7%BA%BF%E7%A8%8B%E5%92%8C%E8%BF%9B%E7%A8%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">ruby的线程和进程</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>###</p>
+
+<h3 id="ruby的线程和进程">ruby的线程和进程</h3>
+
+<pre><code>Ruby给了你两个基本的方法来组织你的程序，使它同时能运行自己的不同部分。你可以使用多线程在程序内部将任务分割，或者将任务分解为不同的程序，使用多进程来运行。下面我们轮流看一下这两种方法。
+
+
+
+多线程
+
+
+一般来说同时做两件事情最简单途径是使用Ruby线程。线程在进程中，由Ruby解释器实现。这使得Ruby线程很轻便--它不需要依赖特定的操作系统，但是这样你也不能利用本地线程的优点了。这么说是什么意思？
+
+你也许有过饥饿线程的经验（优先级低的线程没有机会运行）。也许你会遇到线程死锁，整个进程都被挂起。或者一些线程的某些操作占用了CPU的太多时间，以至于所有线程必须等待直到解释器重新获得控制。最后，如果你机器不止有一块CPU，Ruby线程也不会得到什么好处—因为它们运行在个处理器中，在单个本地线程内，它们每次只能运行在一个处理器上。
+
+
+
+创建 Ruby 线程
+
+
+创建一个新的线程十分简单，下面的部分代码并行的下载一些网页，对每个被请求下载的URL，这段代码都将产生一个独立的线程处理HTTP传输。
+
+require 'net/http'
+
+pages = %w( www.rubycentral.com slashdot.org www.google.com )
+
+threads = []
+
+for page_to_fetch in pages
+
+threads &lt;&lt; Thread.new(page_to_fetch) do |url|
+
+h = Net::HTTP.new(url, 80)
+
+puts &quot;Fetching: #{url}&quot;
+
+resp = h.get('/', nil )
+
+puts &quot;Got #{url}: #{resp.message}&quot;
+
+end
+
+end
+
+threads.each {|thr| thr.join }
+
+produces:
+
+Fetching: www.rubycentral.com
+
+Fetching: slashdot.org
+
+Fetching: www.google.com
+
+Got www.google.com: OK
+
+Got www.rubycentral.com: OK
+
+Got slashdot.org: OK
+
+让我们更详细的看看这段代码，这里有一些新技巧在里面。
+
+新线程用 Thread.new 创建，这个方法接收一个block作为线程中要运行的代码，在我们的例子里面，这个block使用net/http库从我们指定的指定的站点抓取首页。从我们打印出来的信息来看，这些抓取活动是同时进行的。
+
+当我们创建线程的时候，我们传递被请求的URL作为参数。这个参数然后作为url参数传给块。为什么我们这么做而不是直接块内page_to_fetch变量的值呢？
+
+线程共享在它启动之前已经存在的所有全局变量，实例变量和局部变量。善意的人有时候会告诉你，共享有时候不一定是好事。在这个例子里面，3个线程将共享page_to_fetch变量。第一个线程启动之后，page_to_fetch被设为http://www.rubycentral.com。在此期间，创建线程的循环没有结束还在运行着。接着，page_to_fetch被设为http://www.awl.com。如果第一个线程没有完成并还在使用page_to_fetch变量，那么它可能会突然使用这个新的值来启动。这个bug将很难被跟踪发现。
+
+但是，在线程块中创建的局部变量的作用域只在创建它的线程里，而不能被其它线程共享。在我们的例子里面，变量url将在线程被创建时赋值，每个线程都有自己的page地址的拷贝。你可以通过Thread.new传递任意数量的参数到块内。
+
+
+
+多线程
+
+
+另一个很微妙的地方是程序的最后一行，为什么我们要给所创建的线程分别调用join方法？
+
+当一个Ruby程序结束退出的时候，它会杀死所有的线程，而不管它们的状态。但是，你可以通过线程的 Thread#join 方法，使得主程序在等待这个线程结束后再退出。调用它的线程将会被阻塞，直到给定的线程结束。通过调用3个线程的join方法，你可以确定这三个请求将会在主程序退出之前完成。如果你不想对块永远地等下去，1.8中你可以给join一个超时参数—如果在线程终止前出现超时，则这个join调用返回nil。Join的另一种变化是方法Thread#value，它返回由程序的最后语句执行后返回的值。
+
+除了join，还有其它几个用于方便地管理线程的方法。你可以用 Thread.current 来访问当前可访问的线程。你可以用 Thread.list 来取得所有线程列表，这个列表包括所有可运行或者已停止的线程。为了检测特定线程的状态，可以用方法 Thread#status 和 Thread#alive? 。
+
+另外，你可以使用 Thread#priority= 来调整线程的优先级。高优先级的将会先于低优先级的线程执行。我们将更多地讨论程序调度，及停止和启动线程。
+
+
+
+
+线程变量
+
+
+线程可以访问在它被创建时的作用域内的任何变量。在包含线程代码的块内的变量只对当前线程有效，是不被共享的。
+
+
+但是，如果你想一个线程的变量能被其它线程访问，包括主线程，该怎么办呢？Ruby中的线程提供了一个功能，就是能够按名字创建和访问线程内的局部变量。你可以简单的把这个线程对象看成是个哈希表，使用[ ]=方法写元素并用[ ]方法将它读回。在下面这个例子里， 每个线程在线程局部变量内用键mycount来记录当前变量count的值。要做到这些，则当索引线程对象时，代码使用字符串”mycount”。（这里有竞争条件的出现，但是我们还没有谈到同步问题，所以这里我们只是忽略它们。）
+
+count = 0
+
+threads = []
+
+10.times do |i|
+
+threads[i] = Thread.new do
+
+sleep(rand(0.1))
+
+Thread.current[&quot;mycount&quot;] = count
+
+count += 1
+
+end
+
+end
+
+threads.each {|t| t.join; print t[&quot;mycount&quot;], &quot;, &quot; }
+
+puts &quot;count = #{count}&quot;
+
+produces:
+
+4, 1, 0, 8, 7, 9, 5, 6, 3, 2, count = 10
+
+主线程等待子线程结束，然后打印由each捕获的count值。如果有兴趣我们可让每个线程在取得count值之前休眠随机的时间。　
+
+
+
+
+线程和异常　
+
+
+如果一个线程抛出一个没有被处理的异常，将会怎样呢？这依赖于abort_on_exception标志的设置(文档在612和615页)和解释器的debug标志的设置(在168页描述)。
+
+
+如果abort_on_exception 被设置为false并且debug标志没有被激活(缺省条件)，一个未处理异常简单地杀死当前线程—其余的则继续运行。事实上，在你将引起异常的线程使用join之前，你不会听到任何异常。
+
+在下面的例子里，线程2不会输出任何东西。但是，你仍然可以看到其它线程的输出。
+
+threads = []
+
+4.times do |number|
+
+threads &lt;&lt; Thread.new(number) do |i|
+
+raise &quot;Boom!&quot; if i == 2
+
+print &quot;#{i}n&quot;
+
+end
+
+end
+
+threads.each {|t| t.join }
+
+produces:
+
+0
+
+1
+
+3
+
+prog.rb:4: Boom! (RuntimeError)
+
+from prog.rb:8:in `join'
+
+from prog.rb:8
+
+from prog.rb:8:in `each'
+
+from prog.rb:8
+
+我们可以在线程被加入时捕获异常。
+
+threads = []
+
+4.times do |number|
+
+threads &lt;&lt; Thread.new(number) do |i|
+
+raise &quot;Boom!&quot; if i == 2
+
+print &quot;#{i}n&quot;
+
+end
+
+end
+
+threads.each do |t|
+
+begin
+
+t.join
+
+rescue RuntimeError =&gt; e
+
+puts &quot;Failed: #{e.message}&quot;
+
+end
+
+end
+
+produces:
+
+0
+
+1
+
+3
+
+Failed: Boom!
+
+然而，设置abort_on_exception为true，或者使用-d来打开debug标志。则一个未处理异常会杀死所有运行中的线程。一旦线程2出现错误，就不会有任何输出产生。
+
+Thread.abort_on_exception = true
+
+threads = []
+
+4.times do |number|
+
+threads &lt;&lt; Thread.new(number) do |i|
+
+raise &quot;Boom!&quot; if i == 2
+
+print &quot;#{i}n&quot;
+
+end
+
+end
+
+threads.each {|t| t.join }
+
+produces:
+
+0
+
+1
+
+prog.rb:5: Boom! (RuntimeError)
+
+from prog.rb:4:in `initialize'
+
+from prog.rb:4:in `new'
+
+from prog.rb:4
+
+from prog.rb:3:in `times'
+
+from prog.rb:3
+
+这个代码也显示了一个gotcha。在循环内部，线程使用print来印出号码，而不使用puts。为什么？因为在背后，puts将它的工作分成两个部分：它打印它的参数，然后它再打印一个换行符。在这两步之间，一个线程可能会被调度，而输出将会出现交叉。用含有换行符的单个字符串调用print则会避开这个问题。
+
+
+
+控制线程调度
+
+
+在一个设计良好的应用程序中，你应该让线程只做自己该做的事情；在一个多线程环境中创建一个基于时间的系统一般来说不是一个好主意。它会使代码复杂也会阻止线程调度对你程序运行的优化。
+
+但是，有时候我们需要明确地控制线程的运行。也许我们的自动点唱机有一个线程用来控制指示灯。我们希望在音乐停止播放的时候也停止指示灯。你也许在一个经典的生产者－消费者关系中有两个线程，一个消费者在生产者挂起的时候也必须挂起。
+
+类Thread 提供了很多方法用来控制线程调度，调用 Thread.stop 能停止当前线程，而Thread#run 将使某个线程启动运行，调用Thread.pass 将告诉线程调度器去执行另外一个线程。 Thread#join 和 Thread#value 将使调用者挂起，直到指定线程结束。
+
+我们可以用下面代码来示范一下上面的特点。它创建两个字线程t1和t2，每个线程都是类Chase的一个实例。chase方法增量一个count，但不会让它多于另一个线程count的2倍。多了就停止它，方法Thread.pass，它允许另一个线程来赶上chase。要想更有趣，我们在开始时挂起线程，然后随机启动一个。
+
+class Chaser
+
+attr_reader :count
+
+def initialize(name)
+
+@name = name
+
+@count = 0
+
+end
+
+def chase(other)
+
+while @count &lt; 5
+
+while @count other.
+
+count &gt; 1
+
+Thread.pass
+
+end
+
+@count += 1
+
+print &quot;#@name: #{count}n&quot;
+
+end
+
+end
+
+end
+
+c1 = Chaser.new(&quot;A&quot;)
+
+c2 = Chaser.new(&quot;B&quot;)
+
+threads = [ Thread.new { Thread.stop; c1.chase(c2) },
+
+Thread.new { Thread.stop; c2.chase(c1) } ]
+
+start_index = rand(2)
+
+threads[start_index].run
+
+threads[1 start_
+
+index].run
+
+threads.each {|t| t.join }
+
+produces:
+
+B: 1
+
+B: 2
+
+A: 1
+
+B: 3
+
+A: 2
+
+B: 4
+
+A: 3
+
+B: 5
+
+A: 4
+
+A: 5
+
+但是，使用这些原始的方法来控制线程调度实现同步，不管怎么说，都可能会遇到竞争条件。如果你需要在线程中共享数据，竞争条件将会一直存在并且给调试带来麻烦。事实上，前面的例子中包含了一个bug；count可能被另一个线程增量，并且是在count被输出之前，第二个线程获得调度并输出它的count。余下的输出将不会是次序的。
+
+幸运的是，线程还有另一个工具：互斥。使用它，我们能编写一个安全的同步方案。
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

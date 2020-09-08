@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本之sed篇 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本之sed篇 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本之sed篇">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E4%B9%8Bsed%E7%AF%87/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本之sed篇</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>Shell脚本之sed篇</p>
+
+<p>目录：<br />
+一、概述<br />
+二、sed基本语法格式<br />
+三、简单正则表达式<br />
+四、sed脚本指令(注释、替换、删除、追加、打印、下一行、读写文件、退出、多行模式）<br />
+五、综合案例</p>
+
+<p>一、概述<br />
+1.sed是一款流编辑工具，用来对文本进行过滤与替换工作，特别是当你想要对几十个配置文件做统计修改时，你会感受到sed的魅力！<br />
+sed通过输入读取文件内容，但一次仅读取一行内容进行某些指令处理后输出，所以sed更适合于处理大数据文件。</p>
+
+<p>2.sed流程：<br />
+* 通过文件或管道读取文件内容。<br />
+* sed并不直接修改源文件，而是将读入的内容复制到缓冲区中，我们称之为模式空间（pattern space）。<br />
+* 根据sed的指令对模式空间中的内容进行处理并输出结果，默认输出至标准输出即屏幕上。</p>
+
+<p>输入<br />
+-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;<br />
+|<br />
+|<br />
+v<br />
+v<br />
+读取一行内容，并复制到模式空间 |<br />
+|<br />
+v<br />
+v<br />
+-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;<br />
+输出经过处理后的内容</p>
+
+<hr />
+
+<p>二、sed基本语法结构</p>
+
+<p>sed Options&hellip; [script] [inputfile&hellip;]</p>
+
+<p>sed 选项&hellip; [脚本指令] [输入文件]</p>
+
+<p>如果没有输入文件，则sed默认对标准输入进行处理（即键盘输入）。脚本指令是第一个不以“-”开始的参数。</p>
+
+<p>1.选项含义：<br />
+--version 显示sed版本。</p>
+
+<p>--help 显示帮助文档。</p>
+
+<p>-n,&ndash;quiet,&ndash;silent 静默输出，默认情况下，sed程序在所有的脚本指令执行完毕后，将自动打印<br />
+模式空间中的内容，这些选项可以屏蔽自动打印。</p>
+
+<p>-e script 允许多个脚本指令被执行。</p>
+
+<p>-f script-file,<br />
+--file=script-file 从文件中读取脚本指令，对编写自动脚本程序来说很棒！</p>
+
+<p>-i,&ndash;in-place 直接修改源文件，经过脚本指令处理后的内容将被输出至源文件（源文件被修改）<br />
+慎用！</p>
+
+<p>-l N, &ndash;line-length=N 该选项指定l指令可以输出的行长度，l指令用于输出非打印字符。</p>
+
+<p>--posix 禁用GNU sed扩展功能。</p>
+
+<p>-r, &ndash;regexp-extended<br />
+在脚本指令中使用扩展正则表达式</p>
+
+<p>-s, &ndash;separate 默认情况下，sed将把命令行指定的多个文件名作为一个长的连续的输入流。<br />
+而GNU sed则允许把他们当作单独的文件，<br />
+这样如正则表达式则不进行跨文件匹配。</p>
+
+<p>-u, &ndash;unbuffered 最低限度的缓存输入与输出。</p>
+
+<p>2.简单案例：<br />
+以上仅是sed程序本身的选项功能说明，至于具体的脚本指令（即对文件内容做的操作）后面我们会详细描述，<br />
+这里就简单介绍几个脚本指令操作作为sed程序的例子。<br />
+a,append 追加<br />
+i,insert 插入<br />
+d,delete 删除<br />
+s,substitution 替换</p>
+
+<p>案例说明：灰色背景的内容为待处理的源文件，红色字体的文字为sed脚本，蓝色字体的文字为处理后的结果输出。</p>
+
+<p>这里test.txt为样本文件：<br />
+[jacob@localhost ~] #cat test.txt<br />
+DEVICE=eth0<br />
+ONBOOT=yes<br />
+BOOTPROTO=static<br />
+IPADDR=192.168.0.1<br />
+NETMASK=255.255.255.0</p>
+
+<p>GATEWAY=192.168.0.254</p>
+
+<p>[jacob@localhost ~] #sed &lsquo;2a TYPE=Ethernet&rsquo; test.txt 第二行后添加TYPE=Ethernet</p>
+
+<p>[jacob@localhost ~] #sed &lsquo;3i TYPE=Ethernet&rsquo; test.txt 第三行前添加TYPE=Ethernet</p>
+
+<p>[jacob@localhost ~] #sed &rsquo;s/yes/no/g&rsquo; test.txt 将样本文件中的所有yes替换为no</p>
+
+<p>[jacob@localhost ~] #sed &lsquo;3,4d&rsquo; test.txt 删除第3至4行的内容</p>
+
+<p>以上大多数操作指令，都依据行号定位操作对象（地址），如：2a即第二行后添加。<br />
+但实际情况可能大多数情况你并不确定你要操作对象（地址）的行号，这时更多的我们会使用正则表达式确定操作对象（地址）。<br />
+下面是使用正则表达式定位操作行的示例：</p>
+
+<p>[jacob@localhost ~] #sed &lsquo;/ONBOOT/a TYPE=Ethernet&rsquo; test.txt</p>
+
+<p>匹配到包含ONBOOT的行，并在其后添加TYPE=Ethernet</p>
+
+<p>[jacob@localhost ~] #sed &lsquo;/^GATEWAY/d&rsquo; test.txt</p>
+
+<p>匹配以GATEWAY开始的行，并删除改行</p>
+
+<p>另外我们的操作指令可以，写入到脚本文件中并通过sed的-f选项读取。<br />
+创建一个sed脚本，内容如下：</p>
+
+<p>[jacob@localhost ~] #cat sed.sh<br />
+/^$/d 这条指令的作用是：匹配到空白行后，删除改行。</p>
+
+<p>[jacob@localhost ~] #sed -f sed.sh test.txt 对test.txt文件执行sed.sh指令</p>
+
+<p>另外，当你需要执行多个指令时，可以使用以下三种方法：<br />
+1. [jacob@localhost ~] #sed &rsquo;s/yes/no/;s/static/dhcp/&rsquo; test.txt 注：使用分号隔开指令。</p>
+
+<p>2. [jacob@localhost ~] #sed -e &rsquo;s/yes/no/&rsquo; -e &rsquo;s/static/dhcp/&rsquo; test.txt 注：使用-
+e选项。</p>
+
+<p>3. [jacob@localhost ~] #sed &lsquo;<br />
+&gt;s/yes/no/<br />
+&gt;s/static/dhcp/&rsquo; test.txt 注：利用分行指令。<br />
+然而在命令行上输入过长的指令是愚蠢的，这时就需要-f选项指定sed脚本文件，在脚本文件中可以包含多行指令，而且便于修改！</p>
+
+<hr />
+
+<p>三、简单正则表达式<br />
+从以上案例中我们不难发现，我们编写的脚本指令需要指定一个地址来决定操作范围，如果不指定则默认对文件的所有行操作。<br />
+如：sed &rsquo;d&rsquo; test.txt 将删除test.txt的所有行，而&rsquo;2d&rsquo;则仅删除第二行。</p>
+
+<p>1.为sed指令确定操作地址：<br />
+number 指定输入文件的唯一行号。</p>
+
+<p>first~step 以first开始，并指定操作步长为step，如1~2，指定第一行，第三行，第五行&hellip; 为操作地址。<br />
+[jacob@localhost ~] #sed -n &lsquo;1~2p&rsquo; test.txt 打印文件的奇数行。<br />
+2~5，则可以指定第二行开始，每5行匹配一次操作地址。</p>
+
+<p>$ 匹配文件的最后一行。</p>
+
+<p>/regexp/ //中间包含的是正则表达式，通过正则表达式匹配操作地址。<br />
+注：//空的正则表达式，匹配最近一次正则表达式的匹配地址，会在后面使用看出效果。</p>
+
+<p>\cregexpc 匹配扩展正则表达式，c字符可以使用任意字符替代。</p>
+
+<p>addr1,addr2 匹配从操作地址1到操作地址2的所有行。<br />
+[jacob@localhost ~] #sed &lsquo;2,8d&rsquo; test.txt 删除2至8中间的所有行。</p>
+
+<p>addr1,+N 匹配地址1以及后面的N行内容。</p>
+
+<p>2.正则表达式概述(对你要找内容的一种描述)</p>
+
+<p>char 字符本身就匹配字符本身，如/abc/就是定位包含abc的行。</p>
+
+<ul>
+<li>匹配前面表达式出现了0或若干次，如/a*/可以帮你找到a,aa,aaa,&hellip; &hellip;等等。<br />
+<br /></li>
+</ul>
+
+<p>\+ 类似于*，但匹配前面表达式的1次或多次，这属于扩展正则表达式。</p>
+
+<p>\? 类似于*，但匹配前面表达式的0次或1次，这属于扩展正则表达式。</p>
+
+<p>\{i\} 类似于*，但匹配前面表达式的i次(i为整数)，如：a\{3\}可以帮你找到aaa。</p>
+
+<p>\{i,j\} 匹配前面表达式的i到j次，如a\{1,2\}可以帮你找到a或aa或aaa。</p>
+
+<p>\{i,\} 匹配前面表达式至少i次。</p>
+
+<p>\( \) 将\( \)内的模式存储在保留空间。最多可以存储9个独立子模式，可<br />
+通过转义\1至\9重复保留空间的内容至此点。</p>
+
+<p>\n 转义\1至\9重复保留空间的内容至此点。<br />
+例：test.txt的内容为ssttss<br />
+grep &lsquo;\(ss\)tt\1&rsquo; test.txt \1表示将ss重复在tt后面<br />
+该grep命令等同于grep ssttss test.txt 在test.txt文件中找ssttss</p>
+
+<p>. (点)匹配任意字符。</p>
+
+<p>^ 匹配行的开始，如^test 将匹配所有以test开始的行。</p>
+
+<p>$ 匹配行的结尾，如test$ 将匹配所有以test结尾的行。</p>
+
+<p>[] 匹配括号中的任意单个字符，如a[nt] 将匹配an或at。</p>
+
+<p>[^] 匹配不包含在[]中的字符，如[^a-z] 将匹配除a-z以外的字符。</p>
+
+<p>\n 匹配换行符。</p>
+
+<p>\char 转义特殊字符，如\*，就是匹配字面意义上的星号。</p>
+
+<hr />
+
+<p>四、sed脚本指令<br />
+常用的sed脚本指令有：<br />
+*注释(#)<br />
+*替换(s)<br />
+*删除(d)<br />
+*追加(a)<br />
+*插入(i)<br />
+*更改&copy;<br />
+*列印(l)<br />
+*转换(y)<br />
+*打印(p)<br />
+*读写文件(r,w)<br />
+*退出(q)<br />
+*下一步(n)<br />
+*Next(N)<br />
+*Print(P)<br />
+*Delete(D)<br />
+*Hold(h,H)<br />
+*Get(g,G)<br />
+*branch,test</p>
+
+<p>sed脚本指令的基本格式：</p>
+
+<p>[address]command<br />
+[地址]命令 备注：有些命令仅可以对一行操作，有些可以对多行操作。</p>
+
+<p>命令可以用大括号进行组合以使命令序列可以作用于同一个地址：<br />
+address{<br />
+command1<br />
+command2<br />
+command3<br />
+}<br />
+第一个命令可以和左大括号在同一行，但右大括号必须单独处于一行。<br />
+注意事项：命令后添加空格会产生错误。</p>
+
+<p>1.注释(#)：<br />
+注释行是以#开始的行，如果#后面的字符为n，则屏蔽sed程序的自动输出功能，等同于命令选项-n。</p>
+
+<p>2.替换(s,Substitution)：<br />
+[address]s/pattern/replacement/flags<br />
+address为操作地址，s为替换指令，/pattern/匹配要替换的内容，/replacement/为替换的内容。<br />
+flags可以是：<br />
+n 1至512之间的数字，表示对模式空中指定模式的第n次出现进行替换。<br />
+如一行中有3个A，而只想替换第二个A。<br />
+g 对模式空间的匹配进行全局更改。没有g则仅第一次匹配被替换，如一行中有3个A，则仅替换第一个A。<br />
+p 打印模式空间的内容。<br />
+w file<br />
+将模式空间的内容写到文件file中。</p>
+
+<p>replacement为字符串，用来替换与正则表达式匹配的内容。<br />
+在replacement部分，只有下列字符有特殊含义：<br />
+&amp; 用正则表达式匹配的内容进行替换。<br />
+\n 匹配第n个子串，这个子串之前在pattern中用\( \)指定。<br />
+\ 转义(转义替换部分包含的：&amp;, \等)。</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-<br />
+示例1所使用的样本文件为：<br />
+[jacob@localhost ~] #cat test.txt</p>
+
+<p>First Web<br />
+Hello the World!</p>
+
+<p>示例1：将样本文件中的第二个</p>
+
+<p>替换为<br />
+编写sed脚本为：<br />
+[jacob@localhost ~] #cat sed.sh<br />
+/body/{<br />
+s//\/body/2  注：替换与行匹配相同的内容即body，替换为/body，但仅替换第二个body为/body。<br />
+}<br />
+执行sed程序的结果：<br />
+[jacob@localhost ~] #sed -f sed.sh test.txt</p>
+
+<p>First Web<br />
+Hello the World!</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</p>
+
+<p>示例2所使用的样本文件为：<br />
+[jacob@localhost ~] #cat test.txt</p>
+
+<p>First Web</p>
+
+<p>h1Helloh1<br />
+h2Helloh2<br />
+h3Helloh3</p>
+
+<p>示例2：给所有第一个的h1,h2等添加&lt;&gt;；第二个h1,h2添加&gt;<br />
+编写sed脚本为：<br />
+[jacob@localhost ~] #cat sed.sh<br />
+/h[0-9]/{ 注：匹配h紧跟一个数字的行<br />
+s//\/1 注：替换与上一行中匹配内容相同的内容，即替换h[0-9]，替换为，其中&amp;即前面要替换的内容。<br />
+s//\/2 注：上一条指令仅替换第一个h1,h2&hellip;，本行指令用来替换第二个h1,h2&hellip;。<br />
+}<br />
+执行sed程序的结果：<br />
+[jacob@localhost ~] #sed -f sed.sh test.txt</p>
+
+<h1 id="hello">Hello</h1>
+
+<h2 id="hello-1">Hello</h2>
+
+<h3 id="hello-2">Hello</h3>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</p>
+
+<p>技巧：关于 &rsquo;s///&rsquo; 命令的另一个妙处是 &lsquo;/&rsquo; 分隔符有许多替换选项。<br />
+如果规则表达式或替换字符串中有许多斜杠，则可以通过在 &rsquo;s&rsquo; 之后指定一个不同的字符来更改分隔符。<br />
+示例：$ sed -e &rsquo;s:/usr/local:/usr:g&rsquo; mylist.txt 这里：为分隔符。</p>
+
+<p>3.删除(d ,delete)：</p>
+
+<p>删除指令删除匹配的行，而且删除命令还会改变sed脚本中命令的执行顺序。因为：<br />
+匹配的行一旦被删除，模式空间将变为“空”，自然不会再执行sed脚本后续的命令。<br />
+删除命令将导致读取新的输入行（下一行），而sed脚本中的命令则从头开始执行。<br />
+注意事项：删除将删除整个行，而不只是删除匹配的内容。（如要删除匹配的内容，可以使用替换）</p>
+
+<p>示例1所使用的样本文件为：</p>
+
+<p>[jacob@localhost ~] #cat test.txt<br />
+DEVICE=eth0<br />
+ONBOOT=yes<br />
+BOOTPROTO=static</p>
+
+<p>IPADDR=192.168.0.1<br />
+NETMASK=255.255.255.0</p>
+
+<p>GATEWAY=192.168.0.254</p>
+
+<p>示例1：删除文件中的空白行<br />
+编写sed脚本为：<br />
+[jacob@localhost ~] #cat sed.sh<br />
+/.*/{<br />
+/^$/d<br />
+}<br />
+执行sed程序的结果：<br />
+[jacob@localhost ~] #sed -f sed.sh test.txt<br />
+DEVICE=eth0<br />
+ONBOOT=yes<br />
+BOOTPROTO=static<br />
+IPADDR=192.168.0.1<br />
+NETMASK=255.255.255.0<br />
+GATEWAY=192.168.0.254</p>
+
+<p>4.追加(a)：在匹配行后追加内容</p>
+
+<p>示例所使用的样本文件为：<br />
+[jacob@localhost ~] #cat test.txt<br />
+DEVICE=eth0<br />
+ONBOOT=yes<br />
+BOOTPROTO=static<br />
+NETMASK=255.255.255.0<br />
+GATEWAY=192.168.0.254</p>
+
+<p>示例程序：sed &lsquo;/static/a IPADDR=192.168.0.1&rsquo; test.txt 注：在static行后添加一行。</p>
+
+<p>5.插入(i)：在匹配行前插入内容</p>
+
+<p>示例程序：sed &lsquo;/NETMASK/i IPADDR=192.168.0.1&rsquo; test.txt  注：在NETMASK行前添加一行。</p>
+
+<p>6.更改&copy;：更改匹配行的内容</p>
+
+<p>示例程序：sed &lsquo;/ONBOOT/c ONBOOT=yes&rsquo; test.txt 注：包含ONBOOT的行(整行)替换为ONBOOT=yes。</p>
+
+<p>7.列印(l)：显示模式空间中的内容，显示非打印字符，一般与-n一起使用，否则会输出两次。</p>
+
+<p>示例程序：sed -n &lsquo;1,2l&rsquo; test.txt 注：如果使用sed脚本文件，需要#n屏蔽自动输出<br />
+结果如下：<br />
+DEVICE=eth0$<br />
+ONBOOT=yes$</p>
+
+<p>8.转换(y)：按字符的转换(Transform) [address]y/source-chars/dest-chars/</p>
+
+<p>示例所使用的样本文件为：<br />
+[jacob@localhost ~] #cat test.txt<br />
+DEVICE=eth0<br />
+ONBOOT=yes<br />
+BOOTPROTO=static<br />
+netmask=255.255.255.0<br />
+GATEWAY=192.168.0.254</p>
+
+<p>编写sed脚本为：<br />
+[jacob@localhost ~] #cat sed.sh<br />
+/.*/{<br />
+/netmask/y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/ 将小写转换为大写<br />
+}<br />
+执行sed程序的结果：<br />
+[jacob@localhost ~] #sed -f sed.sh test.txt<br />
+DEVICE=eth0<br />
+ONBOOT=yes<br />
+BOOTPROTO=static<br />
+NETMASK=255.255.255.0<br />
+GATEWAY=192.168.0.254</p>
+
+<p>9.打印(p)：作用类似与l(列印)，但不显示非显示字符，一般与-n配合使用，脚本文件中需要#n</p>
+
+<p>sed -n &lsquo;1,2p&rsquo; test.txt 仅显示第一、第二行的内容。</p>
+
+<p>10.读写文件(r,w)：[line-address]r file, [address]w file</p>
+
+<p>示例所使用的样本文件为：<br />
+[jacob@localhost ~] #cat name.txt<br />
+Jacob<br />
+Tom<br />
+Jerry</p>
+
+<p>[jacob@localhost ~] #cat mail.txt<br />
+jacob@gmail.com<br />
+tom@gmail.com<br />
+jerry@gmail.com</p>
+
+<p>编写sed脚本为：<br />
+[jacob@localhost ~] #cat sed.sh<br />
+/.*/{<br />
+$r mail.txt<br />
+}<br />
+执行sed程序的结果：<br />
+[jacob@localhost ~] #sed -f sed.sh name.txt<br />
+Jacob<br />
+Tom<br />
+Jerry<br />
+jacob@gmail.com<br />
+tom@gmail.com<br />
+jerry@gmail.com</p>
+
+<p>11.退出(q): 匹配地址后退出sed脚本</p>
+
+<p>sed &lsquo;10q&rsquo; test.txt 打印文件前10行内容(到第10行后退出sed脚本指令)。</p>
+
+<p>12.下一步(n)： [address]n 输出模式空间中的内容，然后读取输入的下一行。<br />
+next命令改变了正常的sed脚本指令的流程，默认只有到sed脚本的底部才会输出模式空间的内容。<br />
+next命令导致输入的下一行取代模式空间中的当前行，sed脚本中的后续命令将应用于替换后的行，而不是当前行。</p>
+
+<p>示例所使用的样本文件为：<br />
+[jacob@localhost ~] #cat name.txt<br />
+Jacob<br />
+Tom<br />
+Jerry</p>
+
+<p>编写sed脚本为：<br />
+[jacob@localhost ~] #cat sed.sh<br />
+/.<em>/{<br />
+n 读取下一行后删除（删除偶数行）。<br />
+/.</em>/d<br />
+}</p>
+
+<p>执行sed程序的结果：<br />
+[jacob@localhost ~] #sed -f sed.sh name.txt<br />
+Jacob<br />
+Jerry</p>
+
+<p>13.Next(N)：</p>
+
+<p>多行Next(N)命令通过读取新的输入行，并将它添加到模式空间的现有内容之后，来创建多行模式空间。<br />
+模式空间的最初内容与新的输入行之间用换行符分隔。在模式空间中插入的换行符可以使用\n匹配。<br />
+示例1：<br />
+[jacob@localhost ~] #cat test.txt<br />
+111<br />
+222<br />
+222<br />
+333</p>
+
+<p>[jacob@localhost ~] #cat sed.sh<br />
+#n<br />
+/222/{<br />
+N<br />
+l<br />
+}</p>
+
+<p>[jacob@localhost ~] #sed -f sed.sh test.txt 结果如下：<br />
+222\n222<br />
+示例2：<br />
+[jacob@localhost ~] #cat test.txt<br />
+111<br />
+222<br />
+222<br />
+222<br />
+333<br />
+[jacob@localhost ~] #cat sed.sh<br />
+#n<br />
+/222/{<br />
+N<br />
+l<br />
+}</p>
+
+<p>[jacob@localhost ~] #sed -f sed.sh test.txt<br />
+222\n222<br />
+222\n333</p>
+
+<p>14.Print(P)：多行打印(P)与打印(p)稍有不同，该命令仅输出多行模式空间中的第一部分，直到第一个插入的\n换行符为止。</p>
+
+<p>示例：</p>
+
+<p>#cat test.txt #cat test.txt #cat test.txt #cat test.txt<br />
+111 111 111 111<br />
+222 222 222 222<br />
+333 333 333 333<br />
+444 444 444 444<br />
+555 555 555 555<br />
+666 666 666 666<br />
+-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<p>#cat sed.sh #cat sed.sh #cat sed.sh #cat sed.sh</p>
+
+<p>/.<em>/{ /.</em>/{ /.<em>/{ /.</em>/{<br />
+N N N N<br />
+} l P p<br />
+} } }<br />
+-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</p>
+
+<p>结果： 结果： 结果： 结果：<br />
+111 111\n222$ 111 111<br />
+222 111 111 222<br />
+333 222 222 111<br />
+444 333\n444$ 333 222<br />
+555 333 333 333<br />
+666 444 444 444<br />
+555\n666$ 555 333<br />
+555 555 444<br />
+666 666 555<br />
+666<br />
+555<br />
+666<br />
+-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p>
+
+<p>流程说明：1.sed脚本文件使用了N，但后续没有任何指令，所以仅按sed自动输出，即输出源文件所有内容。<br />
+2.sed脚本问使用了N，l表示显示模式空间的内容，即111\n222（N的作用为把下一行追加至行尾），<br />
+同时sed脚本的自动输出功能会把源文件内容显示出来即111，222。<br />
+依次类推，sed脚本继续读取第三行333，并使用N将444追加至行尾，使用l显示模式空间的内容，<br />
+sed自动输出再把源文件内容显示出来。<br />
+3.sed脚本文件使用了N将下一行追加至行尾，现在模式空间中的内容为111\n222，而P指令的作用是<br />
+打印模式空间中的第一部分内容直到\n结尾，即仅打印111，这时sed的自动输出功能把源文件<br />
+内容打印出来111，222。依次类推读取第三行333，N将444追加至行尾,P打印\n前的内容，<br />
+同时sed脚本自动将源问内容输出。<br />
+4.原理类似与第三个sed脚本，但p打印时\n看作是回车换行，所以打印出来的是111回车222。</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<p>15.Delete(D)：<br />
+删除命令(d)删除模式空间中的内容并导致读入新的输入行，而sed脚本重新执行。<br />
+删除命令(D)删除模式空间中直到第一个插入的换行符(\n)前的这部分内容，它不会读入新的输入行，并返回sed脚本的顶端，<br />
+使得剩余指令继续应用于模式空间中剩余的内容。</p>
+
+<p>16.Hold(h,H)，Get(g,G)：</p>
+
+<p>模式空间是存放当前输入行的缓冲区。还有一个称为保持空间(hold space)的缓冲区。<br />
+模式空间的内容可以复制到保持空间，保持空间的内容同样可以复制到模式空间。<br />
+有一组命令用于在两者之间移动数据。<br />
+Hold(h|H) 将模式空间的内容复制或追加到保持空间<br />
+Get(g|G) 将保持空间的内容复制或追加到模式空间<br />
+Exchange(x) 交换保持空间与模式空间的内容</p>
+
+<p>示例：反转部分行<br />
+[jacob@localhost ~] #cat test.txt<br />
+1<br />
+2<br />
+11<br />
+22<br />
+111<br />
+222<br />
+[jacob@localhost ~] #cat sed.sh<br />
+/1/{<br />
+h<br />
+d<br />
+}<br />
+/2/{<br />
+G<br />
+}</p>
+
+<p>结果：<br />
+2<br />
+1<br />
+22<br />
+11<br />
+222<br />
+111</p>
+
+<p>17.branch,test</p>
+
+<p>分支(b)，测试(t)命令将sed脚本中的控制转移到包含特殊标签的行，如果没有指定的标签，则将控制转移到脚本结尾处。<br />
+分支命令是无条件转移，测试命令用于有条件转移，测试只有当替换命令改变当前行成功时才会执行。</p>
+
+<p>标签是任意不多于7个字符的序列，标签本身占据一行并以冒号开始:<br />
+:mylable<br />
+冒号与标签之间不允许有空格</p>
+
+<p>当分支或测试命令中指定标签时，在命令与标签之间允许有空格：<br />
+b mylabel 注：不要在标签后插入空格</p>
+
+<p>五、综合案例（案例摘自GNU sed官网）<br />
+综合案例1：重命名文件名为小写<br />
+[jacob@localhost ~] #cat sed.sh<br />
+#! /bin/sh</p>
+
+<h1 id="rename-files-to-lower-upper-case">rename files to lower/upper case&hellip;</h1>
+
+<h1 id="usage">usage:</h1>
+
+<h1 id="move-to-lower">move-to-lower *</h1>
+
+<h1 id="move-to-upper">move-to-upper *</h1>
+
+<h1 id="or">or</h1>
+
+<h1 id="move-to-lower-r">move-to-lower -R .</h1>
+
+<h1 id="move-to-upper-r">move-to-upper -R .</h1>
+
+<p>help()<br />
+{<br />
+cat &lt;&lt; eof<br />
+Usage: $0 [-n] [-r] [-h] files&hellip;</p>
+
+<p>-n do nothing, only see what would be done<br />
+-R recursive (use find)<br />
+-h this message<br />
+files files to remap to lower case</p>
+
+<p>Examples:<br />
+$0 -n * (see if everything is ok, then&hellip;)<br />
+$0 *</p>
+
+<p>$0 -R .</p>
+
+<p>eof<br />
+}</p>
+
+<p>apply_cmd=&lsquo;sh&rsquo;<br />
+finder=&lsquo;echo &ldquo;$@&rdquo; | tr &ldquo; &rdquo; &ldquo;\n&rdquo;&rsquo;<br />
+files_only=</p>
+
+<p>while :<br />
+do<br />
+case &ldquo;$1&rdquo; in<br />
+-n) apply_cmd=&lsquo;cat&rsquo; ;;<br />
+-R) finder=&lsquo;find &ldquo;$@&rdquo; -type f&rsquo;;;<br />
+-h) help ; exit 1 ;;<br />
+*) break ;;<br />
+esac<br />
+shift<br />
+done</p>
+
+<p>if [ -z &ldquo;$1&rdquo; ]; then<br />
+echo Usage: $0 [-h] [-n] [-r] files&hellip;<br />
+exit 1<br />
+fi</p>
+
+<p>LOWER=&lsquo;abcdefghijklmnopqrstuvwxyz&rsquo;<br />
+UPPER=&lsquo;ABCDEFGHIJKLMNOPQRSTUVWXYZ&rsquo;</p>
+
+<p>case <code>basename $0</code> in<br />
+<em>upper</em>) TO=$UPPER; FROM=$LOWER ;;<br />
+*) FROM=$UPPER; TO=$LOWER ;;<br />
+esac</p>
+
+<p>eval $finder | sed -n &lsquo;</p>
+
+<h1 id="remove-all-trailing-slashes">remove all trailing slashes</h1>
+
+<p>s/\/*$//</p>
+
+<h1 id="add-if-there-is-no-path-only-a-filename">add ./ if there is no path, only a filename</h1>
+
+<p>/\//! s/^/.\//</p>
+
+<h1 id="save-path-filename">save path+filename</h1>
+
+<p>h</p>
+
+<h1 id="remove-path">remove path</h1>
+
+<p>s/.*\///</p>
+
+<h1 id="do-conversion-only-on-filename">do conversion only on filename</h1>
+
+<p>y/&lsquo;$FROM&rsquo;/&lsquo;$TO&rsquo;/</p>
+
+<h1 id="now-line-contains-original-path-file-while">now line contains original path+file, while</h1>
+
+<h1 id="hold-space-contains-the-new-filename">hold space contains the new filename</h1>
+
+<p>x</p>
+
+<h1 id="add-converted-file-name-to-line-which-now-contains">add converted file name to line, which now contains</h1>
+
+<h1 id="path-file-name-nconverted-file-name">path/file-name\nconverted-file-name</h1>
+
+<p>G</p>
+
+<h1 id="check-if-converted-file-name-is-equal-to-original-file-name">check if converted file name is equal to original file name,</h1>
+
+<h1 id="if-it-is-do-not-print-nothing">if it is, do not print nothing</h1>
+
+<p>/^.<em>\/\(.</em>\)\n\1/b</p>
+
+<h1 id="now-transform-path-fromfile-n-into">now, transform path/fromfile\n, into</h1>
+
+<h1 id="mv-path-fromfile-path-tofile-and-print-it">mv path/fromfile path/tofile and print it</h1>
+
+<p>s/^\(.<em>\/\)\(.</em>\)\n\(.*\)$/mv &ldquo;\1\2&rdquo; &ldquo;\1\3&rdquo;/p</p>
+
+<p>&rsquo; | $apply_cmd</p>
+
+<p>综合案例2：获取bash环境变量<br />
+#!/bin/sh<br />
+set | sed -n &lsquo;<br />
+:x</p>
+
+<h1 id="if-no-occurrence-of-print-and-load-next-line">if no occurrence of ‘=()’ print and load next line</h1>
+
+<p>/=()/! { p; b; }<br />
+/ () $/! { p; b; }</p>
+
+<h1 id="possible-start-of-functions-section">possible start of functions section</h1>
+
+<h1 id="save-the-line-in-case-this-is-a-var-like-foo">save the line in case this is a var like FOO=&ldquo;() &ldquo;</h1>
+
+<p>h</p>
+
+<h1 id="if-the-next-line-has-a-brace-we-quit-because">if the next line has a brace, we quit because</h1>
+
+<h1 id="nothing-comes-after-functions">nothing comes after functions</h1>
+
+<p>n<br />
+/^{/ q</p>
+
+<h1 id="print-the-old-line">print the old line</h1>
+
+<p>x; p</p>
+
+<h1 id="work-on-the-new-line-now">work on the new line now</h1>
+
+<p>x; bx<br />
+&lsquo;</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

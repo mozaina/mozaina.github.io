@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell编写一个简单的jmeter自动化压测脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell编写一个简单的jmeter自动化压测脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell编写一个简单的jmeter自动化压测脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E7%BC%96%E5%86%99%E4%B8%80%E4%B8%AA%E7%AE%80%E5%8D%95%E7%9A%84jmeter%E8%87%AA%E5%8A%A8%E5%8C%96%E5%8E%8B%E6%B5%8B%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell编写一个简单的jmeter自动化压测脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>在公司做压力测试也挺长时间了，每次测试前环境数据准备都需要话费较长时间，所以一直在考虑能不能将整个过程实现自动化进行，于是就抽空写了一个自动化脚本，当然这个脚本目前功能十分简陋，代码也不完善，很有很多需要改的地方，后续再优化。文中如有错误或者不妥之处，还望指教。</p>
+
+<h3 id="一-设计思路">一、设计思路</h3>
+
+<p>1、初始化数据库（导入用户，清除数据等）</p>
+
+<p>2、初始化缓存（使用了redis缓存优化系统）</p>
+
+<p>3、执行压力测试</p>
+
+<h3 id="二-目录结构">二、目录结构</h3>
+
+<p><a href="https://img.it610.com/image/info8/aa78c7b608504937ba3acd241ca2354c.png"><img src="https://img.it610.com/image/info8/aa78c7b608504937ba3acd241ca2354c.png" alt="在这里插入图片描述" /></a><br />
+目录解读：</p>
+
+<ul>
+<li><p>apache-jmeter-3.0 为jmeter程序目录</p></li>
+
+<li><p>asserts.log 断言日志</p></li>
+
+<li><p>auto_jmeter.sh 脚本文件（启动这个项目就是执行它）</p></li>
+
+<li><p>jmeter.log jmeter启动日志</p></li>
+</ul>
+
+<h3 id="三-代码如下-按照惯例-所有涉及公司的代码都有修改">三、代码如下（按照惯例，所有涉及公司的代码都有修改）</h3>
+
+<pre><code>#!/bin/bash
+set -e
+LC_ALL=C
+LANG=C
+unset TZ
+file_path=&quot;./&quot;
+host=&quot;192.168.0.32&quot;
+username=&quot;test&quot;
+password=&quot;test.123&quot;
+dbname=&quot;test&quot;
+jmeter_path=&quot;./apache-jmeter-3.0/bin/jmeter.sh&quot;
+jmx_path=&quot;./apache-jmeter-3.0/jmxs/termplan_dq.jmx&quot;
+jtl_path=&quot;./apache-jmeter-3.0/jtls/`date +%Y%m%d-%H%M`.jtl&quot;
+sql_path=&quot;./sqlFiles/&quot;
+#now=`date +date +%Y%m%d-%H%M`
+
+###############33######
+####数据库初始化
+###############33######
+function init_data(){
+        echo &quot;===========开始初始化相关数据=============&quot;
+        mysql -h${host} --default-character-set=utf8 -u${username} -p${password} ${dbname} -e&quot;
+        DELETE FROM t_user WHERE id &gt; 50000;
+        DELETE FROM t_person WHERE id &gt; 50000;
+        SELECT count(*) AS '压测前预约总数' FROM t_test_table;
+        &quot;
+
+        cd ${sql_path}
+        sql_name=`ls`
+        for file_name in ${sql_name[@]}
+        do
+                if [ -f &quot;$file_name&quot; ];then
+                        #command=&quot;source $file_name&quot;
+                        mysql -h${host} --default-character-set=utf8 -u${username} -p${password} ${dbname} -e &quot;source ${file_name}&quot;
+                else
+                        echo -e &quot;\033[31;31m SQL文件不存在！！！\033[0m&quot;
+                fi
+        done
+        cd ..
+
+        mysql -h${host} --default-character-set=utf8 -u${username} -p${password} ${dbname} -e&quot;
+        SELECT count(*) AS '新增用户数' FROM t_user WHERE id &gt; 50000;
+        &quot;
+        echo &quot;==========已完成初始化相关数据============&quot;
+}
+###############33######
+####缓存初始化
+###############33######
+function init_cache(){
+        echo &quot;=============开始初始化缓存===============&quot;
+        echo &quot;==============初始化(kiwi)================&quot;
+        curl &quot;http://127.0.0.1:10000/test/test.action&quot;
+        echo -e &quot;\n==========初始化冻结缓存(kiwi)============&quot;
+        curl &quot;http://127.0.0.1:10000/test/test/zen.action&quot;
+        echo -e &quot;\n============已完成初始化缓存==============&quot;
+}
+###############33######
+####执行jmeter脚本
+###############33######
+function auto_jmeter(){
+        sh ${jmeter_path} -n -t ${jmx_path} -l ${jtl_path}
+}
+###############33######
+####查询数据(数据太多无作用，因为缓存到数据库需要很长时间)
+###############33######
+function select_data(){
+        echo &quot;============开始查询相关数据==============&quot;
+        mysql -h${host} --default-character-set=utf8 -u${username} -p${password} ${dbname} -e&quot;
+        select count(*) as '压测后预约总数'  from t_test_table;
+        quit
+        &quot;
+        echo &quot;============相关数据查询完毕==============&quot;
+        echo -e &quot;\033[36;36m============压力测试执行完毕==============\033[0m&quot;
+}
+#######################
+#######################
+init_data
+init_cache
+auto_jmeter
+sleep 10
+select_data
+</code></pre>
+
+<h3 id="四-执行结果如下图">四、执行结果如下图</h3>
+
+<p><a href="https://img.it610.com/image/info8/b66f3570e14f4f80a9ff79f52f517602.png"><img src="https://img.it610.com/image/info8/b66f3570e14f4f80a9ff79f52f517602.png" alt="shell编写一个简单的jmeter自动化压测脚本_第1张图片" /></a></p>
+
+<h3 id="五-遗留的问题">五、遗留的问题</h3>
+
+<p>1、jmeter压力上不去，尽管加了1000个线程，但实际并发20左右，这个在之前发的文档里面有数据呈现。</p>
+
+<p>2、支持输出html报告，需要实现，压测报告更加直观。如何输出正确的测试报告非常重要。</p>
+
+<p>等等</p>
+
+<p>上述问题解决会继续更新</p>
+
+<p>【注】欢迎探讨，欢迎转载，但转载请注明出处。（2017-06-30）<br />
+欢迎扫描关注我的公众号，欢迎投稿，一起探讨技术、人生，谢谢。<br />
+<a href="https://img.it610.com/image/info8/f587ee6d8ad9443b9e1c12c930363199.jpg"><img src="https://img.it610.com/image/info8/f587ee6d8ad9443b9e1c12c930363199.jpg" alt="shell编写一个简单的jmeter自动化压测脚本_第2张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

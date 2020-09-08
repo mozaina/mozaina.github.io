@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell实现DockerMySQL57安装及SQL脚本运行 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell实现DockerMySQL57安装及SQL脚本运行 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell实现DockerMySQL57安装及SQL脚本运行">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%AE%9E%E7%8E%B0dockermysql57%E5%AE%89%E8%A3%85%E5%8F%8Asql%E8%84%9A%E6%9C%AC%E8%BF%90%E8%A1%8C/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell实现DockerMySQL57安装及SQL脚本运行</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>Linux Shell 实现Docker MySQL安装及脚本运行的目标：</p>
+
+<p>1、实现MySQL5.7安装</p>
+
+<p>2、安装完成后创建对应的账号和数据库实例表等</p>
+
+<h3 id="创建docker-mysql容器实例">创建docker mysql容器实例</h3>
+
+<p>定义docker_mysql_install.sh</p>
+
+<pre><code>#! /bin/bash
+#file:mysql_docker_install.sh
+#company:cvnavi.com
+#author:Pengjunlin
+echo &quot;当前执行文件......$0&quot;
+exists_name=&quot;&quot;
+exists_tag=&quot;&quot;
+# 下载 mysql
+for i in [ `docker images ` ]; do
+
+    if [[ $i == &quot;docker.io/mysql&quot; ]]; then
+        echo &quot;$i&quot;
+        exists_name=&quot;1&quot;
+    fi
+    if [[ $i == &quot;5.7&quot; ]]; then
+        echo &quot;$i&quot;
+        exists_tag=&quot;1&quot;
+    fi
+done
+if [[ $exists_name == &quot;1&quot; &amp;&amp; $exists_tag == &quot;1&quot; ]]; then
+    echo &quot;本地已存在mysql:5.7镜像.&quot;
+else
+    docker pull mysql:5.7
+fi
+# 停止mysql容器
+for i in [ `docker ps ` ]; do
+    if [[ $i == &quot;mysql5.7&quot; ]]; then
+        echo &quot;停止mysql5.7容器 &quot;
+        docker stop mysql5.7
+        break
+    fi
+done
+# 删除mysql容器
+for i in [ `docker ps -a` ]; do
+    if [[ $i == &quot;mysql5.7&quot; ]]; then
+        echo &quot;删除mysql5.7容器 &quot;
+        docker rm mysql5.7
+        break
+    fi
+done
+
+if [[ -f &quot;/usr/local/docker_mysql_create_table.sh&quot; ]]; then
+    # 创建mysql映射目录
+    if [[ ! -d &quot;/etc/mysql&quot; ]]; then
+        mkdir /etc/mysql
+    fi
+    if [[ ! -d &quot;/etc/mysql/conf.d&quot; ]]; then
+        mkdir /etc/mysql/conf.d
+    fi
+    if [[ ! -d &quot;/etc/mysql/logs&quot; ]]; then
+        mkdir /etc/mysql/logs
+    fi
+    if [[ ! -d &quot;/etc/mysql/data&quot; ]]; then
+        mkdir /etc/mysql/data
+    fi
+    # 运行容器实例
+    docker run -d -p 3306:3306 --name mysql5.7 -v /etc/mysql/conf.d:/etc/mysql/conf.d -v /etc/mysql/logs:/logs -v /etc/mysql/data:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=root  mysql:5.7
+    # 映射copy文件路径到docker容器
+    docker cp /usr/local/docker_mysql_create_table.sh mysql5.7:/usr/local/docker_mysql_create_table.sh
+    # 打印即将执行的指令
+    echo &quot; docker exec -it mysql5.7  /bin/bash -c 'sh /usr/local/docker_mysql_create_table.sh'&quot;
+    # 进入容器并执行脚本：
+    docker exec -it mysql5.7  /bin/bash -c &quot;sh /usr/local/docker_mysql_create_table.sh&quot;
+else
+    echo &quot;/usr/local/docker_mysql_create_table.sh文件不存在，docker需要用此文件创建mysql容器实例并创建用户和数据库表.&quot;
+    exit 1
+fi
+</code></pre>
+
+<p>注意：mysql容器的 账号密码都是root，使用了/bin/bash/ -c 来执行指令文件。</p>
+
+<h3 id="创建用户和执行sql语句">创建用户和执行SQL语句</h3>
+
+<p>定义docker_mysql_create_table.sh</p>
+
+<pre><code>#！/bin/bash
+#file:docker_mysql_create_table.sh
+#company:cvnavi.com
+#author:Pengjunlin
+echo &quot;当前执行文件......$0&quot;
+# Mysql数据库相关配置
+mysql_database_host=&quot;localhost&quot;
+mysql_database_name=&quot;filecache&quot;
+mysql_root_user_name=&quot;root&quot;
+mysql_root_user_pwd=&quot;root&quot;
+mysql_remote_user_name=&quot;rtvsweb&quot;
+mysql_remote_user_pwd=&quot;rtvs2018&quot;
+mysql_table_name=&quot;avinfo&quot;;
+# 进入mysql控制台 默认用户是root
+echo &quot;Docker Mysql控制台创建数据库....&quot;
+echo &quot;***********************************以下容执行可能会有错误提示，请忽略**************************&quot;
+# 为root用户设置密码
+echo &quot;Docker Mysql控制台为root用户设置密码....$mysql_root_user_pwd&quot;
+sql_alter_user=&quot;ALTER USER '$mysql_root_user_name'@'$mysql_database_host' IDENTIFIED BY '$mysql_root_user_pwd'&quot;
+mysql -u$mysql_root_user_name -p$mysql_root_user_pwd -e&quot;$sql_alter_user&quot;
+
+
+# 添加远程登录用户
+echo &quot;Docker Mysql控制台创建远程用户....$mysql_remote_user_name&quot;
+sql_create_user=&quot;CREATE USER '$mysql_remote_user_name'@'%' IDENTIFIED WITH mysql_native_password BY '$mysql_remote_user_pwd'&quot;
+mysql -u$mysql_root_user_name -p$mysql_root_user_pwd -e&quot;$sql_create_user&quot;
+
+#为远程账号添加权限
+echo &quot;Docker Mysql控制台为远程账号添加权限.... *.* TO '$mysql_remote_user_name'@'%'&quot;
+sql_grant_user=&quot;GRANT ALL PRIVILEGES ON *.* TO '$mysql_remote_user_name'@'%'&quot;
+mysql -u$mysql_root_user_name -p$mysql_root_user_pwd -e&quot;$sql_grant_user&quot;
+
+# 创建数据库
+echo &quot;Docker Mysql控制台创建数据库.... $mysql_database_name&quot;
+sql_create_database=&quot;create database IF NOT EXISTS $mysql_database_name&quot;
+mysql -u$mysql_root_user_name -p$mysql_root_user_pwd -e&quot;$sql_create_database&quot;
+
+#用户创建Mysql数据库脚本
+echo &quot;Docker Mysql控制台创建数据库表.... $mysql_table_name&quot;
+sql_create_table=&quot;create table IF NOT EXISTS $mysql_table_name (
+  F_ID varchar(255) NOT NULL,
+  F_SIM varchar(20) NOT NULL,
+  F_CHANNEL int(11) NOT NULL,
+  F_ALARM decimal(18,0) NOT NULL,
+  F_STORAGE_TYPE int(11) NOT NULL,
+  F_STREAM_TYPE int(11) NOT NULL,
+  F_START_TIME decimal(20,0) NOT NULL,
+  F_END_TIME decimal(20,0) NOT NULL,
+  F_FILE_PATH varchar(255) NOT NULL,
+  F_FILE_SIZE decimal(18,0) NOT NULL,
+  F_DATA_TYPE int(11) default NULL,
+  PRIMARY KEY (F_ID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8&quot;
+mysql -u$mysql_root_user_name -p$mysql_root_user_pwd -d$mysql_database_name -e&quot;$sql_create_table&quot;
+echo &quot;***********************************上内容执行可能会有错误提示，请忽略**************************&quot;
+</code></pre>
+
+<p>这里创建了远程账号rtvsweb,数据库实例filecache,以及数据库表avinfo。</p>
+
+<p>注意：mysql是运行在容器中的，我们在外部不能直接使用mysql -uroot -proot
+来验证访问，因为它是一个微型的容器实例有自己的ip地址，如172.17.0.2
+，容器默认的网关是172.17.0.1。我们访问容器实例可以通过外部的mysql客户端如navicat来验证远程账号。如果本地已经安装过mysql
+可以使用如：mysql -h172.17.0.2 -urtvsweb -prtvs2018 来访问容器版本的mysql。</p>
+
+<p>非容器管理的MySQL安装请参考：shell脚本实现msyql5.7全自动安装</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

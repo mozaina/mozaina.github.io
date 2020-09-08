@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linux学习用户的特殊shell与PAM模块 | 开发者问答集锦</title>
+    <meta property="og:title" content="linux学习用户的特殊shell与PAM模块 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linux学习用户的特殊shell与PAM模块">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E5%AD%A6%E4%B9%A0%E7%94%A8%E6%88%B7%E7%9A%84%E7%89%B9%E6%AE%8Ashell%E4%B8%8Epam%E6%A8%A1%E5%9D%97/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linux学习用户的特殊shell与PAM模块</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="特殊的-shell-sbin-nologin">特殊的 shell, /sbin/nologin</h3>
+
+<p>『无法登入』指的是:『这个使用者无法使用 bash 或其他 shell 来登入系统』而已， 并不是说这个账号就无法使用其他的系统资源!</p>
+
+<p>让某个具有 /sbin/nologin 的使用者知道，他们不能登入主机时， 其实我可以建立 『/etc/nologin.txt 』这个文件，</p>
+
+<p>并且在这个文件内说明不能登入的原因，那么下次当这个用户想要登 入系统时， 屏幕上出现的就会是 /etc/nologin.txt
+这个文件的内容，而不是预设的内容了!</p>
+
+<h3 id="pam-模块简介">PAM 模块简介</h3>
+
+<p>PAM 可以说是一套应用程序编程接口 (Application Programming Interface, API)，他提供了一连串的
+验证机制，只要使用者将验证阶段的需求告知 PAM 后， PAM 就能够回报使用者验证的结果 (成 功或失败)。</p>
+
+<p><a href="https://img.it610.com/image/info8/c99dd33d7baf4307b7b16103c3608513.jpg"><img src="https://img.it610.com/image/info8/c99dd33d7baf4307b7b16103c3608513.jpg" alt="linux学习-用户的特殊 shell 与 PAM
+模块_第1张图片" /></a></p>
+
+<p>如上述的图示， PAM 是一个独立的 API 存在，只要任何程序有需求时，可以向 PAM 发出验证要 求的通知， PAM
+经过一连串的验证后，将验证的结果回报给该程序，然后该程序就能够利用验证 的结果来进行可登入或显示其他无法使用的讯息。</p>
+
+<p>PAM 用来进行验证的数据称为模块 (Modules)，每个 PAM 模块的功能都不太相同。举例来说， 还 记得我们在本章使用 passwd
+指令时，如果随便输入字典上面找的到的字符串， passwd 就会回报错 误信息了!这是为什么呢?这就是 PAM 的 pam_cracklib.so
+模块的功能!他能够判断该密码是否在 字典里面! 并回报给密码修改程序，此时就能够了解你的密码强度了。</p>
+
+<h3 id="pam-模块设定语法">PAM 模块设定语法</h3>
+
+<p>PAM 藉由一个与程序相同文件名的配置文件来进行一连串的认证分析需求。我们同样以 passwd 这 个指令的呼叫 PAM 来说明好了。 当你执行
+passwd 后，这支程序呼叫 PAM 的流程是:</p>
+
+<ol>
+<li>用户开始执行 /usr/bin/passwd 这支程序，并输入密码;</li>
+<li>passwd 呼叫 PAM 模块进行验证;</li>
+<li>PAM 模块会到 /etc/pam.d/ 找寻与程序 (passwd) 同名的配置文件;</li>
+<li>依据 /etc/pam.d/passwd 内的设定，引用相关的 PAM 模块逐步进行验证分析;</li>
+<li>将验证结果 (成功、失败以及其他讯息) 回传给 passwd 这支程序;</li>
+<li>passwd 这支程序会根据 PAM 回传的结果决定下一个动作 (重新输入新密码或者通过验证!)</li>
+</ol>
+
+<p>从上头的说明，我们会知道重点其实是 /etc/pam.d/ 里面的配置文件，以及配置文件所呼叫的 PAM 模块进行的验证工作!既然一直谈到 passwd
+这个密码修改指令，那我们就来看看 /etc/pam.d/passwd 这个配置文件的内容是怎样吧!</p>
+
+<pre><code>[root@study ~]# cat /etc/pam.d/passwd
+#%PAM-1.0 &lt;==PAM 版本的说明而已!
+auth    include    system-auth    &lt;==每一行都是一个验证的过程
+account include system-auth
+password substack system-auth
+-password optional pam_gnome_keyring.so use_authtok
+password substack postlogin
+验证类别 控制标准 PAM 模块与该模块的参数
+</code></pre>
+
+<p>在这个配置文件当中，除了第一行宣告 PAM 版本之外，其他任何『 # 』开头的都是批注，而每一 行都是一个独立的验证流程，
+每一行可以区分为三个字段，分别是验证类别(type)、控制标准(flag)、 PAM 的模块与该模块的参数。</p>
+
+<h2 id="tips-你会发现在我们上面的表格当中出现的是-include-包括-这个关键词-他代表的是-请呼叫后面的文件来作为这个类别的验证">Tips 你会发现在我们上面的表格当中出现的是『 include (包括) 』这个关键词，他代表的是『请呼叫后面的文件来作为这个类别的验证』，</h2>
+
+<p>所以，上述的每一行都要重复呼叫 /etc/pam.d/system-auth 那个文件来进行验证的意思!</p>
+
+<ul>
+<li>第一个字段:验证类别 (Type)</li>
+</ul>
+
+<p>验证类别主要分为四种，分别说明如下:</p>
+
+<ul>
+<li>auth</li>
+</ul>
+
+<p>是 authentication (认证) 的缩写，所以这种类别主要用来检验使用者的身份验证，这种类别通常是需要密码 来检验的，
+所以后续接的模块是用来检验用户的身份。</p>
+
+<ul>
+<li>account</li>
+</ul>
+
+<p>account (账号) 则大部分是在进行 authorization
+(授权)，这种类别则主要在检验使用者是否具有正确的权限，举例来说，当你使用一个过期的密码来登入时，当然就无法正确的登入了。</p>
+
+<ul>
+<li>session</li>
+</ul>
+
+<p>session 是会议期间的意思，所以 session 管理的就是使用者在这次登入 (或使用这个指令) 期间，PAM 所
+给予的环境设定。这个类别通常用在记录用户登入与注销时的信息!例如，如果你常常使用 su 或者是 sudo 指令的话， 那么应该可以在
+/var/log/secure 里面发现很多关于 pam 的说明，而且记载的数据是『session open, session close』的信息!</p>
+
+<ul>
+<li>password</li>
+</ul>
+
+<p>password 就是密码嘛!所以这种类别主要在提供验证的修订工作，举例来说，就是修改/变更密码啦!</p>
+
+<hr />
+
+<ul>
+<li>第二个字段:验证的控制旗标 (control flag)</li>
+</ul>
+
+<p>那么『验证的控制旗标(control flag)』又是什么?简单的说，他就是『验证通过的标准』啦!这个字 段在管控该验证的放行方式，主要也分为四种控制方式:</p>
+
+<ul>
+<li>required</li>
+</ul>
+
+<p>此验证若成功则带有 success (成功) 的标志，若失败则带有 failure 的标志，但不论成功或失败都会继续后 续的验证流程。
+由于后续的验证流程可以继续进行，因此相当有利于资料的登录 (log) ，这也是 PAM 最 常使用 required 的原因。</p>
+
+<ul>
+<li>requisite</li>
+</ul>
+
+<p>若验证失败则立刻回报原程序 failure 的标志，并终止后续的验证流程。若验证成功则带有 success 的标志 并继续后续的验证流程。 这个项目与
+required 最大的差异，就在于失败的时候还要不要继续验证下去?由 于 requisite 是失败就终止， 因此失败时所产生的 PAM
+信息就无法透过后续的模块来记录了。</p>
+
+<ul>
+<li>sufficient</li>
+</ul>
+
+<p>若验证成功则立刻回传 success 给原程序，并终止后续的验证流程;若验证失败则带有 failure 标志并继续 后续的验证流程。 这玩意儿与
+requisits 刚好相反!</p>
+
+<ul>
+<li>optional</li>
+</ul>
+
+<p>这个模块控件目大多是在显示讯息而已，并不是用在验证方面的。</p>
+
+<p>将这些控制旗标以图示的方式配合成功与否的条件绘图，会有点像底下这样:</p>
+
+<p><a href="https://img.it610.com/image/info8/c1b1774c1ec84fe09e5002d612a40d38.jpg"><img src="https://img.it610.com/image/info8/c1b1774c1ec84fe09e5002d612a40d38.jpg" alt="linux学习-用户的特殊 shell 与 PAM
+模块_第2张图片" /></a></p>
+
+<h3 id="常用模块简介">常用模块简介</h3>
+
+<p>由于我们常常需要透过各种方式登入 (login) 系统，因此就来看看登入所需要的 PAM 流程为何:</p>
+
+<pre><code>[root@study ~]# cat /etc/pam.d/login
+#%PAM-1.0
+auth [user_unknown=ignore success=ok ignore=ignore default=bad] pam_securetty.so
+auth    substack    system-auth
+auth    include      postlogin
+account    required    pam_nologin.so
+account    include     system-auth
+password  include     system-auth
+# pam_selinux.so close should be the first session rule
+session    required    pam_selinux.so    close
+session    required    pam_loginuid.so
+session    optional    pam_console.so
+# pam_selinux.so open should only be followed by sessions to be executed in the user context
+session    required    pam_selinux.so open
+session    required    pam_namespace.so
+session    optional    pam_keyinit.so force revoke
+session    include    system-auth
+session    include    postlogin
+-session  optional   pam_ck_connector.so
+# 我们可以看到，其实 login 也呼叫多次的 system-auth ，所以底下列出该配置文件
+
+[root@study ~]# cat /etc/pam.d/system-auth
+#%PAM-1.0
+# This file is auto-generated.
+# User changes will be destroyed the next time authconfig is run.
+auth        required      pam_env.so
+auth        sufficient    pam_fprintd.so
+auth        sufficient    pam_unix.so nullok try_first_pass
+auth        requisite     pam_succeed_if.so uid &gt;= 1000 quiet_success
+auth        required      pam_deny.so
+
+account     required      pam_unix.so
+account     sufficient    pam_localuser.so
+account     sufficient    pam_succeed_if.so uid &lt; 1000 quiet
+account     required      pam_permit.so
+
+password    requisite     pam_pwquality.so try_first_pass local_users_only retry=3 authtok_type=
+password    sufficient    pam_unix.so sha512 shadow nullok try_first_pass use_authtok
+password    required      pam_deny.so
+
+session     optional      pam_keyinit.so revoke
+session     required      pam_limits.so
+-session     optional      pam_systemd.so
+session     [success=1 default=ignore] pam_succeed_if.so service in crond quiet use_uid
+session     required      pam_unix.so
+</code></pre>
+
+<p>上面这个表格当中使用到非常多的 PAM 模块，每个模块的功能都不太相同，详细的模块情报可以 在你的系统中找到:</p>
+
+<ul>
+<li>/etc/pam.d/*:每个程序个别的 PAM 配置文件;</li>
+<li>/lib64/security/*:PAM 模块文件的实际放置目录;</li>
+<li>/etc/security/*:其他 PAM 环境的配置文件;</li>
+<li>/usr/share/doc/pam-*/:详细的 PAM 说明文件。</li>
+</ul>
+
+<p>这里 仅简单介绍几个较常使用的模块，详细的信息还得要您努力查阅参考书呢!</p>
+
+<ul>
+<li>pam_securetty.so</li>
+</ul>
+
+<p>限制系统管理员 (root) 只能够从安全的 (secure) 终端机登入;那什么是终端机?例如 tty1, tty2 等就是传
+统的终端机装置名称。那么安全的终端机设定呢? 就写在 /etc/securetty 这个文件中。你可以查阅一下该文 件， 就知道为什么 root 可以从
+tty1~tty7 登入，但却无法透过 telnet 登入 Linux 主机了!</p>
+
+<ul>
+<li>pam_nologin.so</li>
+</ul>
+
+<p>这个模块可以限制一般用户是否能够登入主机之用。当 /etc/nologin 这个文件存在时，则所有一般使用者均 无法再登入系统了!若
+/etc/nologin 存在，则一般使用者在登入时， 在他们的终端机上会将该文件的内容 显示出来!所以，正常的情况下，这个文件应该是不能存在系统中的。
+但这个模块对 root 以及已经登入 系统中的一般账号并没有影响。 (注意喔!这与 /etc/nologin.txt 并不相同!)</p>
+
+<ul>
+<li>pam_selinux.so</li>
+</ul>
+
+<p>SELinux 是个针对程序来进行细部管理权限的功能，SELinux 这玩意儿我们会在第十六章的时候再来详细谈论。由于 SELinux
+会影响到用户执行程序的权限，因此我们利用 PAM 模块，将 SELinux 暂时关闭， 等到验证通过后， 再予以启动!</p>
+
+<ul>
+<li>pam_console.so</li>
+</ul>
+
+<p>当系统出现某些问题，或者是某些时刻你需要使用特殊的终端接口 (例如 RS232 之类的终端联机设备) 登 入主机时，
+这个模块可以帮助处理一些文件权限的问题，让使用者可以透过特殊终端接口 (console) 顺利 的登入系统。</p>
+
+<ul>
+<li>pam_loginuid.so</li>
+</ul>
+
+<p>我们知道系统账号与一般账号的 UID 是不同的!一般账号 UID 均大于 1000 才合理。 因此，为了验证使用者的 UID
+真的是我们所需要的数值，可以使用这个模块来进行规范!</p>
+
+<ul>
+<li>pam_env.so</li>
+</ul>
+
+<p>用来设定环境变量的一个模块，如果你有需要额外的环境变量设定，可以参考 /etc/security/pam_env.conf 这 个文件的详细说明。</p>
+
+<ul>
+<li>pam_unix.so</li>
+</ul>
+
+<p>这是个很复杂且重要的模块，这个模块可以用在验证阶段的认证功能，可以用在授权阶段的账号许可证管 理，
+可以用在会议阶段的登录文件记录等，甚至也可以用在密码更新阶段的检验!非常丰富的功能! 这个模块在早期使用得相当频繁喔!</p>
+
+<ul>
+<li>pam_pwquality.so</li>
+</ul>
+
+<p>可以用来检验密码的强度!包括密码是否在字典中，密码输入几次都失败就断掉此次联机等功能，都是这 模块提供的! 最早之前其实使用的是
+pam_cracklib.so 这个模块，后来改成 pam_pwquality.so 这个模块， 但此模块完全兼容于
+pam_cracklib.so，同时提供了 /etc/security/pwquality.conf 这个文件可以额外指定默认 值!比较容易处理修改!</p>
+
+<ul>
+<li>pam_limits.so</li>
+</ul>
+
+<p>还记得ulimit吗？其实那就是这个模块提供的能力!还有更多细部的设定可以参考: /etc/security/limits.conf 内的说明。</p>
+
+<h3 id="其他相关文件">其他相关文件</h3>
+
+<p>我们也知道 PAM 相关的配置文件在 /etc/pam.d ， 说明文件在 /usr/share/doc/pam-(版本) ，模块实际在
+/lib64/security/ 。那么还有没有相关的 PAM 文件呢? 是有 的，主要都在 /etc/security 这个目录内!</p>
+
+<hr />
+
+<ul>
+<li>limits.conf</li>
+</ul>
+
+<p>ulimit 功能中， 除了修改使用者的 ~/.bashrc 配置文件之外，其实系统管理员可 以统一藉由 PAM 来管理的! 那就是
+/etc/security/limits.conf 这个文件的设定了。这个文件的设定 很简单，你可以自行参考一下该文件内容。 我们这里仅作个简单的介绍:</p>
+
+<pre><code>范例一:vbird1 这个用户只能建立 100MB 的文件，且大于 90MB 会警告 [root@study ~]# vim /etc/security/limits.conf
+vbird1 soft fsize 90000
+vbird1 hard fsize 100000
+#账号 限制依据 限制项目 限制值
+# 第一字段为账号，或者是群组!若为群组则前面需要加上 @ ，例如 @projecta 
+# 第二字段为限制的依据，是严格(hard)，还是仅为警告(soft);
+# 第三字段为相关限制，此例中限制文件容量，
+# 第四字段为限制的值，在此例中单位为 KB。
+# 若以 vbird1 登入后，进行如下的操作则会有相关的限制出现!
+
+[vbird1@study ~]$ ulimit -a
+ ....(前面省略)....
+file size (blocks, -f) 90000 
+....(后面省略)....
+
+[vbird1@study ~]$ dd if=/dev/zero of=test bs=1M count=110 File size limit exceeded
+[vbird1@study ~]$ ll --block-size=K test
+-rw-rw-r--. 1 vbird1 vbird1 90000K Jul 22 01:33 test
+# 果然有限制到了
+
+范例二:限制 pro1 这个群组，每次仅能有一个用户登入系统 (maxlogins)
+[root@study ~]# vim /etc/security/limits.conf
+@pro1 hard maxlogins 1
+# 如果要使用群组功能的话，这个功能似乎对初始群组才有效喔!而如果你尝试多个 pro1 的登入时， 
+# 第二个以后就无法登入了。而且在 /var/log/secure 文件中还会出现如下的信息:
+# pam_limits(login:session): Too many logins (max 1) for pro1 
+</code></pre>
+
+<hr />
+
+<ul>
+<li>/var/log/secure, /var/log/messages</li>
+</ul>
+
+<p>PAM 模块都会将数据记载在 /var/log/secure 当中，所以发生了问题请务必到该文件内去查询一下问题点!</p>
+
+<p>转载于:<a href="https://www.cnblogs.com/uetucci/p/7661837.html">https://www.cnblogs.com/uetucci/p/7661837.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

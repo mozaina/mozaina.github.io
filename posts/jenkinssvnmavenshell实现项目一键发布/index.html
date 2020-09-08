@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>JenkinsSVNMavenShell实现项目一键发布 | 开发者问答集锦</title>
+    <meta property="og:title" content="JenkinsSVNMavenShell实现项目一键发布 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="JenkinsSVNMavenShell实现项目一键发布">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/jenkinssvnmavenshell%E5%AE%9E%E7%8E%B0%E9%A1%B9%E7%9B%AE%E4%B8%80%E9%94%AE%E5%8F%91%E5%B8%83/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">JenkinsSVNMavenShell实现项目一键发布</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>转载地址： <a href="http://jdkleo.iteye.com/blog/2159844">http://jdkleo.iteye.com/blog/2159844</a></strong></p>
+
+<p>**<br />
+**</p>
+
+<p><strong>Jenkins+SVN+Maven+Shell</strong></p>
+
+<p><strong>实现项目一键发布</strong></p>
+
+<p><strong>一、前言</strong></p>
+
+<p>众所周知，Jenkins默认情况下可以实现项目更新(通过SVN)，和项目发布，通过（MAVEN插件），但是这种情况下发布到一些容器底下（如Tomcat）时，经过多次发布后JVM会报OutOfMemoryError
+PermGen
+space，这个原因是由于这些容器在覆盖老项目后并不会释放老项目内存永久区的资源，久而久之，导致系统永久区内存溢出。为解决这个问题，我们只有通过发布后重新启动容器才能解决该问题。那有什么办法可以使容器在发布新项目后自动重启呢？重启过程中，我们希望容器正在处理的作业安全完成后（如quartz作业执行完后），容器再重启，如何做到？本文要与大家分享的便是其中一种便利安全的方法。</p>
+
+<p><strong>二、 Jenkins安装与配置</strong></p>
+
+<p>Jenkins是一个开源软件项目，旨在提供一个开放易用的软件平台，使持续集成变成可能。</p>
+
+<p>安装：</p>
+
+<p>官网：<a href="http://jenkins-ci.org/">http://jenkins-ci.org/</a></p>
+
+<p>选择一个操作系统版本的安装，我这边选择的是 Red Hat/Fedora/CentOS版</p>
+
+<p>安装及启动过程：</p>
+
+<p>Ruby代码
+<img src="https://img.it610.com/image/info8/371201db9a6c495dba3413d5401090fa.jpg" alt="收藏代码" /></p>
+
+<ol>
+<li>rpm -ivh jenkins-1.590-1.1.noarch.rpm</li>
+<li>service jenkins start
+
+<br /></li>
+</ol>
+
+<p>访问：</p>
+
+<p>http://:8080/</p>
+
+<p><strong>三、</strong> <strong>Publish Over SSH</strong> <strong>插件安装</strong></p>
+
+<p><img src="https://img.it610.com/image/info8/25112fa3d9984b66a81c89419e346ded.jpg" alt="" /></p>
+
+<p>依次单击“Jenkins-&gt;系统管理-&gt;管理插件”菜单</p>
+
+<p><img src="https://img.it610.com/image/info8/211a820079ad455da7f46ba19e13fab3.png" alt="" /></p>
+
+<p>在可选插件选项卡中找到勾选Publish Over SSH插件，点击界面下方的直接安装按钮。等待jenkins安装完毕即可。</p>
+
+<p><img src="https://img.it610.com/image/info8/35abc34a590b4476be7c60e6180b6c04.png" alt="" /></p>
+
+<p><strong>四、</strong> <strong>Publish Over SSH</strong> <strong>插件配置</strong></p>
+
+<p>全局配置：</p>
+
+<p><img src="https://img.it610.com/image/info8/4295405299f74166a720c4ccd6ba0da9.jpg" alt="" /></p>
+
+<p>依次点开“Jenkins-&gt;系统管理-&gt;系统设置”菜单</p>
+
+<p>找到Publish over SSH配置项，配置如下配置</p>
+
+<p><img src="https://img.it610.com/image/info8/d8ff56b587004e568d760187b68779b9.jpg" alt="" /></p>
+
+<p>底下还有个Test Configuration按钮，点击，如出现Success则表示配置成功。</p>
+
+<p><img src="https://img.it610.com/image/info8/758e5592b5f549b88499ec2d91812120.jpg" alt="" /></p>
+
+<p>最后点击页底的保存按钮，完成配置。</p>
+
+<p><img src="https://img.it610.com/image/info8/0ba853f05a9041e48da9d0aa3aadaa6c.png" alt="" /></p>
+
+<p><strong>五、 创建Jenkins Item</strong></p>
+
+<p>直接点击Jenkins首页的新建按钮，创建一个Maven项目，配置根据大家需要，实际配置，本文仅列出作者的配置，供参考：</p>
+
+<p><img src="https://img.it610.com/image/info8/9f15875c7b4b4e4eb8d45fe9a0d74510.jpg" alt="" /></p>
+
+<p><img src="https://img.it610.com/image/info8/e4197eb517134502964f21563ac03d41.jpg" alt="" /></p>
+
+<p><img src="https://img.it610.com/image/info8/2f1d7fe42ef04eea8feec77a0b1c32cd.jpg" alt="" /><img src="https://img.it610.com/image/info8/f493b9013e9d47beadb88e0f84be0640.jpg" alt="" /><img src="https://img.it610.com/image/info8/67ae648530074fe99f4809054f817b36.jpg" alt="" /></p>
+
+<p>其中Exec
+command的脚本是一个shell文件，放置在远程发布机上后，可执行参数有三个，分别如下，第一个参数必填，后面两个选填，默认值是8080和/save/apache-
+tomcat-7.0.56，大家可以在第六节的SHELL脚本中改成大家项目中自己的默认参数。</p>
+
+<p>Ruby代码
+<img src="https://img.it610.com/image/info8/371201db9a6c495dba3413d5401090fa.jpg" alt="收藏代码" /></p>
+
+<ol>
+<li>./publish.sh [TOMCAT端口] [tomcat安装主目录]</li>
+</ol>
+
+<p><strong>六、 编写Shell脚本</strong></p>
+
+<p>需要在你发布的目标机器上编写该脚本，你也可以在开发环境编好后，放到目标机器上，以下给出我的脚本：</p>
+
+<p>Ruby代码
+<img src="https://img.it610.com/image/info8/371201db9a6c495dba3413d5401090fa.jpg" alt="收藏代码" /></p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>#defined</li>
+<li>TOMCAT_HOME=&ldquo;/save/apache-tomcat-7.0.56&rdquo;</li>
+<li>TOMCAT_PORT=8080</li>
+<li>PROJECT=&ldquo;$1&rdquo;</li>
+<li>#param validate</li>
+<li>if [ $# -lt 1 ]; then</li>
+<li>echo &ldquo;you must use like this : ./publish.sh  [tomcat port] [tomcat home dir]&rdquo;</li>
+<li>exit</li>
+<li>fi</li>
+<li>if [ &ldquo;$2&rdquo; != &ldquo;&rdquo; ]; then</li>
+<li>TOMCAT_PORT=$2</li>
+<li>fi</li>
+<li>if [ &ldquo;$3&rdquo; != &ldquo;&rdquo; ]; then</li>
+<li>TOMCAT_HOME=&ldquo;$3&rdquo;</li>
+<li>fi</li>
+<li>#shutdown tomcat</li>
+<li>&rdquo;$TOMCAT_HOME&rdquo;/bin/shutdown.sh</li>
+<li>echo &ldquo;tomcat shutdown&rdquo;</li>
+<li>#check tomcat process</li>
+<li>tomcat_pid=<code>/usr/sbin/lsof -n -P -t -i :$TOMCAT_PORT</code></li>
+<li>echo &ldquo;current :&rdquo; $tomcat_pid</li>
+<li>while [ -n &ldquo;$tomcat_pid&rdquo; ]</li>
+<li>do</li>
+<li>sleep 5</li>
+<li>tomcat_pid=<code>/usr/sbin/lsof -n -P -t -i :$TOMCAT_PORT</code></li>
+<li>echo &ldquo;scan tomcat pid :&rdquo; $tomcat_pid</li>
+<li>done</li>
+<li>#publish project</li>
+<li>echo &ldquo;scan no tomcat pid,$PROJECT publishing&rdquo;</li>
+<li>rm -rf &ldquo;$TOMCAT_HOME&rdquo;/webapps/$PROJECT*</li>
+<li>cp /save/$PROJECT*.war &ldquo;$TOMCAT_HOME&rdquo;/webapps/$PROJECT.war</li>
+<li>#bak project</li>
+<li>BAK_DIR=/save/bak/$PROJECT/<code>date +%Y%m%d</code></li>
+<li>mkdir -p &ldquo;$BAK_DIR&rdquo;</li>
+<li>cp &ldquo;$TOMCAT_HOME&rdquo;/webapps/$PROJECT.war &ldquo;$BAK<em>DIR&rdquo;/&ldquo;$PROJECT&rdquo;</em><code>date +%H%M%S</code>.war</li>
+<li>#remove tmp</li>
+<li>rm -rf /save/$PROJECT*.war</li>
+<li>#start tomcat</li>
+<li>&rdquo;$TOMCAT_HOME&rdquo;/bin/startup.sh</li>
+<li>echo &ldquo;tomcat is starting,please try to access $PROJECT conslone url&rdquo;</li>
+</ol>
+
+<p>该脚本具有自动安全停Tomcat,自动发布项目，自动备份已发布项目版本的功能。</p>
+
+<p>需要注意的是你连上来的admin用户需要具有执行该文件的权限，如果没有可以</p>
+
+<p>chmod 600(或755) publish.sh</p>
+
+<p>具体权限给多少，根据你们的需要，决定权在你们手上。</p>
+
+<p>如果shell执行出现如下错误，则可能是你在etc/profile中设置了JAVA_HOME，同时您还需要在/etc/bashrc也设置JAVA_HOME。</p>
+
+<p><img src="https://img.it610.com/image/info8/6f92bc90b7594bb3a0262fcaab493afd.png" alt="" /></p>
+
+<p>原因：远程机器的java_home在配置在/etc/profile中的，这个只给shell用户使用的；</p>
+
+<p>但对于ssh 这种非login shell(non-login shell)用户，需要配置在/etc/bashrc中。</p>
+
+<p>参考配置：</p>
+
+<p>Ruby代码
+<img src="https://img.it610.com/image/info8/371201db9a6c495dba3413d5401090fa.jpg" alt="收藏代码" /></p>
+
+<ol>
+<li>export JAVA_HOME=/usr/java/jdk1.6.0_45</li>
+<li>export JAVA_BIN=/usr/java/jdk1.6.0_45/bin</li>
+<li>export PATH=$PATH:$JAVA_HOME/bin</li>
+</ol>
+
+<p>如果以上配置还不能解决你的问题，尝试下去的做法：</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;修改.bash_profile文件开始&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<p>修改.bash_profile文件方式是用户级的，对当前用户可用，其它用户无法使用。这种方式一般用于生产。.bash_profile文件在用户的根目录，比如说www用户的根目录是/home/www。</p>
+
+<p>具体配置如下：</p>
+
+<p>Java代码
+<img src="https://img.it610.com/image/info8/371201db9a6c495dba3413d5401090fa.jpg" alt="收藏代码" /></p>
+
+<ol>
+<li>cd /home/www/</li>
+<li>vim .bash_profile</li>
+</ol>
+
+<p>插入下面3行配置后保存退出：</p>
+
+<p>Ruby代码
+<img src="https://img.it610.com/image/info8/371201db9a6c495dba3413d5401090fa.jpg" alt="收藏代码" /></p>
+
+<ol>
+<li>export JAVA_HOME=/usr/java/jdk1.6.0_45/</li>
+<li>export PATH=$JAVA_HOME/bin:$PATH</li>
+<li>export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+
+<br /></li>
+</ol>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

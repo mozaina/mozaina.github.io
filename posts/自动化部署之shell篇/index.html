@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>自动化部署之shell篇 | 开发者问答集锦</title>
+    <meta property="og:title" content="自动化部署之shell篇 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="自动化部署之shell篇">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2%E4%B9%8Bshell%E7%AF%87/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">自动化部署之shell篇</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="前言">前言</h1>
+
+<p>最近在写一个自动化部署脚本，因为产品涉及到十几个模块，每个模块都需要部署，纯手动部署太繁琐了，同时也很容易出问题，所需急需通过脚本来实现自动化部署，<br />
+主要需求：<br />
+需要通过bat脚本自动化从svn、ftp库中取出各模块包、数据、授权文件等，生成完整的安装部署包，减少人工取包带来的差异性导致的各种问题；<br />
+同时需要通过shell脚本在linux服务器上自动化部署各模块，包括tomcat、war包部署，现场配置修改，数据库备份、更新等，降低部署的复杂度，减少人为漏改错改配置等引发的问题</p>
+
+<p>因为自己之前基本没咋写过bat脚本和shell脚本，linux也仅会一些系统的常规操作命令，所以只能紧急的边学边用，摸石头过河，所幸经过努力后不负所托，基本实现了功能需求，<br />
+现将最近这段时间自己边学边用的bat脚本和shell脚本两部分用到的主要功能和实现方案整理记录，供自己后续查阅，有需要的同学也可以参考</p>
+
+<h1 id="shell篇">shell篇</h1>
+
+<p>shell脚本判断解压成功与否</p>
+
+<pre><code>  unzip -o $src -d $des &gt;/dev/null
+  if [ $? -eq 0 ]; then
+    printAndWrite &quot;info: unzip $src successfully!!&quot;
+  else
+    printAndWrite &quot;error : unzip $src failed , the storage limited ?&quot;
+    #exit
+  fi
+</code></pre>
+
+<p>unzip -o $src -d  d e s 解 压 时 相 同 文 件 直 接 覆 盖 ， &gt; / d e v / n u l l 则 是 通 过 重
+定 向 屏 蔽 了 屏 幕 输 出 内 容 ， des解压时相同文件直接覆盖，&gt;/dev/null则是通过重定向屏蔽了屏幕输出内容，
+des解压时相同文件直接覆盖，&gt;/dev/null则是通过重定向屏蔽了屏幕输出内容，?是获取上条命令执行的退出状态，0表示没有错误，其他任何值表明有错误。</p>
+
+<p>定义函数：实现同时在屏幕输出和输出到文件</p>
+
+<pre><code>time=$(date &quot;+%Y%m%d%H%M%S&quot;)
+#print $info in screen and write in file
+function printAndWrite(){
+  info=$1
+  echo $info
+  echo $info &gt;&gt; deploy_log_package_$time.txt
+}
+</code></pre>
+
+<p>主要是用来记录部署过程中的部署情况，&gt;&gt;是重定向符号，将输出信息转移以追加的方式输出到指定的文件了，如果该文件不存在则会自动创建,&gt;也是重定向符号，区别是覆盖原文件已有内容的方式输出到指定的文件了</p>
+
+<p>shell脚本ftp获取，实现自动从ftp上取资源</p>
+
+<pre><code> wget -r -nH -nd -q ftp://ftpip:21/xxx/ xxx/xxx/--ftp-user=ftpusername --ftp-password=ftppassword
+</code></pre>
+
+<p>shell脚本删除目标文件夹下所有的文件和文件夹（慎重使用，建议备份后操作）</p>
+
+<pre><code>rm -rf $TARGET_DIR/*
+</code></pre>
+
+<p>shell脚本移动目录文件</p>
+
+<pre><code>mv $TARGET_DIR/$module_name $bak_dir
+</code></pre>
+
+<p>扩展：目标目录与原目录一致，指定了新文件名，效果就是仅仅重命名。</p>
+
+<pre><code>mv  /xxx/x.txt   /xxx/y.txt    
+</code></pre>
+
+<p>目标目录与原目录不一致，没有指定新文件名，效果就是仅仅移动。</p>
+
+<pre><code>mv  /xxx/x.txt   /xxx/yyy/
+</code></pre>
+
+<p>目标目录与原目录一致, 指定了新文件名，效果就是：移动 + 重命名。</p>
+
+<pre><code>mv  /xxx/x.txt   /xxx/yyy/y.txt
+</code></pre>
+
+<p>shell脚本复制目录文件</p>
+
+<pre><code>cp xxx/test.war $TARGET_DIR/xxx/
+</code></pre>
+
+<p>shell脚本判断文件夹是或否存在、创建软链接</p>
+
+<pre><code>  if [ ! -d $TARGET_DIR/tomcat-9.0.16 ];
+  then
+      ln -s $TARGET_DIR/tomcat-9.0.16 $TARGET_DIR/tomcat
+      printAndWrite &quot;create link $TARGET_DIR/xxxln successfully&quot;
+  fi
+</code></pre>
+
+<p>软链接的好处：其他操作可以基于软链接来执行，后续如源文件因版本升级等原因需变更，则只需要修改软链接即可，其他基于软链接的可以不动</p>
+
+<p>shell脚本层级创建目录</p>
+
+<pre><code>mkdir -p xxx/xxx
+</code></pre>
+
+<p>shell脚本判断文件是否存在</p>
+
+<pre><code>  if [ -a xxx/xxx.war ];
+  then
+    printAndWrite &quot;xxx war is exist&quot;
+  fi
+</code></pre>
+
+<p>shell脚本判断文件夹是否为空</p>
+
+<pre><code>    data_files=`ls $DIR/xxx`
+    if [ ! -z &quot;$data_files&quot; ];
+    then
+        printAndWrite &quot;xxx data is exist&quot;
+    fi
+</code></pre>
+
+<p>shell脚本for循环</p>
+
+<pre><code>for i in $DIR/xxx/*.zip;
+do 
+    unzip -o $i  -d $TARGET_DIR/xxx;
+done
+</code></pre>
+
+<p>shell脚本解压tar包到指定目录</p>
+
+<pre><code>tar zvxf $DIR/xxx/xxx.tar.gz -C $TARGET_DIR/xxx/
+</code></pre>
+
+<p>shell脚本读取文件中的值</p>
+
+<pre><code>MYSQL_USER=`sed '/^MYSQL_USER=/!d;s/.*=//' $DIR/file.txt`
+</code></pre>
+
+<p>shell脚本替换ip和端口</p>
+
+<pre><code>sed -ri &quot;s/(http:\/\/)([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+)/\1$TESTIP:8899/g&quot; $data_xml
+</code></pre>
+
+<p>查找mysql安装目录</p>
+
+<pre><code>MYSQL_DIR=&quot;$( ps -aux | grep mysqld | awk '{print$11}'| grep mysqld | sed 's/\/mysqld//' )&quot;
+</code></pre>
+
+<p>shell脚本备份数据库、执行sql语句</p>
+
+<pre><code>    $MYSQL_DIR/mysqldump -u$MYSQL_USER -p$MYSQL_PWD -h 127.0.0.1 test_db &gt; /xxx/bk.sql
+    $MYSQL_DIR/mysql -u$MYSQL_USER -p$MYSQL_PWD -h 127.0.0.1 -e 'create database if not exists test_db_bkb'
+    $MYSQL_DIR/mysql -u$MYSQL_USER -p$MYSQL_PWD -h 127.0.0.1 test_db_bkb &lt; /xxx/bk.sql
+</code></pre>
+
+<p>shell脚本查找文件并获取查找结果，实现同时在屏幕输出和输出到文件</p>
+
+<pre><code>    return_str=`grep -n &quot;ERROR&quot; log.txt`
+    if [ ! -z &quot;$return_str&quot; ]
+    then
+        printAndWrite &quot;$return_str&quot;
+    fi
+</code></pre>
+
+<p>注意语句被·· 包含，这个字符不是常用的单引号，在 Esc 键下边。</p>
+
+<p>shell脚本开机自启动，在该脚本加上下面的语句，该脚本即可开机自启动</p>
+
+<pre><code>      chmod +x $0
+      chmod +x /etc/rc.d/rc.local
+
+      filename=$(basename ${0})
+      inlocal=$(cat /etc/rc.d/rc.local | grep $filename)
+      if [ ! -n &quot;$inlocal&quot; ]; then
+        echo &quot;$cur_path/$filename &gt; /tmp/$filename.log&quot; &gt;&gt; /etc/rc.d/rc.local
+        echo &quot;success add $(basename ${0}) to rc.local&quot;
+      else
+        echo 'success inited'
+      fi
+      exit 0
+</code></pre>
+
+<p>shell脚本根据端口判断进程是或否启动成功</p>
+
+<pre><code>function port_is_started(){
+  port=$1
+  COUNT=0
+  while [ $COUNT -lt 1 ]; do    
+    echo -e &quot;.\c&quot;
+    sleep 1 
+    COUNT=`netstat -anp|grep $port | grep LISTEN | awk '{print $7}' | wc -l`
+    if [ $COUNT -gt 0 ]; then
+        break
+    fi
+  done
+
+  echo &quot;$port is started!&quot;
+}
+</code></pre>
+
+<p>shell脚本根据端口后杀进程</p>
+
+<pre><code>function stop_by_port(){
+    port=$1
+    pid=$(netstat -nlp | grep :$port | awk '{print $7}' | awk -F&quot;/&quot; '{ print $1 }');
+    if [  -n  &quot;$pid&quot;  ];  then
+        kill  -9  $pid;
+        sleep 2
+    fi
+}
+</code></pre>
+
+<p>shell脚本定时执行任务，如定时执行清理大文件或者其他操作<br />
+交互式，适用于所有用户</p>
+
+<pre><code>crontab -e   
+</code></pre>
+
+<p>然后输入i即可进入编辑模式，增加命令：</p>
+
+<pre><code>22 * * * * sh /xxx/clear.sh &gt;&gt; /xxx/clear.sh
+</code></pre>
+
+<p>自动化，直接修改/etc/crontab文件，仅适用于root用户</p>
+
+<pre><code>22 * * * * sh /xxx/clear.sh &gt;&gt; /xxx/clear.sh
+</code></pre>
+
+<p>shell脚本大日志文件自动拆分，避免系统长时间运行后部分日志文件过大塞满空间导致系统异常<br />
+在etc/logrotate.d目录下放置配置文件</p>
+
+<pre><code>tomcat_catalina
+/xxx/tomcat-9.0.16/logs/catalina.out {
+daily
+rotate 7
+missingok
+dateext
+compress
+notifempty
+copytruncate
+}
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

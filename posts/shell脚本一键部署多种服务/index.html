@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本一键部署多种服务 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本一键部署多种服务 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本一键部署多种服务">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E4%B8%80%E9%94%AE%E9%83%A8%E7%BD%B2%E5%A4%9A%E7%A7%8D%E6%9C%8D%E5%8A%A1/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本一键部署多种服务</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>通过一个实验案例来说明shell脚本一键部署多种服务的方法。</p>
+
+<h1 id="实验场景">实验场景</h1>
+
+<p>初创公司是一家新成立的创业公司， 公司根据业务需求准备部署一个小型网络， 包含四<br />
+台服务器和若干客户机。考虑到后期需要在全国多个城市开分公司， 公司希望通过 Shell 的方式， 可以在不同的分支机构进行快速复制现有网络。</p>
+
+<h1 id="实验拓扑">实验拓扑</h1>
+
+<p><a href="https://img.it610.com/image/info8/545f3092921746d1b63e4fd54b62ae78.jpg"><img src="https://img.it610.com/image/info8/545f3092921746d1b63e4fd54b62ae78.jpg" alt="shell脚本一键部署多种服务_第1张图片" /></a></p>
+
+<h1 id="实验要求">实验要求</h1>
+
+<p><strong>在管理员 PC 上编写 Shell 脚本， 实现一键部署。 实现以下项目需求：</strong></p>
+
+<ol>
+<li>分别部署防火墙、 DHCP 服务器、 DNS 服务器和 FTP 服务器</li>
+<li>防火墙使用 Firewalld 服务， 并允许来自内网客户端（ 172.16.1.0/24） 对服务器的访问。同时防火墙作为公司的边界设备， 要允许内网客户端（ 172.16.1.0/24） 对互联网web服务器的访问。</li>
+<li>Firewalld 上配置 DHCP 中继服务， 使内网客户端（ 172.16.1.0/24） 可以动态获取由 DHCP服务器分配的 IP 地址。</li>
+<li>内网客户端（ 172.16.1.0/24） 可以通过 DNS Server 解析 bdqn.com 中的域名。</li>
+<li>网客户端（ 192.168.1.0/24） 可以通过被动模式以匿名身份访问 FTP Server， 并且具备上<br />
+传、 下载、 修改目录以及删除权限</li>
+</ol>
+
+<h1 id="实现步骤">实现步骤</h1>
+
+<h3 id="配置ssh免密访问">配置SSH免密访问</h3>
+
+<p>在管理员PC上生成秘钥对</p>
+
+<pre><code>ssh-keygen 
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/3a11989895314b20b90d395a533569f4.jpg"><img src="https://img.it610.com/image/info8/3a11989895314b20b90d395a533569f4.jpg" alt="shell脚本一键部署多种服务_第2张图片" /></a><br />
+为了可以将管理员PC上生成的公钥上传到其他网段的服务器，需要在网关服务器(firewalld)开启 <strong>路由转发</strong> 功能和 <strong>地址伪装</strong></p>
+
+<pre><code>echo &quot;1&quot; &gt; /proc/sys/net/ipv4/ip_forward  #路由转发
+firewall-cmd --add-masquerade   #地址伪装
+</code></pre>
+
+<p>上传公钥至其他服务器<br />
+命令<code>ssh-copy-id IP地址</code><br />
+<a href="https://img.it610.com/image/info8/24b379a179e9498d9eebf0c80f69de1d.jpg"><img src="https://img.it610.com/image/info8/24b379a179e9498d9eebf0c80f69de1d.jpg" alt="shell脚本一键部署多种服务_第3张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/e39e33a5e79640e1b8dd8fa52a1d6f2a.jpg"><img src="https://img.it610.com/image/info8/e39e33a5e79640e1b8dd8fa52a1d6f2a.jpg" alt="shell脚本一键部署多种服务_第4张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/9d2bb52e224c4c139917ea990236891f.jpg"><img src="https://img.it610.com/image/info8/9d2bb52e224c4c139917ea990236891f.jpg" alt="shell脚本一键部署多种服务_第5张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/56cd80b7ec5845378e7926fe6144dad7.jpg"><img src="https://img.it610.com/image/info8/56cd80b7ec5845378e7926fe6144dad7.jpg" alt="shell脚本一键部署多种服务_第6张图片" /></a><br />
+验证免密连接<br />
+<a href="https://img.it610.com/image/info8/051482a498fa4a1980f115b5b5cdfaad.jpg"><img src="https://img.it610.com/image/info8/051482a498fa4a1980f115b5b5cdfaad.jpg" alt="网关服务器" /></a><br />
+<a href="https://img.it610.com/image/info8/71eb8f99803b462b8b50117605568a4c.jpg"><img src="https://img.it610.com/image/info8/71eb8f99803b462b8b50117605568a4c.jpg" alt="DHCP服务器" /></a><br />
+<a href="https://img.it610.com/image/info8/cd7f1d8a66f441549d2a5059d54cf792.jpg"><img src="https://img.it610.com/image/info8/cd7f1d8a66f441549d2a5059d54cf792.jpg" alt="DNS服务器" /></a><br />
+<a href="https://img.it610.com/image/info8/cf550451451d43f897f7e414fc639be7.jpg"><img src="https://img.it610.com/image/info8/cf550451451d43f897f7e414fc639be7.jpg" alt="FTP服务器" /></a></p>
+
+<h3 id="编写-main-sh-脚本-并完成调试-最终执行的脚本">编写<code>main.sh</code>脚本，并完成调试(最终执行的脚本)</h3>
+
+<pre><code>#!/bin/bash
+Admin_IP=172.16.1.10
+FW_IP=172.16.1.2
+DHCP_Server_IP=192.168.1.10
+DHCP_relay_IP=172.16.1.2
+DNS_Server_IP=192.168.1.20
+FTP_Server_IP=192.168.1.30
+
+source ./firewall.sh
+source ./yum.sh
+source ./dhcp.sh
+source ./dhcrelay.sh
+source ./dns.sh
+source ./ftp.sh
+</code></pre>
+
+<p>赋予可执行权限<br />
+<code>chmod +x main.sh</code></p>
+
+<h3 id="编写-firewall-sh-脚本-并完成调试">编写<code>firewall.sh</code>脚本，并完成调试</h3>
+
+<pre><code>#!/bin/bash
+FW_cmd=&quot;ssh $FW_IP&quot;
+route=`$FW_cmd cat /proc/sys/net/ipv4/ip_forward`
+if test $route != 0
+then
+$FW_cmd &quot;echo 1 &gt; /proc/sys/net/ipv4/ip_forward&quot;
+echo &quot;route on firewall is open&quot;
+fi
+$FW_cmd firewall-cmd  --zone=internal --query-interface=ens33 &amp;&gt; /dev/null
+if test $? != 0
+then
+$FW_cmd ferewall-cmd --permanent --zone=internal --add-interface=ens33 &amp;&gt; /dev/null
+fi
+
+$FW_cmd firewall-cmd  --zone=dmz --query-interface=ens37 &amp;&gt; /dev/null
+if test $? != 0
+then
+$FW_cmd firewall-cmd --permanent --zone=dmz --add-interface=ens37 &amp;&gt; /dev/null
+fi
+$FW_cmd firewall-cmd  --zone=external --query-interface=ens38 &amp;&gt; /dev/null
+if test $? != 0
+then
+$FW_cmd firewall-cmd --permanent --zone=external --add-interface=ens38 &amp;&gt; /dev/null
+fi
+
+#ftp
+$FW_cmd firewall-cmd --permanent --direct --query-rule ipv4 filter FORWARD_direct 0 -p tcp  --dport 21 -m conntrack --ctstate NEW -j ACCEPT &amp;&gt; /dev/null
+if test $? != 0
+then
+$FW_cmd firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD_direct 0 -p tcp  --dport 21 -m conntrack --ctstate NEW -j ACCEPT &amp;&gt; /dev/null
+fi
+$FW_cmd firewall-cmd --permanent --direct --query-rule ipv4 filter FORWARD_direct 0 -p tcp  --dport 20000:20100 -m conntrack --ctstate NEW -j ACCEPT &amp;&gt; /dev/null
+if test $? != 0
+then
+$FW_cmd firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD_direct 0 -p tcp  --dport 20000:20100 -m conntrack --ctstate NEW -j ACCEPT &amp;&gt; /dev/null     
+fi
+#ssh
+$FW_cmd firewall-cmd --permanent --direct --query-rule ipv4 filter FORWARD_direct 0 -p tcp --dport 22 -j ACCEPT &amp;&gt; /dev/null
+if test $? != 0
+then
+$FW_cmd firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD_direct 0 -p tcp --dport 22 -j ACCEPT &amp;&gt; /dev/null
+fi
+#dns
+$FW_cmd firewall-cmd --permanent --direct --query-rule ipv4 filter FORWARD_direct 0 -p udp  --dport 53 -m conntrack --ctstate NEW -j ACCEPT &amp;&gt; /dev/null
+if test $? != 0
+then
+$FW_cmd firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD_direct 0 -p udp  --dport 53 -m conntrack --ctstate NEW -j ACCEPT &amp;&gt; /dev/null
+fi
+#端口转发
+$FW_cmd firewall-cmd --permanent --zone=external --query-forward-port=port=22:proto=tcp:toport=22:toaddr=$Admin_IP &amp;&gt; /dev/null
+if test $? != 0
+then
+$FW_cmd firewall-cmd --permanent --zone=external --add-forward-port=port=22:proto=tcp:toport=22:toaddr=$Admin_IP &amp;&gt; /dev/null
+fi
+$FW_cmd firewall-cmd --reload &amp;&gt; /dev/null
+echo &quot;firewalld rules are ok!&quot;
+</code></pre>
+
+<p>赋予可执行权限<br />
+<code>chmod +x firewall.sh</code></p>
+
+<h3 id="编写-yum-sh-脚本-并完成调试">编写<code>yum.sh</code>脚本，并完成调试</h3>
+
+<p>在编写完后，一定要现将每一台服务器上<code>/etc/yum.repos.d/</code>目录下的文件手动移动到其他目录，如：<br />
+<code>cd /etc/yum.repos.d</code><br />
+<code>mkdir repo</code><br />
+<code>mv * repo</code><br />
+以下是脚本内容：</p>
+
+<pre><code>#!/bin/bash
+ServerIP=&quot;$FW_IP $DHCP_Server_IP $DNS_Server_IP $FTP_Server_IP&quot;
+for i in $ServerIP
+do
+cmd=&quot;ssh $i&quot;
+$cmd 'df | grep /dev/cdrom' &gt; /dev/null
+if test $? == 0
+then
+        $cmd 'umount /dev/cdrom' &amp;&gt; /dev/null
+        $cmd 'umount /mnt' &amp;&gt; /dev/null
+fi
+        $cmd 'mount /dev/cdrom /mnt' &amp;&gt; /dev/null
+$cmd 'echo &quot;[local]&quot; &gt;&gt; /etc/yum.repos.d/local.repo'
+$cmd 'echo &quot;name=local&quot; &gt;&gt; /etc/yum.repos.d/local.repo'
+$cmd 'echo &quot;baseurl=file:///mnt&quot; &gt;&gt; /etc/yum.repos.d/local.repo'
+$cmd 'echo &quot;enabled=1&quot; &gt;&gt; /etc/yum.repos.d/local.repo'
+$cmd 'echo &quot;gpgcheck=0&quot; &gt;&gt; /etc/yum.repos.d/local.repo'
+$cmd 'yum clean all' &amp;&gt; /dev/null
+$cmd 'yum makecache' &amp;&gt; /dev/null
+if test $? == 0
+then
+        echo &quot;yum is ok($i)&quot;
+else
+        echo &quot;yum is failed($i)&quot;
+fi
+done
+</code></pre>
+
+<p>赋予可执行权限<br />
+<code>chmod +x yum.sh</code></p>
+
+<h3 id="编写-dhcp-sh-脚本-并完成调试">编写<code>dhcp.sh</code>脚本，并完成调试</h3>
+
+<pre><code>#!/bin/bash
+DHCP_Server_cmd=&quot;ssh $DHCP_Server_IP&quot;
+$DHCP_Server_cmd &quot;rpm -qa | grep dhcp-4&quot; &amp;&gt; /dev/null
+if [ $? -eq 0 ]
+then
+        $DHCP_Server_cmd yum -y remove dhcp &amp;&gt; /dev/null
+fi
+
+
+$DHCP_Server_cmd yum -y install dhcp &amp;&gt; /dev/null
+if [ $? -eq 0 ]
+then
+$DHCP_Server_cmd 'echo &quot;subnet 172.16.1.0 netmask 255.255.255.0 {&quot; &gt;&gt; /etc/dhcp/dhcpd.conf'
+$DHCP_Server_cmd 'echo &quot;range 172.16.1.100 172.16.1.200;&quot; &gt;&gt; /etc/dhcp/dhcpd.conf'
+$DHCP_Server_cmd ' echo &quot;option domain-name-servers 192.168.1.20;&quot; &gt;&gt; /etc/dhcp/dhcpd.conf‘
+$DHCP_Server_cmd 'echo &quot;option routers 172.16.1.2;&quot; &gt;&gt; /etc/dhcp/dhcpd.conf'
+$DHCP_Server_cmd 'echo &quot;}&quot; &gt;&gt; /etc/dhcp/dhcpd.conf'
+$DHCP_Server_cmd 'echo &quot;subnet 192.168.1.0 netmask 255.255.255.0 {}&quot; &gt;&gt; /etc/dhcp/dhcpd.conf'
+$DHCP_Server_cmd systemctl enable firewalld &amp;&gt; /dev/null
+$DHCP_Server_cmd systemctl restart firewalld &amp;&gt; /dev/null
+$DHCP_Server_cmd firewall-cmd --permanent --zone=public --query-service=dhcp &amp;&gt; /dev/null
+if test $? != 0
+then
+$DHCP_Server_cmd firewall-cmd --permanent --add-service=dhcp &amp;&gt; /dev/null
+$DHCP_Server_cmd firewall-cmd --reload &amp;&gt; /dev/null
+fi
+
+$DHCP_Server_cmd systemctl enable dhcpd &amp;&gt; /dev/null
+$DHCP_Server_cmd systemctl restart dhcpd &amp;&gt; /dev/null
+    if test $? != 0
+    then
+        echo &quot;dhcpd boot error!&quot;
+    else
+        echo &quot;DHCP Server is ok&quot;
+    fi
+else
+echo &quot;dhcp install error!!!&quot;
+fi
+</code></pre>
+
+<p>赋予可执行权限<br />
+<code>chmod +x dhcp.sh</code></p>
+
+<h3 id="编写-dhcrelay-sh-脚本-并完成调试">编写<code>dhcrelay.sh</code>脚本，并完成调试</h3>
+
+<pre><code>#!/bin/bash
+DHCP_relay_cmd=&quot;ssh $DHCP_relay_IP&quot;
+$DHCP_relay_cmd &quot;rpm -qa | grep dhcp-4&quot; &amp;&gt; /dev/null
+if [ $? -eq 0 ]
+then
+        $DHCP_relay_cmd yum -y remove dhcp &amp;&gt; /dev/null
+fi
+$DHCP_relay_cmd yum -y install dhcp &amp;&gt; /dev/null
+$DHCP_relay_cmd &quot;sed -i 's/--no-pid/&amp; 192.168.1.10/' /usr/lib/systemd/system/dhcrelay.service&quot;
+$DHCP_relay_cmd systemctl enable dhcrelay &amp;&gt; /dev/null
+$DHCP_relay_cmd systemctl start dhcrelay &amp;&gt; /dev/null
+if [ $? -eq 0 ]
+then
+        echo &quot;dhcrelay is ok!&quot;
+else
+        echo &quot;dhcrelay boot error!&quot;
+fi
+</code></pre>
+
+<p>赋予可执行权限<br />
+<code>chmod +x dhcrelay.sh</code></p>
+
+<h3 id="编写-dns-sh-脚本-并完成调试">编写<code>dns.sh</code>脚本，并完成调试</h3>
+
+<pre><code>#!/bin/bash
+DNS_Server_cmd=&quot;ssh $DNS_Server_IP&quot;
+$DNS_Server_cmd &quot;rpm -qa | grep '^bind-9'&quot; &amp;&gt; /dev/null
+if [ $? -eq 0 ]
+then
+    $DNS_Server_cmd yum -y remove bind &amp;&gt; /dev/null
+fi
+$DNS_Server_cmd 'yum -y install bind*' &amp;&gt; /dev/null
+$DNS_Server_cmd sed -i 's/127.0.0.1/any/g' /etc/named.conf
+$DNS_Server_cmd sed -i 's/localhost/any/g' /etc/named.conf
+$DNS_Server_cmd sed -i 's/\&quot;\.\&quot;/\&quot;bdqn.com\&quot;/g' /etc/named.conf
+$DNS_Server_cmd sed -i 's/hint/master/g' /etc/named.conf
+$DNS_Server_cmd sed -i 's/named.ca/bdqn.zone/g' /etc/named.conf
+$DNS_Server_cmd touch /var/named/bdqn.zone
+$DNS_Server_cmd chown root.named /var/named/bdqn.zone
+$DNS_Server_cmd 'echo &quot;\$TTL 1D&quot; &gt;&gt; /var/named/bdqn.zone'
+$DNS_Server_cmd 'echo &quot;@    IN  SOA bdqn.com.  admin.bdqn.com.  (200 1H 15M 1W 1D)&quot; &gt;&gt; /var/named/bdqn.zone'
+$DNS_Server_cmd 'echo &quot;@        IN  NS  www.bdqn.com.&quot; &gt;&gt; /var/named/bdqn.zone'
+$DNS_Server_cmd 'echo &quot;www  IN  A   192.168.1.20&quot; &gt;&gt; /var/named/bdqn.zone'
+$DNS_Server_cmd 'echo &quot;dhcp IN  A   192.168.1.10&quot; &gt;&gt; /var/named/bdqn.zone'
+$DNS_Server_cmd 'echo &quot;ftp  IN  A   192.168.1.30&quot; &gt;&gt; /var/named/bdqn.zone'
+$DNS_Server_cmd 'echo &quot;dns  IN  A   192.168.1.20&quot; &gt;&gt; /var/named/bdqn.zone'
+$DNS_Server_cmd systemctl enable firewalld &amp;&gt; /dev/null
+$DNS_Server_cmd systemctl restart firewalld &amp;&gt; /dev/null
+$DNS_Server_cmd firewall-cmd --permanent --zone=public --query-service=dns &amp;&gt; /dev/null
+if test $? != 0
+then
+$DNS_Server_cmd firewall-cmd --permanent --zone=public --add-service=dns &amp;&gt; /dev/null
+$DNS_Server_cmd firewall-cmd --reload
+fi
+$DNS_Server_cmd systemctl  enable named &amp;&gt; /dev/null
+$DNS_Server_cmd systemctl restart named &amp;&gt; /dev/null
+if test $? != 0
+then
+    echo named boot error
+else
+    echo named is ok
+fi
+</code></pre>
+
+<p>赋予可执行权限<br />
+<code>chmod +x dns.sh</code></p>
+
+<h3 id="编写-ftp-sh-脚本-并完成调试">编写<code>ftp.sh</code>脚本，并完成调试</h3>
+
+<pre><code>#!/bin/bash
+FTP_Server_cmd=&quot;ssh $FTP_Server_IP&quot;
+$FTP_Server_cmd 'rpm -qa | grep vsftpd' &amp;&gt; /dev/null
+if [ $? -eq 0 ]
+then
+    $FTP_Server_cmd yum -y remove vsftpd &amp;&gt; /dev/null
+fi
+$FTP_Server_cmd yum -y install vsftpd &amp;&gt; /dev/null
+# 备份原配置文件
+$FTP_Server_cmd &quot;mv /etc/vsftpd/vsftpd.conf /etc/vsftpd/vsftpd.conf_bak&quot;
+$FTP_Server_cmd 'grep -v &quot;#&quot; /etc/vsftpd/vsftpd.conf_bak &gt; /etc/vsftpd/vsftpd.conf'
+# 修改配置文件
+$FTP_Server_cmd 'echo &quot;anon_umask=022&quot; &gt;&gt; /etc/vsftpd/vsftpd.conf'
+$FTP_Server_cmd 'echo &quot;anon_upload_enable=YES&quot; &gt;&gt; /etc/vsftpd/vsftpd.conf'
+$FTP_Server_cmd 'echo &quot;anon_mkdir_write_enable=YES&quot; &gt;&gt; /etc/vsftpd/vsftpd.conf'
+$FTP_Server_cmd 'echo &quot;anon_other_write_enable=YES&quot; &gt;&gt; /etc/vsftpd/vsftpd.conf'
+$FTP_Server_cmd 'echo &quot;pasv_max_port=20100&quot; &gt;&gt; /etc/vsftpd/vsftpd.conf'
+$FTP_Server_cmd 'echo &quot;pasv_min_port=20000&quot; &gt;&gt; /etc/vsftpd/vsftpd.conf'
+
+$FTP_Server_cmd chmod  777 /var/ftp/pub/
+$FTP_Server_cmd systemctl enable firewalld &amp;&gt; /dev/null
+$FTP_Server_cmd systemctl restart firewalld &amp;&gt; /dev/null
+$FTP_Server_cmd firewall-cmd --permanent --zone=public --query-service=ftp &amp;&gt; /dev/null
+if test $? != 0
+then
+$FTP_Server_cmd firewall-cmd --permanent --add-service=ftp &amp;&gt; /dev/null
+$FTP_Server_cmd firewall-cmd --reload &amp;&gt; /dev/null
+fi
+$FTP_Server_cmd systemctl enable vsftpd &amp;&gt; /dev/null
+$FTP_Server_cmd systemctl restart vsftpd &amp;&gt; /dev/null
+if [ $? -eq 0 ]
+then
+    echo &quot;ftp is ok!&quot;
+else
+    echo &quot;ftp boot error!&quot;
+fi
+</code></pre>
+
+<p>赋予可执行权限<br />
+<code>chmod +x ftp.sh</code></p>
+
+<h3 id="运行-main-sh-脚本实现一键部署">运行<code>main.sh</code>脚本实现一键部署</h3>
+
+<p><code>./main.sh</code><br />
+运行结果：<br />
+<a href="https://img.it610.com/image/info8/e3ef9d8e32164737b7ce7a01ede155ec.jpg"><img src="https://img.it610.com/image/info8/e3ef9d8e32164737b7ce7a01ede155ec.jpg" alt="shell脚本一键部署多种服务_第7张图片" /></a><br />
+从运行结果看，所有服务已经部署成功<br />
+<strong>提示：</strong> 如果在运行脚本的过程中出现报错，可执行<code>bash -x mian.sh</code>命令来显示详细过程来查看具体错误<br />
+为了验证一键部署是否成功，在服务器上进行查看<br />
+<a href="https://img.it610.com/image/info8/d9cb0ec9228a4703a4d5ecf89d5a83e8.jpg"><img src="https://img.it610.com/image/info8/d9cb0ec9228a4703a4d5ecf89d5a83e8.jpg" alt="DHCP服务器" /></a><br />
+<a href="https://img.it610.com/image/info8/322d5c88ddf048b397fe46dd61943f60.jpg"><img src="https://img.it610.com/image/info8/322d5c88ddf048b397fe46dd61943f60.jpg" alt="DNS服务器" /></a><br />
+<a href="https://img.it610.com/image/info8/5e8bdb9d7f8f4f8fbf488ec78a88e2ea.jpg"><img src="https://img.it610.com/image/info8/5e8bdb9d7f8f4f8fbf488ec78a88e2ea.jpg" alt="FTP服务器" /></a><br />
+服务正常都启动了，就说明yum也成功了</p>
+
+<h1 id="验证">验证</h1>
+
+<h3 id="验证内网访问外网">验证内网访问外网</h3>
+
+<p><a href="https://img.it610.com/image/info8/820a0414753846d296c53152728ba62e.jpg"><img src="https://img.it610.com/image/info8/820a0414753846d296c53152728ba62e.jpg" alt="内网访问外网" /></a><br />
+成功从内部客户机访问到外网</p>
+
+<h3 id="验证dhcp">验证DHCP</h3>
+
+<p><a href="https://img.it610.com/image/info8/cd43c2ba315543ed9d965dacb878a51d.jpg"><img src="https://img.it610.com/image/info8/cd43c2ba315543ed9d965dacb878a51d.jpg" alt="shell脚本一键部署多种服务_第8张图片" /></a><br />
+已成功获取到DHCP服务器分发的地址</p>
+
+<h3 id="验证dns">验证DNS</h3>
+
+<p><a href="https://img.it610.com/image/info8/ae2c32e73cd440a4b515245bf4639ad3.jpg"><img src="https://img.it610.com/image/info8/ae2c32e73cd440a4b515245bf4639ad3.jpg" alt="shell脚本一键部署多种服务_第9张图片" /></a><br />
+内部客户机可以成功解析服务器的地址</p>
+
+<h3 id="验证ftp">验证FTP</h3>
+
+<p><a href="https://img.it610.com/image/info8/4dd7f2a93f58469985f7986be1ac4eb1.jpg"><img src="https://img.it610.com/image/info8/4dd7f2a93f58469985f7986be1ac4eb1.jpg" alt="shell脚本一键部署多种服务_第10张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/d9382618875c4f8a8e2bf11d4d548fd7.jpg"><img src="https://img.it610.com/image/info8/d9382618875c4f8a8e2bf11d4d548fd7.jpg" alt="shell脚本一键部署多种服务_第11张图片" /></a><br />
+FTP验证成功。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

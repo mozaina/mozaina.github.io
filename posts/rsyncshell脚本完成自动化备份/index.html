@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>rsyncshell脚本完成自动化备份 | 开发者问答集锦</title>
+    <meta property="og:title" content="rsyncshell脚本完成自动化备份 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="rsyncshell脚本完成自动化备份">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/rsyncshell%E8%84%9A%E6%9C%AC%E5%AE%8C%E6%88%90%E8%87%AA%E5%8A%A8%E5%8C%96%E5%A4%87%E4%BB%BD/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">rsyncshell脚本完成自动化备份</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>因为知识有些零碎所以认真看，我们还是首先介绍一下什么是 <strong>rsync</strong> ？</p>
+
+<p><strong>rsync</strong> 是linux系统下的数据镜像备份工具。使用快速增量备份工具Remote
+Sync可以远程同步，支持本地复制，或者与其他SSH、rsync主机同步。Rsync其实是一个远程数据同步工具，可通过LAN/WAN快速同步多台主机间的文件。rsync使用所谓的“rsync算法”来使本地和远程两个主机之间的文件达到同步，这个算法只传送两个文件的不同部分，而不是每次都整份传送，因此速度相当快。
+rsync是一个功能非常强大的工具，其命令也有很多功能特色选项。</p>
+
+<p><strong>它的特性如下：</strong></p>
+
+<p>可以镜像保存整个目录树和文件系统。</p>
+
+<p>可以很容易做到保持原来文件的权限、时间、软硬链接等等。</p>
+
+<p>无须特殊权限即可安装。</p>
+
+<p>快速：第一次同步时 rsync 会复制全部内容，但在下一次只传输修改过的文件。rsync
+在传输数据的过程中可以实行压缩及解压缩操作，因此可以使用更少的带宽。</p>
+
+<p>安全：可以使用scp、ssh等方式来传输文件，当然也可以通过直接的socket连接。</p>
+
+<p>支持匿名传输，以方便进行网站镜象。</p>
+
+<p><strong>准备阶段：(客户端和服务端)</strong></p>
+
+<p>[root@1 ~]# <strong>cat /etc/redhat-release</strong> #查看系统版本</p>
+
+<p>CentOS Linux release 7.2.1511 (Core)</p>
+
+<p>[root@1 ~]# <strong>uname -r</strong> #查看系统内核版本</p>
+
+<p>3.10.0-327.el7.x86_64</p>
+
+<p>[root@1 ~]# <strong>uname -m</strong> #查看系统是否64位</p>
+
+<p>x86_64</p>
+
+<p><a href="https://img.it610.com/image/info8/1be5cd1c0a6547059b86c9f42d55490d.png"><img src="https://img.it610.com/image/info8/1be5cd1c0a6547059b86c9f42d55490d.png" alt="rsync+shell脚本完成自动化备份_第1张图片" /></a></p>
+
+<p>首先我们还是做服务之前先把奇葩的防火墙给关掉，因为很多规则会撞到墙，注意是服务端和客户端都要做这个操作</p>
+
+<p>[root@1 ~]# <strong>iptables -F</strong></p>
+
+<p>[root@1 ~]# <strong>iptables -X</strong></p>
+
+<p>[root@1 ~]# <strong>iptables -Z</strong></p>
+
+<p>[root@1 ~]# <strong>iptables -L</strong></p>
+
+<p>[root@1 ~]# <strong>setenforce 0</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/713032b86b2a40e697ff38286c1ae6f7.png"><img src="https://img.it610.com/image/info8/713032b86b2a40e697ff38286c1ae6f7.png" alt="rsync+shell脚本完成自动化备份_第2张图片" /></a></p>
+
+<p>[root@1 ~]# <strong>vi /etc/sysconfig/selinux</strong> #修改SELINUX</p>
+
+<p><a href="https://img.it610.com/image/info8/716efca967934406a0b90691c174186d.png"><img src="https://img.it610.com/image/info8/716efca967934406a0b90691c174186d.png" alt="rsync+shell脚本完成自动化备份_第3张图片" /></a></p>
+
+<p>首先两个虚拟机，一个是客户端一个是服务端</p>
+
+<p>[root@1 ~]# <strong>yum -y install rsync</strong> #安装rsync服务</p>
+
+<p><img src="https://img.it610.com/image/info8/3bbca8e76d254e6ebf0141691316b989.png" alt="" /></p>
+
+<p>[root@1 ~]# <strong>systemctl start rsyncd.service</strong></p>
+
+<p>[root@1 ~]# <strong>systemctl enable rsyncd.service</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/aca6b6897b844e56b7bd9d0bddcd3c6a.jpg"><img src="https://img.it610.com/image/info8/aca6b6897b844e56b7bd9d0bddcd3c6a.jpg" alt="" /></a></p>
+
+<p>[root@1 ~]# <strong>netstat -lnp|grep 873</strong> #检查是否已经成功启动</p>
+
+<p><a href="https://img.it610.com/image/info8/9e1ea3c67cbb4490876bd11d12870819.jpg"><img src="https://img.it610.com/image/info8/9e1ea3c67cbb4490876bd11d12870819.jpg" alt="" /></a></p>
+
+<p>[root@1 lala]# <strong>vi /root/lala/11.txt</strong> #为了测试我创建了一个TxT记事本</p>
+
+<p><img src="https://img.it610.com/image/info8/d866fd9c1dc1401fa747dc3dfac2fe1d.png" alt="" /></p>
+
+<p>[root@1 lala]# **scp -r /ro ot/lala/11.txt root@192.168.139.20:/root/ **
+#远程被文件传输过去</p>
+
+<p><a href="https://img.it610.com/image/info8/5b804a5bed0b494fb0a392be26e320bd.jpg"><img src="https://img.it610.com/image/info8/5b804a5bed0b494fb0a392be26e320bd.jpg" alt="" /></a></p>
+
+<p>然后我们切换到服务端看一下</p>
+
+<p><a href="https://img.it610.com/image/info8/35d97b7663314c6db9e62c7df52e1a14.png"><img src="https://img.it610.com/image/info8/35d97b7663314c6db9e62c7df52e1a14.png" alt="" /></a></p>
+
+<p>然后我们把服务端这个txt文件给删除，我们再用一种不需要密码的方式来进行传输。</p>
+
+<p>[root@02 ~]# <strong>rm -rfv 11.txt</strong></p>
+
+<p><img src="https://img.it610.com/image/info8/e2e96f40d5d54aadab68c22dc80b77f4.png" alt="" /></p>
+
+<p>为了让两个linux机器之间使用ssh不需要用户名和密码。所以采用了数字签名RSA或者DSA来完成这个操作。客户端和服务端都要进行接下来的步骤</p>
+
+<p>[root@1 ~]# <strong>ssh-keygen</strong> #客户端生成密钥</p>
+
+<p>[root@2 ~]# <strong>ssh-keygen</strong> #服务端生成密钥</p>
+
+<p><a href="https://img.it610.com/image/info8/3379e009ebab46309044a6437a8073f7.png"><img src="https://img.it610.com/image/info8/3379e009ebab46309044a6437a8073f7.png" alt="rsync+shell脚本完成自动化备份_第4张图片" /></a></p>
+
+<p>[root@1 ~]# <strong>cat /root/.ssh/id_rsa.pub</strong></p>
+
+<p>[root@2 ~]# <strong>cat /root/.ssh/id_rsa.pub</strong></p>
+
+<p>两个节点都执行操作：#ssh-keygen然后全部回车,采用默认值.</p>
+
+<p><a href="https://img.it610.com/image/info8/9ee887b360f24d2d9cc2fc0a7a183e43.jpg"><img src="https://img.it610.com/image/info8/9ee887b360f24d2d9cc2fc0a7a183e43.jpg" alt="" /></a></p>
+
+<p>[root@1 ~]# <strong>vi /root/.ssh/authorized_keys</strong></p>
+
+<p>[root@1 ~]# <strong>vi /root/.ssh/authorized_keys</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/5ba2c61262eb46798341a92618231771.jpg"><img src="https://img.it610.com/image/info8/5ba2c61262eb46798341a92618231771.jpg" alt="" /></a></p>
+
+<p>[root@1 ~]# **scp -r /root/lala/11.txt root@192.168.139.20:/root/ **
+#我们再从客户端尝试一次发现没有了密码这就已经成功了</p>
+
+<p><img src="https://img.it610.com/image/info8/932961953b7e4b60979d146b5045dc38.jpg" alt="" /></p>
+
+<p>回到服务端发现文档已经传过来了</p>
+
+<p><a href="https://img.it610.com/image/info8/dbebd9cee39a4ae9b1c7b70b96fc8b35.jpg"><img src="https://img.it610.com/image/info8/dbebd9cee39a4ae9b1c7b70b96fc8b35.jpg" alt="" /></a></p>
+
+<p>本着作死的节奏，我们删除了这个文档再来一个定时脚本尝试一下</p>
+
+<p><img src="https://img.it610.com/image/info8/fbc6c1b9ea5041b9b0a67004ab11b66b.png" alt="" /></p>
+
+<p>[root@1 ~]# <strong>vi copy.sh</strong></p>
+
+<p><strong>#!/bin/bash</strong></p>
+
+<p><strong>scp -r /root/lala/11.txt root@192.168.139.20:/root/</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/a03be2dfd9aa42179b01f4d6cf8afad2.jpg"><img src="https://img.it610.com/image/info8/a03be2dfd9aa42179b01f4d6cf8afad2.jpg" alt="" /></a></p>
+
+<p>[root@1 ~]# <strong>cat copy.sh</strong> #我们看一下脚本的权限</p>
+
+<p><a href="https://img.it610.com/image/info8/442414ca9a90437db54f1d33619cab5b.jpg"><img src="https://img.it610.com/image/info8/442414ca9a90437db54f1d33619cab5b.jpg" alt="" /></a></p>
+
+<p>[root@1 ~]# <strong>chmod 777 copy.sh</strong> #感觉权限有点低，给它一个权限。</p>
+
+<p><a href="https://img.it610.com/image/info8/5ed45e3496cb4f2cbb8abec939e6ec69.jpg"><img src="https://img.it610.com/image/info8/5ed45e3496cb4f2cbb8abec939e6ec69.jpg" alt="rsync+shell脚本完成自动化备份_第5张图片" /></a></p>
+
+<p>[root@1 ~]# <strong>./copy.sh</strong> #首先测试一下脚本看看好用不</p>
+
+<p><img src="https://img.it610.com/image/info8/54941249a02541fdb77a98f23e5b2073.jpg" alt="" /></p>
+
+<p>[root@02 ~]# <strong>ls</strong> #发现已经有txt了</p>
+
+<p><a href="https://img.it610.com/image/info8/0c3f5fbc55ab4f9b9d7cf53cc209782f.jpg"><img src="https://img.it610.com/image/info8/0c3f5fbc55ab4f9b9d7cf53cc209782f.jpg" alt="" /></a></p>
+
+<p>定时脚本就涉及到一个目录crontab，还是先介绍一下 <strong>crontab文件的含义：</strong></p>
+
+<p>用户所建立的crontab文件中，每一行都代表一项任务，每行的每个字段代表一项设置，它的格式共分为六个字段，前五段是时间设定段，第六段是要执行的命令段，格式如下：</p>
+
+<p>minute hour day month week command</p>
+
+<p>其中：</p>
+
+<p>minute： 表示分钟，可以是从0到59之间的任何整数。</p>
+
+<p>hour：表示小时，可以是从0到23之间的任何整数。</p>
+
+<p>day：表示日期，可以是从1到31之间的任何整数。</p>
+
+<p>month：表示月份，可以是从1到12之间的任何整数。</p>
+
+<p>week：表示星期几，可以是从0到7之间的任何整数，这里的0或7代表星期日。</p>
+
+<p>command：要执行的命令，可以是系统命令，也可以是自己编写的脚本文件。</p>
+
+<p><a href="https://img.it610.com/image/info8/61db4c3607864a54bb590323ce7fd577.jpg"><img src="https://img.it610.com/image/info8/61db4c3607864a54bb590323ce7fd577.jpg" alt="rsync+shell脚本完成自动化备份_第6张图片" /></a></p>
+
+<p>[root@1 ~]# <strong>crontab -e</strong> #编辑该用户的计时器设置；</p>
+
+<p><img src="https://img.it610.com/image/info8/50555473b82445e69fd6cb5cb84dd130.png" alt="" /></p>
+
+<p>*** * * * * bash /root/copy.sh** 我设置的是每分钟都会去运行一下这个脚本</p>
+
+<p><img src="https://img.it610.com/image/info8/3bb0eb9228004d05bc74742a45da04eb.png" alt="" /></p>
+
+<p>[root@1 ~]# <strong>crontab -l</strong> #-l：列出该用户的计时器设置；</p>
+
+<ul>
+<li>* * * * bash /root/copy.sh</li>
+</ul>
+
+<p><a href="https://img.it610.com/image/info8/d208b164b866443ca0d866264e15fa50.jpg"><img src="https://img.it610.com/image/info8/d208b164b866443ca0d866264e15fa50.jpg" alt="" /></a></p>
+
+<p>定时做好后我们去服务端看一下</p>
+
+<p><a href="https://img.it610.com/image/info8/482722a358e44e22a43581ab822d73d9.jpg"><img src="https://img.it610.com/image/info8/482722a358e44e22a43581ab822d73d9.jpg" alt="" /></a></p>
+
+<p>果真做好了，大功告成</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

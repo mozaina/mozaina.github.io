@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linuxshell自动化检测网络与端口联通情况 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linuxshell自动化检测网络与端口联通情况 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linuxshell自动化检测网络与端口联通情况">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E8%87%AA%E5%8A%A8%E5%8C%96%E6%A3%80%E6%B5%8B%E7%BD%91%E7%BB%9C%E4%B8%8E%E7%AB%AF%E5%8F%A3%E8%81%94%E9%80%9A%E6%83%85%E5%86%B5/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linuxshell自动化检测网络与端口联通情况</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<blockquote>
+<p>背景：我们某个机房交换机需要替换，替换完成后，我们也需要校验主机和服务的连通性。以前只测某个主机时，测网络的话就ping一下，测端口的话就telnet一下。现在机器多起来，挨个敲命令就太麻烦了。花了一点时间写了一个通用脚本，现在分享一下。</p>
+</blockquote>
+
+<p>分享脚本前先普及一下，脚本里核心的原理和方法</p>
+
+<h1 id="测试网络">测试网络</h1>
+
+<p>测试网络，我们都会用ping，但是linux默认情况下ping会一直进行（windows是默认4次），所以查阅一下ping命令的参数（ping
+-h），可以发现用-c参数指定ping的次数。<br />
+另外ping命令执行后，执行$?会返回值0（成功），ping有异常时，继续执行$?会返回值&gt;0(异常)。简单的代码如下：</p>
+
+<pre><code>HOST=8.8.8.8
+ping -c 4 &quot;$HOST&quot;  ##这里设置4次，参考windows默认值
+echo $?
+</code></pre>
+
+<h1 id="测试端口">测试端口</h1>
+
+<p>测试端口，我们一般都会用telnet，但是telnet貌似没有次数或时长的参数。我这里用的nc命令来测试。nc有个-
+t参数可以设置超时时长，-z参数是只用于扫描测试（我理解就是不会影响原服务），执行nc命令后，也用$?来检测结果是否有异常。简单代码如下：</p>
+
+<pre><code>HOST=8.8.8.8
+PORT=8080
+nc -w 10 -z $HOST $PORT ##-w设置超时时长10秒
+echo $?
+</code></pre>
+
+<h2 id="自动化多ip-多端口测试脚本">自动化多IP，多端口测试脚本</h2>
+
+<p>好了，放大招了~~脚本注释直接写脚本里了，不影响执行哦<br />
+vi net_check.sh</p>
+
+<pre><code>#! /bin/bash
+# 这一段代码实现：用户可以自己指定待扫描的列表文件，不指定的话，默认找同级目录的net.list文件。
+ARGS_NUM=$#
+if [ $ARGS_NUM -eq 0 ]; then
+  LIST=&quot;net.list&quot;
+elif [ $ARGS_NUM -eq 1 ]; then
+  LIST=$1
+  [ ! -f $LIST ] &amp;&amp; echo &quot;File[$LIST] does not exists !&quot; &amp;&amp; exit 1
+else
+  echo &quot;Usage net_check.sh [net_list_file]&quot; &amp;&amp; exit 1
+fi
+
+#这一段代码是实现通用日志打印，后面日志打印直接调用，不用辣么麻烦拼日期什么啦~~
+#参考java的log4j，可能有的机器不支持printf命令
+#如果对输出格式无所谓的话，用echo也一样的
+#FUNCTION
+log(){
+  if [ $# -eq 2 ];then
+    printf &quot;%-5s `date '+%F %T'` $2\n&quot; ${1^^}
+  else
+    printf &quot;%-5s `date '+%F %T'` $*\n&quot; INFO
+  fi
+}
+
+#这一段代码是实现测试网络的，原理见文章里
+#FUNCTION
+ping_check(){
+  HOST=$1
+  log &quot;Ping check : $HOST&quot;
+  ping -c 4 &quot;$HOST&quot; &gt; /dev/null
+  if [ $? -eq 0 ];then
+    log &quot;Ping $HOST successfully&quot;
+  else
+    log &quot;ERROR&quot; &quot;Ping $HOST failed&quot;
+  fi
+}
+
+#这一段代码是实现测试端口的，原理见文章里
+#FUNCTION
+port_check(){
+  HOST=${1%%&quot; &quot;*}  ##根据空格，截取前者。也可以用awk等命令实现
+  PORT=${1##*&quot; &quot;}  ##根据空格，截取后者。
+  log &quot;Port check : $HOST $PORT&quot;
+  nc -w 10 -z $HOST $PORT &gt; /dev/null
+  if [ $? -eq 0 ];then
+    log &quot;Port $HOST $PORT successfully&quot;
+  else
+    log &quot;ERROR&quot; &quot;Port $HOST $PORT failed&quot;
+  fi
+}
+
+#真正的执行在这里啦~~
+#MAIN
+cat $LIST|grep -v &quot;#&quot;|while read line  #剔除带#注释的行
+do
+  NET=`echo ${line##&quot; &quot;}`  #ltrim
+  NET=`echo ${NET%%&quot; &quot;}`   #rtrim
+  [ -z &quot;$NET&quot; ] &amp;&amp; continue  #ignore null line
+  NET_PARA_NUM=`echo &quot;$NET&quot;|awk -F[&quot; &quot;]+ '{print NF}'`  #判断有几个参数
+  if [ $NET_PARA_NUM -eq 1 ]; then
+    ping_check &quot;$NET&quot;
+  elif [ $NET_PARA_NUM -eq 2 ]; then
+    port_check &quot;$NET&quot;
+  else
+    log error &quot;Please make sure your config\&quot;$line\&quot; with the format\&quot;HOST [PORT]\&quot;&quot; 
+  fi
+done
+</code></pre>
+
+<p>vi net.list</p>
+
+<pre><code>#test ping
+8.8.8.8
+10.1.1.1
+#test port
+10.1.1.1 21
+10.1.1.1 21 80
+</code></pre>
+
+<p>测试结果展示：</p>
+
+<pre><code>INFO  2019-08-29 14:43:48 Ping check : 8.8.8.8
+INFO  2019-08-29 14:43:51 Ping 8.8.8.8 successfully
+INFO  2019-08-29 14:43:51 Port check : 10.1.1.1 21
+ERROR 2019-08-29 14:43:51 Port 10.1.1.1 21 failed
+ERROR 2019-08-29 14:43:51 Please make sure your config&quot;10.1.1.1 21 80&quot; with the format&quot;HOST [PORT]&quot;
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

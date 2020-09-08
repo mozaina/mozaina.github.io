@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell学习之运维用的telnet小脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell学习之运维用的telnet小脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell学习之运维用的telnet小脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%BF%90%E7%BB%B4%E7%94%A8%E7%9A%84telnet%E5%B0%8F%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell学习之运维用的telnet小脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>生活中经常遇到的一件事情我想是，领导给你一堆IP，让你去telnet测试下网络连通性，这时候你就需要写一个shell小脚本去高效的执行了。以下是我在生产环境上试验过的，不一定是最优的代码，当我想应该也够用了。</p>
+
+<p>共有两种情况：<br />
+第一种情况是每个IP的端口都不固定</p>
+
+<pre><code>IPs_Port.txt 存放的文件是
+192.168.1.1 4949
+192.168.2.3 9090
+
+
+cat IPs_Port.txt | while read line  #这里只有存放在文件里面 while才能逐行读取，如果直接写成列表，那读取出来就一排。这个可以自己试验下或者用我的代码直接执行试验
+do
+(sleep 1) | telnet $line &gt;&gt; telnet_result.txt
+done
+cat telnet_result.txt | grep &quot;Connected to&quot; | awk -F &quot; &quot; '{print $3}' | cut -d '.' 1,2,3,4 &gt; telnet_alive.txt   #注意cut的强大功能
+cat IPs_Port.txt | awk -F &quot; &quot; '{print $2}' &gt; IPS.txt
+cat IPS.txt telnet_alive.txt | sort | uniq -u &gt; telnet_die.txt  #去重，导入telnet_die.txt，最后查看这个文件，就是失败的IP
+</code></pre>
+
+<p>附：验证<br />
+A=’<br />
+192.168.1.1 4949<br />
+192.168.2.3 9090<br />
+’<br />
+echo $A | while read line<br />
+do<br />
+echo $line<br />
+done</p>
+
+<p><strong>cut介绍：</strong><br />
+cut 按列切分文件，你可以指定分隔每列的定界符。在cut的术语中，每列都是一个字段，就是有时候说第一列，可能表述称第一个字段。<br />
+ <strong>实战：</strong><br />
+假设有文件data.txt,格式如下<br />
+NO Name Mark Percent<br />
+1 Sarath 45 90<br />
+2 Alex 49 98<br />
+3 Anu 45 90</p>
+
+<p>分隔符（定界符）为Tab 制表符<br />
+如果我要取得第二列，所有人的名称，有什么好的办法吗？此时cut该大显身手了。<br />
+ <strong>1. 取得2,3列 即name,和mark</strong></p>
+
+<blockquote>
+<p>cut –f 2,3 data.txt<br />
+ <strong>2. 取得除第3列以外所有列</strong><br />
+ $cut –f3 –complement data.txt<br />
+ <strong>3. 采取其他定界符，可以用-d改变。</strong><br />
+ 假设data_comma.txt：<br />
+NO,Name,Mark,Percent<br />
+1,Sarath,45,90<br />
+2,Alex,49,98<br />
+3,Anu,45,90<br />
+则：<br />
+cut –f2 -d&rdquo;,&rdquo; data_comma.txt</p>
+</blockquote>
+
+<p><strong>用法：cut [选项]&hellip; [文件]&hellip;</strong><br />
+从每个文件中输出指定部分到标准输出。<br />
+长选项必须使用的参数对于短选项时也是必需使用的。<br />
+-b, &ndash;bytes=列表 只选中指定的这些字节<br />
+-c, &ndash;characters=列表 只选中指定的这些字符<br />
+-d, &ndash;delimiter=分界符 使用指定分界符代替制表符作为区域分界<br />
+-f, &ndash;fields=列表 只选中指定的这些域；并打印所有不包含分界符的<br />
+行，除非-s 选项被指定<br />
+-n (忽略)<br />
+--complement 补全选中的字节、字符或域<br />
+-s, &ndash;only-delimited 不打印没有包含分界符的行<br />
+--output-delimiter=字符串 使用指定的字符串作为输出分界符，默认采用输入<br />
+的分界符<br />
+--help 显示此帮助信息并退出<br />
+--version 显示版本信息并退出</p>
+
+<p>仅使用f -b, -c 或-f 中的一个。每一个列表都是专门为一个类别作出的，或者您可以用逗号隔<br />
+开要同时显示的不同类别。您的输入顺序将作为读取顺序，每个仅能输入一次。<br />
+每种参数格式表示范围如下：<br />
+N 从第1 个开始数的第N 个字节、字符或域<br />
+N- 从第N 个开始到所在行结束的所有字符、字节或域<br />
+N-M 从第N 个开始到第M 个之间(包括第M 个)的所有字符、字节或域<br />
+-M 从第1 个开始到第M 个之间(包括第M 个)的所有字符、字节或域</p>
+
+<p>当没有文件参数，或者文件不存在时，从标准输入读取<br />
+ <strong>解读：</strong><br />
+ <strong>1.取得某一列的字符或者字节 可以用-c， -b等</strong><br />
+ <strong>2.可以取得某个范围</strong><br />
+ <strong>1和2综合例子：</strong><br />
+有文件range_data.txt，内容如下<br />
+abcdefghijklmnopqrstuvwxyz<br />
+abcdefghijklmnopqrstuvwxyz<br />
+abcdefghijklmnopqrstuvwxyz<br />
+abcdefghijklmnopqrstuvwxyz<br />
+<strong>运行：$cut range_data.txt -c-2</strong><br />
+打印字符1-2列<br />
+再复杂一点：<br />
+ <strong>$cut range_data.txt -c1-3,6-9 &ndash;output-delimiter &ldquo;,&rdquo;</strong><br />
+打印1-3行，6-9行，并且用逗号分隔。</p>
+
+<p><strong>分开解释</strong></p>
+
+<pre><code>&gt;cat telnet_result.txt | grep &quot;Connected to&quot;   #过滤telnet通的地址，你发现没有，这个结果IP后面有个点。我们先把IP取出来
+Connected to 192.168.1.1.
+&gt;cat telnet_result.txt | grep &quot;Connected to&quot; | awk -F &quot; &quot; '{print $3}'  #awk取出来 IP
+192.168.1.1.
+&gt;cat telnet_result.txt | grep &quot;Connected to&quot; | awk -F &quot; &quot; '{print $3}' | cut -d '.' 1,2,3,4  #这时候用强大的cut 把最后一个点去掉。  为什么非要去掉这个点呢，因为下面我们要做文件比较，去重有这个点的话，默认是不重复的。（机器比较笨，所以你的把这个点去掉。）
+192.168.1.1
+</code></pre>
+
+<p>**<br />
+第二种固定的端口方式：以下用8080端口举例，只写部分。**</p>
+
+<pre><code>PORT=8080
+count=0
+for i in (cat )
+do
+    ((count++))  #累加
+    #echo &quot;count=$count&quot;
+    (sleep 1) | telnet $i $PORT &gt; telnet_result.txt
+done
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

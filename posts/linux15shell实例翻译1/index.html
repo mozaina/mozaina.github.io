@@ -1,0 +1,1773 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux15Shell实例翻译1 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux15Shell实例翻译1 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux15Shell实例翻译1">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux15shell%E5%AE%9E%E4%BE%8B%E7%BF%BB%E8%AF%911/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux15Shell实例翻译1</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="转自">转自</h1>
+
+<p><a href="http://www.intuitive.com/wicked/wicked-cool-shell-script-library.shtml">http://www.intuitive.com/wicked/wicked-cool-shell-script-library.shtml</a></p>
+
+<p>先抄下来，后面有空慢慢加中文注释。</p>
+
+<h1 id="inpath-sh">inpath.sh</h1>
+
+<pre><code>#!/bin/sh
+# inpath - verify that a specified programis either valid as-is,
+#  or can be found in the PATH directory list.
+
+in_path()
+{
+  #given a command and the PATH, try to find the command. Returns
+  # 0if found and executable, 1 if not. Note that this temporarily modifies
+  #the IFS (input field seperator), but restores it upon completion.
+
+ cmd=$1        path=$2         retval=1
+ oldIFS=$IFS   IFS=&quot;:&quot;
+
+  fordirectory in $path
+  do
+   if [ -x $directory/$cmd ] ; then
+     retval=0      # if we're here, wefound $cmd in $directory
+   fi
+ done
+ IFS=$oldIFS
+ return $retval
+}
+
+checkForCmdInPath()
+{
+ var=$1
+
+  #The variable slicing notation in the following conditional
+  #needs some explanation: ${var#expr} returns everything after
+  #the match for 'expr' in the variable value (if any), and
+  #${var%expr} returns everything that doesn't match (in this
+  #case just the very first character. You can also do this in
+  #Bash with ${var:0:1} and you could use cut too: cut -c1
+
+  if[ &quot;$var&quot; != &quot;&quot; ] ; then
+    if [ &quot;${var%${var#?}}&quot; =&quot;/&quot; ] ; then
+     if [ ! -x $var ] ; then
+       return 1
+     fi
+   elif ! in_path $var $PATH ; then
+     return 2
+   fi
+  fi
+}
+
+if [ $# -ne 1 ] ; then
+ echo&quot;Usage: $0 command&quot; &gt;&amp;2 ; exit 1
+fi
+
+checkForCmdInPath &quot;$1&quot;
+case $? in
+  0 )echo &quot;$1 found in PATH&quot;                            ;;
+  1 )echo &quot;$1 not found or not executable&quot;  ;;
+  2 )echo &quot;$1 not found in PATH&quot;            ;;
+esac
+
+exit 0
+</code></pre>
+
+<h1 id="validalnum-sh">validalnum.sh</h1>
+
+<pre><code>#!/bin/sh
+# validalAlphaNum - Ensures that input onlyconsists of alphabetical
+#              and numeric characters.
+
+validAlphaNum()
+{
+  #validate arg: returns 0 if all upper+lower+digits, 1 otherwise
+
+  #Remove all unacceptable chars
+ compressed=&quot;$(echo $1 | sed -e 's/[^[:alnum:]]//g')&quot;
+
+  if[ &quot;$compressed&quot; != &quot;$input&quot; ] ; then
+   return 1
+  else
+   return 0
+  fi
+}
+
+# Sample usage of this function in a script
+
+echo -n &quot;Enter input: &quot;
+read input
+
+if ! validAlphaNum &quot;$input&quot; ;then
+ echo &quot;Your input must consist of only letters and numbers.&quot;&gt;&amp;2
+ exit 1
+else
+ echo &quot;Input is valid.&quot;
+fi
+
+exit 0
+</code></pre>
+
+<h1 id="normdate-sh"><strong>normdate.sh</strong></h1>
+
+<pre><code>#!/bin/sh
+# normdate - Normalizes month field in datespecification
+#   to three letters, first letter capitalized. A helper
+#   function for hack #7, validdate. Exits w/ zero if no error.
+
+monthnoToName()
+{
+  #sets the variable 'month' to the appropriate value
+ case $1 in
+    1) month=&quot;Jan&quot;    ;;  2 ) month=&quot;Feb&quot;    ;;
+    3) month=&quot;Mar&quot;    ;;  4 ) month=&quot;Apr&quot;    ;;
+    5) month=&quot;May&quot;    ;;  6 ) month=&quot;Jun&quot;    ;;
+    7) month=&quot;Jul&quot;    ;;  8 ) month=&quot;Aug&quot;    ;;
+    9) month=&quot;Sep&quot;    ;;  10) month=&quot;Oct&quot;    ;;
+   11) month=&quot;Nov&quot;   ;;  12) month=&quot;Dec&quot;    ;;
+    *) echo &quot;$0: Unknown numeric month value $1&quot; &gt;&amp;2; exit 1
+  esac
+  return 0
+}
+
+## Begin main script
+
+if [ $# -eq 1 ] ; then  # try to compensate for / or - formats
+  set-- $(echo $1 | sed 's/[\/\-]/ /g')
+fi
+
+if [ $# -ne 3 ] ; then
+ echo &quot;Usage: $0 month day year&quot; &gt;&amp;2
+ echo &quot;Typical input formats are August 3 1962 and 8 3 2002&quot;&gt;&amp;2
+ exit 1
+fi
+
+if [ $3 -lt 99 ] ; then
+ echo&quot;$0: expected four-digit year value.&quot; &gt;&amp;2; exit 1
+fi
+
+if [ -z $(echo $1|sed 's/[[:digit:]]//g')]; then
+ monthnoToName $1
+else
+  #normalize to first three letters, first upper, rest lowercase
+ month=&quot;$(echo $1|cut -c1|tr '[:lower:]' '[:upper:]')&quot;
+ month=&quot;$month$(echo $1|cut -c2-3 | tr '[:upper:]' '[:lower:]')&quot;
+fi
+
+echo $month $2 $3
+
+exit 0
+</code></pre>
+
+<h1 id="nicenumber-sh">nicenumber.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# nicenumber - given a number, show it withcomma separated values
+#   expects DD and TD to be instantiated. instantiates nicenum
+#   or, if a second arg is specified, the output is echoed to stdout
+
+nicenumber()
+{
+  #Note that we use the '.' as the decimal separator for parsing
+  #the INPUT value to this script. The output value is as specified
+  #by the user with the -d flag, if different from a '.'
+
+ integer=$(echo $1 | cut -d. -f1)            #left of the decimal
+ decimal=$(echo $1 | cut -d. -f2)           #right of the decimal
+
+  if[ $decimal != $1 ]; then
+    #there's a fractional part, let's include it.
+   result=&quot;${DD:=&quot;.&quot;}$decimal&quot;
+  fi
+
+ thousands=$integer
+
+ while [ $thousands -gt 999 ]; do
+   remainder=$(($thousands % 1000))        #three least significant digits
+
+   while [ ${#remainder} -lt 3 ] ; do      #force leading zeroes as needed
+     remainder=&quot;0$remainder&quot;
+   done
+
+   thousands=$(($thousands / 1000)) #to left of remainder, if any
+   result=&quot;${TD:=&quot;,&quot;}${remainder}${result}&quot;       # builds right-to-left
+ done
+
+ nicenum=&quot;${thousands}${result}&quot;
+  if[ ! -z $2 ] ; then
+   echo $nicenum
+  fi
+}
+
+DD=&quot;.&quot;     # decimal point delimiter, between integer &amp; fractionalvalue
+TD=&quot;,&quot;      # thousands delimiter, separates every three digits
+
+while getopts &quot;d:t:&quot; opt; do
+ case $opt in
+    d) DD=&quot;$OPTARG&quot; ;;
+    t) TD=&quot;$OPTARG&quot;   ;;
+ esac
+done
+
+shift $(($OPTIND - 1))
+
+if [ $# -eq 0 ] ; then
+  cat&lt;&lt; &quot;EOF&quot; &gt;&amp;2
+Usage: $(basename $0) [-d c] [-t c] numericvalue
+      -d specifies the decimal point delimiter (default '.')
+      -t specifies the thousands delimiter (default ',')
+EOF
+ exit 1
+fi
+
+nicenumber $1 1               # second arg forces this to 'echo' output
+
+exit 0
+</code></pre>
+
+<h1 id="validint-sh">validint.sh</h1>
+
+<pre><code>#!/bin/sh
+# validint - validate integer input, allownegative ints too
+
+validint()
+{
+  #validate first field. Optionally test against min value $2 and/or
+  #max value $3: if you'd rather skip these tests, send &quot;&quot; as values.
+  #returns 1 for error, 0 for success.
+
+ number=&quot;$1&quot;;          min=&quot;$2&quot;;            max=&quot;$3&quot;
+
+  if[ -z $number ] ; then
+   echo &quot;You didn't enter anything. Unacceptable.&quot; &gt;&amp;2 ;return 1
+  fi
+
+  if[ &quot;${number%${number#?}}&quot; = &quot;-&quot; ] ; then        # first char '-' ?
+   testvalue=&quot;${number#?}&quot;      #all but first character
+ else
+   testvalue=&quot;$number&quot;
+  fi
+
+ nodigits=&quot;$(echo $testvalue | sed 's/[[:digit:]]//g')&quot;
+
+  if[ ! -z $nodigits ] ; then
+   echo &quot;Invalid number format! Only digits, no commas, spaces,etc.&quot; &gt;&amp;2
+   return 1
+  fi
+
+  if[ ! -z $min ] ; then
+   if [ &quot;$number&quot; -lt &quot;$min&quot; ] ; then
+      echo &quot;Your value is too small: smallest acceptable value is$min&quot; &gt;&amp;2
+      return 1
+   fi
+  fi
+  if[ ! -z $max ] ; then
+    if [ &quot;$number&quot; -gt &quot;$max&quot; ] ; then
+      echo &quot;Your value is too big: largest acceptable value is $max&quot;&gt;&amp;2
+      return 1
+    fi
+  fi
+ return 0
+}
+
+# uncomment these lines to test, but bewarethat it'll break Hack #6
+# because Hack #6 wants to source this fileto get the validint()
+# function. :-)
+
+# if validint &quot;$1&quot; &quot;$2&quot;&quot;$3&quot; ; then
+#  echo &quot;That input is a valid integer value within yourconstraints&quot;
+# fi
+</code></pre>
+
+<h1 id="validfloat-sh">validfloat.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# validfloat - test whether a number is avalid floating point value.
+#   Note that this cannot accept scientific (1.304e5) notation.
+
+# To test whether an entered value is avalid floating point number, we
+# need to split the value at the decimalpoint, then test the first part
+# to see if it's a valid integer, then thesecond part to see if it's a
+# valid &gt;=0 integer, so -30.5 is valid,but -30.-8 isn't.
+
+. 005-validint.sh                 # source the validint function
+
+validfloat()
+{
+ fvalue=&quot;$1&quot;
+
+  if[ ! -z $(echo $fvalue | sed 's/[^.]//g') ] ; then
+
+   decimalPart=&quot;$(echo $fvalue | cut -d. -f1)&quot;
+   fractionalPart=&quot;$(echo $fvalue | cut -d. -f2)&quot;
+
+   if [ ! -z $decimalPart ] ; then
+     if ! validint &quot;$decimalPart&quot; &quot;&quot; &quot;&quot; ; then
+       return 1
+     fi
+   fi
+
+   if [ &quot;${fractionalPart%${fractionalPart#?}}&quot; = &quot;-&quot; ]; then
+     echo &quot;Invalid floating point number: '-' not allowed \
+         afterdecimal point&quot; &gt;&amp;2
+     return 1
+   fi
+   if [ &quot;$fractionalPart&quot; != &quot;&quot; ] ; then
+     if ! validint &quot;$fractionalPart&quot; &quot;0&quot; &quot;&quot; ;then
+       return 1
+     fi
+   fi
+
+   if [ &quot;$decimalPart&quot; = &quot;-&quot; -o -z $decimalPart ] ;then
+     if [ -z $fractionalPart ] ; then
+       echo &quot;Invalid floating point format.&quot; &gt;&amp;2 ; return 1
+     fi
+   fi
+
+ else
+   if [ &quot;$fvalue&quot; = &quot;-&quot; ] ; then
+     echo &quot;Invalid floating point format.&quot; &gt;&amp;2 ; return 1
+   fi
+
+   if ! validint &quot;$fvalue&quot; &quot;&quot; &quot;&quot; ; then
+     return 1
+   fi
+  fi
+
+ return 0
+}
+
+if validfloat $1 ; then
+ echo &quot;$1 is a valid floating point value&quot;
+fi
+
+exit 0
+</code></pre>
+
+<h1 id="valid-date-sh">valid-date.sh</h1>
+
+<pre><code>#!/bin/sh
+# valid-date - validate date, taking intoaccount leap year rules
+
+normdate=&quot;./003-normdate.sh&quot;     # hack #3 for normalizing month name
+
+exceedsDaysInMonth()
+{
+  #given a month name, return 0 if the specified day value is
+  #less than or equal to the max days in the month, 1 otherwise
+
+ case $(echo $1|tr '[:upper:]' '[:lower:]') in
+   jan* ) days=31    ;;  feb* ) days=28    ;;
+   mar* ) days=31    ;;  apr* ) days=30    ;;
+   may* ) days=31    ;;  jun* ) days=30    ;;
+   jul* ) days=31    ;;  aug* ) days=31    ;;
+   sep* ) days=30    ;;  oct* ) days=31    ;;
+   nov* ) days=30    ;;  dec* ) days=31    ;;
+    *) echo &quot;$0: Unknown month name $1&quot; &gt;&amp;2; exit 1
+  esac
+
+   if[ $2 -lt 1 -o $2 -gt $days ] ; then
+    return 1
+  else
+    return 0 # all is well
+   fi
+}
+
+isLeapYear()
+{   
+  #this function returns 0 if a leap year, 1 otherwise
+  #The formula for checking whether a year is a leap year is:
+  #1. years divisible by four are leap years, unless..
+  #2. years also divisible by 100 are not leap years, except...
+  #3. years divisible by 400 are leap years
+
+ year=$1
+  if[ &quot;$((year % 4))&quot; -ne 0 ] ; then
+   return 1 # nope, not a leap year
+ elif [ &quot;$((year % 400))&quot; -eq 0 ] ; then
+   return 0 # yes, it's a leap year
+ elif [ &quot;$((year % 100))&quot; -eq 0 ] ; then
+   return 1
+ else
+   return 0
+  fi
+}
+
+## Begin main script
+
+if [ $# -ne 3 ] ; then
+ echo &quot;Usage: $0 month day year&quot; &gt;&amp;2
+ echo &quot;Typical input formats are August 3 1962 and 8 3 2002&quot;&gt;&amp;2
+ exit 1
+fi
+
+# normalize date and split back outreturned values
+
+newdate=&quot;$($normdate&quot;$@&quot;)&quot;
+
+if [ $? -eq 1 ] ; then
+ exit 1    # error condition alreadyreported by normdate
+fi
+
+month=&quot;$(echo $newdate | cut -d\  -f1)&quot;
+ day=&quot;$(echo $newdate | cut -d\ -f2)&quot;
+ year=&quot;$(echo $newdate | cut -d\  -f3)&quot;
+
+# Now that we have a normalized date, let'scheck to see if the
+# day value is logical
+
+if ! exceedsDaysInMonth $month&quot;$2&quot; ; then
+  if[ &quot;$month&quot; = &quot;Feb&quot; -a $2 -eq 29 ] ; then
+   if ! isLeapYear $3 ; then
+     echo &quot;$0: $3 is not a leap year, so Feb doesn't have 29 days&quot;&gt;&amp;2
+     exit 1
+   fi
+ else
+   echo &quot;$0: bad day value: $month doesn't have $2 days&quot;&gt;&amp;2
+   exit 1
+  fi
+fi
+
+echo &quot;Valid date: $newdate&quot;
+
+exit 0
+</code></pre>
+
+<h1 id="echon-sh">echon.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# echon - a script to emulate the -n flagfunctionality with 'echo'
+#  for Unix systems that don't have that available.
+
+echon()
+{
+ echo &quot;$*&quot; | tr -d '\n'
+}
+
+echon &quot;this is a test: &quot;
+read answer
+
+echon this is a test too &quot; &quot;
+read answer2
+</code></pre>
+
+<h1 id="scriptbc-sh">scriptbc.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# echon - a script to emulate the -n flagfunctionality with 'echo'
+#  for Unix systems that don't have that available.
+
+echon()
+{
+ echo &quot;$*&quot; | tr -d '\n'
+}
+
+echon &quot;this is a test: &quot;
+read answer
+
+echon this is a test too &quot; &quot;
+read answer2
+</code></pre>
+
+<h1 id="filelock-sh">filelock.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# echon - a script to emulate the -n flagfunctionality with 'echo'
+#  for Unix systems that don't have that available.
+
+echon()
+{
+ echo &quot;$*&quot; | tr -d '\n'
+}
+
+echon &quot;this is a test: &quot;
+read answer
+
+echon this is a test too &quot; &quot;
+read answer2
+</code></pre>
+
+<h1 id="colors-sh">colors.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# ANSI Color -- use these variables toeasily have different color
+#   and format output. Make sure to output the reset sequence after
+#   colors (f = foreground, b = background), and use the 'off'
+#   feature for anything you turn on.
+
+initializeANSI()
+{
+ esc=&quot;&quot;
+
+ blackf=&quot;${esc}[30m&quot;;  redf=&quot;${esc}[31m&quot;;   greenf=&quot;${esc}[32m&quot;
+ yellowf=&quot;${esc}[33m&quot;  bluef=&quot;${esc}[34m&quot;;  purplef=&quot;${esc}[35m&quot;
+ cyanf=&quot;${esc}[36m&quot;;   whitef=&quot;${esc}[37m&quot;
+
+ blackb=&quot;${esc}[40m&quot;;  redb=&quot;${esc}[41m&quot;;   greenb=&quot;${esc}[42m&quot;
+ yellowb=&quot;${esc}[43m&quot;  blueb=&quot;${esc}[44m&quot;;  purpleb=&quot;${esc}[45m&quot;
+ cyanb=&quot;${esc}[46m&quot;;   whiteb=&quot;${esc}[47m&quot;
+
+ boldon=&quot;${esc}[1m&quot;;   boldoff=&quot;${esc}[22m&quot;
+ italicson=&quot;${esc}[3m&quot;; italicsoff=&quot;${esc}[23m&quot;
+ ulon=&quot;${esc}[4m&quot;;     uloff=&quot;${esc}[24m&quot;
+ invon=&quot;${esc}[7m&quot;;    invoff=&quot;${esc}[27m&quot;
+
+ reset=&quot;${esc}[0m&quot;
+}
+
+# note in this first use that switchingcolors doesn't require a reset
+# first - the new color overrides the oldone.
+
+initializeANSI
+
+cat &lt;&lt; EOF
+${yellowf}This is a phrase in yellow${redb}and red${reset}
+${boldon}This is bold${ulon} this isitalics${reset} bye bye
+${italicson}This is italics${italicsoff}and this is not
+${ulon}This is ul${uloff} and this is not
+${invon}This is inv${invoff} and this isnot
+${yellowf}${redb}WarningI${yellowb}${redf}Warning II${reset}
+EOF
+</code></pre>
+
+<h1 id="library-test-sh">library-test.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# Script to demonstrate use of the shellfunction library
+
+. 012-library.sh
+
+initializeANSI
+
+echon &quot;First off, do you have echo inyour path? (1=yes, 2=no) &quot;
+read answer
+while ! validint $answer 1 2 ; do
+ echon &quot;${boldon}Try again${boldoff}. Do you have echo &quot;
+ echon &quot;in your path? (1=yes, 2=no) &quot;
+ read answer
+done
+
+if ! checkForCmdInPath &quot;echo&quot; ;then
+ echo &quot;Nope, can't find the echo command.&quot;
+else
+ echo &quot;The echo command is in the PATH.&quot;
+fi
+
+echo &quot;&quot;
+echon &quot;Enter a year you think might bea leap year: &quot;
+read year
+
+while ! validint $year 1 9999 ; do
+ echon &quot;Please enter a year in the ${boldon}correct${boldoff}format: &quot;
+ read year
+done
+
+if isLeapYear $year ; then
+ echo &quot;${greenf}You're right! $year was a leap year.${reset}&quot;
+else
+ echo &quot;${redf}Nope, that's not a leap year.${reset}&quot;
+fi
+
+exit 0
+</code></pre>
+
+<h1 id="library-sh">library.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# inpath - verify that a specified programis either valid as-is,
+#  or can be found in the PATH directory list.
+
+in_path()
+{
+  #given a command and the PATH, try to find the command. Returns
+  # 0if found and executable, 1 if not. Note that this temporarily modifies
+  #the the IFS (input field seperator), but restores it upon completion.
+  #return variable 'directory' contains the directory where the
+  #command was found.
+
+ cmd=$1        path=$2         retval=1
+ oldIFS=$IFS   IFS=&quot;:&quot;
+
+  fordirectory in $path
+  do
+   if [ -x $directory/$cmd ] ; then
+     retval=0      # if we're here, wefound $cmd in $directory
+    fi
+ done
+ IFS=$oldIFS
+ return $retval
+}
+
+checkForCmdInPath()
+{
+ var=$1
+
+  #The variable slicing notation in the following conditional
+  #needs some explanation: ${var#expr} returns everything after
+  #the match for 'expr' in the variable value (if any), and
+  #${var%expr} returns everything that doesn't match (in this
+  #case just the very first character. You can also do this in
+  #Bash with ${var:0:1} and you could use cut too: cut -c1
+
+  if[ &quot;$var&quot; != &quot;&quot; ] ; then
+   if [ &quot;${var%${var#?}}&quot; = &quot;/&quot; ] ; then
+     if [ ! -x $var ] ; then
+       return 1
+     fi
+   elif ! in_path $var $PATH ; then
+     return 2
+   fi
+  fi
+ return 0
+}
+
+# cnvalidate - Ensures that input onlyconsists of alphabetical
+#              and numeric characters.
+
+cnvalidate()
+{
+  #validate arg: returns 0 if all upper+lower+digits, 1 otherwise
+
+  #Remove all unacceptable chars
+ compressed=&quot;$(echo $1 | sed -e 's/[^[:alnum:]]//g')&quot;
+
+  if[ &quot;$compressed&quot; != &quot;$input&quot; ] ; then
+   return 1
+ else
+   return 0
+  fi
+}
+
+monthnoToName()
+{
+  #sets the variable 'month' to the appropriate value
+ case $1 in
+    1) month=&quot;Jan&quot;    ;;  2 ) month=&quot;Feb&quot;    ;;
+    3) month=&quot;Mar&quot;    ;;  4 ) month=&quot;Apr&quot;    ;;
+    5) month=&quot;May&quot;    ;;  6 ) month=&quot;Jun&quot;    ;;
+    7) month=&quot;Jul&quot;    ;;  8 ) month=&quot;Aug&quot;    ;;
+    9) month=&quot;Sep&quot;    ;;  10) month=&quot;Oct&quot;    ;;
+   11) month=&quot;Nov&quot;   ;;  12) month=&quot;Dec&quot;    ;;
+    *) echo &quot;$0: Unknown numeric month value $1&quot; &gt;&amp;2; exit 1
+  esac
+  return 0
+}
+
+# nicenumber - given a number, show it withcomma separated values
+#   expects DD and TD to be instantiated. instantiates nicenum
+#   if arg2 is specified, this function echoes output, rather than
+#   sending it back as a variable
+
+nicenumber()
+{
+  #Note that we use the '.' as the decimal separator for parsing
+  #the INPUT value to this script. The output value is as specified
+  #by the user with the -d flag, if different from a '.'
+
+ integer=$(echo $1 | cut -d. -f1)            #left of the decimal
+ decimal=$(echo $1 | cut -d. -f2)           #right of the decimal
+
+  if[ $decimal != $1 ]; then
+    #there's a fractional part, let's include it.
+   result=&quot;${DD:=&quot;.&quot;}$decimal&quot;
+  fi
+
+ thousands=$integer
+
+ while [ $thousands -gt 999 ]; do
+   remainder=$(($thousands % 1000))        #three least significant digits
+
+   while [ ${#remainder} -lt 3 ] ; do      #force leading zeroes as needed
+     remainder=&quot;0$remainder&quot;
+   done
+
+   thousands=$(($thousands / 1000)) #to left of remainder, if any
+   result=&quot;${TD:=&quot;,&quot;}${remainder}${result}&quot;       # builds right-to-left
+  done
+
+ nicenum=&quot;${thousands}${result}&quot;
+
+  if[ ! -z $2 ] ; then
+    echo $nicenum
+  fi
+}
+
+# validint - validate integer input, allownegative ints too
+
+validint()
+{
+  #validate first field. Optionally test against min value $2 and/or
+  #max value $3: if you'd rather skip these tests, send &quot;&quot; as values.
+  #returns 1 for error, 0 for success
+
+ number=&quot;$1&quot;;          min=&quot;$2&quot;;            max=&quot;$3&quot;
+
+  if[ -z &quot;$number&quot; ] ; then
+   echo &quot;You didn't enter anything. Unacceptable.&quot; &gt;&amp;2 ;return 1
+  fi
+
+  if[ &quot;${number%${number#?}}&quot; = &quot;-&quot; ] ; then        # first char '-' ?
+   testvalue=&quot;${number#?}&quot;      #all but first character
+ else
+   testvalue=&quot;$number&quot;
+  fi
+
+ nodigits=&quot;$(echo $testvalue | sed 's/[[:digit:]]//g')&quot;
+
+  if[ ! -z &quot;$nodigits&quot; ] ; then
+   echo &quot;Invalid number format! Only digits, no commas, spaces,etc.&quot; &gt;&amp;2
+   return 1
+  fi
+
+  if[ ! -z &quot;$min&quot; ] ; then
+   if [ &quot;$number&quot; -lt &quot;$min&quot; ] ; then
+      echo &quot;Your value is too small: smallest acceptable value is$min&quot; &gt;&amp;2
+      return 1
+   fi
+  fi
+  if[ ! -z &quot;$max&quot; ] ; then
+    if [ &quot;$number&quot; -gt &quot;$max&quot; ] ; then
+      echo &quot;Your value is too big: largest acceptable value is $max&quot;&gt;&amp;2
+      return 1
+    fi
+  fi
+ return 0
+}
+
+# validfloat - test whether a number is avalid floating point value.
+#   Note that this cannot accept scientific (1.304e5) notation.
+
+# To test whether an entered value is avalid floating point number, we
+# need to split the value at the decimalpoint, then test the first part
+# to see if it's a valid integer, then the secondpart to see if it's a
+# valid &gt;=0 integer, so -30.5 is valid,but -30.-8 isn't.  Returns 0 on
+# success, 1 on failure.
+
+validfloat()
+{
+ fvalue=&quot;$1&quot;
+
+  if[ ! -z &quot;$(echo $fvalue | sed 's/[^.]//g')&quot; ] ; then
+
+   decimalPart=&quot;$(echo $fvalue | cut -d. -f1)&quot;
+   fractionalPart=&quot;$(echo $fvalue | cut -d. -f2)&quot;
+
+   if [ ! -z &quot;$decimalPart&quot; ] ; then
+     if ! validint &quot;$decimalPart&quot; &quot;&quot; &quot;&quot; ; then
+       return 1
+     fi
+   fi
+
+   if [ &quot;${fractionalPart%${fractionalPart#?}}&quot; = &quot;-&quot; ]; then
+      echo &quot;Invalid floating point number:'-' not allowed \
+       after decimal point&quot; &gt;&amp;2
+     return 1
+   fi
+   if [ &quot;$fractionalPart&quot; != &quot;&quot; ] ; then
+     if ! validint &quot;$fractionalPart&quot; &quot;0&quot; &quot;&quot; ;then
+       return 1
+     fi
+   fi
+
+   if [ &quot;$decimalPart&quot; = &quot;-&quot; -o -z&quot;$decimalPart&quot; ] ; then
+     if [ -z &quot;$fractionalPart&quot; ] ; then
+       echo &quot;Invalid floating point format.&quot; &gt;&amp;2 ; return 1
+     fi
+   fi
+
+ else
+   if [ &quot;$fvalue&quot; = &quot;-&quot; ] ; then
+     echo &quot;Invalid floating point format.&quot; &gt;&amp;2 ; return 1
+   fi
+
+   if ! validint &quot;$fvalue&quot; &quot;&quot; &quot;&quot; ; then
+     return 1
+   fi
+  fi
+
+ return 0
+}
+
+exceedsDaysInMonth()
+{
+  #given a month name, return 0 if the specified day value is
+  #less than or equal to the max days in the month, 1 otherwise
+
+ case $(echo $1|tr '[:upper:]' '[:lower:]') in
+   jan* ) days=31    ;;  feb* ) days=28    ;;
+   mar* ) days=31    ;;  apr* ) days=30    ;;
+   may* ) days=31    ;;  jun* ) days=30    ;;
+   jul* ) days=31    ;;  aug* ) days=31    ;;
+   sep* ) days=30    ;; oct* ) days=31    ;;
+   nov* ) days=30    ;;  dec* ) days=31    ;;
+    *) echo &quot;$0: Unknown month name $1&quot; &gt;&amp;2; exit 1
+  esac
+
+   if[ $2 -lt 1 -o $2 -gt $days ] ; then
+    return 1
+  else
+    return 0 # all is well
+   fi
+}
+
+isLeapYear()
+{   
+  #this function returns 0 if a leap year, 1 otherwise
+  #The formula for checking whether a year is a leap year is:
+  #1. years divisible by four are leap years, unless..
+  #2. years also divisible by 100 are not leap years, except...
+  #3. years divisible by 400 are leap years
+
+ year=$1
+  if[ &quot;$((year % 4))&quot; -ne 0 ] ; then
+   return 1 # nope, not a leap year
+ elif [ &quot;$((year % 400))&quot; -eq 0 ] ; then
+   return 0 # yes, it's a leap year
+ elif [ &quot;$((year % 100))&quot; -eq 0 ] ; then
+   return 1
+ else
+   return 0
+  fi
+}
+
+validdate()
+{
+  #expects three values, month, day and year. Returns 0 if success.
+
+ newdate=&quot;$(normdate &quot;$@&quot;)&quot;
+
+  if[ $? -eq 1 ] ; then
+   exit 1        # error conditionalready reported by normdate
+  fi
+
+ month=&quot;$(echo $newdate | cut -d\ -f1)&quot;
+   day=&quot;$(echo $newdate | cut -d\ -f2)&quot;
+  year=&quot;$(echo $newdate | cut -d\ -f3)&quot;
+
+  #Now that we have a normalized date, let's check to see if the
+  #day value is logical
+
+  if! exceedsDaysInMonth $month &quot;$2&quot; ; then
+   if [ &quot;$month&quot; = &quot;Feb&quot; -a $2 -eq 29 ] ; then
+     if ! isLeapYear $3 ; then
+       echo &quot;$0: $3 is not a leap year, so Feb doesn't have 29 days&quot;&gt;&amp;2
+       exit 1
+     fi
+   else
+     echo &quot;$0: bad day value: $month doesn't have $2 days&quot;&gt;&amp;2
+     exit 1
+   fi
+  fi
+ return 0
+}
+
+echon()
+{
+ echo &quot;$*&quot; | tr -d '\n'
+}
+
+initializeANSI()
+{
+ esc=&quot;&quot;
+
+ blackf=&quot;${esc}[30m&quot;;  redf=&quot;${esc}[31m&quot;;   greenf=&quot;${esc}[32m&quot;
+ yellowf=&quot;${esc}[33m&quot;  bluef=&quot;${esc}[34m&quot;;  purplef=&quot;${esc}[35m&quot;
+ cyanf=&quot;${esc}[36m&quot;;   whitef=&quot;${esc}[37m&quot;
+
+ blackb=&quot;${esc}[40m&quot;;  redb=&quot;${esc}[41m&quot;;   greenb=&quot;${esc}[42m&quot;
+ yellowb=&quot;${esc}[43m&quot;  blueb=&quot;${esc}[44m&quot;;  purpleb=&quot;${esc}[45m&quot;
+ cyanb=&quot;${esc}[46m&quot;;   whiteb=&quot;${esc}[47m&quot;
+
+ boldon=&quot;${esc}[1m&quot;;   boldoff=&quot;${esc}[22m&quot;
+ italicson=&quot;${esc}[3m&quot;; italicsoff=&quot;${esc}[23m&quot;
+ ulon=&quot;${esc}[4m&quot;;     uloff=&quot;${esc}[24m&quot;
+ invon=&quot;${esc}[7m&quot;;    invoff=&quot;${esc}[27m&quot;
+
+ reset=&quot;${esc}[0m&quot;
+}
+</code></pre>
+
+<h1 id="hilow-sh">hilow.sh</h1>
+
+<pre><code>#!/bin/sh
+# hilow - a simple number guessing game
+
+biggest=100                             # maximum numberpossible
+guess=0                                 # guessed byplayer
+guesses=0                               # number ofguesses made
+number=$(( $$ % $biggest ))             # random number, 1 .. $biggest
+
+while [ $guess -ne $number ] ; do
+ echo -n &quot;Guess? &quot; ; read guess
+  if[ &quot;$guess&quot; -lt $number ] ; then
+   echo &quot;... bigger!&quot;
+ elif [ &quot;$guess&quot; -gt $number ] ; then
+   echo &quot;... smaller!&quot;
+  fi
+ guesses=$(( $guesses + 1 ))
+done
+
+echo &quot;Right!! Guessed $number in$guesses guesses.&quot;
+
+exit 0
+</code></pre>
+
+<h1 id="nfmt-sh">nfmt.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# nfmt - A version of fmt, using nroff.Adds two useful flags: -w X for
+# line width and -h to enable hyphenationfor better fills.
+
+while getopts &quot;hw:&quot; opt; do
+ case $opt in
+    h) hyph=1                 ;;
+    w) width=&quot;$OPTARG&quot;    ;;
+  esac
+done
+shift $(($OPTIND - 1))
+
+nroff &lt;&lt; EOF
+.ll ${width:-72}
+.na
+.hy ${hyph:-0}
+.pl 1
+$(cat &quot;$@&quot;)
+EOF
+
+exit 0
+</code></pre>
+
+<h1 id="newrm-sh">newrm.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# newrm - a replacement for the existing rmcommand that allows a
+#  rudimentary unremove capability through utilizing a newly created
+#  directory in the user's home directory. It can handle directories
+#  of content as well as individual files, and if the user specifies
+#  the -f flag, files are NOT archived, but removed.
+
+# Big Important Warning: you'll want a cronjob or similar to keep the
+#  individual trash directories tamed, otherwise nothing will ever
+#  actually be deleted on the system and you'll run out of disk space!
+
+ mydir=&quot;$HOME/.deleted-files&quot;
+realrm=&quot;/bin/rm &quot;
+ copy=&quot;/bin/cp -R&quot;
+
+if [ $# -eq 0 ] ; then  # let 'rm' ouptut the usage error
+ exec $realrm        # our shelldies and is replaced by /bin/rm
+fi
+
+# parse all options looking for '-f'
+
+flags=&quot;&quot;
+
+while getopts &quot;dfiPRrvW&quot; opt
+do
+ case $opt in
+    f) exec $realrm &quot;$@&quot;     ;;  # exec lets us exit this script directly.
+    *) flags=&quot;$flags -$opt&quot;  ;;  # other flags are for 'rm', not us
+ esac
+done
+shift $(( $OPTIND - 1 ))
+
+# make sure that the $mydir exists
+
+if [ ! -d $mydir ] ; then
+  if[ ! -w $HOME ] ; then
+    echo&quot;$0 failed: can't create $mydir in $HOME&quot; &gt;&amp;2
+   exit 1
+  fi
+ mkdir $mydir
+ chmod 700 $mydir       # a littlebit of privacy, please
+fi
+
+for arg
+do
+ newname=&quot;$mydir/$(date &quot;+%S.%M.%H.%d.%m&quot;).$(basename&quot;$arg&quot;)&quot;
+  if[ -f &quot;$arg&quot; ] ; then
+   $copy &quot;$arg&quot; &quot;$newname&quot;
+ elif [ -d &quot;$arg&quot; ] ; then
+   $copy &quot;$arg&quot; &quot;$newname&quot;
+  fi
+done
+
+exec $realrm $flags &quot;$@&quot;       # our shell is replaced by realrm
+</code></pre>
+
+<h1 id="unrm-sh">unrm.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# unrm - search the deleted files archivefor the specified file. If
+#  there is more than one match, show a list ordered by timestamp, and
+#  let the user specify which they want restored.
+
+# Big Important Warning: you'll want a cronjob or similar to keep the
+#  individual trash directories tamed, otherwise nothing will ever
+#  actually be deleted on the system and you'll run out of disk space!
+
+mydir=&quot;$HOME/.deleted-files&quot;
+realrm=&quot;/bin/rm&quot;
+move=&quot;/bin/mv&quot;
+
+dest=$(pwd)
+
+if [ ! -d $mydir ] ; then
+ echo &quot;$0: No deleted files directory: nothing to unrm&quot;&gt;&amp;2 ; exit 1
+fi
+
+cd $mydir
+
+if [ $# -eq 0 ] ; then # no args, just showlisting
+ echo &quot;Contents of your deleted files archive (sorted bydate):&quot;
+#  ls-FC | sed -e 's/[[:digit:]][[:digit:]]\.//g' -e 's/^/  /'
+  ls-FC | sed -e 's/\([[:digit:]][[:digit:]]\.\)\{5\}//g' \
+   -e 's/^/  /'
+  exit0
+fi
+
+# Otherwise we must have a pattern to workwith. Let's see if the
+# user-specified pattern matches more thanone file or directory
+# in the archive.
+
+matches=&quot;$(ls *&quot;$1&quot; 2&gt;/dev/null | wc -l)&quot;
+
+if [ $matches -eq 0 ] ; then
+ echo &quot;No match for \&quot;$1\&quot; in the deleted filearchive.&quot; &gt;&amp;2
+ exit 1
+fi
+
+if [ $matches -gt 1 ] ; then
+ echo &quot;More than one file or directory match in the archive:&quot;
+ index=1
+  forname in $(ls -td *&quot;$1&quot;)
+  do
+   datetime=&quot;$(echo $name | cut -c1-14| \
+      awk -F. '{ print $5&quot;/&quot;$4&quot; at&quot;$3&quot;:&quot;$2&quot;:&quot;$1 }')&quot;
+   if [ -d $name ] ; then
+     size=&quot;$(ls $name | wc -l | sed 's/[^0-9]//g')&quot;
+     echo &quot; $index)   $1  (contents = ${size} items, deleted =$datetime)&quot;
+   else
+     size=&quot;$(ls -sdk1 $name | awk '{print $1}')&quot;
+     echo &quot; $index)   $1  (size = ${size}Kb, deleted = $datetime)&quot;
+   fi
+   index=$(( $index + 1))
+ done
+
+ echo &quot;&quot;
+ echo -n &quot;Which version of $1 do you want to restore ('0' to quit)?[1] : &quot;
+ read desired
+
+  if[ ${desired:=1} -ge $index ] ; then
+   echo &quot;$0: Restore cancelled by user: index value too big.&quot;&gt;&amp;2
+   exit 1
+  fi
+
+  if[ $desired -lt 1 ] ; then
+   echo &quot;$0: restore cancelled by user.&quot; &gt;&amp;2 ; exit 1
+  fi
+
+ restore=&quot;$(ls -td1 *&quot;$1&quot; | sed -n&quot;${desired}p&quot;)&quot;
+
+  if[ -e &quot;$dest/$1&quot; ] ; then
+    echo &quot;\&quot;$1\&quot; already exists inthis directory. Cannot overwrite.&quot; &gt;&amp;2
+   exit 1
+  fi
+
+ echo -n &quot;Restoring file \&quot;$1\&quot; ...&quot;
+ $move &quot;$restore&quot; &quot;$dest/$1&quot;
+ echo &quot;done.&quot;
+
+ echo -n &quot;Delete the additional copies of this file? [y] &quot;
+ read answer
+
+  if[ ${answer:=y} = &quot;y&quot; ] ; then
+   $realrm -rf *&quot;$1&quot;
+   echo &quot;deleted.&quot;
+ else
+   echo &quot;additional copies retained.&quot;
+  fi
+else
+  if[ -e &quot;$dest/$1&quot; ] ; then
+   echo &quot;\&quot;$1\&quot; already exists in this directory. Cannotoverwrite.&quot; &gt;&amp;2
+   exit 1
+  fi
+
+ restore=&quot;$(ls -d *&quot;$1&quot;)&quot;
+
+ echo -n &quot;Restoring file \&quot;$1\&quot; ... &quot;
+ $move &quot;$restore&quot; &quot;$dest/$1&quot;
+ echo &quot;done.&quot;
+fi
+
+exit 0
+</code></pre>
+
+<h1 id="logrm-sh">logrm.sh</h1>
+
+<pre><code>#!/bin/sh
+# logrm - log all file deletion requests unless &quot;-s&quot; flag isused
+
+removelog=&quot;/tmp/removelog.log&quot;
+
+if [ $# -eq 0 ] ; then
+ echo &quot;Usage: $0 [-s] list of files or directories&quot; &gt;&amp;2
+ exit 1
+fi
+
+if [ &quot;$1&quot; = &quot;-s&quot; ] ;then
+  #silent operation requested... don't log
+ shift
+else
+ echo &quot;$(date): ${USER}: $@&quot; &gt;&gt; $removelog
+fi
+
+/bin/rm &quot;$@&quot;
+
+exit 0
+</code></pre>
+
+<h1 id="formaidir-sh">formaidir.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# formatdir - output a directory listing ina friendly and useful format
+
+gmk()
+{
+  #given input in Kb, output in Kb, Mb or Gb for best output format
+  if[ $1 -ge 1000000 ] ; then
+   echo &quot;$(scriptbc -p 2 $1 / 1000000)Gb&quot;
+ elif [ $1 -ge 1000 ] ; then
+   echo  &quot;$(scriptbc -p 2 $1 /1000)Mb&quot;
+ else
+   echo &quot;${1}Kb&quot;
+  fi
+}
+
+if [ $# -gt 1 ] ; then
+ echo &quot;Usage: $0 [dirname]&quot; &gt;&amp;2; exit 1
+elif [ $# -eq 1 ] ; then
+  cd&quot;$@&quot;
+fi
+
+for file in *
+do
+  if[ -d &quot;$file&quot; ] ; then
+   size=$(ls &quot;$file&quot; | wc -l | sed 's/[^[:digit:]]//g')
+   if [ $size -eq 1 ] ; then
+     echo &quot;$file ($size entry)|&quot;
+   else
+     echo &quot;$file ($size entries)|&quot;
+   fi
+ else
+   size=&quot;$(ls -sk &quot;$file&quot; | awk '{print $1}')&quot;
+   echo &quot;$file ($(gmk $size))|&quot;
+  fi
+done | \
+  sed's/ /^^^/g'  | \
+ xargs -n 2     | \
+  sed's/\^\^\^/ /g' | \
+  awk-F\| '{ printf &quot;%-39s %-39s\n&quot;, $1, $2 }'
+
+exit 0
+</code></pre>
+
+<h1 id="locate-sh">locate.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# locate - search the locate database forthe specified pattern
+
+locatedb=&quot;/var/locate.db&quot;
+
+exec grep -i &quot;$@&quot; $locatedb
+</code></pre>
+
+<h1 id="mklocatedb-sh">mklocatedb.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# mklocatedb - build the locate databaseusing find. Must be root to run this
+
+locatedb=&quot;/var/locate.db&quot;
+
+if [ &quot;$(whoami)&quot; !=&quot;root&quot; ] ; then
+ echo &quot;Must be root to run this command.&quot; &gt;&amp;2
+ exit 1
+fi
+
+find / -print &gt; $locatedb
+
+exit 0
+</code></pre>
+
+<h1 id="dir-sh">DIR.sh</h1>
+
+<pre><code>#!/bin/sh
+# DIR - pretend we're the DIR command in DOS and display the contents
+#   of the specified file, accepting some of the standard DIR flags
+
+usage()
+{
+cat &lt;&lt; EOF &gt;&amp;2
+ Usage: $0 [DOS flags] directory or directories
+ Where:
+   /D              sort by columns
+   /H                show help for this shell script
+   /N              showlong listing format with filenames on right
+  /OD           sort by oldest to newest
+  /O-D           sort by newest tooldest
+   /P             pauseafter each screenful of information
+   /Q                show owner of the file
+   /S                 recursive listing
+   /W             usewide listing format
+EOF
+ exit 0
+}
+
+postcmd=&quot;&quot;
+flags=&quot;&quot;
+
+while [ $# -gt 0 ]
+do
+ case $1 in
+   /D     ) flags=&quot;$flags-x&quot;                ;;
+   /H        ) usage                          ;;
+    /[NQW]) flags=&quot;$flags -l&quot;                  ;;
+   /OD    ) flags=&quot;$flags-rt&quot;              ;;
+   /O-D   ) flags=&quot;$flags-t&quot;                ;;
+   /P     ) postcmd=&quot;more&quot;               ;;
+   /S     ) flags=&quot;$flags-s&quot;                 ;;
+          * ) # unknown flag: probably a dir specifier
+                 break;       #so let's get outta the while loop
+ esac
+ shift            # processed flag, let's see if there'sanother
+done
+
+# done processing flags, now the commanditself:
+
+if [ ! -z &quot;$postcmd&quot; ] ; then
+  ls$flags &quot;$@&quot; | $postcmd
+else
+  ls$flags &quot;$@&quot;
+fi
+
+exit 0
+</code></pre>
+
+<h1 id="findman-sh">findman.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# findman -- given a pattern and a mansection, show all the matches
+#  for that pattern from within all relevant man pages.
+
+match1=&quot;/tmp/$0.1.$$&quot;
+matches=&quot;/tmp/$0.$$&quot;
+manpagelist=&quot;&quot;
+
+trap &quot;rm -f $match1 $matches&quot;EXIT
+
+case $#
+in
+  3 )section=&quot;$1&quot; cmdpat=&quot;$2&quot; manpagepat=&quot;$3&quot;           ;;
+  2 )section=&quot;&quot;   cmdpat=&quot;$1&quot; manpagepat=&quot;$2&quot;           ;;
+  * )echo &quot;Usage: $0 [section] cmdpattern manpagepattern&quot; &gt;&amp;2
+     exit 1
+esac
+
+if ! man -k &quot;$cmdpat&quot; | grep&quot;($section&quot; &gt; $match1 ; then
+ echo &quot;No matches to pattern \&quot;$cmdpat\&quot;. Try somethingbroader?&quot;; exit 1
+fi
+
+cut -d\( -f1 &lt; $match1 &gt; $matches  # command names only
+cat /dev/null &gt; $match1                  #clear the file...
+
+for manpage in $(cat $matches)
+do
+ manpagelist=&quot;$manpagelist $manpage&quot;
+  man$manpage | col -b | grep -i $manpagepat | \
+   sed &quot;s/^/${manpage}: /&quot; | tee -a $match1
+done
+
+if [ ! -s $match1 ] ; then
+cat &lt;&lt; EOF
+Command pattern &quot;$cmdpat&quot; hadmatches, but within those there were no
+matches to your man page pattern&quot;$manpagepat&quot; found in that set.
+Man pages checked:$manpagelist
+EOF
+fi
+
+exit 0
+</code></pre>
+
+<h1 id="timein-sh">timein.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# timein - show the current time in thespecified timezone or
+#  geographic zone. Without any argument, show UTC/GMT. Use
+#  the word &quot;list&quot; to see a list of known geographic regions
+#   Notethat it's possible to match a zone directory (a region)
+#  but that only timezone files are valid specifications.
+
+#  Timezone database ref: http://www.twinsun.com/tz/tz-link.htm
+
+zonedir=&quot;/usr/share/zoneinfo&quot;
+
+if [ ! -d $zonedir ] ; then
+ echo &quot;No timezone database at $zonedir.&quot; &gt;&amp;2 ; exit 1
+fi
+
+if [ -d &quot;$zonedir/posix&quot; ] ; then
+ zonedir=$zonedir/posix        #modern Linux systems
+fi
+
+if [ $# -eq 0 ] ; then
+ timezone=&quot;UTC&quot;
+ mixedzone=&quot;UTC&quot;
+elif [ &quot;$1&quot; = &quot;list&quot; ]; then
+  (echo &quot;All known timezones and regions defined on this system:&quot;
+   cd $zonedir
+   find * -type f -print | xargs -n 2 | \
+     awk '{ printf &quot;  %-38s%-38s\n&quot;, $1, $2 }'
+  ) |more
+ exit 0
+else
+
+ region=&quot;$(dirname $1)&quot;
+ zone=&quot;$(basename $1)&quot;
+
+  #Is it a direct match?  If so,  we're good to go. Otherwise we need
+  #to dig around a bit to find things. Start by just counting matches
+
+ matchcnt=&quot;$(find $zonedir -name $zone -type f -print |
+       wc -l | sed 's/[^[:digit:]]//g' )&quot;
+
+  if[ &quot;$matchcnt&quot; -gt 0 ] ; then      # at least one file matches
+   if [ $matchcnt -gt 1 ] ; then      # more than one file match
+     echo &quot;\&quot;$zone\&quot; matches more than one possible time zonerecord.&quot; &gt;&amp;2
+     echo &quot;Please use 'list' to see all known regions andtimezones&quot; &gt;&amp;2
+     exit 1
+   fi
+   match=&quot;$(find $zonedir -name $zone -type f -print)&quot;
+   mixedzone=&quot;$zone&quot;
+ else
+    #Normalize to first upper, rest of word lowercase for region + zone
+   mixedregion=&quot;$(echo ${region%${region#?}} | tr '[[:lower:]]''[[:upper:]]')\
+$(echo ${region#?} | tr '[[:upper:]]''[[:lower:]]')&quot;
+   mixedzone=&quot;$(echo ${zone%${zone#?}} | tr '[[:lower:]]''[[:upper:]]')\
+$(echo ${zone#?} | tr '[[:upper:]]''[[:lower:]]')&quot;
+
+   if [ &quot;$mixedregion&quot; != &quot;.&quot; ] ; then
+     # only look for specified zone in specified region
+     # to let users specify unique matches when there's more than one
+     # possibility (e.g., &quot;Atlantic&quot;)
+     match=&quot;$(find $zonedir/$mixedregion -type f -name $mixedzone-print)&quot;
+   else
+     match=&quot;$(find $zonedir -name $mixedzone -type f -print)&quot;
+   fi
+
+   if [ -z &quot;$match&quot;  ] ;then  # no file matches specified pattern
+     if [ ! -z $(find $zonedir -name $mixedzone -type d -print) ] ; then
+       echo \
+   &quot;The region \&quot;$1\&quot; has more than one timezone. Please use'list'&quot; &gt;&amp;2
+     else  #  just not a match at all
+       echo &quot;Can't find an exact match for \&quot;$1\&quot;. Please use'list'&quot; &gt;&amp;2
+     fi
+     echo &quot;to see all known regions and timezones.&quot; &gt;&amp;2
+     exit 1
+   fi
+  fi
+ timezone=&quot;$match&quot;
+fi
+
+nicetz=$(echo $timezone | sed&quot;s|$zonedir/||g&quot;)     # prettyup the output
+
+echo It\'s $(TZ=$timezone date '+%A, %B %e,%Y, at %l:%M %p') in $nicetz
+
+exit 0
+</code></pre>
+
+<h1 id="remember-sh">remember.sh</h1>
+
+<pre><code>#!/bin/sh
+
+#  remember- an easy command-line based memory pad
+#   search the results with 'remindme'
+
+rememberfile=&quot;$HOME/.remember&quot;
+
+if [ $# -eq 0 ] ; then
+ echo &quot;Enter note, end with ^D: &quot;
+  cat- &gt;&gt; $rememberfile
+else
+ echo &quot;$@&quot; &gt;&gt; $rememberfile
+fi
+
+exit 0
+</code></pre>
+
+<h1 id="remindme-sh">remindme.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# remindme - search a datafile for matchinglines, or show the contents
+#  of the datafile if no arg is specified
+
+rememberfile=&quot;$HOME/.remember&quot;
+
+if [ $# -eq 0 ] ; then
+ more $rememberfile
+else
+ grep -i &quot;$@&quot; $rememberfile | ${PAGER:-more}
+fi
+
+exit 0
+</code></pre>
+
+<h1 id="calc-sh">calc.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# calc - a command-line calculator thatacts as a front-end to bc
+
+scale=2
+
+show_help()
+{
+cat &lt;&lt; EOF
+  Inaddition to standard math functions, calc also supports
+
+  a %b       remainder of a/b
+  a ^b       exponential: a raised to the bpower
+ s(x)        sine of x, x in radians
+ c(x)        cosine of x, x inradians
+ a(x)        arctangent of x,returns radians
+ l(x)        natural log of x
+ e(x)        exponential log ofraising e to the x
+ j(n,x)      bessel function ofinteger order n of x
+  scaleN     show N fractional digits (default =2)
+EOF
+}
+
+if [ $# -gt 0 ] ; then
+ exec scriptbc &quot;$@&quot;
+fi
+
+echo &quot;Calc - a simple calculator. Use'help' for help, 'quit' to quit.&quot;
+
+echo -n &quot;calc&gt; &quot;
+
+while read command args
+do
+ case $command
+  in
+   quit|exit) exit 0                                              ;;
+   help|\?)   show_help                                ;;
+   scale)     scale=$args                             ;;
+   *)         scriptbc -p $scale&quot;$command&quot; &quot;$args&quot;    ;;
+ esac
+
+ echo -n &quot;calc&gt; &quot;
+done
+
+echo &quot;&quot;
+
+exit 0
+</code></pre>
+
+<h1 id="checkspelling-sh">checkspelling.sh</h1>
+
+<pre><code>#!/bin/sh
+
+# checkspelling - check the spelling of aword
+
+spell=&quot;ispell -l&quot;          # if you have ispell installed instead
+                              # if not, just define spell=spell or
+                              # equivalent.
+
+if [ $# -lt 1 ] ; then
+ echo &quot;Usage: $0 word or words&quot; &gt;&amp;2
+ exit 1
+fi
+
+for word
+do
+  if[ -z $(echo $word | $spell) ] ; then
+   echo &quot;$word:            spelledcorrectly.&quot;
+ else
+   echo &quot;$word:            misspelled.&quot;
+  fi
+done
+
+exit 0
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

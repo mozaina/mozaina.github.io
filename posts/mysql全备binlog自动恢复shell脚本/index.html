@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>mysql全备binlog自动恢复shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="mysql全备binlog自动恢复shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="mysql全备binlog自动恢复shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/mysql%E5%85%A8%E5%A4%87binlog%E8%87%AA%E5%8A%A8%E6%81%A2%E5%A4%8Dshell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">mysql全备binlog自动恢复shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="mysql-全备-binlog自动恢复shell脚本">mysql 全备+binlog自动恢复shell脚本</h1>
+
+<p>注意：</p>
+
+<p>1、数据库全备的命名规则 bak_dbname_xxx_sql</p>
+
+<p>2、BAKUPDIR存放所有的数据全备的文件的目录</p>
+
+<p>3、BINLOGBAKDIR用与存放所有用到的binlog的目录</p>
+
+<p>该脚本主要用于数据库故障时，进行及时的整库加日志的增量恢复，以求数据损失降低的最小值。</p>
+
+<p>该脚本的主要思想：</p>
+
+<p>** 1.  首先进行全库导入；**</p>
+
+<p>** 2.  通过查找二进制日志的pos来进行日志的恢复；**</p>
+
+<p>1. #!/bin/bash</p>
+
+<p>2. BASEDIR=/data1/xxx/xxx/backuptest</p>
+
+<p>3. BAKUPDIR=$BASEDIR/tmpbak</p>
+
+<p>4. #BAKUPDIR=$BASEDIR/2012-03-27</p>
+
+<p>5. BINLOGBAKDIR=$BASEDIR/binlog</p>
+
+<p>6. LOGDIR=$BASEDIR/log</p>
+
+<p>7. RECOVERY_LOG=$LOGDIR/recovery.log</p>
+
+<p>8. MYSQL=/usr/local/mysql/bin/mysql</p>
+
+<p>9. MYSQLBINLOG=/usr/local/mysql/bin/mysqlbinlog</p>
+
+<p>10.USER=root</p>
+
+<p>11.PASS=123</p>
+
+<p>12.MYSQLIP=localhost</p>
+
+<p>13.</p>
+
+<p>14.mkdir -p $LOGDIR</p>
+
+<p>15.BAKUPSQL=<code>find$BAKUPDIR  -type f -name&quot;*sql&quot;|xargs-i basename{}</code></p>
+
+<p>16.</p>
+
+<p>17.for i  in $BAKUPSQL</p>
+
+<p>18.do</p>
+
+<p>19.cd $BAKUPDIR</p>
+
+<p>20.</p>
+
+<p>21.#########CHECK BINLOG POSITION############</p>
+
+<p>22.BINLOG=<code>head  -n 50 $i |grep  &quot;CHANGE MASTER TO MASTER_LOG_FILE&quot;|awk  -F
+&quot;'&quot; '{print$2}'</code></p>
+
+<p>23.BINLOGPOS=<code>head  -n 50 $i |grep  &quot;CHANGE MASTER TO MASTER_LOG_FILE&quot;|awk  -F
+&quot;=&quot; '{print$3}'|sed's/;//'</code></p>
+
+<p>24.DATABASE=<code>echo $i|awk-F&quot;_&quot;'{print$2}'</code></p>
+
+<p>25.# echo $i $DATABASE $BINLOG $BINLOGPOS</p>
+
+<p>26.</p>
+
+<p>27.####BEGINE FULLBAKUP RECOVERY#############</p>
+
+<p>28.echo &ldquo;#<code>date +'%Y-%m-%d%H:%M:%S'</code>: start recover $DATABASE
+&ldquo;&gt;&gt;${RECOVERY_LOG}</p>
+
+<p>29.if $MYSQL  -h$MYSQLIP -u$USER-p$PASS&lt; $i&gt;&gt;${RECOVERY_LOG}2&gt;&1;then</p>
+
+<p>30.echo &ldquo;recovery $DATABASEsucessfully&rdquo;&gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>31.else</p>
+
+<p>32.echo &ldquo;recovery $DATABASEfail&rdquo;&gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>33.exit;</p>
+
+<p>34.fi</p>
+
+<p>35.echo &ldquo;#<code>date +'%Y-%m-%d%H:%M:%S'</code>: end recover $DATABASE&rdquo;&gt;&gt;${RECOVERY_LOG}</p>
+
+<p>36.</p>
+
+<p>37.</p>
+
+<p>38.#####BEGINE BINLOGBAKUP RECOVERY##########</p>
+
+<p>39.</p>
+
+<p>40.cd $BINLOGBAKDIR</p>
+
+<p>41.find . -type f -name  &ldquo;<em>bin</em>&rdquo; |xargs-i basename{}&gt;/tmp/binlog.tmp</p>
+
+<p>42.sort -n  /tmp/binlog.tmp&gt;$LOGDIR/binlog.tmp2</p>
+
+<p>43.sed &lsquo;/md5/d&rsquo; $LOGDIR/binlog.tmp2&gt; $LOGDIR/binlog.tmp3</p>
+
+<p>44.sed -n  &ldquo;/$BINLOG/,\$p&rdquo; $LOGDIR/binlog.tmp3&gt; $LOGDIR/binlog${DATABASE}.log</p>
+
+<p>45.RECBINLOGS=<code>awk  '{printf &quot;%s&quot;,&quot; &quot;$1}' $LOGDIR/binlog${DATABASE}.log</code></p>
+
+<p>46.#echo $DATABASE $BINLOGPOS $RECBINLOGS</p>
+
+<p>47.</p>
+
+<p>48.echo &ldquo;#<code>date +'%Y-%m-%d%H:%M:%S'</code>: start recover $DATABASE binlog &ldquo;&gt;&gt;
+${RECOVERY_LOG}</p>
+
+<p>49.echo &ldquo; $MYSQLBINLOG&ndash;no-defaults &ndash;disable-log-bin &ndash;start-
+position=$BINLOGPOS $RECBINLOGS -d$DATABASE |$MYSQL -h$MYSQLIP -u$USER -p$PASS
+-f &ldquo;&gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>50.if$MYSQLBINLOG  --no-defaults--disable-log-bin--start-
+position=$BINLOGPOS$RECBINLOGS-d $DATABASE |$MYSQL-h$MYSQLIP-u$USER-p$PASS-f
+&gt;&gt; ${RECOVERY_LOG} 2&gt;&1;then</p>
+
+<p>51.echo &ldquo;recover $DATABASEbinlog sucessfully&rdquo;&gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>52.else</p>
+
+<p>53.echo &ldquo;recover $DATABASEbinlog fail&rdquo;&gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>54.exit;</p>
+
+<p>55.fi</p>
+
+<p>56.echo &ldquo;#<code>date +'%Y-%m-%d%H:%M:%S'</code>:end recover $DATABASE
+binlog&rdquo;&gt;&gt;${RECOVERY_LOG}</p>
+
+<p>57.</p>
+
+<p>58.</p>
+
+<p>59.done</p>
+
+<p>附脚本源代码：</p>
+
+<p>full_db_log_imp.sh</p>
+
+<h1 id="bin-bash">!/bin/bash</h1>
+
+<p>BASEDIR=/data/bak/test</p>
+
+<p>BAKUPDIR=$BASEDIR/20121024</p>
+
+<p>BINLOGBAKDIR=$BASEDIR/bin-log-bk</p>
+
+<p>LOGDIR=$BASEDIR/log</p>
+
+<p>RECOVERY_LOG=$LOGDIR/recovery.log</p>
+
+<p>MYSQL=/usr/local/mysql/bin/mysql</p>
+
+<p>MYSQLBINLOG=/usr/local/mysql/bin/mysqlbinlog</p>
+
+<p>USER=root</p>
+
+<p>PASS=root@centos</p>
+
+<p>MYSQLIP=localhost</p>
+
+<p>cd $BAKUPDIR</p>
+
+<p>find $BAKUPDIR -name &lsquo;*.gz&rsquo;</p>
+
+<p>gunzip $BAKUPDIR *.gz</p>
+
+<p>BAKUPSQL=<code>find $BAKUPDIR -type f -name&quot;*.sql&quot; |xargs -i basename {}</code></p>
+
+<p>for i in $BAKUPSQL</p>
+
+<p>do</p>
+
+<p>cd $BAKUPDIR</p>
+
+<p>#########CHECK BINLOG POSITION############</p>
+
+<p>BINLOG=<code>head -n 50 $i |grep &quot;CHANGEMASTER TO MASTER_LOG_FILE&quot;|awk -F &quot;'&quot;
+'{print $2}'</code></p>
+
+<p>BINLOGPOS=<code>head -n 50 $i |grep &quot;CHANGEMASTER TO MASTER_LOG_FILE&quot;|awk -F &quot;=&quot;
+'{print $3}'|sed 's/;//'</code></p>
+
+<p>DATABASE=<code>echo $i|awk -F&quot;_&quot;'{print $2}'</code></p>
+
+<p>echo $i $DATABASE $BINLOG $BINLOGPOS</p>
+
+<p>####BEGINE FULLBAKUP RECOVERY#############</p>
+
+<p>echo &ldquo;#<code>date +'%Y-%m-%d %H:%M:%S'</code>:start recover $DATABASE &ldquo; &gt;&gt;
+${RECOVERY_LOG}</p>
+
+<p>if $MYSQL -h$MYSQLIP -u$USER -p$PASS &gt; ${RECOVERY_LOG} 2&gt;&1;then</p>
+
+<p>echo &ldquo;recovery $DATABASE sucessfully&rdquo;&gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>else</p>
+
+<p>echo &ldquo;recovery $DATABASE fail&rdquo;&gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>exit;</p>
+
+<p>fi</p>
+
+<p>echo &ldquo;#<code>date +'%Y-%m-%d %H:%M:%S'</code>:end recover $DATABASE&rdquo; &gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>#####BEGINE BINLOGBAKUP RECOVERY##########</p>
+
+<p>cd $BASEDIR</p>
+
+<p>#find ./ -type f -name &ldquo;<em>bin</em>&rdquo;|xargs -i basename {} &gt; /tmp/binlog.tmp</p>
+
+<p>find ./ -type f -name&rdquo;<em>mysql-bin</em>&rdquo; &gt;/tmp/binlog.tmp</p>
+
+<p>sort -n /tmp/binlog.tmp &gt;$LOGDIR/binlog.tmp2</p>
+
+<p>sed &lsquo;/md5/d&rsquo; $LOGDIR/binlog.tmp2 &gt;$LOGDIR/binlog.tmp3</p>
+
+<p>sed -n &ldquo;/$BINLOG/,\$p&rdquo;$LOGDIR/binlog.tmp3 &gt; $LOGDIR/binlog${DATABASE}.log</p>
+
+<p>RECBINLOGS=<code>awk '{printf&quot;%s&quot;,&quot; &quot;$1}' $LOGDIR/binlog${DATABASE}.log</code></p>
+
+<p>echo $DATABASE $BINLOGPOS $RECBINLOGS</p>
+
+<p>#exit 0</p>
+
+<p>echo &ldquo;#<code>date +'%Y-%m-%d %H:%M:%S'</code>:start recover $DATABASE binlog &ldquo; &gt;&gt;
+${RECOVERY_LOG}</p>
+
+<p>echo &ldquo; $MYSQLBINLOG &ndash;no-defaults &ndash;disable-log-bin&ndash;start-position=$BINLOGPOS
+$RECBINLOGS -d $DATABASE |$MYSQL -h$MYSQLIP -u$USER-p$PASS -f &ldquo; &gt;&gt;
+${RECOVERY_LOG}</p>
+
+<p>if $MYSQLBINLOG &ndash;no-defaults&ndash;disable-log-bin &ndash;start-position=$BINLOGPOS
+$RECBINLOGS $DATABASE |$MYSQL -h$MYSQLIP -u$USER -p$PASS-f &gt;&gt; ${RECOVERY_LOG}
+2&gt;&1;then</p>
+
+<p>echo $BINLOGPOS $RECBINLOGS</p>
+
+<p>echo &ldquo;recover $DATABASE binlogsucessfully&rdquo; &gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>else</p>
+
+<p>echo &ldquo;recover $DATABASE binlogfail&rdquo; &gt;&gt; ${RECOVERY_LOG}</p>
+
+<p>exit;</p>
+
+<p>fi</p>
+
+<p>echo &ldquo;#<code>date +'%Y-%m-%d %H:%M:%S'</code>:endrecover $DATABASE binlog&rdquo; &gt;&gt;
+${RECOVERY_LOG}</p>
+
+<p>done</p>
+
+<p>脚本执行后，恢复到的数据为：</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

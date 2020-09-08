@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Androidrecovery支持adbshell | 开发者问答集锦</title>
+    <meta property="og:title" content="Androidrecovery支持adbshell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Androidrecovery支持adbshell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/androidrecovery%E6%94%AF%E6%8C%81adbshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Androidrecovery支持adbshell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>Android recovery支持adb shell</p>
+
+<p>最近开发过程注意到recovery不支持adb shell，为了便于调试方便，决定增加此功能。</p>
+
+<p>刚开始我们采用的是user版本系统，进入recovery后，输入adb shell命令，提示“error: no devices/emulators
+found”，我们先确认recovery.img是否包含有adb，看out\debug\target\product\xxx\recovery\root\sbin是否有adb文件(源代码\system\core\adb)，然后检查\bootable\recovery\etc\init.rc下关于adbd</p>
+
+<pre><code>service adbd /sbin/adbd--root_seclabel=u:r:su:s0 --device_banner=recovery
+   disabled
+   socket adbd stream 660 system system
+   seclabel u:r:adbd:s0
+
+# Always start adbd on userdebug and engbuilds
+on property:ro.debuggable=1
+   write /sys/class/android_usb/android0/enable 1
+   start adbd
+
+# Restart adbd so it can run as root
+on property:service.adb.root=1
+   write /sys/class/android_usb/android0/enable 0
+   restart adbd
+write/sys/class/android_usb/android0/enable 1
+</code></pre>
+
+<p>从上面可知init.rc 中adbd 是配置的，disabled 表示开机不启动，如 ro.debuggable 被置为1，那么adb
+就会开启，或是service.adb.root设置为1，则重启adbd。</p>
+
+<p>ro.debuggable 在\build\core\main.mk下面的内容赋值</p>
+
+<pre><code>ifeq (true,$(strip$(enable_target_debugging)))
+  #Target is more debuggable and adbd is on by default
+ ADDITIONAL_DEFAULT_PROPERTIES += ro.debuggable=1
+</code></pre>
+
+<p>enable_target_debugging 在\build\core\main.mk下面的内容赋值：</p>
+
+<pre><code>## user/userdebug ##
+
+user_variant := $(filter useruserdebug,$(TARGET_BUILD_VARIANT))
+enable_target_debugging := true
+tags_to_install :=
+ifneq (,$(user_variant))
+  #Target is secure in user builds.
+ ADDITIONAL_DEFAULT_PROPERTIES += ro.secure=1
+
+ ifeq ($(user_variant),userdebug)
+    #Pick up some extra useful tools
+   tags_to_install += debug
+
+    #Enable Dalvik lock contention logging for userdebug builds.
+   ADDITIONAL_BUILD_PROPERTIES += dalvik.vm.lockprof.threshold=500
+ else
+    #Disable debugging in plain user builds.
+   enable_target_debugging :=
+
+    #Add for testUsbDebugging()
+   ADDITIONAL_DEFAULT_PROPERTIES += ro.adb.secure=1
+  Endif
+…
+Endif
+</code></pre>
+
+<p>可知默认为enable_target_debugging :=
+true，根据user_variant的值如果为user，则enable_target_debugging
+:=，这又和TARGET_BUILD_VARIANT有关，此变量对应于VARIANT_CHOICES=(user userdebug
+eng)中的一个值，由我们来选择，相关的实现在\build\envsetup.sh中。</p>
+
+<p>根据上面可知，编译时如果选择userdebug或是eng，则ro.debuggable=1，下面我们选择eng版本编译recovery.img，进入recovery后，输入adb
+shell命令，提示：</p>
+
+<p>Exec ‘/system/bin/sh’ failed:No such fileor directory(2)</p>
+
+<p>表示没有sh这个文件，无法进入shell，检查ramdisk 文件系统 system
+目录为(out\debug\target\product\xxx\recovery\root\system)空，但我们知道boot.img下是可以的，看\system\core\rootdir\init.rc检查boot.img
+启动的init.rc 关于sh的</p>
+
+<pre><code>service console /system/bin/sh
+   class core
+   console
+   disabled
+   user shell
+   group shell log
+   seclabel u:r:shell:s0
+
+on property:ro.debuggable=1
+start console
+</code></pre>
+
+<p>可知是启动了sh这控制台的，所以需要在bootable\recovery\etc\init.rc增加相应的内容：</p>
+
+<p><a href="https://img.it610.com/image/info8/ebcf14c252624fe4ba53c3346626243d.jpg"><img src="https://img.it610.com/image/info8/ebcf14c252624fe4ba53c3346626243d.jpg" alt="Android recovery支持adb
+shell_第1张图片" /></a></p>
+
+<p>图1</p>
+
+<p>我们知道out\debug\target\product\xxx\recovery\root\system下没有bin文件夹(当然也没有sh)，所以需要在编译的时候创建，需要\build\core\Makefile增加创建目录和把out目录下的/system/bin/sh拷贝到out/recovery/system/bin目录下</p>
+
+<p><a href="https://img.it610.com/image/info8/865b4db6ac8f4da18fb3566fdbf6ec93.jpg"><img src="https://img.it610.com/image/info8/865b4db6ac8f4da18fb3566fdbf6ec93.jpg" alt="Android recovery支持adb
+shell_第2张图片" /></a></p>
+
+<p>图2</p>
+
+<p>但这样还是不行，后来知道recovery可执行文件是静态编译的，之所以这样是因为recovery模式中没有共享库还有缺动态链接库加载器(/system/bin/linker，Android动态连接器linker与静态连接器ld)。</p>
+
+<p>所以\external\mksh\Android.mk</p>
+
+<p><a href="https://img.it610.com/image/info8/e4c9b3eba4c84c69923fb483e96517b1.jpg"><img src="https://img.it610.com/image/info8/e4c9b3eba4c84c69923fb483e96517b1.jpg" alt="Android recovery支持adb
+shell_第3张图片" /></a></p>
+
+<p>图3</p>
+
+<p>参考链接：</p>
+
+<p>Android recovery.img 支持adb shell</p>
+
+<p><a href="http://blog.csdn.net/chituhuan/article/details/52383655">http://blog.csdn.net/chituhuan/article/details/52383655</a></p>
+
+<p>[IMX6Q][Android5.1]移植笔记 &mdash; Recovery mode的shell功能实现(sh+toolbox)</p>
+
+<p><a href="http://blog.csdn.net/kris_fei/article/details/50921384">http://blog.csdn.net/kris_fei/article/details/50921384</a></p>
+
+<p>Android Recovery 支持 Adb</p>
+
+<p><a href="http://www.jianshu.com/p/a0bdcce0a5e1">http://www.jianshu.com/p/a0bdcce0a5e1</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用gitmavenshell实现持续集成 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用gitmavenshell实现持续集成 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用gitmavenshell实现持续集成">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8gitmavenshell%E5%AE%9E%E7%8E%B0%E6%8C%81%E7%BB%AD%E9%9B%86%E6%88%90/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用gitmavenshell实现持续集成</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>前言：这篇博客是一直心心念念想要写的，但是因为拖延症一直拖着拖着已经拖了半个月了，今晚就一定把他写完。</p>
+
+<p>需求：之前在做项目的时候经常会有这么一个情况，交付的时候往往会出现需求变动，修复bug的情况，每次上线测试之后发现问题就需要执行“修复-编译打包-
+部署”等动作，一次两次操作还好，但是一年来每次都是完成这样的动作，就会很疲劳，特别是部署，每次都需要kill -9
+tomcat，再启动。有的时候在家里开发，打出来的包已经四五十M，上传速度慢每次都要上传个半小时，每次的修复部署都是一个比较烦躁的过程。</p>
+
+<p>认识《maven实战》：因为之前在开发的过程中使用maven的主要功能只是添加依赖，因为在工作中需要接触工程的依赖与聚合，所以下载了这本书阅读，如果100分为满分的话，那这本书可以给100分，是接触到的maven资料里面写的最好，最齐全的。在学习的过程中不仅知道了maven的相关知识点，也认识到一个东西，即使用maven来进行持续集成。</p>
+
+<p>持续集成：持续集成是什么呢？阮一峰的这篇文章 已经描写的很详细，对于我来说，持续集成的过程就是上述的整个“修复-
+部署”的过程，即持续集成的过程让我很烦躁，那maven是如何来解决持续集成的这个问题呢？在《maven实战》书中介绍的是使用Hudson来进行项目自动化持续集成，Hudson是什么呢？便是jenkins的前身。</p>
+
+<p>认识jenkins：百科——Jenkins是一个开源软件项目，是基于Java开发的一种持续集成工具，用于监控持续重复的工作，旨在提供一个开放易用的软件平台，使软件的持续集成变成可能。简而言之，是一个让你可以自动持续集成，又提供监控….的java项目。在查看相关资料后立马就下载了玩，在一番接触过之后，发现持续集成需要通过Jenkins配置以下内容：</p>
+
+<ul>
+<li>maven</li>
+<li>git地址</li>
+<li>shell语法（主要用来启动服务）</li>
+</ul>
+
+<p>看了一下之后发现配置的方式好像比较麻烦，而且对于目前我做的这个项目来说只有一个服务器，所以只能在应用服务器上面部署Jenkins，再让Jenkins来帮我完成持续集成，总体来说，为了实现我的需求，那么可以画出以下的架构图<br />
+<a href="https://img.it610.com/image/info8/a47eaf4f92484cdbb31f9e89ebe165bb.jpg"><img src="https://img.it610.com/image/info8/a47eaf4f92484cdbb31f9e89ebe165bb.jpg" alt="使用git+maven+shell实现持续集成_第1张图片" /></a><br />
+其中：</p>
+
+<ul>
+<li>git的作用是用来拉取源码</li>
+<li>maven的作用是用来编译打包</li>
+<li>shell是把maven打出来的应用包部署到服务器</li>
+</ul>
+
+<p>看完上述Jenkins的流程之后，我就在想这些东西我都会用，那我为什么还要用Jenkins那么重的一个工程来消耗我的服务器资源呢？所以干脆卸载Jenkins，自己用git+maven+shell来实现一个持续部署的流程。思路如下：<br />
+其主要的思路就是：<br />
+让shell帮我完成</p>
+
+<ul>
+<li>拉取代码</li>
+<li>编译打包</li>
+<li>部署至服务器</li>
+</ul>
+
+<p>其中部署至服务器只是简单的把软件包复制到tomcat的Apps中，关闭tomcat，再重启即可。</p>
+
+<p>那实际是如何完成整个步骤的呢？</p>
+
+<p>一、安装maven<br />
+在你的服务器上安装maven，网上已经有很多maven的安装教程，这里便不再重复，其中，几个需要注意的点是：<br />
+1.配置maven的环境变量，即把/bin目录配置到环境变量中。<br />
+2.配置好你的maven仓库，如果你不想你的jar包乱放的话。<br />
+3.配置maven淘宝镜像，体验飞一般的速度。</p>
+
+<p>二、安装git<br />
+在你的服务器上安装git，网上已经有很多git的安装教程，这里便不再重复，其中，几个需要注意的点是：<br />
+1.配置git的环境变量。<br />
+2.配置ssh，这里可以直接参考官网教程，这里为什么需要配置ssh呢？这是因为当我们使用git
+pull命令时需要手动的填入密码，我们使用shell操作时要模拟输入密码的这个过程比较麻烦，所以我们使用ssh的通信方式可以省过这个输入密码的过程，当然了，让你创建仓库拉取代码的时候，你也需要使用ssh的获取方式</p>
+
+<p>三、测试maven与git<br />
+首先测试git看看能否拉取代码，这里可以参考这篇文章 记录了一些常用的git命令，非常实用。</p>
+
+<pre><code>git remote rm origin
+git remote add origin git@gitee.com:jjtHappy/hospital.git
+git push origin
+</code></pre>
+
+<p>拉取之后尝试编译打包：</p>
+
+<pre><code>mvn clean package -Dmaven.test.skip=true -Premote
+</code></pre>
+
+<p>当执行成功之后，你将会在你的代码库中看到生成target的文件夹，进入之后会看到你打包出来的项目<br />
+<a href="https://img.it610.com/image/info8/42fbdae0730341878f57f4aec0eb8793.png"><img src="https://img.it610.com/image/info8/42fbdae0730341878f57f4aec0eb8793.png" alt="使用git+maven+shell实现持续集成_第2张图片" /></a><br />
+看到这里，已经证明你离成功不远了。</p>
+
+<p>四、把tomcat配置成服务<br />
+这里可以参考我写的另外一篇文章这里，为什么要把tomcat配置成服务呢？</p>
+
+<ul>
+<li>可以做成开机启动</li>
+<li>停止tomcat的时候可以使用服务去停，不用用kill -9，不用用./shutdown.sh，你可能会说你想用./shutdown.sh，但是你要考虑使用./shutdown.sh的时候能不能杀干净进程。</li>
+<li>启动时可以用服务启动</li>
+</ul>
+
+<p>因为第二、第三点的原因，我们需要把tomcat配置成服务器，这样我们就可以简单的使用</p>
+
+<pre><code>service tomcat start
+service tomcat stop
+</code></pre>
+
+<p>的命令来操作tomcat了。</p>
+
+<p>五、shell<br />
+接下来就是重头戏了，shell是整个持续集成的核心，是帮我们操作的机器人，他主要完成以下逻辑：<br />
+<a href="https://img.it610.com/image/info8/547228c8cafd4b38992260d21e44ca4e.png"><img src="https://img.it610.com/image/info8/547228c8cafd4b38992260d21e44ca4e.png" alt="使用git+maven+shell实现持续集成_第3张图片" /></a></p>
+
+<p>接下来还是通过shell代码来认识整个逻辑：</p>
+
+<p>deploy.sh</p>
+
+<pre><code>#! /bin/bash
+logsPath=/home/apps/service/deploy/logs #日志地址
+srcPath=/home/apps/software/git-repository/hospital #源码地址
+deployPath=/home/apps/service/webapps/hospital #部署路径
+function log(){#日志函数
+        logPath=$logsPath/deploy.`date +%Y-%m-%d`.log
+        if [ ! -d $logsPath  ]; then
+                mkdir -p $logsPath
+        fi
+        if [ ! -d $logPath ];then
+                touch $logPath
+        fi
+        echo [`date +%Y-%m-%d\ %H:%M:%S`] $* &gt;&gt; $logPath;
+}
+
+#执行git拉取源码
+log 'pull src from github'
+cd $srcPath
+gitLog=`git pull origin 2&gt;&amp;1` 
+if [ $? -ne 0  ];
+then 
+    log $gitLog
+    exit $?
+fi
+echo &quot;$gitLog&quot; | while read line
+do 
+    log $line
+done
+
+#执行maven进行编译
+log 'maven is building'
+mavenLog=`mvn clean package -Dmaven.test.skip=true -Premote  2&gt;&amp;1`
+if [ $? -ne 0  ];
+then 
+        log $mavenLog
+        exit $?
+fi
+echo &quot;$mavenLog&quot; | while read line
+do 
+        log $line
+done
+
+#杀死tomcat
+log 'stop tomcat service'
+tomcatLog=`service tomcat stop 2&gt;&amp;1`
+
+#删除旧部署数据
+log 'delete old deploy data'
+rm $deployPath/* -rf
+log 'copy war to deploy path'
+
+#把代码包拷贝到部署路径
+cp $srcPath/target/hospital.war $deployPath/hospital.war
+cd $deployPath 
+unzip hospital.war &gt; /dev/null
+
+#启动tomcat
+log 'start tomcat'
+service tomcat start
+
+#检测tomcat进程
+TomcatID=$(ps -ef |grep tomcat |grep -w 'tomcat'|grep -v 'grep'|awk '{print $2}')  
+log tomcatId is $TomcatID
+</code></pre>
+
+<p>执行脚本获取日志：</p>
+
+<pre><code>[2017-12-26 10:43:57] pull src from github
+[2017-12-26 10:43:59] 来自 gitee.com:jjtHappy/hospital
+[2017-12-26 10:43:59] a7f407d..3f9190d master -&gt; origin/master
+[2017-12-26 10:43:59] 更新 a7f407d..3f9190d
+[2017-12-26 10:43:59] Fast-forward
+[2017-12-26 10:43:59] pom.xml | 2 +-
+[2017-12-26 10:43:59] 1 file changed, 1 insertion(+), 1 deletion(-)
+[2017-12-26 10:43:59] maven is building
+[2017-12-26 10:44:10] [INFO] Scanning for projects...
+[2017-12-26 10:44:10] [WARNING]
+[2017-12-26 10:44:10] [WARNING] Some problems were encountered while building the effective model for com.haizhi:hospital:war:0.0.1-SNAPSHOT
+[2017-12-26 10:44:10] [WARNING] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: org.slf4j:slf4j-log4j12:jar -&gt; duplicate declaration of version 1.6.1 @ line 299, column 15
+[2017-12-26 10:44:10] [WARNING] 'dependencies.dependency.scope' for org.springframework.data:spring-data-releasetrain:pom must be one of [provided, compile, runtime, test, system] but is 'import'. @ line 215, column 11
+[2017-12-26 10:44:10] [WARNING]
+[2017-12-26 10:44:10] [WARNING] It is highly recommended to fix these problems because they threaten the stability of your build.
+[2017-12-26 10:44:10] [WARNING]
+[2017-12-26 10:44:10] [WARNING] For this reason, future Maven versions might no longer support building such malformed projects.
+[2017-12-26 10:44:10] [WARNING]
+[2017-12-26 10:44:10] [INFO]
+[2017-12-26 10:44:10] [INFO] ------------------------------------------------------------------------
+[2017-12-26 10:44:10] [INFO] Building hospital 0.0.1-SNAPSHOT
+[2017-12-26 10:44:10] [INFO] ------------------------------------------------------------------------
+[2017-12-26 10:44:10] [INFO]
+[2017-12-26 10:44:10] [INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ hospital ---
+[2017-12-26 10:44:10] [INFO] Deleting /home/apps/software/git-repository/hospital/target
+[2017-12-26 10:44:10] [INFO]
+[2017-12-26 10:44:10] [INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ hospital ---
+[2017-12-26 10:44:10] [INFO] Using 'UTF-8' encoding to copy filtered resources.
+[2017-12-26 10:44:10] [INFO] Copying 10 resources
+[2017-12-26 10:44:10] [INFO]
+[2017-12-26 10:44:10] [INFO] --- maven-compiler-plugin:3.1:compile (default-compile) @ hospital ---
+[2017-12-26 10:44:10] [INFO] Changes detected - recompiling the module!
+[2017-12-26 10:44:10] [INFO] Compiling 218 source files to /home/apps/software/git-repository/hospital/target/classes
+[2017-12-26 10:44:10] [WARNING] /home/apps/software/git-repository/hospital/src/main/java/com/haizhi/hospital/freemark/intf/impl/MedicalRecordDocServiceImpl.java: /home/apps/software/git-repository/hospital/src/main/java/com/haizhi/hospital/freemark/intf/impl/MedicalRecordDocServiceImpl.java使用或覆盖了已过时的 API。
+[2017-12-26 10:44:10] [WARNING] /home/apps/software/git-repository/hospital/src/main/java/com/haizhi/hospital/freemark/intf/impl/MedicalRecordDocServiceImpl.java: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+[2017-12-26 10:44:10] [WARNING] /home/apps/software/git-repository/hospital/src/main/java/com/haizhi/hospital/dao/special/impl/StatisticRegisterDaoImpl.java: 某些输入文件使用了未经检查或不安全的操作。
+[2017-12-26 10:44:10] [WARNING] /home/apps/software/git-repository/hospital/src/main/java/com/haizhi/hospital/dao/special/impl/StatisticRegisterDaoImpl.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[2017-12-26 10:44:10] [INFO]
+[2017-12-26 10:44:10] [INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ hospital ---
+[2017-12-26 10:44:10] [INFO] Not copying test resources
+[2017-12-26 10:44:10] [INFO]
+[2017-12-26 10:44:10] [INFO] --- maven-compiler-plugin:3.1:testCompile (default-testCompile) @ hospital ---
+[2017-12-26 10:44:10] [INFO] Not compiling test sources
+[2017-12-26 10:44:10] [INFO]
+[2017-12-26 10:44:10] [INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ hospital ---
+[2017-12-26 10:44:10] [INFO] Tests are skipped.
+[2017-12-26 10:44:10] [INFO]
+[2017-12-26 10:44:10] [INFO] --- maven-war-plugin:2.2:war (default-war) @ hospital ---
+[2017-12-26 10:44:10] [INFO] Packaging webapp
+[2017-12-26 10:44:10] [INFO] Assembling webapp [hospital] in [/home/apps/software/git-repository/hospital/target/hospital]
+[2017-12-26 10:44:10] [INFO] Processing war project
+[2017-12-26 10:44:10] [INFO] Copying webapp resources [/home/apps/software/git-repository/hospital/src/main/webapp]
+[2017-12-26 10:44:10] [INFO] Webapp assembled in [342 msecs]
+[2017-12-26 10:44:10] [INFO] Building war: /home/apps/software/git-repository/hospital/target/hospital.war
+[2017-12-26 10:44:10] [INFO] WEB-INF/web.xml already added, skipping
+[2017-12-26 10:44:10] [INFO] ------------------------------------------------------------------------
+[2017-12-26 10:44:10] [INFO] BUILD SUCCESS
+[2017-12-26 10:44:10] [INFO] ------------------------------------------------------------------------
+[2017-12-26 10:44:10] [INFO] Total time: 9.621 s
+[2017-12-26 10:44:10] [INFO] Finished at: 2017-12-26T10:44:10+08:00
+[2017-12-26 10:44:10] [INFO] Final Memory: 28M/263M
+[2017-12-26 10:44:10] [INFO] ------------------------------------------------------------------------
+[2017-12-26 10:44:10] stop tomcat service
+[2017-12-26 10:44:12] delete old deploy data
+[2017-12-26 10:44:12] copy war to deploy path
+[2017-12-26 10:44:13] start tomcat
+[2017-12-26 10:44:13] tomcatId is 37253 37254 37255
+</code></pre>
+
+<p>成功完成整个部署流程。</p>
+
+<p>最后一个环节别忘了，部署脚本不是后台启动的，这里需要创建一个脚本，来后台启动它：</p>
+
+<p>deploy-service.sh</p>
+
+<pre><code>#! /bin/bash
+/home/apps/service/deploy/deploy.sh &amp;
+</code></pre>
+
+<p>以后当你修复的时候，你只需要在本地修改好代码，然后去到服务器执行./deploy-service.sh脚本，那么程序将会自动帮你完成编译-打包-
+部署的整个流程。</p>
+
+<p>看到这里你会说，好麻烦，还需要自己去服务器启动脚本，嘿嘿，其实我也是想到这个点，也已经想出办法，但是懒得做，因为我觉得这样已经够智能了。</p>
+
+<p>使用git hook的功能：<br />
+1.提交代码时自动去调用服务器的某个接口<br />
+2.利用这个接口去启动./deploy-service.sh脚本</p>
+
+<p>这样就能做到你每次一提交就自动编译打包部署，一体化的持续集成过程，是不是很方便咧！赞我@</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>DNS反弹Shell | 开发者问答集锦</title>
+    <meta property="og:title" content="DNS反弹Shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="DNS反弹Shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/dns%E5%8F%8D%E5%BC%B9shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">DNS反弹Shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="0x01-引子">0X01 引子</h1>
+
+<p>反弹Shell广泛应用于远程控制下的权限维持，通过反转攻（客户端）和受（服务端）的角色，来实现条件限制，尤其是内网情况下的远程连接。</p>
+
+<p>反弹Shell的工具和实现方法多种多样，只要能够让被控端通过网络发送数据到控制端，并且实现数据的解析即可完成控制过程。</p>
+
+<p>最近在继续了解网络协议，于是突然想在DNS数据包中插入一些伪造的命令来实现解析，本来准备自己尝试写一个DNS服务器和DNS请求程序来实现反弹，不过刚动笔就看到了别人开源的程序，于是直接使用别人的程序来学习了。</p>
+
+<p><a href="https://github.com/ahhh/Reverse_DNS_Shell">https://github.com/ahhh/Reverse_DNS_Shell</a></p>
+
+<p>为了运行测试更方便，去掉了程序中的加解密功能，额外的Python包只需要dns和dnslib</p>
+
+<h2 id="0x02-dns">0X02 DNS</h2>
+
+<p>为了关联主机和IP地址对应关系而诞生的DNS本身，不需要我在这里赘述了。跳过域名构成、查询过程等可以轻松在网络查询到的内容，我们直接来看看DNS的包构成</p>
+
+<p><img src="https://img.it610.com/image/info8/b3cffe0a688c41f7821a00dc2ba5442b.png" alt="" /></p>
+
+<p>在smtp那篇文章中，我们提过一层一层洋葱状的协议包裹，在这里，我们跳过以太、IP、UDP头，直接到DNS数据的部分。</p>
+
+<ul>
+<li>标志着数据开始的是Tran ID段，所有的问答信息都需要一定的机制来保证对应，这部分应该就是对应机制中的一部分。</li>
+<li>紧接着的Flags，0x0100表明了一些查询属性。</li>
+<li>Queries中是我们所要查询的host，查询类型。作为A类型查询，得到的是host的IP，这里也是我们做手脚的地方，不过TXT类型可以插入一些附加的信息，更适合我们用来构造命令语句。</li>
+</ul>
+
+<p>服务器回应包如下：</p>
+
+<p><img src="https://img.it610.com/image/info8/d9518b42d5bf41ba964ecd9a650e5565.jpg" alt="" /></p>
+
+<ul>
+<li>作为回应的Tran ID，它和查询包相同。</li>
+<li>Flags中标准回应标志位</li>
+<li>重复显示的Queries</li>
+<li>回应的Answers信息。通过CNAME查取主机规范名，再通过规范名查取对应IP。</li>
+</ul>
+
+<p>利用这种相互应答的特性，我们初步计划通过以下流程来实现我们的反弹Shell</p>
+
+<p><img src="https://img.it610.com/image/info8/4b8f04426dfa452c880c172f5c028118.png" alt="" /></p>
+
+<h2 id="0x03-程序">0X03 程序</h2>
+
+<p>原始的程序可以在上面的github中找到，这里贴出我们去掉加解密的部分程序。</p>
+
+<p>先说DNS服务器的部分</p>
+
+<p><img src="https://img.it610.com/image/info8/205cf417d9be45c395cffdf551a07139.png" alt="" /></p>
+
+<p>这一部分封装了对DNS的应答，payload里是被控端发来的查询信息，也就是上一次命令执行后的回显，而out是我们这一次的命令，封装成了TXT的应答包</p>
+
+<p><img src="https://img.it610.com/image/info8/8ef592a604ed4d5c85c4da5804e0d557.png" alt="" /></p>
+
+<p>这部分对于被控端的查询包进行解析，从中获取到地址和数据，对于数据，解析出其中的命令回显，并且初始化一个应答包。</p>
+
+<p>主函数中使用socket监听相关端口，对于监听到的包按照预定流程进行处理。</p>
+
+<p>再来看看被控端发送的部分</p>
+
+<p><img src="https://img.it610.com/image/info8/5abf417494844fcf8283a63f30cd9501.png" alt="" /></p>
+
+<p>首先是整个流程一览，从程序中可以很清晰的看到建立连接，解析命令，执行命令，发送回显的过程。</p>
+
+<p><img src="https://img.it610.com/image/info8/e8542521f0de48c08833b4da3e3cc142.png" alt="" /></p>
+
+<p>构造的url，也就是命令回显，对于没有命令的，会返回nxt。利用回显构造查询语句。</p>
+
+<p><img src="https://img.it610.com/image/info8/974875dc9ec74efc928f1b748ab95105.png" alt="" /></p>
+
+<p>这两段程序对于收到的文本格式的命令进行解析和执行，没有太多的东西可以讲。只是注意格式的截取，并且考虑对Linux和Windows的命令之间转换。</p>
+
+<p><img src="https://img.it610.com/image/info8/6f70d52a02b049fc81133cceb6eddde3.png" alt="" /></p>
+
+<p>这部分负责发送DNS查询，按照与服务器约定的格式构造包并且进行发送。</p>
+
+<h2 id="0x04-测试">0X04 测试</h2>
+
+<p>我们需要先执行服务器端程序，然后执行被控端程序。我的服务端程序在一台Ubuntu主机上，被控端在我的Win10机器上。</p>
+
+<p><img src="https://img.it610.com/image/info8/c56ad4600fde447d90b0b13d5b84ba55.jpg" alt="" /></p>
+
+<p><img src="https://img.it610.com/image/info8/629019bdac804f429819fe14f71052b8.png" alt="" /></p>
+
+<p>这是被控端第一次连接时发送的包，因为控制端还没有指令，第一次连接发送的是空包，其中Name的值bnh0就是我之前所说的NXT</p>
+
+<p><img src="https://img.it610.com/image/info8/0de5a17faaff4eab9e9113622a6fdfc8.png" alt="" /></p>
+
+<p>而第二个包就是控制端发送的指令，在TXT中发送的就是指令whoami的base64编码，</p>
+
+<p>可以对比和我之前实际抓包的不同之处，对照可以看出我们在DNS包的哪些地方做过修改。</p>
+
+<h2 id="0x05-延伸">0X05 延伸</h2>
+
+<p>其实相关的DNS隧道技术原理应该差不多，都是在本来应该放DNS规定信息的地方放入了其他的东西，来达到一些意想不到的结果。</p>
+
+<p>当然，RFC还有许多协议可以让我随意构造去做测试，下一步考虑写一个多协议支持的Fuzzing工具 ：）</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

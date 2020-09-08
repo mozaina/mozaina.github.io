@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>源代码sparkshell解读 | 开发者问答集锦</title>
+    <meta property="og:title" content="源代码sparkshell解读 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="源代码sparkshell解读">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%BA%90%E4%BB%A3%E7%A0%81sparkshell%E8%A7%A3%E8%AF%BB/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">源代码sparkshell解读</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="1-spark-shell启动指定master">1.spark-shell启动指定master</h1>
+
+<pre><code>./bin/spark-shell --master local[4] --jars code.jar  
+</code></pre>
+
+<h1 id="2-错误-system-memory-239075328-must-be-at-least-471859200">2.错误：System memory 239075328 must be at least 471859200</h1>
+
+<pre><code>[root@biluos spark-2.2.0-bin-hadoop2.7]# bin/spark-shell
+Setting default log level to &quot;WARN&quot;.
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+18/03/30 15:46:14 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+18/03/30 15:46:15 ERROR SparkContext: Error initializing SparkContext.
+java.lang.IllegalArgumentException: System memory 239075328 must be at least 471859200. Please increase heap size using the --driver-memory option or spark.driver.memory in Spark configuration.
+        at org.apache.spark.memory.UnifiedMemoryManager$.getMaxMemory(UnifiedMemoryManager.scala:217)
+      org.apache.spark.deploy.SparkSubmit$.org$apache$spark$deploy$SparkSubmit$$runMain(SparkSubmit.scala:755)
+        at org.apache.spark.deploy.SparkSubmit$.doRunMain$1(SparkSubmit.scala:180)
+
+java.lang.IllegalArgumentException: System memory 239075328 must be at least 471859200. Please increase heap size using the --driver-memory option or spark.driver.memory in Spark configuration.
+  at org.apache.spark.memory.UnifiedMemoryManager$.getMaxMemory(UnifiedMemoryManager.scala:217)
+
+:14: error: not found: value spark
+       import spark.implicits._
+              ^
+:14: error: not found: value spark
+       import spark.sql
+              ^
+Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /___/ .__/\_,_/_/ /_/\_\   version 2.2.0
+      /_/
+
+Using Scala version 2.11.8 (Java HotSpot(TM) 64-Bit Server VM, Java 1.8.0_121)
+Type in expressions to have them evaluated.
+Type :help for more information.
+</code></pre>
+
+<p><code>这个原因是内存不够</code>,修改<code>spark-env.sh</code></p>
+
+<pre><code>SPARK_DRIVER_MEMORY=1024M
+</code></pre>
+
+<h1 id="2-源码解析">2.源码解析</h1>
+
+<h2 id="2-1-spark-shell-sh">2.1 spark-shell.sh</h2>
+
+<pre><code>#
+# Shell script for starting the Spark Shell REPL
+
+cygwin=false
+case &quot;$(uname)&quot; in
+  CYGWIN*) cygwin=true;;
+esac
+
+# Enter posix mode for bash
+set -o posix
+
+# 　set 　是显示所有变量       -o  选项名 打开该选项
+#                           +o 选项名 关闭该选项
+#                           如果不写选项名，列出所有选项的状态
+
+if [ -z &quot;${SPARK_HOME}&quot; ]; then
+  source &quot;$(dirname &quot;$0&quot;)&quot;/find-spark-home
+fi
+
+export _SPARK_CMD_USAGE=&quot;Usage: ./bin/spark-shell [options]&quot;
+
+# SPARK-4161: scala does not assume use of the java classpath,
+# so we need to add the &quot;-Dscala.usejavacp=true&quot; flag manually. We
+# do this specifically for the Spark shell because the scala REPL
+# has its own class loader, and any additional classpath specified
+# through spark.driver.extraClassPath is not automatically propagated.
+
+SPARK_SUBMIT_OPTS=&quot;$SPARK_SUBMIT_OPTS -Dscala.usejavacp=true&quot;
+# 修改为：
+#     SPARK_SUBMIT_OPTS=&quot;$SPARK_SUBMIT_OPTS -Dscala.usejavacp=true -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=10207 -Dcom.sun.management.jmxremote.authenticate=false  -Dcom.sun.management.jmxremote.ssl=false&quot;
+
+function main() {
+  if $cygwin; then
+    # Workaround for issue involving JLine and Cygwin
+    # (see http://sourceforge.net/p/jline/bugs/40/).
+    # If you're using the Mintty terminal emulator in Cygwin, may need to set the
+    # &quot;Backspace sends ^H&quot; setting in &quot;Keys&quot; section of the Mintty options
+    # (see https://github.com/sbt/sbt/issues/562).
+    stty -icanon min 1 -echo &gt; /dev/null 2&gt;&amp;1
+    export SPARK_SUBMIT_OPTS=&quot;$SPARK_SUBMIT_OPTS -Djline.terminal=unix&quot;
+    # 这里执行了spark-submit脚本
+    &quot;${SPARK_HOME}&quot;/bin/spark-submit --class org.apache.spark.repl.Main --name &quot;Spark shell&quot; &quot;$@&quot;
+    stty icanon echo &gt; /dev/null 2&gt;&amp;1
+  else
+    export SPARK_SUBMIT_OPTS
+    &quot;${SPARK_HOME}&quot;/bin/spark-submit --class org.apache.spark.repl.Main --name &quot;Spark shell&quot; &quot;$@&quot;
+  fi
+}
+
+# Copy restore-TTY-on-exit functions from Scala script so spark-shell exits properly even in
+# binary distribution of Spark where Scala is not installed
+exit_status=127
+saved_stty=&quot;&quot;
+
+# restore stty settings (echo in particular)
+function restoreSttySettings() {
+  stty $saved_stty
+  saved_stty=&quot;&quot;
+}
+
+function onExit() {
+  if [[ &quot;$saved_stty&quot; != &quot;&quot; ]]; then
+    restoreSttySettings
+  fi
+  exit $exit_status
+}
+
+# to reenable echo if we are interrupted before completing.
+trap onExit INT
+
+# save terminal settings
+saved_stty=$(stty -g 2&gt;/dev/null)
+# clear on error so we don't later try to restore them
+if [[ ! $? ]]; then
+  saved_stty=&quot;&quot;
+fi
+
+main &quot;$@&quot;
+
+# record the exit status lest it be overwritten:
+# then reenable echo and propagate the code.
+exit_status=$?
+onExit
+</code></pre>
+
+<p>这里执行了spark-submit脚本</p>
+
+<p>然后看spark-submit脚本</p>
+
+<pre><code>if [ -z &quot;${SPARK_HOME}&quot; ]; then
+  source &quot;$(dirname &quot;$0&quot;)&quot;/find-spark-home
+fi
+
+# disable randomized hash for string in Python 3.3+
+export PYTHONHASHSEED=0
+
+# 这里可以看到执行了spark-class脚本
+exec &quot;${SPARK_HOME}&quot;/bin/spark-class org.apache.spark.deploy.SparkSubmit &quot;$@&quot;
+</code></pre>
+
+<p>继续看spark-class脚本</p>
+
+<pre><code>if [ -z &quot;${SPARK_HOME}&quot; ]; then
+  source &quot;$(dirname &quot;$0&quot;)&quot;/find-spark-home
+fi
+
+. &quot;${SPARK_HOME}&quot;/bin/load-spark-env.sh
+
+# Find the java binary  这一段，主要是寻找java命令
+if [ -n &quot;${JAVA_HOME}&quot; ]; then
+  RUNNER=&quot;${JAVA_HOME}/bin/java&quot;
+else
+  if [ &quot;$(command -v java)&quot; ]; then
+    RUNNER=&quot;java&quot;
+  else
+    echo &quot;JAVA_HOME is not set&quot; &gt;&amp;2
+    exit 1
+  fi
+
+# Find Spark jars.   寻找spark的jar包 这里如果我们的jar包数量多，而且内容大，可以事先放到每个机器的对应目录下，这里是一个优化点
+if [ -d &quot;${SPARK_HOME}/jars&quot; ]; then
+  SPARK_JARS_DIR=&quot;${SPARK_HOME}/jars&quot;
+else
+  SPARK_JARS_DIR=&quot;${SPARK_HOME}/assembly/target/scala-$SPARK_SCALA_VERSION/jars&quot;
+fi
+
+if [ ! -d &quot;$SPARK_JARS_DIR&quot; ] &amp;&amp; [ -z &quot;$SPARK_TESTING$SPARK_SQL_TESTING&quot; ]; then
+  echo &quot;Failed to find Spark jars directory ($SPARK_JARS_DIR).&quot; 1&gt;&amp;2
+  echo &quot;You need to build Spark with the target \&quot;package\&quot; before running this program.&quot; 1&gt;&amp;2
+  exit 1
+else
+  LAUNCH_CLASSPATH=&quot;$SPARK_JARS_DIR/*&quot;
+fi
+
+# Add the launcher build dir to the classpath if requested.
+if [ -n &quot;$SPARK_PREPEND_CLASSES&quot; ]; then
+  LAUNCH_CLASSPATH=&quot;${SPARK_HOME}/launcher/target/scala-$SPARK_SCALA_VERSION/classes:$LAUNCH_CLASSPATH&quot;
+fi
+
+# For tests
+if [[ -n &quot;$SPARK_TESTING&quot; ]]; then
+  unset YARN_CONF_DIR
+  unset HADOOP_CONF_DIR
+fi
+
+# The launcher library will print arguments separated by a NULL character, to allow arguments with
+# characters that would be otherwise interpreted by the shell. Read that in a while loop, populating
+# an array that will be used to exec the final command.
+# 启动程序库将打印由NULL字符分隔的参数，以允许与shell进行其他解释的字符进行参数。在while循环中读取它，填充将用于执行最终命令的数组。
+#
+# The exit code of the launcher is appended to the output, so the parent shell removes it from the
+# command array and checks the value to see if the launcher succeeded.
+# 启动程序的退出代码被追加到输出，因此父shell从命令数组中删除它，并检查其值，看看启动器是否成功。
+# 这里spark启动了以SparkSubmit为主类的JVM进程。
+build_command() {
+  &quot;$RUNNER&quot; -Xmx128m -cp &quot;$LAUNCH_CLASSPATH&quot; org.apache.spark.launcher.Main &quot;$@&quot;
+  printf &quot;%d\0&quot; $?
+}
+
+# Turn off posix mode since it does not allow process substitution
+# 关闭posix模式，因为它不允许进程替换。
+set +o posix
+CMD=()
+while IFS= read -d '' -r ARG; do
+  CMD+=(&quot;$ARG&quot;)
+done &lt; &amp;2
+  exit 1
+fi
+
+if [ $LAUNCHER_EXIT_CODE != 0 ]; then
+  exit $LAUNCHER_EXIT_CODE
+fi
+
+CMD=(&quot;${CMD[@]:0:$LAST}&quot;)
+exec &quot;${CMD[@]}&quot;
+</code></pre>
+
+<h1 id="2-2-远程监控">2.2 远程监控</h1>
+
+<p>为了方便在本地对Spark进行远程监控，在spark-shell.sh脚本中，添加一些配置</p>
+
+<pre><code># 修改为：
+#     SPARK_SUBMIT_OPTS=&quot;$SPARK_SUBMIT_OPTS -Dscala.usejavacp=true -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=10207 -Dcom.sun.management.jmxremote.authenticate=false  -Dcom.sun.management.jmxremote.ssl=false&quot;
+</code></pre>
+
+<p>然后远程执行spark-shell</p>
+
+<pre><code>[root@bigdata02 spark]# bin/spark-shell 
+Setting default log level to &quot;WARN&quot;.
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/opt/hzjs/spark-2.1.1-bin-hadoop2.7/jars_test/slf4j-log4j12-1.7.16.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/opt/hzjs/spark-2.1.1-bin-hadoop2.7/jars/slf4j-log4j12-1.7.16.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.slf4j.impl.Log4jLoggerFactory]
+18/04/12 16:57:46 WARN spark.SparkConf: 
+SPARK_WORKER_INSTANCES was detected (set to '2').
+This is deprecated in Spark 1.0+.
+
+Please instead use:
+ - ./spark-submit with --num-executors to specify the number of executors
+ - Or set SPARK_EXECUTOR_INSTANCES
+ - spark.executor.instances to configure the number of instances in the spark config.
+
+Spark context Web UI available at http://192.168.10.83:4040
+Spark context available as 'sc' (master = local[*], app id = local-1523523467622).
+Spark session available as 'spark'.
+Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /___/ .__/\_,_/_/ /_/\_\   version 2.1.0
+      /_/
+
+Using Scala version 2.11.8 (Java HotSpot(TM) 64-Bit Server VM, Java 1.8.0_77)
+Type in expressions to have them evaluated.
+Type :help for more information.
+
+scala&gt; 
+</code></pre>
+
+<p>本地打开<code>jvisualvm.exe</code></p>
+
+<p><a href="https://img.it610.com/image/info8/0f3e749ecf9a4c8f935c2280746a5e53.jpg"><img src="https://img.it610.com/image/info8/0f3e749ecf9a4c8f935c2280746a5e53.jpg" alt="源代码：spark-
+shell解读_第1张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/924063b9960543dd8d36eda14fbf56bc.jpg"><img src="https://img.it610.com/image/info8/924063b9960543dd8d36eda14fbf56bc.jpg" alt="源代码：spark-
+shell解读_第2张图片" /></a></p>
+
+<p>这里的端口要和配置的一样</p>
+
+<p><a href="https://img.it610.com/image/info8/7091ab13ed7046fbb5328183f8750444.png"><img src="https://img.it610.com/image/info8/7091ab13ed7046fbb5328183f8750444.png" alt="源代码：spark-
+shell解读_第3张图片" /></a></p>
+
+<p>查看效果</p>
+
+<p><a href="https://img.it610.com/image/info8/2682a88db2ec43149efe807603b6cb62.jpg"><img src="https://img.it610.com/image/info8/2682a88db2ec43149efe807603b6cb62.jpg" alt="源代码：spark-
+shell解读_第4张图片" /></a></p>
+
+<h1 id="3-查看调用结构">3.查看调用结构</h1>
+
+<p>查看线程，然后找到main</p>
+
+<p><a href="https://img.it610.com/image/info8/4c52a355f8ae4675b720610e587bf7d7.jpg"><img src="https://img.it610.com/image/info8/4c52a355f8ae4675b720610e587bf7d7.jpg" alt="源代码：spark-
+shell解读_第5张图片" /></a></p>
+
+<p>可以找到main的信息</p>
+
+<pre><code>&quot;main&quot; - Thread t@1
+   java.lang.Thread.State: RUNNABLE
+        at java.io.FileInputStream.read0(Native Method)
+        at java.io.FileInputStream.read(FileInputStream.java:207)
+        at jline.internal.NonBlockingInputStream.read(NonBlockingInputStream.java:169)
+        - locked &lt;63f65caa&gt; (a jline.internal.NonBlockingInputStream)
+        at jline.internal.NonBlockingInputStream.read(NonBlockingInputStream.java:137)
+        at jline.internal.NonBlockingInputStream.read(NonBlockingInputStream.java:246)
+        at jline.internal.InputStreamReader.read(InputStreamReader.java:261)
+        - locked &lt;63f65caa&gt; (a jline.internal.NonBlockingInputStream)
+        at jline.internal.InputStreamReader.read(InputStreamReader.java:198)
+        - locked &lt;63f65caa&gt; (a jline.internal.NonBlockingInputStream)
+        at jline.console.ConsoleReader.readCharacter(ConsoleReader.java:2145)
+        at jline.console.ConsoleReader.readLine(ConsoleReader.java:2349)
+        at jline.console.ConsoleReader.readLine(ConsoleReader.java:2269)
+        at scala.tools.nsc.interpreter.jline.InteractiveReader.readOneLine(JLineReader.scala:57)
+        at scala.tools.nsc.interpreter.InteractiveReader$class.readLine(InteractiveReader.scala:38)
+        at scala.tools.nsc.interpreter.jline.InteractiveReader.readLine(JLineReader.scala:28)
+        at scala.tools.nsc.interpreter.ILoop.readOneLine(ILoop.scala:404)
+        at scala.tools.nsc.interpreter.ILoop.loop(ILoop.scala:413)
+        at scala.tools.nsc.interpreter.ILoop$$anonfun$process$1.apply$mcZ$sp(ILoop.scala:923)
+        at scala.tools.nsc.interpreter.ILoop$$anonfun$process$1.apply(ILoop.scala:909)
+        at scala.tools.nsc.interpreter.ILoop$$anonfun$process$1.apply(ILoop.scala:909)
+        at scala.reflect.internal.util.ScalaClassLoader$.savingContextLoader(ScalaClassLoader.scala:97)
+        at scala.tools.nsc.interpreter.ILoop.process(ILoop.scala:909)
+        at org.apache.spark.repl.Main$.doMain(Main.scala:68)
+        at org.apache.spark.repl.Main$.main(Main.scala:51)
+        at org.apache.spark.repl.Main.main(Main.scala)
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:498)
+        at org.apache.spark.deploy.SparkSubmit$.org$apache$spark$deploy$SparkSubmit$$runMain(SparkSubmit.scala:738)
+        at org.apache.spark.deploy.SparkSubmit$.doRunMain$1(SparkSubmit.scala:187)
+        at org.apache.spark.deploy.SparkSubmit$.submit(SparkSubmit.scala:212)
+        at org.apache.spark.deploy.SparkSubmit$.main(SparkSubmit.scala:126)
+        at org.apache.spark.deploy.SparkSubmit.main(SparkSubmit.scala)
+
+   Locked ownable synchronizers:
+        - None
+</code></pre>
+
+<p>然后从这里可以看到，main线程的栈信息中可以看到程序的调用顺序：<br />
+<code>sparkSubmit.main ---&gt; repl.main --&gt; lLoop.process</code></p>
+
+<h2 id="3-1-源码分析">3.1 源码分析</h2>
+
+<p>根据这句话</p>
+
+<pre><code>&quot;${SPARK_HOME}&quot;/bin/spark-submit --class org.apache.spark.repl.Main --name &quot;Spark shell&quot; &quot;$@&quot;
+</code></pre>
+
+<p>我们看到使用<code>bin/spark-submit</code>去先运行了<code>org.apache.spark.repl.Main</code>的<code>main</code>方法</p>
+
+<p><a href="https://img.it610.com/image/info8/1f1d6060d15546b5bced9b40d89e00a9.jpg"><img src="https://img.it610.com/image/info8/1f1d6060d15546b5bced9b40d89e00a9.jpg" alt="源代码：spark-
+shell解读_第6张图片" /></a></p>
+
+<p>可以看到有俩，但是暂且不看2.10的因为毕竟老了一辈，而且还那么多文件，表示不爽，直接看新的<br />
+先看main对象方法<br />
+前几行</p>
+
+<h2 id="日志">日志</h2>
+
+<pre><code>// 初始化日志
+  initializeLogIfNecessary(true)
+
+
+ protected def initializeLogIfNecessary(isInterpreter: Boolean): Unit = {
+    // initialized默认为false，这里为true
+    if (!Logging.initialized) {
+      Logging.initLock.synchronized {
+        // initialized默认为false，这里为true
+        if (!Logging.initialized) {
+          // 默认isInterpreter为true
+          initializeLogging(isInterpreter)
+        }
+      }
+    }
+  }
+
+
+/**
+    * 初始化日志
+    * @param isInterpreter
+    */
+  private def initializeLogging(isInterpreter: Boolean): Unit = {
+    // Don't use a logger in here, as this is itself occurring during initialization of a logger
+    // If Log4j 1.2 is being used, but is not initialized, load a default properties file
+    // 在这里不要使用logger，因为如果Log4j 1.2被使用，但是没有初始化，加载一个默认属性文件，就会发生这种情况。
+    val binderClass = StaticLoggerBinder.getSingleton.getLoggerFactoryClassStr
+    // This distinguishes the log4j 1.2 binding, currently
+    // org.slf4j.impl.Log4jLoggerFactory, from the log4j 2.0 binding, currently
+    // org.apache.logging.slf4j.Log4jLoggerFactory
+
+    // 这区分了log4j 1.2绑定，目前是org.slf4j.impl。log4j 2.0绑定的Log4jLoggerFactory，
+    // 当前org.apache.logging.slf4j.Log4jLoggerFactory。
+    val usingLog4j12 = &quot;org.slf4j.impl.Log4jLoggerFactory&quot;.equals(binderClass)
+    if (usingLog4j12) {
+      val log4j12Initialized = LogManager.getRootLogger.getAllAppenders.hasMoreElements
+      // scalastyle:off println
+      if (!log4j12Initialized) {
+        val defaultLogProps = &quot;org/apache/spark/log4j-defaults.properties&quot;
+        Option(Utils.getSparkClassLoader.getResource(defaultLogProps)) match {
+          case Some(url) =&gt;
+            PropertyConfigurator.configure(url)
+            // Using Spark's default log4j profile: org/apache/spark/log4j-defaults.properties  第一句话
+            System.err.println(s&quot;Using Spark's default log4j profile: $defaultLogProps&quot;)
+          case None =&gt;
+            System.err.println(s&quot;Spark was unable to load $defaultLogProps&quot;)
+        }
+      }
+
+      if (isInterpreter) {
+        // Use the repl's main class to define the default log level when running the shell,
+        // overriding the root logger's config if they're different.
+        // 使用repl的主类来定义运行shell时的默认日志级别，如果它们不同，则重写根日志记录器的配置。
+        val rootLogger = LogManager.getRootLogger()
+        val replLogger = LogManager.getLogger(logName)
+        // 日志级别默认为warn
+        val replLevel = Option(replLogger.getLevel()).getOrElse(Level.WARN)
+        if (replLevel != rootLogger.getEffectiveLevel()) {
+          System.err.printf(&quot;Setting default log level to \&quot;%s\&quot;.\n&quot;, replLevel)
+          System.err.println(&quot;To adjust logging level use sc.setLogLevel(newLevel). &quot; +
+            &quot;For SparkR, use setLogLevel(newLevel).&quot;)
+          rootLogger.setLevel(replLevel)
+        }
+      }
+      // scalastyle:on println
+    }
+    Logging.initialized = true
+
+    // Force a call into slf4j to initialize it. Avoids this happening from multiple threads
+    // and triggering this: http://mailman.qos.ch/pipermail/slf4j-dev/2010-April/002956.html
+    log
+  }
+</code></pre>
+
+<h2 id="原来ctrl-c能终止程序的原因在这里">原来ctrl+c能终止程序的原因在这里</h2>
+
+<p>main对象</p>
+
+<pre><code> // z注册一个信号事件：当我们按下ctrl+c键的时候，会调用对应的信号处理程序，先获取活动的SparkContext，然后取消全部的job
+  Signaling.cancelOnInterrupt()
+</code></pre>
+
+<p>注册一个<code>ctrl+c</code>监听事件</p>
+
+<pre><code>/**
+   * Register a SIGINT handler, that terminates all active spark jobs or terminates
+   * when no jobs are currently running.
+   * This makes it possible to interrupt a running shell job by pressing Ctrl+C.
+    *
+    * 注册一个SIGINT处理程序，在当前没有作业时终止所有活跃的spark作业或终止。
+    * 这使得通过按Ctrl+C来中断运行的shell任务成为可能。
+    *
+    * 当我们按下ctrl+c键的时候，会调用对应的信号处理程序，先获取活动的SparkContext，然后取消全部的job
+   */
+  def cancelOnInterrupt(): Unit = SignalUtils.register(&quot;INT&quot;) {
+    // 获取活动的SparkContext，并且遍历
+    SparkContext.getActive.map { ctx =&gt;
+      if (!ctx.statusTracker.getActiveJobIds().isEmpty) {
+        logWarning(&quot;Cancelling all active jobs, this can take a while. &quot; +
+          &quot;Press Ctrl+C again to exit now.&quot;)
+        ctx.cancelAllJobs()
+        true
+      } else {
+        false
+      }
+    }.getOrElse(false)
+  }
+</code></pre>
+
+<p>然后调用了<code>SparkContext</code>的方法</p>
+
+<pre><code>/** Cancel all jobs that have been scheduled or are running.
+    * 取消所有的jobs已被预定或运行。
+    * */
+  def cancelAllJobs() {
+    assertNotStopped()
+    dagScheduler.cancelAllJobs()
+  }
+</code></pre>
+
+<p>然后调用了DAG的方法</p>
+
+<pre><code> /**
+   * Cancel all jobs that are running or waiting in the queue.
+    * 取消正在运行或在队列中等待的所有作业。
+   */
+  def cancelAllJobs(): Unit = {
+    eventProcessLoop.post(AllJobsCancelled)
+  }
+</code></pre>
+
+<h2 id="正式看我们的main函数">正式看我们的main函数</h2>
+
+<pre><code> /**
+    * main方法
+    * @param args
+    */
+  def main(args: Array[String]) {
+    // 这里先new  SparkILoop，然后才是调用doMain（）
+    doMain(args, new SparkILoop)
+  }
+</code></pre>
+
+<p>然后看new SparkILoop，但是里面都是方法，所以先不管，然后看看你doMain(）</p>
+
+<pre><code> // Visible for testing 可见测试
+  private[repl] def doMain(args: Array[String], _interp: SparkILoop): Unit = {
+    interp = _interp
+    val jars = Utils.getUserJars(conf, isShell = true).mkString(File.pathSeparator)
+    val interpArguments = List(
+      &quot;-Yrepl-class-based&quot;,
+      &quot;-Yrepl-outdir&quot;, s&quot;${outputDir.getAbsolutePath}&quot;,
+      &quot;-classpath&quot;, jars
+    ) ++ args.toList
+
+    val settings = new GenericRunnerSettings(scalaOptionError)
+    // 一个可变对象设置。
+    settings.processArguments(interpArguments, true)
+
+    // 默认为false，这里为true
+    if (!hasErrors) {
+      /**  这里调用lLoop的process() --&gt; SparkILoop.loadFiles --&gt; SparkILoop.initializeSpark() */
+      interp.process(settings) // Repl starts and goes in loop of R.E.P.L
+      Option(sparkContext).foreach(_.stop)
+    }
+  }
+</code></pre>
+
+<p>先看这一句
+<code>interp.process(settings)</code>，这句话调用了<code>scala.tools.nsc.interpreter.ILoop</code>的process方法。</p>
+
+<pre><code> // start an interpreter with the given settings
+  def process(settings: Settings): Boolean = savingContextLoader {
+    this.settings = settings
+    createInterpreter()
+
+    // sets in to some kind of reader depending on environmental cues
+    in = in0.fold(chooseReader(settings))(r =&gt; SimpleReader(r, out, interactive = true))
+    globalFuture = future {
+      intp.initializeSynchronous()
+      loopPostInit()
+      !intp.reporter.hasErrors
+    }
+    loadFiles(settings)
+    printWelcome()
+
+    try loop() match {
+      case LineResults.EOF =&gt; out print Properties.shellInterruptedString
+      case _               =&gt;
+    }
+    catch AbstractOrMissingHandler()
+    finally closeInterpreter()
+
+    true
+  }
+</code></pre>
+
+<p>这里面主要调用了下面两个方法</p>
+
+<pre><code>loadFiles(settings)
+printWelcome()
+</code></pre>
+
+<p>而<code>SparkILoop</code>继承了<code>scala.tools.nsc.interpreter.ILoop</code>，并且重写了上面两个方法，先看重写的<code>loadFiles</code>方法</p>
+
+<pre><code>/**
+   * We override `loadFiles` because we need to initialize Spark *before* the REPL
+   * sees any files, so that the Spark context is visible in those files. This is a bit of a
+   * hack, but there isn't another hook available to us at this point.
+    *
+    *
+    *
+    *
+    * lLoop的process滴啊用了loadFiles方法，而，SparkLoop继承了lloop并且重写了loadFiles（）方法
+   */
+  override def loadFiles(settings: Settings): Unit = {
+    /**
+      * 这里调用了SparkLoop的初始化方法
+      */
+    initializeSpark()
+    super.loadFiles(settings)
+  }
+</code></pre>
+
+<p>这里调用了初始化方法<code>initializeSpark()</code></p>
+
+<pre><code>def initializeSpark() {
+    intp.beQuietDuring {
+      // initializeSpark向交互式shell发送一大串代码，Scala的交互shell将调用org.apache.spark.repl.Main的
+      // createSparkSession方法创建Spark-Session。我们看到常量spark将持有SparkSession的引用，并且sc持有
+      // SparkSession内部初始化好的SparkContext.所以我们才能在spark-shell的交互式shell中使用sc和spark.
+      /**
+        * val spark = if (org.apache.spark.repl.Main.sparkSession != null) {
+        *            org.apache.spark.repl.Main.sparkSession
+        *   } else {
+        *             org.apache.spark.repl.Main.createSparkSession()
+        *  }
+        *
+        *  这里开始org.apache.spark.repl.Main.sparkSession为null，所以调用org.apache.spark.repl.Main.createSparkSession()
+        *  否则重用这个org.apache.spark.repl.Main.sparkSession
+        */
+      processLine(&quot;&quot;&quot;
+        @transient val spark = if (org.apache.spark.repl.Main.sparkSession != null) {
+            org.apache.spark.repl.Main.sparkSession
+          } else {
+            org.apache.spark.repl.Main.createSparkSession()
+          }
+        @transient val sc = {
+          val _sc = spark.sparkContext
+          if (_sc.getConf.getBoolean(&quot;spark.ui.reverseProxy&quot;, false)) {
+            val proxyUrl = _sc.getConf.get(&quot;spark.ui.reverseProxyUrl&quot;, null)
+            if (proxyUrl != null) {
+              println(s&quot;Spark Context Web UI is available at ${proxyUrl}/proxy/${_sc.applicationId}&quot;)
+            } else {
+              println(s&quot;Spark Context Web UI is available at Spark Master Public URL&quot;)
+            }
+          } else {
+            _sc.uiWebUrl.foreach {
+              webUrl =&gt; println(s&quot;Spark context Web UI available at ${webUrl}&quot;)
+            }
+          }
+          println(&quot;Spark context available as 'sc' &quot; +
+            s&quot;(master = ${_sc.master}, app id = ${_sc.applicationId}).&quot;)
+          println(&quot;Spark session available as 'spark'.&quot;)
+          _sc
+        }
+        &quot;&quot;&quot;)
+      processLine(&quot;import org.apache.spark.SparkContext._&quot;)
+      processLine(&quot;import spark.implicits._&quot;)
+      processLine(&quot;import spark.sql&quot;)
+      processLine(&quot;import org.apache.spark.sql.functions._&quot;)
+      replayCommandStack = Nil // remove above commands from session history.
+    }
+  }
+</code></pre>
+
+<p>这里创建了名字为<code>spark</code>和<code>sc</code>的SparkSession对象。</p>
+
+<p>然后看<code>printWelcome()</code> 看子类<code>SparkILoop</code>的</p>
+
+<pre><code>  /** Print a welcome message */
+  override def printWelcome() {
+    import org.apache.spark.SPARK_VERSION
+    echo(&quot;&quot;&quot;Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /___/ .__/\_,_/_/ /_/\_\   version %s
+      /_/
+         &quot;&quot;&quot;.format(SPARK_VERSION))
+    val welcomeMsg = &quot;Using Scala %s (%s, Java %s)&quot;.format(
+      versionString, javaVmName, javaVersion)
+    echo(welcomeMsg)
+    echo(&quot;Type in expressions to have them evaluated.&quot;)
+    echo(&quot;Type :help for more information.&quot;)
+  }
+</code></pre>
+
+<p>看到这里我们知道了，原来每次执行<code>Spark-shell</code>打印的welcom信息了</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linuxshell脚本EOF妙用 | 开发者问答集锦</title>
+    <meta property="og:title" content="linuxshell脚本EOF妙用 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linuxshell脚本EOF妙用">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E8%84%9A%E6%9C%ACeof%E5%A6%99%E7%94%A8/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linuxshell脚本EOF妙用</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>在平时的运维工作中，我们经常会碰到这样一个场景：<br />
+执行脚本的时候，需要往一个文件里自动输入N行内容。如果是少数的几行内容，还可以用echo追加方式，但如果是很多行，那么单纯用echo追加的方式就显得愚蠢之极了！<br />
+这个时候，就可以使用EOF结合cat命令进行行内容的追加了。</p>
+
+<p>下面就对EOF的用法进行梳理：<br />
+EOF是END Of File的缩写,表示自定义终止符.既然自定义,那么EOF就不是固定的,可以随意设置别名,在linux按ctrl-d就代表EOF.<br />
+EOF一般会配合cat能够多行文本输出.<br />
+其用法如下:<br />
+&lt;//开始<br />
+&hellip;.<br />
+EOF //结束</p>
+
+<p>还可以自定义，比如自定义：<br />
+&lt;//开始<br />
+&hellip;.<br />
+BBB //结束</p>
+
+<p>通过cat配合重定向能够生成文件并追加操作,在它之前先熟悉几个特殊符号:<br />
+&lt; :输入重定向<br />
+&gt; :输出重定向<br />
+&gt;&gt; :输出重定向,进行追加,不会覆盖之前内容</p>
+
+<p>&lt;&lt; :标准输入来自命令行的一对分隔号的中间内容.</p>
+
+<p>先举一个简单的例子，例1：</p>
+
+<h1 id="cat-eof">cat &lt;&lt; EOF</h1>
+
+<p>在出现输入提示符&rdquo;&gt;&ldquo;，输入以下内容：<br />
+&gt; Hello<br />
+&gt; EOF<br />
+输入结束后，在终端显示以下内容：<br />
+Hello</p>
+
+<p>思考：<br />
+我们可以从cat命令的说明中知道，cat的操作对象是文件，但是例1中cat的操作对象不是文件，而是用户输入。</p>
+
+<p>那么我们可以这样理解例1：先在文件file中输入“Hello”，再用cat file输出其中的内容。</p>
+
+<p>也就是说我们可以用一个文件来替代&rdquo;&lt;&lt; EOF EOF&rdquo;。<br />
+反过来说，如果操作命令中的文件是输入对象，也可以用&rdquo;&lt;&lt; EOF EOF&rdquo;来替代的。</p>
+
+<p>为了验证上面的思考，我们试验两个例子：<br />
+例2. 假设有如下的磁盘分区脚本：<br />
+sfdisk -uM /dev/sda &lt;&lt; EOF<br />
+,2048,b<br />
+,1024,83<br />
+,1024,83<br />
+EOF<br />
+根据之前的思考，将&rdquo;&lt;&lt; EOF&rdquo;和&rdquo;EOF&rdquo;之间的内容保存到文件part中，然后将脚本修改为：<br />
+sfdisk -uM /dev/sda &lt; part<br />
+经测试，修改后的方式可以达到同样的分区结果。</p>
+
+<p>例3. 将一个文件的内容输出到另一个文件中：</p>
+
+<h1 id="cat-filea-fileb">cat fileA &gt; fileB</h1>
+
+<p>按照之前的思考，将&rdquo;&lt;&lt; EOF EOF&rdquo;替代输入对象文件fileA：</p>
+
+<h1 id="cat-eof-fileb">cat &lt;&lt; EOF &gt; fileB</h1>
+
+<p>经测试，命令执行后提示用户输入内容，输入结束后，用户的输入内容被保存到了fileB中。</p>
+
+<p>综上所述，“&lt;&lt; EOF EOF”的作用是在命令执行过程中用户自定义输入，它类似于起到一个临时文件的作用，只是比使用文件更方便灵活。</p>
+
+<p>下面通过具体实例来感受下EOF用法的妙处：<br />
+1）向文件test.sh里输入内容。<br />
+[root@slave-server opt]# cat <EOF >test.sh<br />
+&gt; 123123123<br />
+&gt; 3452354345<br />
+&gt; asdfasdfs<br />
+&gt; EOF<br />
+[root@slave-server opt]# cat test.sh<br />
+123123123<br />
+3452354345<br />
+asdfasdfs</p>
+
+<p>追加内容<br />
+[root@slave-server opt]# cat <EOF >&gt;test.sh<br />
+&gt; 7777<br />
+&gt; 8888<br />
+&gt; EOF<br />
+[root@slave-server opt]# cat test.sh<br />
+123123123<br />
+3452354345<br />
+asdfasdfs<br />
+7777<br />
+8888</p>
+
+<p>覆盖<br />
+[root@slave-server opt]# cat &lt;&lt; EOF &gt;test.sh<br />
+&gt; 55555<br />
+&gt; EOF<br />
+[root@slave-server opt]# cat test.sh<br />
+55555</p>
+
+<p>2）自定义EOF，比如自定义为wang<br />
+[root@slave-server opt]# cat <wang > haha.txt<br />
+&gt; ggggggg<br />
+&gt; 4444444<br />
+&gt; 6666666<br />
+&gt; wang<br />
+[root@slave-server opt]# cat haha.txt<br />
+ggggggg<br />
+4444444<br />
+6666666</p>
+
+<p>3）可以编写脚本，向一个文件输入多行内容<br />
+[root@slave-server opt]# touch /usr/local/mysql/my.cnf
+//文件不提前创建也行，如果不存在，EOF命令中也会自动创建<br />
+[root@slave-server opt]# vim test.sh<br />
+#!/bin/bash</p>
+
+<p>cat &gt; /usr/local/mysql/my.cnf &lt;&lt; EOF //或者cat &lt;&lt; EOF &gt; /usr/local/mysql/my.cnf<br />
+[client]<br />
+port = 3306<br />
+socket = /usr/local/mysql/var/mysql.sock</p>
+
+<p>[mysqld]<br />
+port = 3306<br />
+socket = /usr/local/mysql/var/mysql.sock</p>
+
+<p>basedir = /usr/local/mysql/<br />
+datadir = /data/mysql/data<br />
+pid-file = /data/mysql/data/mysql.pid<br />
+user = mysql<br />
+bind-address = 0.0.0.0<br />
+server-id = 1<br />
+sync_binlog=1<br />
+log_bin = mysql-bin</p>
+
+<p>[myisamchk]<br />
+key_buffer_size = 8M<br />
+sort_buffer_size = 8M<br />
+read_buffer = 4M<br />
+write_buffer = 4M</p>
+
+<p>sql_mode=NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES<br />
+port = 3306<br />
+EOF</p>
+
+<p>[root@slave-server opt]# sh test.sh //执行上面脚本<br />
+[root@slave-server opt]# cat /usr/local/mysql/my.cnf //检查脚本中的EOF是否写入成功<br />
+[client]<br />
+port = 3306<br />
+socket = /usr/local/mysql/var/mysql.sock</p>
+
+<p>[mysqld]<br />
+port = 3306<br />
+socket = /usr/local/mysql/var/mysql.sock</p>
+
+<p>basedir = /usr/local/mysql/<br />
+datadir = /data/mysql/data<br />
+pid-file = /data/mysql/data/mysql.pid<br />
+user = mysql<br />
+bind-address = 0.0.0.0<br />
+server-id = 1<br />
+sync_binlog=1<br />
+log_bin = mysql-bin</p>
+
+<p>[myisamchk]<br />
+key_buffer_size = 8M<br />
+sort_buffer_size = 8M<br />
+read_buffer = 4M<br />
+write_buffer = 4M</p>
+
+<p>sql_mode=NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES<br />
+port = 3306</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;<br />
+下面分享一个自动新建分区并挂载的脚本：</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>|</p>
+
+<p><code>[root@es-node1 ~]</code> <code># cat auto_add_disk.sh</code></p>
+
+<p><code>#!/bin/bash</code></p>
+
+<p><code>fdisk</code> <code>/dev/sdb</code> <code>&lt;</code></p>
+
+<p><code>n</code></p>
+
+<p><code>p</code></p>
+
+<p><code>1</code></p>
+
+<p><code>wq</code></p>
+
+<p><code>EOF</code></p>
+
+<p><code>/sbin/mkfs</code> <code>.ext4</code> <code>/dev/sdb1</code> <code>&amp;&amp;</code> <code>/bin/mkdir</code> <code>-p</code> <code>/data</code> <code>&amp;&amp;</code>
+<code>/bin/mount</code> <code>/dev/sdb1</code> <code>/data</code></p>
+
+<p><code>echo</code> <code>'LABEL=data_disk /data ext4 defaults 0 2'</code> <code>&gt;&gt;</code> <code>/etc/fstab</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

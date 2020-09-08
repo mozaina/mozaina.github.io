@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>自己写一个Linux的shell程序 | 开发者问答集锦</title>
+    <meta property="og:title" content="自己写一个Linux的shell程序 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="自己写一个Linux的shell程序">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E8%87%AA%E5%B7%B1%E5%86%99%E4%B8%80%E4%B8%AAlinux%E7%9A%84shell%E7%A8%8B%E5%BA%8F/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">自己写一个Linux的shell程序</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="linux下的shell程序设计">Linux下的Shell程序设计</h2>
+
+<p>我们需要设计一个shell程序，目前实现的功能有如下：</p>
+
+<ol>
+<li>获取当前操作系统的用户名、当前路径、以及操作权限展示为提示符</li>
+<li>输入一系列的内部指令并执行：cd、exit、help以及无效指令</li>
+<li>输入一系列的外部指令并执行：ps、ls执行当前路径文件等</li>
+<li>利用管道标识符“||”将标识符的命令输出的内容作为标识符后面的命令的输入内容</li>
+<li>利用 &lt; 和 &gt;进行输入输出的重定向</li>
+<li>循环执行命令</li>
+</ol>
+
+<p>下面将逐步拆解shell程序讲解其编写</p>
+
+<p>首先我们需要定义我们的shell程序的 <strong>运行逻辑</strong> 如下：</p>
+
+<blockquote>
+<p>1.开启shell程序进程<br />
+ 2.进入执行循环<br />
+ 2.1获取操作系统的用户名、当前路径、操作权限并作为提示符输出<br />
+ 2.2接收一整行的输入<br />
+ 2.3将一整行的输入进行拆解，以空格为分隔符将一整行命令拆解成一个命令数组<br />
+ 2.4分析命令数组，判断是否需要使用管道、重定向<br />
+ 2.5执行命令数组并输出<br />
+ 2.6结束循环<br />
+ 3.程序结束</p>
+</blockquote>
+
+<p>在决定了我们程序的框架之后就可以进入程序功能的编写了</p>
+
+<h3 id="获取当前操作系统的用户名-当前路径-以及操作权限展示为提示符">获取当前操作系统的用户名、当前路径、以及操作权限展示为提示符</h3>
+
+<p>Linux的命令行提示符由以下几个部分组成：</p>
+
+<blockquote>
+<p>操作系统用户名@主机名 相对路径#($)</p>
+</blockquote>
+
+<p>所以我定义我自己的Shell程序的提示符如下：</p>
+
+<blockquote>
+<p>操作系统用户名@KlayShell 绝对路径</p>
+</blockquote>
+
+<p>当为root权限用户是结束符为#<br />
+当为普通用户时结束符为$</p>
+
+<p>我们首先需要用geteuid()获取当前的用户id<br />
+然后利用用户id作为参数使用getpwuid(uid uid)函数<br />
+getpwuid(uid uid)会返回以下的结构体</p>
+
+<pre><code>struct passwd 
+{ 
+      char *pw_name;       /* 用户名*/ 
+      char *pw_passwd;     /* 密码.*/ 
+      __uid_t pw_uid;      /* 用户ID.*/ 
+      __gid_t pw_gid;      /*组ID.*/ 
+      char *pw_gecos;      /*真实名*/ 
+      char *pw_dir;        /* 主目录.*/ 
+      char *pw_shell;      /*使用的shell*/ 
+}; 
+</code></pre>
+
+<p>这样子我们就可以获取到当前的用户名了</p>
+
+<p>其次我们还需要获取到当前的绝对路径<br />
+getcwd()会将当前工作目录的绝对路径复制到参数buffer所指的内存空间中,参数size为buffer的空间大小</p>
+
+<p>其次我们还需要根据之前获取到的用户id选择输出#还是输出$<br />
+这部分完整的代码如下：</p>
+
+<pre><code>void print_prompt(){
+        struct passwd *myinfo;
+        //获取用户id
+        int euid=  geteuid();
+        //获取用户信息结构体
+        myinfo = getpwuid(euid);
+
+        //获取主机名（这个舍弃掉了，被置换为我自己定义的名字）
+        char hostname[80];
+        gethostname(hostname,sizeof(hostname));
+
+        //获取绝对路径
+        char path[400];
+        getcwd(path,sizeof(path));
+
+        //输出命令提示符
+        printf(&quot;[%s@KlayShell:%s]&quot;,myinfo-&gt;pw_name,path);
+        //根据root权限输出
+        if(euid==0){
+                printf(&quot;# &quot;);
+        }
+        else{
+                printf(&quot;$ &quot;);
+        }
+}
+</code></pre>
+
+<p>得到的结果：</p>
+
+<p><a href="https://img.it610.com/image/info8/636e57eec0754dedbbe23dd0512ed0a8.jpg"><img src="https://img.it610.com/image/info8/636e57eec0754dedbbe23dd0512ed0a8.jpg" alt="在这里插入图片描述" /></a></p>
+
+<h3 id="接收一整行的输入并根据空格符进行分割">接收一整行的输入并根据空格符进行分割</h3>
+
+<p>我们定义两个全局变量，分别用于接收整行输入以及拆分后的输入</p>
+
+<pre><code>//存放输入的命令
+char inputCommand[400];
+
+//存放分解后的命令
+char command[30][50];
+</code></pre>
+
+<p>我们直接利用gets(inputCommand)接收一整行的输入</p>
+
+<p>然后利用以下函数根据空格对指令进行切割,并且返回指令的长度</p>
+
+<pre><code>int breakInput2Command(){
+    char *s = inputCommand;
+    int i = 0;int j = 0;
+    while(1){
+        if((*s)=='\0'){
+            command[i][j] = '\0';
+            break;
+        }
+
+        //当前字符为空格
+        if(isspace(*s)){
+            command[i][j] = '\0';
+            i++;
+            j=0;
+        }
+        //不是空格
+        else{
+            command[i][j] = *s;
+            j++;
+        }
+        s++;
+
+    }
+    return i+1;
+
+}
+</code></pre>
+
+<p>原来的指令：<br />
+<a href="https://img.it610.com/image/info8/df451d095def40ffb6001c337b232fab.jpg"><img src="https://img.it610.com/image/info8/df451d095def40ffb6001c337b232fab.jpg" alt="自己写一个Linux的shell程序_第1张图片" /></a></p>
+
+<p>分割后的指令：<br />
+<a href="https://img.it610.com/image/info8/d795b97aa0ef4c40a7868d02c35309d9.jpg"><img src="https://img.it610.com/image/info8/d795b97aa0ef4c40a7868d02c35309d9.jpg" alt="自己写一个Linux的shell程序_第2张图片" /></a></p>
+
+<h3 id="分析内部指令">分析内部指令</h3>
+
+<p>首先把内部指令的字符定义在静态变量中</p>
+
+<pre><code>//静态变量存储内部命令
+static char COMMAMD_HELP[] = &quot;help&quot;;
+static char COMMAND_EXIT[] = &quot;exit&quot;;
+static char COMMAND_CD[] = &quot;cd&quot;;
+</code></pre>
+
+<p>然后利用分割后的第一个单词进行strcmp判断</p>
+
+<ul>
+<li>当为退出时，直接打印一句后并退出</li>
+<li>当为help时，程序打开一个本地文件，并将本地文件内的帮助信息输出</li>
+<li>当为cd时，首先会检查输入的命令单词个数，如果命令单词个数大于或者少于2个都会提示错误</li>
+</ul>
+
+<p>如果输入单词个数为2个，程序会根据第二个参数作为cd的路径调用chdir（const char * path）执行</p>
+
+<p>如果这些命令都不符合，就会作为外部命令执行</p>
+
+<p>这部分的代码如下：</p>
+
+<pre><code>void run_command(int count){
+
+
+    if(strcmp(command[0],COMMAND_EXIT)==0){
+        printf(&quot;Exit the programme\n&quot;);
+        exit(0);
+    }
+    else if(strcmp(command[0],COMMAMD_HELP)==0){
+        do_help();
+    }
+    else if(strcmp(command[0],COMMAND_CD)==0){
+        do_cd(count);
+    }
+    else{
+        //外部命令
+        do_outside_command_with_pipe(count);
+    }
+
+
+}
+
+打印帮助信息
+
+void do_help(){
+    FILE * fp = fopen(&quot;HelpDocument&quot;,&quot;r&quot;);
+    int ret;
+    while(1){
+        ret = fgetc(fp);
+        if(feof(fp)){
+            break;
+        }
+        fputc(ret,stdout);
+    }
+}
+</code></pre>
+
+<p>执行cd命令</p>
+
+<pre><code>void do_cd(int count){
+    if(count&gt;2){
+        printf(&quot;CD_ERROR:参数过多，请重新输入\n&quot;);
+    }else if(count&lt;2){
+        printf(&quot;CD_ERROR:参数过少，请重新输入\n&quot;);
+    }
+    else{
+        int ret = chdir(command[1]);
+        if(ret!=0){
+            printf(&quot;CD_ERROR:不正确的路径参数\n&quot;);
+        }
+    }
+
+}
+</code></pre>
+
+<p>该部分结果如下：<br />
+Help</p>
+
+<p><a href="https://img.it610.com/image/info8/1bd1a5afbb91416e81ea0b8c2f121692.jpg"><img src="https://img.it610.com/image/info8/1bd1a5afbb91416e81ea0b8c2f121692.jpg" alt="自己写一个Linux的shell程序_第3张图片" /></a></p>
+
+<p>Cd</p>
+
+<p><a href="https://img.it610.com/image/info8/d3a7f62e79914c2180a4dea703686bf3.jpg"><img src="https://img.it610.com/image/info8/d3a7f62e79914c2180a4dea703686bf3.jpg" alt="在这里插入图片描述" /></a></p>
+
+<p>Exit</p>
+
+<p><a href="https://img.it610.com/image/info8/2700eff0719d4c409f18e0e912193619.jpg"><img src="https://img.it610.com/image/info8/2700eff0719d4c409f18e0e912193619.jpg" alt="在这里插入图片描述" /></a></p>
+
+<h3 id="执行普通外部命令">执行普通外部命令</h3>
+
+<p>执行普通的外部命令的方式比较简单<br />
+只需要调用execvp()函数即可</p>
+
+<blockquote>
+<p>execvp()会从PATH 环境变量所指的目录中查找符合参数file<br />
+ 的文件名，找到后便执行该文件，然后将第二个参数argv传给该欲执行的文件。 返回值<br />
+ 如果执行成功则函数不会返回，执行失败则直接返回-1，失败原因存于errno中。</p>
+</blockquote>
+
+<p>其中需要注意的时执行execvp命令时需要新建一个新的进程去执行</p>
+
+<p>这部分的代码跟后面的代码结合</p>
+
+<h3 id="执行重定向输入和输出">执行重定向输入和输出</h3>
+
+<p>要实现重定向输入输出首先需要我们识别出重定向符号然后再进行命令切割</p>
+
+<p>根据获取到重定向输出文件<br />
+然后利用freopen()函数对这些文件进行重定向输入输出</p>
+
+<p>然后再根据我们的重定向符号对命令进行切割，切割不包含重定向符号和重定向文件的命令再调用execvp()函数执行</p>
+
+<p>这部分的代码如下：</p>
+
+<pre><code>void do_outside_command(int start,int count){
+
+    //输入重定向符号个数
+    int in = 0;
+    //输出重定向符号个数
+    int out = 0;
+
+    int end = count;
+    char *FILEINPUT;
+    char *FILEOUTPUT;
+    int i;
+    for(i=start;i&lt;count;i++){
+        if(strcmp(command[i],COMMAMD_REINPUT)==0){
+            in++;
+            FILEINPUT = command[i+1];
+            if(strlen(FILEINPUT)==0){
+                printf(&quot;缺少输入重定向文件\n&quot;);
+                return;
+            }
+            if(i&lt;end){
+                end = i;
+            }
+        }
+        else if(strcmp(command[i],COMMAMD_REOUTPUT)==0){
+            out++;
+            FILEOUTPUT =  command[i+1];
+            if(strlen(FILEOUTPUT)==0){
+                printf(&quot;缺少输出重定向文件\n&quot;);
+                return;
+            }
+            if(i&lt;end){
+                end = i;
+            }
+        }
+    }
+
+    pid_t pid;
+
+    pid = fork();
+    if(pid&lt;0){
+        perror(&quot;创建子进程失败\n&quot;);
+        exit(0);
+    }
+    //在子进程中处理外部命令
+    else if(pid==0){
+        if(in==1){
+            //将输入重定向到输入文件
+            freopen(FILEINPUT,&quot;r&quot;,stdin);
+        }
+        if(out==1){
+            //将输出重定向到输出文件
+            freopen(FILEOUTPUT,&quot;w&quot;,stdout);
+        }
+        //定义一个命令变量来切割暂存命令
+        char *commtemp [40];
+        int j=0;
+        int i;
+        for( i = start;i&lt;end;i++){
+            commtemp[j]=command[i];
+            j++;
+        }
+        commtemp[j] = NULL;
+        execvp(commtemp[0],commtemp);
+        exit(0);
+    }
+    else {
+        //等待子进程执行完毕
+        waitpid(pid,NULL,0);
+    }
+
+
+}
+</code></pre>
+
+<p>执行如下：</p>
+
+<p>输出重定向：</p>
+
+<p><a href="https://img.it610.com/image/info8/8fb5c8e1fe5941e2a83a14e8ccbffabf.jpg"><img src="https://img.it610.com/image/info8/8fb5c8e1fe5941e2a83a14e8ccbffabf.jpg" alt="自己写一个Linux的shell程序_第4张图片" /></a></p>
+
+<p>输入重定向：</p>
+
+<p><a href="https://img.it610.com/image/info8/629daebe76324da2940079e415800a16.jpg"><img src="https://img.it610.com/image/info8/629daebe76324da2940079e415800a16.jpg" alt="自己写一个Linux的shell程序_第5张图片" /></a></p>
+
+<h3 id="实现管道功能">实现管道功能</h3>
+
+<p>在实现管道功能之前，我们需要先识别出管道符号，并返回管道符号的位置</p>
+
+<pre><code>//获取管道符号的位置
+int get_pipe_position(int count){
+    int i;
+    for(i=0;i&lt;count;i++){
+        if(strcmp(command[i],COMMAMD_PIPE)==0){
+            return i;
+        }
+    }
+    return 0;
+}
+</code></pre>
+
+<p>然后创建一个子进程在子进程中创建一个管道，让子进程创建一个孙进程，孙进程执行命令并将输入作为管道输入，子进程接收管道的输出，作为标准输入执行命令</p>
+
+<p>代码如下：</p>
+
+<pre><code>void do_outside_command_with_pipe(int count){
+    int pipePosition = get_pipe_position(count);
+    pid_t pid1 = fork();
+    if(pid1&lt;0){
+            perror(&quot;PIPE_ERROR:无法创建子进程\n&quot;);
+            return;
+    }
+        //在子进程中进行执行
+        else if(pid1==0){
+            //有管道符号
+            if(pipePosition&gt;0){
+                int fd[2];
+                int ret = pipe(fd);
+                pid_t pid = vfork();
+                if(pid&lt;0){
+                    perror(&quot;PIPE_ERROR:无法创建子进程\n&quot;);
+                    return;
+                }
+                else if(pid==0){
+                    //子进程关闭读端
+                    close(fd[0]);
+                    //将输出作为管道输入
+                    dup2(fd[1],1);
+                    close(fd[1]);
+                    do_outside_command(0,pipePosition);
+                    exit(0);
+                }
+                else{
+                    waitpid(pid,NULL,0);
+                    //父进程关闭写端
+                    close(fd[1]);
+                    //将管道的输出作为标准写入
+                    dup2(fd[0],0);
+                    close(fd[0]);
+                    do_outside_command(pipePosition+1,count);
+                    exit(0);
+                }
+
+
+
+            }
+            else{
+                do_outside_command(0,count);
+            }
+        }
+        else{
+            waitpid(pid1,NULL,0);
+
+
+        }
+
+
+
+
+
+}
+</code></pre>
+
+<p>代码执行：</p>
+
+<p><a href="https://img.it610.com/image/info8/f3a2b909762c4122a2e7b7aee6f3935f.jpg"><img src="https://img.it610.com/image/info8/f3a2b909762c4122a2e7b7aee6f3935f.jpg" alt="在这里插入图片描述" /></a></p>
+
+<p>以上就是Shell程序设计的全部过程，完整的代码已经上传到github</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

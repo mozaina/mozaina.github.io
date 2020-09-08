@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>关于ansible远程执行的环境变量问题loginshellnonloginshelll | 开发者问答集锦</title>
+    <meta property="og:title" content="关于ansible远程执行的环境变量问题loginshellnonloginshelll - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="关于ansible远程执行的环境变量问题loginshellnonloginshelll">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%85%B3%E4%BA%8Eansible%E8%BF%9C%E7%A8%8B%E6%89%A7%E8%A1%8C%E7%9A%84%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F%E9%97%AE%E9%A2%98loginshellnonloginshelll/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">关于ansible远程执行的环境变量问题loginshellnonloginshelll</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>为什么80%的码农都做不了架构师？&gt;&gt;&gt;
+<img src="https://img.it610.com/image/info8/35bf71b4b7ad4a72bcb9c6561b5679b1.jpg" alt="hot3.png" /></p>
+
+<h1 id="问题">问题</h1>
+
+<p>ansible调用playbook远程mvn执行打包时发现执行出错，找不到<code>JAVA_HOME</code>。<br />
+我们的<code>exporter
+JAVA_HOME=/usr/java/jdk1.8.0</code>写在<code>/etc/profile</code>中，登录时可以正常执行打包并打印<code>JAVA_HOME</code>。</p>
+
+<h1 id="排查过程">排查过程</h1>
+
+<ul>
+<li>在playbook中执行<code>echo $JAVA_HOME &gt; /tmp/test.log</code>，为空</li>
+<li>在playbook中添加<code>echo $PATH &gt; /tmp/test.log</code>，同时在远端服务器登录执行<code>echo $PATH &gt; /tmp/test.log</code>，结果不同，ansible执行的要少很多路径</li>
+<li>在<code>~/.bash_profile</code>中添加环境变量，与<code>/etc/profile</code> 结果一致</li>
+<li>考虑ansible执行的环境变量与登录时使用的环境变量不同,所以将<code>JAVA_HOME</code>写在<code>/etc/bashrc</code>中，再次测试<code>echo $JAVA_HOME &gt; /tmp/test.log</code>，正常打印</li>
+<li>至此，确定ansible执行过程中并未调用<code>/etc/profile和~/.bash_profile</code></li>
+</ul>
+
+<h1 id="原因">原因</h1>
+
+<h2 id="login-shell-和-non-login-shell">login shell 和 non-login shell</h2>
+
+<p>查阅相关文档，以及咨询大佬后，得出如下结果。<br />
+* 我们登录执行的是login shell，会加载/etc/profile,~/.bash_profile<br />
+* ansible这类ssh远程执行是non-login shell，不会加载etc/profile,~/.bash_profile,而是加载etc/bashrc和~/.bashrc</p>
+
+<p><strong>首先了解一下login shell 与 non-login shell</strong></p>
+
+<p>《鸟哥的Linux私房菜基础学习篇》里这样描述/etc/profile及/etc/bashrc的区别：<br />
+* login shell：取得bash时需要完整的登入流程的，就称为login shell。举例来说，你要由tty1~tty6登入，需要输入用户的账号和密码，此时取得的bash就称为『login shell』啰；<br />
+* non-login shell：取得bash接口的方法不需要重复登入的举动，举例来说，(1)你以Xwindow登入Linux后，再以X的图形化接口启动终端机，此时那个终端接口并没有需要再次的输入账号和密码，那个bash的环境就称为non-login shell了。(2)你在原本的bash环境下再次下达bash这个命令，同样的也没有输入账号密码，那第二个bash (子程序)也是non-login shell 。</p>
+
+<p>我们查看~/.bash_profile，发现里面有这样一段内容：</p>
+
+<pre><code>if [ -f ~/.bashrc ]; then
+        . ~/.bashrc
+fi
+</code></pre>
+
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+</ul>
+
+<p>当~/.bashrc存在时，login shell 会引入~/.bashrc的环境变量</p>
+
+<p>我们再看~/.bashrc，发现一段类似的内容：</p>
+
+<pre><code>if [ -f /etc/bashrc ]; then
+        . /etc/bashrc
+fi
+</code></pre>
+
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+</ul>
+
+<p>当/etc/bashrc存在时，login shell会引入/etc/bashrc内的环境变量</p>
+
+<p><strong>也就是说：</strong><br />
+* login shell加载环境变量的顺序是：① /etc/profile ② ~/.bash_profile ③ ~/.bashrc ④ /etc/bashrc<br />
+* 而non-login shell加载环境变量的顺序是： ① ~/.bashrc ② /etc/bashrc</p>
+
+<h2 id="验证">验证</h2>
+
+<p>我们通过在~/.bash_profile和~/.bashrc中引用不同的变量计算来验证上述问题<br />
+* 在~/.bash_profile中引入变量AAA=$((AAA+1))<br />
+<strong><em>注意：引入的变量一定要置于引入~/.bashrc之前，否则会出现运算时AAA还未赋值的情况！！！</em></strong></p>
+
+<pre><code>export AAA=$((AAA+1))
+</code></pre>
+
+<ul>
+<li><p>1</p></li>
+
+<li><p>在~/.bashrc中引入变量AAA=$((AAA+10))</p>
+
+<p>export AAA=$((AAA+10))</p></li>
+
+<li><p>1</p></li>
+</ul>
+
+<h3 id="login-shell">login shell</h3>
+
+<p>按照环境变量的加载顺序:</p>
+
+<ol>
+<li><p>~/.bash_profile<br />
+<code>AAA=$((AAA+1))，AAA为空，AAA=$((AAA+1))=1</code></p></li>
+
+<li><p>~/.bashrc<br />
+<code>AAA=$((AAA+10)),AAA=1,AAA=$((AAA+10))=11</code></p></li>
+</ol>
+
+<p>运行结果</p>
+
+<pre><code>[root@ ~]# echo $AAA
+11
+</code></pre>
+
+<ul>
+<li>1</li>
+<li>2</li>
+</ul>
+
+<p>验证通过</p>
+
+<h3 id="non-login-shell">non-login shell</h3>
+
+<p>采用ssh远程执行来验证</p>
+
+<p>按照环境变量的加载顺序：</p>
+
+<ol>
+<li>~/.bashrc<br />
+<code>AAA=$((AAA+10)),AAA为空,AAA=$((AAA+10))=10</code></li>
+</ol>
+
+<p>运行结果</p>
+
+<pre><code>[root@ ~]# ssh  root@1.1.1.2 'echo $AAA'
+root@1.1.1.2's password: 
+10
+</code></pre>
+
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+</ul>
+
+<p>验证通过</p>
+
+<h3 id="login-shell下启动bash子进程">login shell下启动bash子进程</h3>
+
+<p>bash子进程是一个non-login shell，但是它会继承父进程中的环境变量</p>
+
+<p>按照环境变量的加载顺序：</p>
+
+<ol>
+<li><p>父进程，引入~/.bash_profile<br />
+<code>AAA=$((AAA+1))，AAA为空，AAA=$((AAA+1))=1</code></p></li>
+
+<li><p>父进程，引入~/.bashrc<br />
+<code>AAA=$((AAA+10)),AAA=1,AAA=$((AAA+10))=11</code></p></li>
+
+<li><p>子进程，继承父进程环境变量，引入~/.bashrc<br />
+<code>AAA=$((AAA+10)),AAA=11,AAA=$((AAA+10))=21</code></p></li>
+</ol>
+
+<p>运行结果</p>
+
+<pre><code># 父进程
+[root@ ~]# echo $AAA
+11
+# bash子进程，继承AAA=11
+[root@ ~]# bash
+[root@ ~]# echo $AAA
+21
+# 子进程的子进程，继承AAA=21
+[root@ ~]# bash
+[root@ ~]# echo $AAA
+31
+</code></pre>
+
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+<li>4</li>
+<li>5</li>
+<li>6</li>
+<li>7</li>
+<li>8</li>
+<li>9</li>
+<li>10</li>
+<li>11</li>
+</ul>
+
+<p>验证通过</p>
+
+<h1 id="结论">结论</h1>
+
+<ul>
+<li>ansible这类远程执行的non-login shell 并不会加载/etc/profile和~/.bash_profile下的环境变量，只是加载~/.bashrc和/etc/bashrc</li>
+<li>如果需要在ansible中执行需要特定环境变量的命令，可以在执行前source一下~/.bash_profile， 或者将环境变量写在~/.bashrc 。</li>
+</ul>
+
+<p>转载于:<a href="https://my.oschina.net/yygh/blog/1822406">https://my.oschina.net/yygh/blog/1822406</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

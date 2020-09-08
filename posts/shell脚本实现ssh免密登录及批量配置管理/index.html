@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本实现SSH免密登录及批量配置管理 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本实现SSH免密登录及批量配置管理 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本实现SSH免密登录及批量配置管理">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0ssh%E5%85%8D%E5%AF%86%E7%99%BB%E5%BD%95%E5%8F%8A%E6%89%B9%E9%87%8F%E9%85%8D%E7%BD%AE%E7%AE%A1%E7%90%86/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本实现SSH免密登录及批量配置管理</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="1-ssh免密登录及批量配置管理">1、SSH免密登录及批量配置管理</h2>
+
+<p>本节索引</p>
+
+<p>场景分析<br />
+ssh免密登录<br />
+pssh工具批量管理<br />
+SHELL自动化脚本<br />
+本篇总结<br />
+场景分析</p>
+
+<p>作为一个运维工程师，不是每个人工作的环境都想阿里、腾讯那样，动不动就上亿的PV量，上万台服务器。我们通常还是工作在，几十台上百台服务器这样的环境，而使用ansible或者puppet这样的自动化运维工具则显得大材小用，并且最终的效果可能还不如几个小工具达到的效果好。像ssh免密登录在配合pssh这样的推送工具，在配合自动化配置脚本，可以说是即方便也使用。这一节将详细带大家以shell脚本的形式实现ssh免密登录进行百台机器的配置和管理。</p>
+
+<p>ssh服务</p>
+
+<p>随着明文通信协议telnet渐渐退出历史舞台，ssh这个作为安全的远程登录工具，更加受广大用户的青睐。SSH 为 Secure Shell 的缩写，由
+IETF 的网络小组（Network Working Group）所制定；SSH 为建立在应用层基础上的安全协议。SSH
+是目前较可靠，专为远程登录会话和其他网络服务提供安全性的协议。利用 SSH
+协议可以有效防止远程管理过程中的信息泄露问题。SSH最初是UNIX系统上的一个程序，后来又迅速扩展到其他操作平台。SSH在正确使用时可弥补网络中的漏洞。SSH客户端适用于多种平台。几乎所有UNIX平台—包括HP-
+UX、Linux、AIX、Solaris、Digital UNIX、Irix，以及其他平台，都可运行SSH。</p>
+
+<p>ssh服务有两种验证用户登录的方式，一种是基于密码口令的认证，一种是基于密钥的认证，本文主要是实现基于密钥的认证。ssh基于密钥认证过程：<br />
+<a href="https://img.it610.com/image/info8/ce7da7ffa842412cbdccfa9addb36713.jpg"><img src="https://img.it610.com/image/info8/ce7da7ffa842412cbdccfa9addb36713.jpg" alt="Shell脚本实现SSH免密登录及批量配置管理_第1张图片" /></a><br />
+ssh工具不仅仅提供了远程登录的功能，他还自带了一些命令工具，能够生成ssh会话密钥，并且能够将生成密钥对的公钥复制到远程主机，例如：<br />
+root@ubuntu:~# ssh-keygen -t rsa -P ‘’ -f ~/.ssh/id_rsa<br />
+<a href="https://img.it610.com/image/info8/a45cd8b53f0a4843aa5e8867e887b6e0.jpg"><img src="https://img.it610.com/image/info8/a45cd8b53f0a4843aa5e8867e887b6e0.jpg" alt="Shell脚本实现SSH免密登录及批量配置管理_第2张图片" /></a><br />
+复制公钥至远程主机：ssh-copy-id [-i indetify_file ][user@host_ip]<br />
+#ssh-copy-id -i .ssh/id_rsa.pub 192.168.1.111<br />
+<a href="https://img.it610.com/image/info8/3a16d8b40dec4052b247da7ab4e3998b.jpg"><img src="https://img.it610.com/image/info8/3a16d8b40dec4052b247da7ab4e3998b.jpg" alt="在这里插入图片描述" /></a><br />
+inux服务器A登陆Linux服务器B</p>
+
+<p>服务器A上需要先安装expect。</p>
+
+<p>test.exp<br />
+使用shell脚本编程中的expect语法，他能代替我们输入登录密码：</p>
+
+<pre><code>#!/usr/bin/expect
+spawn ssh 172.18.8.100
+expect {
+    &quot;yes/no&quot; { send &quot;yes\n&quot;;exp_continue }      # 替你回答下载公钥是的提示
+    &quot;password&quot; { send &quot;your_passwd\n&quot; }         # 提示输入密码
+}
+interact
+expect eof 
+</code></pre>
+
+<p><strong>pssh工具</strong><br />
+<a href="https://img.it610.com/image/info8/5ede9b460f8f415f91ddd6e2565e99fa.jpg"><img src="https://img.it610.com/image/info8/5ede9b460f8f415f91ddd6e2565e99fa.jpg" alt="Shell脚本实现SSH免密登录及批量配置管理_第3张图片" /></a><br />
+<strong>SHELL脚本实现</strong></p>
+
+<pre><code>[root@vinsent app]# cat ssh_auto.sh 
+#!/bin/bash
+#!/bin/bash
+#------------------------------------------#
+# FileName:             ssh_auto.sh
+# Revision:             1.1.0
+# Date:                 2017-07-14 04:50:33
+# Author:               vinsent
+# Email:                hyb_admin@163.com
+# Website:              www.vinsent.cn
+# Description:          This script can achieve ssh password-free login, 
+#                       and can be deployed in batches, configuration
+#------------------------------------------#
+# Copyright:            2017 vinsent
+# License:              GPL 2+
+#------------------------------------------#
+[ ! -f /root/.ssh/id_rsa.pub ] &amp;&amp; ssh-keygen -t rsa -p '' &amp;&gt;/dev/null  # 密钥对不存在则创建密钥
+while read line;do
+        ip=`echo $line | cut -d &quot; &quot; -f1`             # 提取文件中的ip
+        user_name=`echo $line | cut -d &quot; &quot; -f2`      # 提取文件中的用户名
+        pass_word=`echo $line | cut -d &quot; &quot; -f3`      # 提取文件中的密码
+expect &lt;&lt;EOF
+        spawn ssh-copy-id -i /root/.ssh/id_rsa.pub $user_name@$ip   # 复制公钥到目标主机
+        expect {
+                &quot;yes/no&quot; { send &quot;yes\n&quot;;exp_continue}     # expect 实现自动输入密码
+                &quot;password&quot; { send &quot;$pass_word\n&quot;}
+        }
+        expect eof
+EOF
+
+done &lt; /root/host_ip.txt      # 读取存储ip的文件
+
+pscp.pssh -h /root/host_ip.txt /root/your_scripts.sh /root     # 推送你在目标主机进行的部署配置
+pssh -h /root/host_ip.txt -i bash /root/your_scripts.sh        # 进行远程配置，执行你的配置脚本
+</code></pre>
+
+<p>host_ip.txt文件可以通过手动写（当然了这就显得不自动化）你可以使用扫描工具扫描你网络中的主机，然后配合awk等工具生成该文件。ip地址即登录用户名密码的文件实例：</p>
+
+<pre><code>[root@vinsent app]# cat host_ip.txt 
+172.18.14.123 root 123456
+172.18.254.54 root 123456
+...
+</code></pre>
+
+<h2 id="2-免密-免密码-不用输入密码-输入远程登录到服务器-并且执行命令-执行完后并退出">2、免密(免密码,不用输入密码)输入远程登录到服务器,并且执行命令,执行完后并退出</h2>
+
+<pre><code>#!/usr/bin/expect -f
+set TARGET [lindex $argv 0]
+set USER [lindex $argv 1]
+set PASSWD [lindex $argv 2]
+set PORT [lindex $argv 3]
+set DIR [lindex $argv 4]
+set timeout 10
+
+spawn ssh $USER@$TARGET -p $PORT
+#'cd /root/'
+expect {
+    &quot;*yes/no&quot; {send &quot;yes\r&quot;; exp_continue}
+    &quot;*password:&quot; {send &quot;$PASSWD\r&quot;}
+}
+#\r 代表回车执行
+ send &quot;cd $DIR\r&quot;
+ send &quot;pwd\r&quot;
+ interact
+</code></pre>
+
+<h2 id="3-shell脚本实现同时多台远程主机执行命令的代码分享">3、shell脚本实现同时多台远程主机执行命令的代码分享</h2>
+
+<p>实现需求<br />
+在对单台机器做操作时我们会用“ssh ip”的方式登录到机器上，可以写这样一个工具vssh ip1,ip2,…ipn 来模拟登录到n
+台服务器，登录后所有操作相当于同时对n 台服务器生效。</p>
+
+<p>实现方法<br />
+首页要确保可以通过本地公钥无密码登录远程主机：</p>
+
+<p>ssh-copy-id [-i [identity_file]] [user@]machine<br />
+shell脚本</p>
+
+<pre><code>#!/bin/bash
+# -------------------------------------------------------------------------------
+# Author:   Loya.Chen
+# Description: Execute commands on multiple remote hosts at the same time.
+# -------------------------------------------------------------------------------
+set -e
+Usage() {
+  echo &quot;Usage: $0 host1 host2 ... 'command'&quot;
+}
+if [ $# -lt 2 ] ;then
+  Usage
+  exit 0
+else
+  cmd=${!#}
+fi
+logfile=$(mktemp)
+i=1
+success=0
+failed=0
+for ip in $@;do
+  if [ $i -eq $# ];then
+    break
+  fi
+  ssh $ip $cmd &amp;&gt; $logfile
+  if [ $? -eq 0 ];then
+    #((success++))
+    success=$(($success+1))
+    echo -e &quot;\n\033[32m$ip | success \033[0m \n&quot;
+    cat $logfile
+  else
+    ((failed++))
+    echo -e &quot;\n\033[31m$ip | failed \033[0m\n &quot;
+    cat $logfile
+  fi
+  ((i++))
+done
+echo -e '\n-------------------------'
+echo -e &quot;\033[32msuccess: $success | failed: $failed \033[0m&quot;
+echo '-------------------------'
+</code></pre>
+
+<p>示例</p>
+
+<p>$ bash vssh 10.0.0.11 10.0.0.12 ‘free -m’</p>
+
+<pre><code>10.0.0.11 | success 
+       total    used    free   shared  buffers   cached
+Mem:     2871    156    2715     0     8     36
+-/+ buffers/cache:    111    2760
+Swap:     2047     0    2047
+10.0.0.12 | success 
+       total    used    free   shared  buffers   cached
+Mem:      980    615    365     0     12     69
+-/+ buffers/cache:    533    447
+Swap:     2047     0    2047
+-------------------------
+success: 2 | failed: 0 
+-------------------------
+</code></pre>
+
+<h2 id="4-批量执行同一命令-shell-脚本">4、批量执行同一命令 shell 脚本</h2>
+
+<pre><code>#!/bin/bash
+if [ &quot;$#&quot; -ne 2 ] ; then
+    echo &quot;USAGE: $0 -f server_list_file cmd&quot;
+    exit -1
+fi
+
+file_name=$1
+cmd_str=$2
+
+cwd=$(pwd)
+cd $cwd
+serverlist_file=&quot;$cwd/$file_name&quot;
+
+if [ ! -e $serverlist_file ] ; then
+    echo 'server.list not exist';
+    exit 0
+fi
+
+while read line
+do
+    #echo $line
+    if [ -n &quot;$line&quot; ] ; then
+        echo &quot;DOING---&gt;&gt;&gt;&gt;&gt;&quot; $line &quot;&lt;&lt;&lt;&lt;&lt;&lt;
+        ssh $line $cmd_str &lt; /dev/null &gt; /dev/null
+        if [ $? -eq 0 ] ; then
+            echo &quot;$cmd_str done!&quot;
+        else
+            echo &quot;error: &quot; $?
+        fi
+    fi
+done &lt; $serverlist_file
+</code></pre>
+
+<p>使用方法：</p>
+
+<ol>
+<li><p>新建一个文件host_file_list，文件中为服务器的地址，每个一行；</p>
+
+<p>vi host_file_list
+192.168.177.128
+192.168.177.129
+192.168.177.130
+192.168.177.131</p></li>
+
+<li><p>保存上面shell 脚本， 如保存为 allcmd.sh，注意使用 chmod +x allcmd.sh 使之成为可执行脚本；</p></li>
+
+<li><p>运行 allcmd.sh host_file_list md 即可， host_file_list 是第1步的文件名（记得和 allcmd.sh 放在相同目录下）， cmd 就是要执行的命令，用单引号包起来，例如：删除/home/nuaazdh/下面的一个 tmp.txt 文件： ./allcmd.sh host_file_list ‘rm /home/nuaazdh/tmp.txt’<br />
+<a href="https://img.it610.com/image/info8/4b1512c1ae8444de933df21c4769afe6.jpg"><img src="https://img.it610.com/image/info8/4b1512c1ae8444de933df21c4769afe6.jpg" alt="Shell脚本实现SSH免密登录及批量配置管理_第4张图片" /></a></p></li>
+</ol>
+
+<h2 id="5-shell-批量服务器执行相同命令的一种方式">5、shell - 批量服务器执行相同命令的一种方式</h2>
+
+<p>通过shell脚本，在批量服务器上执行相同脚本，简单记录下</p>
+
+<pre><code>#!/bin/bash
+iplist=(192.168.174.132 192.168.174.133 192.168.174.134)
+for ip in ${iplist[*]}
+do
+  nohup ssh wfq@$ip &quot;cd; mkdir test07;cd test07;echo '$ip log create done';exit;&quot;&amp;
+  echo $ip
+done
+</code></pre>
+
+<p>执行结果</p>
+
+<pre><code>wfq@ubuntu:~/sbin/shell$ ./update_softlink.sh 
+192.168.174.132
+192.168.174.133
+192.168.174.134
+
+
+
+wfq@ubuntu:~/sbin/shell$ cat nohup.out 
+192.168.174.133 log create done
+192.168.174.132 log create done
+192.168.174.134 log create done
+</code></pre>
+
+<h2 id="参考">参考</h2>
+
+<h2 id="批量登陆linux主机脚本">批量登陆linux主机脚本</h2>
+
+<pre><code>#test.sh
+ #!/bin/bash
+ dir=/home/test
+ while read line
+ do
+ host=`echo $line| awk '{print $1}'`
+ passwd=`echo $line | awk '{print $2}'`
+ $dir/expect_ssh.sh $host $passwd &amp;
+ done &lt; $dir/host.txt
+
+ #expect_ssh.sh
+ #!/usr/bin/env expect
+ set HOST [lindex $argv 0]
+ set PASSWD [lindex $argv 1]
+ spawn ssh root@$HOST
+ expect  &quot;(yes/no)?&quot; { send &quot;yes\n&quot; }
+ expect &quot;*password:&quot; { send &quot;$PASSWD\n&quot; }
+ expect &quot;*password:&quot; { send &quot;$PASSWD\n&quot; }
+ expect &quot;*#&quot; { send &quot;useradd -u 0 -g 0 username\n&quot; } #执行相关操作,比如adduser
+ expect eof
+ #host.txt格式,可从数据库中导出
+IP           passwd
+</code></pre>
+
+<h2 id="shell-登录批量服务器">shell 登录批量服务器</h2>
+
+<pre><code>#!/bin/bash
+cat iplist|while read line  #iplist文件中存放了IP地址和密码，每行格式为“IP地址 密码”
+do
+a=($line)                   #a为数组
+/usr/bin/expect&lt;&lt;EOF      
+spawn ssh root@${a[0]}     
+expect {
+&quot;*yes/no&quot; { send &quot;yes\r&quot;; exp_continue}
+&quot;*password:&quot; { send &quot;${a[1]}\r&quot; } 
+}
+expect &quot;#&quot;
+send &quot;hostname\r&quot;           
+send &quot;exit\r&quot;            
+expect eof
+EOF
+done
+</code></pre>
+
+<h2 id="服务器免密登陆shell脚本">服务器免密登陆shell脚本</h2>
+
+<pre><code>#!/bin/bash
+#ssh免密登录shell脚本
+#配置免密登录的所有机子都要运行该脚本
+
+#修改/etc/ssh/sshd_config配置文件
+#sed -i 's/被替换的内容/替换成的内容/'  /配置文件地址
+#sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+#cat &gt;&gt; /etc/ssh/sshd_config &lt;
+#RSAAuthentication yes
+#EOF
+
+＃yum install expect expect-devel tcl -y  #安装expect
+echo &quot;按enter键3次即可&quot;
+ssh-keygen -t rsa   #生成秘钥（按enter键3次即可生成）
+SERVERS=&quot;arango mysql es redis&quot;   #需要配置的主机名
+PASSWORD=123456   #需要配置的主机登录密码
+
+#将本机生成的公钥复制到其他机子上
+#如果（yes/no）则自动选择yes继续下一步
+#如果password:怎自动将PASSWORD写在后面继续下一步
+auto_ssh_copy_id(){
+        expect -c &quot;set timeout -1;
+        spawn ssh-copy-id $1;                                
+        expect {
+                *(yes/no)* {send -- yes\r;exp_continue;}
+                *password:* {send -- $2\r;exp_continue;}  
+                eof        {exit 0;}
+        }&quot;;
+}
+
+ssh_copy_id_to_all(){
+        for SERVER in $SERVERS #遍历要发送到各个主机的ip
+        do
+                auto_ssh_copy_id $SERVER $PASSWORD
+        done
+}
+ssh_copy_id_to_all
+</code></pre>
+
+<p>常见问题：<br />
+1、直接ssh登录，也报错了。</p>
+
+<pre><code>root@ubuntu:~# ssh-copy-id -i .ssh/id_rsa.pub 192.168.1.132
+/usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: &quot;.ssh/id_rsa.pub&quot;
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+root@192.168.1.132's password: 
+Permission denied, please try again.
+root@192.168.1.132's password: 
+Permission denied, please try again.
+root@192.168.1.132's password: 
+Permission denied (publickey,password).
+</code></pre>
+
+<p>解决办法 ##</p>
+
+<pre><code>1、登录目标机器 打开 /etc/ssh/sshd_config ，修改PasswordAuthentication no 为：
+PasswordAuthentication yes
+2、重启服务
+/etc/init.d/sshd restart
+</code></pre>
+
+<p>2、客户端拒绝连接Connection to 192.168.1.132 closed by remote host.</p>
+
+<pre><code>root@ubuntu:~# ssh-copy-id -i .ssh/id_rsa.pub 192.168.1.132
+/usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: &quot;.ssh/id_rsa.pub&quot;
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+Connection to 192.168.1.132 closed by remote host.
+</code></pre>
+
+<p>解决办法</p>
+
+<pre><code>(1)查看这两个文件是否有阻止
+cat /etc/hosts.deny
+cat /etc/hosts.allow
+（2）客户端连接数过多
+修改/etc/ssh/sshd_config中#MaxStartups 10，将其改为MaxStartups 100
+重启
+</code></pre>
+
+<p>3、给远程主机发送公钥<br />
+<a href="https://img.it610.com/image/info8/622923dc67424285b6f6041a81fbf5d2.jpg"><img src="https://img.it610.com/image/info8/622923dc67424285b6f6041a81fbf5d2.jpg" alt="Shell脚本实现SSH免密登录及批量配置管理_第5张图片" /></a><br />
+Now try logging into the machine, with: “ssh ‘wzq@192.168.1.132’”<br />
+and check to make sure that only the key(s) you wanted were added.<br />
+<a href="https://img.it610.com/image/info8/95aa89facdc441feb0054367e1e96cce.jpg"><img src="https://img.it610.com/image/info8/95aa89facdc441feb0054367e1e96cce.jpg" alt="Shell脚本实现SSH免密登录及批量配置管理_第6张图片" /></a><br />
+4、expect脚本执行脚本出现spawn: command not found的问题<br />
+test.exp: line 8: spawn: command not found<br />
+使用expect -f xxx.sh可行呢<br />
+说明执行方式不正确，因为expect用的不是bash所以会报错。执行的时候直接./autosu.sh就可以了<br />
+（1）使用vi工具</p>
+
+<pre><code> oracle@linux-106:~/RMAN/bin&gt; vi test.sh
+
+（2）利用如下命令查看文件格式 
+ :set ff 或 :set fileformat 
+ 可以看到如下信息 
+ fileformat=dos 或 fileformat=unix 
+ （3） 利用如下命令修改文件格式 
+ :set ff=unix 或 :set fileformat=unix 
+ :wq (存盘退出)
+</code></pre>
+
+<p>最后再执行<br />
+./test.sh</p>
+
+<p>参考链接 ：<br />
+<a href="https://www.cnblogs.com/mmdln/p/8963551.html">https://www.cnblogs.com/mmdln/p/8963551.html</a><br />
+shell - 批量服务器执行相同命令的一种方式
+：<a href="https://blog.csdn.net/wang725/article/details/81142355">https://blog.csdn.net/wang725/article/details/81142355</a></p>
+
+<p><a href="https://blog.csdn.net/lowman2/article/details/89489957">https://blog.csdn.net/lowman2/article/details/89489957</a><br />
+Linux 集群上批量执行同一命令 shell 脚本
+：<a href="https://blog.csdn.net/jdbc/article/details/79936346">https://blog.csdn.net/jdbc/article/details/79936346</a><br />
+<a href="https://blog.51cto.com/bronte/1535807">https://blog.51cto.com/bronte/1535807</a><br />
+服务器免密登陆shell脚本 ：<a href="http://blog.51cto.com/superleedo/2298141">http://blog.51cto.com/superleedo/2298141</a><br />
+<a href="https://blog.csdn.net/weixin_33841722/article/details/91803886">https://blog.csdn.net/weixin_33841722/article/details/91803886</a><br />
+<a href="https://blog.csdn.net/Evan_2008/article/details/90703820">https://blog.csdn.net/Evan_2008/article/details/90703820</a></p>
+
+<p><strong>通过linux的shell脚本批量处理交换机配置变更</strong>
+：<a href="https://blog.csdn.net/weixin_33714884/article/details/91805774">https://blog.csdn.net/weixin_33714884/article/details/91805774</a></p>
+
+<p>linux expect
+自动登录交换机保存配置<a href="https://blog.csdn.net/u014590164/article/details/51236797">https://blog.csdn.net/u014590164/article/details/51236797</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

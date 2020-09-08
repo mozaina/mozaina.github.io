@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux下基于Gitlab和Jenkins的自动化部署实例一执行shell脚本方法二 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux下基于Gitlab和Jenkins的自动化部署实例一执行shell脚本方法二 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux下基于Gitlab和Jenkins的自动化部署实例一执行shell脚本方法二">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E4%B8%8B%E5%9F%BA%E4%BA%8Egitlab%E5%92%8Cjenkins%E7%9A%84%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2%E5%AE%9E%E4%BE%8B%E4%B8%80%E6%89%A7%E8%A1%8Cshell%E8%84%9A%E6%9C%AC%E6%96%B9%E6%B3%95%E4%BA%8C/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux下基于Gitlab和Jenkins的自动化部署实例一执行shell脚本方法二</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>续我的上篇博文：<a href="https://mp.csdn.net/postedit/89250322">https://mp.csdn.net/postedit/89250322</a></p>
+
+<h3 id="在实验之前-先进行设置-使得虚拟机可以上网-因为本次实验需要在安装有jenkins软件的虚拟机server2上下载有关gitlab的软件">在实验之前，先进行设置，使得虚拟机可以上网（因为本次实验需要在安装有Jenkins软件的虚拟机server2上下载有关gitlab的软件）</h3>
+
+<pre><code>##物理机
+
+[root@foundation83 Desktop]# iptables -t nat -I POSTROUTING -s 172.25.83.0/24 -j MASQUERADE
+
+
+##server2
+
+[root@server2 ~]# vim /etc/sysconfig/network-scripts/ifcfg-eth0
+DEVICE=eth0
+ONBOOT=yes
+BOOTPROTO=static
+IPADDR=172.25.83.2
+PREFIX=24
+GATEWAY=172.25.83.83     #设置网关地址
+DNS1=114.114.114.114     #设置DNS域名解析
+
+
+[root@server2 ~]# ping www.baidu.com      #测试网络是否ok
+PING www.a.shifen.com (220.181.112.244) 56(84) bytes of data.
+64 bytes from 220.181.112.244 (220.181.112.244): icmp_seq=1 ttl=50 time=23.0 ms
+64 bytes from 220.181.112.244 (220.181.112.244): icmp_seq=2 ttl=50 time=23.7 ms
+64 bytes from 220.181.112.244 (220.181.112.244): icmp_seq=3 ttl=50 time=35.0 ms
+^C
+--- www.a.shifen.com ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2001ms
+rtt min/avg/max/mdev = 23.070/27.307/35.090/5.513 ms
+</code></pre>
+
+<h2 id="基于gitlab和jenkins的自动化部署实例-执行shell脚本-方法二">基于Gitlab和Jenkins的自动化部署实例—执行shell脚本（方法二）</h2>
+
+<p><strong>1、在jenkins下载有关gitlab的插件 <em>（Gitlab ，Gitlab Hook）</em></strong></p>
+
+<p><a href="https://img.it610.com/image/info8/af177e7b08824d75a33410fc41ebff1f.jpg"><img src="https://img.it610.com/image/info8/af177e7b08824d75a33410fc41ebff1f.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第1张图片" /></a></p>
+
+<p>系统管理—&gt;管理插件—&gt;可选插件</p>
+
+<p><a href="https://img.it610.com/image/info8/78a266a29e694ca29f54d9705c105467.jpg"><img src="https://img.it610.com/image/info8/78a266a29e694ca29f54d9705c105467.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第2张图片" /></a></p>
+
+<p>可以在过滤选择框内搜索gitlab，在搜索结果中选择“Gitlab”和“Gitlab Hook”</p>
+
+<p><a href="https://img.it610.com/image/info8/662e6efd39d54048913dfbc5fe4855e8.jpg"><img src="https://img.it610.com/image/info8/662e6efd39d54048913dfbc5fe4855e8.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第3张图片" /></a></p>
+
+<p>点击“直接安装”，安装选中的这两个插件</p>
+
+<p><a href="https://img.it610.com/image/info8/f0edf5b405ec456d8ab6d12f32b8ec09.jpg"><img src="https://img.it610.com/image/info8/f0edf5b405ec456d8ab6d12f32b8ec09.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第4张图片" /></a></p>
+
+<p>下面的图片是插件安装成功之后的界面图</p>
+
+<p><a href="https://img.it610.com/image/info8/d46938df2a1e41f699c23a82550543b8.jpg"><img src="https://img.it610.com/image/info8/d46938df2a1e41f699c23a82550543b8.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第5张图片" /></a></p>
+
+<p><strong>2、修改之前创建的hello项目的配置</strong></p>
+
+<p>在上一张图片的基础上，点击“返回首页”</p>
+
+<p><a href="https://img.it610.com/image/info8/92eac3e37ee4440fbe41bd7476daf196.jpg"><img src="https://img.it610.com/image/info8/92eac3e37ee4440fbe41bd7476daf196.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第6张图片" /></a></p>
+
+<p>点击“hello”</p>
+
+<p><a href="https://img.it610.com/image/info8/cf2a768452ff48c788aafcade5c9f0ef.jpg"><img src="https://img.it610.com/image/info8/cf2a768452ff48c788aafcade5c9f0ef.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第7张图片" /></a></p>
+
+<p><strong>点击配置，进入hello项目的配置界面</strong></p>
+
+<p><strong>&lt; 1&gt;配置“源码管理“ <em>——上篇博文已经做过</em></strong></p>
+
+<p><strong>&lt; 2&gt;配置“构建“ <em>——上篇博文已经做过</em></strong></p>
+
+<p><strong>&lt; 3&gt;配置构建触发器</strong></p>
+
+<p>（1）选中“Build when a change is pushed to GitLab. GitLab webhook URL:
+<a href="http://172.25.83.2:8080/project/hello”。配置界面如下：">http://172.25.83.2:8080/project/hello”。配置界面如下：</a></p>
+
+<p><strong><a href="https://img.it610.com/image/info8/01a72a428aea4a368b41a8a96fe7288d.jpg"><img src="https://img.it610.com/image/info8/01a72a428aea4a368b41a8a96fe7288d.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第8张图片" /></a></strong></p>
+
+<p>（2）点击高级，生成通行证token。配置界面如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/8d2c5f9227fe4001a0749ef90d371524.jpg"><img src="https://img.it610.com/image/info8/8d2c5f9227fe4001a0749ef90d371524.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第9张图片" /></a></p>
+
+<p>点击“generate”，生成token</p>
+
+<p><a href="https://img.it610.com/image/info8/2afcd502fcfb4b6983787b4c1ad3855d.jpg"><img src="https://img.it610.com/image/info8/2afcd502fcfb4b6983787b4c1ad3855d.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第10张图片" /></a></p>
+
+<p>（3）取消之前勾选的“轮询 SCM”</p>
+
+<p><a href="https://img.it610.com/image/info8/585b0ef6566f450cba7656ea77f4bbfa.jpg"><img src="https://img.it610.com/image/info8/585b0ef6566f450cba7656ea77f4bbfa.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第11张图片" /></a></p>
+
+<hr />
+
+<p><em>值的一提的是：该Jenkins界面配置完“构建触发器“之后，不要关闭界面，因为要在Gitlab的web界面填入Secret
+token。该界面一关闭，就看不到Secrect token的内容了。</em></p>
+
+<hr />
+
+<p>（4）在Gitlab的web界面</p>
+
+<p><a href="https://img.it610.com/image/info8/946f0248a4144673b535d7eeb0ebe351.jpg"><img src="https://img.it610.com/image/info8/946f0248a4144673b535d7eeb0ebe351.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第12张图片" /></a></p>
+
+<p>点击“小扳手”的标志</p>
+
+<p><a href="https://img.it610.com/image/info8/eaa68bf8f3cd46789dea63a7878b5069.jpg"><img src="https://img.it610.com/image/info8/eaa68bf8f3cd46789dea63a7878b5069.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第13张图片" /></a></p>
+
+<p>点击左下角的“设置”，找到关于“外发请求”的设置，设置图如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/66e0f7ca051740a59f8b0248ceda4269.jpg"><img src="https://img.it610.com/image/info8/66e0f7ca051740a59f8b0248ceda4269.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第14张图片" /></a></p>
+
+<p>点击“Save changes”，进行保存</p>
+
+<p><a href="https://img.it610.com/image/info8/b3b55441b77c40b5a37cba0fe1945c1f.jpg"><img src="https://img.it610.com/image/info8/b3b55441b77c40b5a37cba0fe1945c1f.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第15张图片" /></a></p>
+
+<p>点击“项目”</p>
+
+<p><a href="https://img.it610.com/image/info8/f64ca0f1a83f446c955e7f40d6d0f89f.jpg"><img src="https://img.it610.com/image/info8/f64ca0f1a83f446c955e7f40d6d0f89f.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第16张图片" /></a></p>
+
+<p>点击“您的项目”</p>
+
+<p><a href="https://img.it610.com/image/info8/aabde73104c846aaa3e0864a3258bc3e.jpg"><img src="https://img.it610.com/image/info8/aabde73104c846aaa3e0864a3258bc3e.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第17张图片" /></a></p>
+
+<p>点击“Administrator/test”</p>
+
+<p><a href="https://img.it610.com/image/info8/179e3e55b2c8404c8c20ad27ef0cadf4.jpg"><img src="https://img.it610.com/image/info8/179e3e55b2c8404c8c20ad27ef0cadf4.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第18张图片" /></a></p>
+
+<p>点击左下角的“设置”，点击其中的“导入所有仓库”，其配置如下图：（1）在URL内写入Jenkins中“构建触发器”中的URL；（2）在Secret
+Token内内写入Jenkins中“构建触发器”中的生成的Secret Token。（3）选中下面所有的trigger（触发器）。</p>
+
+<blockquote>
+<p>Jenkins中“构建触发器”中的URL及Select Token</p>
+
+<p><a href="https://img.it610.com/image/info8/dd663a9895514259b97c644754c1bcd6.jpg"><img src="https://img.it610.com/image/info8/dd663a9895514259b97c644754c1bcd6.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第19张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/d8fb8c1d7e0749b9adb8e6e4d94728f0.jpg"><img src="https://img.it610.com/image/info8/d8fb8c1d7e0749b9adb8e6e4d94728f0.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第20张图片" /></a></p>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/72838474c266483cbdfde2a2a492b6ba.jpg"><img src="https://img.it610.com/image/info8/72838474c266483cbdfde2a2a492b6ba.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第21张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/ab0704f38c804a3e9687bfc434f2de40.jpg"><img src="https://img.it610.com/image/info8/ab0704f38c804a3e9687bfc434f2de40.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第22张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/ac7b47c8c08b4e24af0d5f11bde9b35b.jpg"><img src="https://img.it610.com/image/info8/ac7b47c8c08b4e24af0d5f11bde9b35b.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第23张图片" /></a></p>
+
+<p>上面的Webhook配置好之后，点击SSL验证中的Push events，进行触发</p>
+
+<p><a href="https://img.it610.com/image/info8/df97dab3d3ce4b1db9f1ecc1202debad.jpg"><img src="https://img.it610.com/image/info8/df97dab3d3ce4b1db9f1ecc1202debad.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第24张图片" /></a></p>
+
+<p>看到200则表示触发成功</p>
+
+<p><a href="https://img.it610.com/image/info8/a3d8d9e1e7f64253b417bb14d2147aee.jpg"><img src="https://img.it610.com/image/info8/a3d8d9e1e7f64253b417bb14d2147aee.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第25张图片" /></a></p>
+
+<p><strong>3、测试</strong></p>
+
+<p><strong>&lt; 1&gt;测试一：</strong></p>
+
+<p><strong>点击“返回面板”，查看可以执行shell脚本的hello工程是否已经配置好。 <em>s下面的球显示蓝色的</em> ，即表示构建成功</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/7ae43aeaab994d53a57bbd90b297d9b4.jpg"><img src="https://img.it610.com/image/info8/7ae43aeaab994d53a57bbd90b297d9b4.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第26张图片" /></a></p>
+
+<p><strong>&lt; 2&gt;测试二：</strong></p>
+
+<p><strong>返回“hello”上一个页面，点击“#3“左边”蓝色的球“，查看控制台输出，如果有输出，则表示可以执行shell脚本的hello工程是否已经配置好</strong></p>
+
+<p><strong><a href="https://img.it610.com/image/info8/8115eabd96d84fd6950fa2bb38e71d20.jpg"><img src="https://img.it610.com/image/info8/8115eabd96d84fd6950fa2bb38e71d20.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第27张图片" /></a></strong></p>
+
+<p><a href="https://img.it610.com/image/info8/d8e57867a6cf4277bdc8c68725b45c38.jpg"><img src="https://img.it610.com/image/info8/d8e57867a6cf4277bdc8c68725b45c38.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第28张图片" /></a></p>
+
+<p><strong>&lt; 3&gt;测试三：</strong></p>
+
+<p><strong>进入Jenkins的工作目录，查看是否有Gitlab上test项目中的内容，如果有，则表示可以执行shell脚本的hello工程是否已经配置好</strong></p>
+
+<pre><code>[root@server2 ~]# cd /var/lib/jenkins/workspace/hello   #Jenkins的工作目录
+[root@server2 hello]# ll
+total 12
+-rw-r--r-- 1 jenkins jenkins  4 Apr 12 21:35 file1
+-rw-r--r-- 1 jenkins jenkins 12 Apr 12 20:56 index.html
+-rw-r--r-- 1 jenkins jenkins  8 Apr 12 20:56 README.md
+</code></pre>
+
+<p><strong>&lt; 4&gt;测试四：</strong></p>
+
+<p><strong>下面我们来测试下轮询SCM（只要SVN或Git中数据有更新，则执行构建任务）</strong></p>
+
+<p><strong>（1）在server1端：想Gitlab远程仓库推送内容</strong></p>
+
+<pre><code>[root@server1 test]# pwd
+/root/test
+[root@server1 test]# ls
+file1  index.html  README.md
+[root@server1 test]# echo is  &gt; file2   #必须在该目录(test的仓库目录)下执行
+[root@server1 test]# git add file2
+[root@server1 test]# git commit -m &quot;add file2&quot;
+[master fcc8eb5] add file2
+ 1 file changed, 1 insertion(+)
+ create mode 100644 file1
+[root@server1 test]# git push -u origin master
+Counting objects: 4, done.
+Compressing objects: 100% (2/2), done.
+Writing objects: 100% (3/3), 296 bytes | 0 bytes/s, done.
+Total 3 (delta 0), reused 0 (delta 0)
+To git@172.25.83.1:root/test.git
+   9bcf5d2..fcc8eb5  master -&gt; master
+Branch master set up to track remote branch master from origin.
+</code></pre>
+
+<p><strong>（2）在server2端的Jenkins的web界面上查看，是否进行了第四次构建，查看控制台输出是否多了内容file2，并在Jenkins工作目录下查看是否多了内容file2</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/d4864b9a76164edbb2d8ddf76fb6e93a.jpg"><img src="https://img.it610.com/image/info8/d4864b9a76164edbb2d8ddf76fb6e93a.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第29张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/ac336836221b487088d53233ef45f1aa.jpg"><img src="https://img.it610.com/image/info8/ac336836221b487088d53233ef45f1aa.jpg" alt="Linux下基于Gitlab和Jenkins的自动化部署实例（一）—执行shell脚本（方法二）_第30张图片" /></a></p>
+
+<pre><code>[root@server2 ~]# ll /var/lib/jenkins/workspace/hello
+total 16
+-rw-r--r-- 1 jenkins jenkins  4 Apr 12 21:35 file1
+-rw-r--r-- 1 jenkins jenkins  3 Apr 14 23:49 file2
+-rw-r--r-- 1 jenkins jenkins 12 Apr 12 20:56 index.html
+-rw-r--r-- 1 jenkins jenkins  8 Apr 12 20:56 README.md
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>GPT和LVM简介磁盘和文件系统管理及小试shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="GPT和LVM简介磁盘和文件系统管理及小试shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="GPT和LVM简介磁盘和文件系统管理及小试shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/gpt%E5%92%8Clvm%E7%AE%80%E4%BB%8B%E7%A3%81%E7%9B%98%E5%92%8C%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E7%AE%A1%E7%90%86%E5%8F%8A%E5%B0%8F%E8%AF%95shell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">GPT和LVM简介磁盘和文件系统管理及小试shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>1、描述GPT是什么，应该怎么使用。</strong><br />
+Linux中磁盘分区分为MBR和GPT。</p>
+
+<p>MBR全称为Master Boot Record，为主引导记录，是传统的分区机制，应用于绝大多数使用的BIOS的PC设备。</p>
+
+<p><strong>MBR分区的特点：</strong></p>
+
+<pre><code>1、MBR支持32位和64位的系统
+2、MBR支持分区数量有限
+3、MBR只支持不超过2T的硬盘，超过2T的硬盘将只能用2T空间。
+</code></pre>
+
+<p>GPT（全称为GUID Partition Table）分区为全局唯一分区表，是一个较新的分区机制，解决了MBR很多缺点</p>
+
+<p><strong>GPT分区的特点：</strong></p>
+
+<pre><code>1、支持超过2T的磁盘（64位寻址）。Fdisk最大只能建立2TB大小的分区
+2、向后兼容MBR
+3、必须在支持UEFI的硬件上才能使用（Intel提出，用于取代BIOS）
+4、必须使用64位系统
+5、Mac、Linux、Windows7/8 64bit、windows Server2008 64bits系统都能支持GPT分区格式
+</code></pre>
+
+<p><strong>parted概述</strong><br />
+由于常见的fdisk不支持GPT(在硬盘容量大于2Tb的
+时候无法使用fdisk进行分区的管理)，故在IA64平台上管理磁盘时parted还是相当实用的，GNU Parted
+具有丰富的功能，它除了能够进行分区的添加、删除等常见操作外，还可以进行移动分区、创建文件系统、调整文件系统大小、复制文件系统等操作。它可以处理最
+常见的分区格式，包括：ext2,ext3,fat16,fat32,NTFS,ReiserFS,JFS,XFS,UFS,HFS,以及Linux交换 分区。</p>
+
+<p><strong>parted 有两种运行模式：</strong><br />
+命令行模式和交互模式。与 fdisk 的交互模式交互模式不同，在 parted
+的交互模式下执行命令，一旦按回车键确认，命令就马上执行，对磁盘的更改就立刻生效。</p>
+
+<p>parted 命令的常用格式是：</p>
+
+<pre><code>1、# parted [选项] 
+2、# parted [选项]   []
+格式（1）用于进入parted 的交互模式，在该模式下输入parted的子命令对指定的硬盘进行分区等操作。quit 命令用于退出交互模式。
+格式（2）直接在命令行方式下对指定的硬盘进行分区等操作。
+其中常用的选项为：
+-h, ––help — 显示求助信息
+-i, ––interactive — 在必要时提示用户
+-l, ––list — 显示所有磁盘设备的分区表
+-s, ––script — 从不提示用户
+-v, ––version — 显示版本
+</code></pre>
+
+<p>操作命令：</p>
+
+<pre><code>检查 MINOR #对文件系统进行一个简单的检查 
+cp [FROM-DEVICE] FROM-MINOR TO-MINOR #将文件系统复制到另一个分区 
+help [COMMAND] #打印通用求助信息，或关于 COMMAND 的信息 
+mklabel 标签类型 #创建新的磁盘标签 (分区表) 
+mkfs MINOR 文件系统类型 #在 MINOR 创建类型为“文件系统类型”的文件系统 
+mkpart 分区类型 [文件系统类型] 起始点 终止点 #创建一个分区 
+mkpartfs 分区类型 文件系统类型 起始点 终止点 #创建一个带有文件系统的分区 
+move MINOR 起始点 终止点 #移动编号为 MINOR 的分区 
+name MINOR 名称 #将编号为 MINOR 的分区命名为“名称” 
+print [MINOR] #打印分区表，或者分区 
+quit #退出程序 
+rescue 起始点 终止点 #挽救临近“起始点”、“终止点”的遗失的分区 
+resize MINOR 起始点 终止点 #改变位于编号为 MINOR 的分区中文件系统的大小 
+rm MINOR #删除编号为 MINOR 的分区 
+select 设备 #选择要编辑的设备 
+set MINOR 标志 状态 #改变编号为 MINOR 的分区的标志
+</code></pre>
+
+<p>parted分区</p>
+
+<pre><code>[root@zyw /]# parted /dev/sdb
+GNU Parted 3.1
+使用 /dev/sdb
+Welcome to GNU Parted! Type 'help' to view a list of commands.
+(parted) mkpart
+分区类型？  primary/主分区/extended/扩展分区? primary
+文件系统类型？  [ext2]? ext4                                              
+起始点？                                                                  
+起始点？ 1
+结束点？ 10G                                                              
+(parted) print                                                            
+Model: VMware, VMware Virtual S (scsi)
+Disk /dev/sdb: 26.8GB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start   End     Size    Type     File system  标志
+ 1      1049kB  10.0GB  9999MB  primary
+
+(parted) q                                                                
+信息: You may need to update /etc/fstab.
+
+[root@zyw /]# 
+</code></pre>
+
+<p><strong>2、创建一个10G的分区，并格式化为ext4文件系统；</strong></p>
+
+<pre><code>[root@zyw ~]# fdisk /dev/sdb
+欢迎使用 fdisk (util-linux 2.23.2)。
+
+更改将停留在内存中，直到您决定将更改写入磁盘。
+使用写入命令前请三思。
+
+Device does not contain a recognized partition table
+使用磁盘标识符 0xa4b1cf36 创建新的 DOS 磁盘标签。
+
+命令(输入 m 获取帮助)：m
+命令操作
+   a   toggle a bootable flag
+   b   edit bsd disklabel
+   c   toggle the dos compatibility flag
+   d   delete a partition
+   g   create a new empty GPT partition table
+   G   create an IRIX (SGI) partition table
+   l   list known partition types
+   m   print this menu
+   n   add a new partition
+   o   create a new empty DOS partition table
+   p   print the partition table
+   q   quit without saving changes
+   s   create a new empty Sun disklabel
+   t   change a partition's system id
+   u   change display/entry units
+   v   verify the partition table
+   w   write table to disk and exit
+   x   extra functionality (experts only)
+
+命令(输入 m 获取帮助)：n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): p
+分区号 (1-4，默认 1)：1
+起始 扇区 (2048-41943039，默认为 2048)：2048
+Last 扇区, +扇区 or +size{K,M,G} (2048-41943039，默认为 41943039)：+10G
+分区 1 已设置为 Linux 类型，大小设为 10 GiB
+
+命令(输入 m 获取帮助)：w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+正在同步磁盘。
+[root@zyw ~]# 
+</code></pre>
+
+<p><strong>(1) block大小为2048；预留空间为2%，卷标为MYDATA，</strong></p>
+
+<pre><code>[root@zyw ~]# mke2fs -t ext4 -b 2048 -m 2 -L MYDATA /dev/sdb1
+mke2fs 1.42.9 (28-Dec-2013)
+文件系统标签=MYDATA
+OS type: Linux
+块大小=2048 (log=1)
+分块大小=2048 (log=1)
+Stride=0 blocks, Stripe width=0 blocks
+655360 inodes, 5242880 blocks
+104857 blocks (2.00%) reserved for the super user
+第一个数据块=0
+Maximum filesystem blocks=273678336
+320 block groups
+16384 blocks per group, 16384 fragments per group
+2048 inodes per group
+Superblock backups stored on blocks: 
+    16384, 49152, 81920, 114688, 147456, 409600, 442368, 802816, 1327104, 
+    2048000, 3981312
+
+Allocating group tables: 完成                            
+正在写入inode表: 完成                            
+Creating journal (32768 blocks): 完成
+Writing superblocks and filesystem accounting information: 完成   
+[root@zyw ~]# blkid /dev/sdb1
+/dev/sdb1: LABEL=&quot;MYDATA&quot; UUID=&quot;0f960234-9299-4d49-bee0-4c891e6ff5d6&quot; TYPE=&quot;ext4&quot; 
+</code></pre>
+
+<p><strong>(2) 挂载至/mydata目录，要求挂载时禁止程序自动运行，且不更新文件的访问时间戳，</strong></p>
+
+<pre><code> [root@zyw ~]# mount -o noatime,noexec -L MYDATA /mydata
+    [root@zyw ~]# df -h
+    文件系统                 容量  已用  可用 已用% 挂载点
+    /dev/mapper/centos-root   17G  1.1G   16G    7% /
+    devtmpfs                 478M     0  478M    0% /dev
+    tmpfs                    489M     0  489M    0% /dev/shm
+    tmpfs                    489M  6.8M  482M    2% /run
+    tmpfs                    489M     0  489M    0% /sys/fs/cgroup
+    /dev/sda1               1014M  125M  890M   13% /boot
+    tmpfs                     98M     0   98M    0% /run/user/0
+    /dev/sdb1                9.8G   13M  9.6G    1% /mydata
+    [root@zyw ~]# 
+</code></pre>
+
+<p><strong>(3) 可开机自动挂载。</strong></p>
+
+<pre><code>vim /etc/fstab
+    #
+    # /etc/fstab
+    # Created by anaconda on Sun May  5 23:48:07 2019
+    #
+    # Accessible filesystems, by reference, are maintained under '/dev/disk'
+    # See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+    #
+    /dev/mapper/centos-root /                       xfs     defaults        0 0
+    UUID=4624e3dc-d9f0-413b-aec8-f9cc75b69b77 /boot                   xfs     defaults        0 0
+    /dev/mapper/centos-swap swap                    swap    defaults        0 0
+    LABEL=MYDATA    /mydata                         ext4    defaults,noatime,noexec     0 0
+[root@zyw ~]# umount /mydata/
+[root@zyw ~]# mount -a
+[root@zyw ~]# df -h
+文件系统                 容量  已用  可用 已用% 挂载点
+/dev/mapper/centos-root   17G  1.1G   16G    7% /
+devtmpfs                 478M     0  478M    0% /dev
+tmpfs                    489M     0  489M    0% /dev/shm
+tmpfs                    489M  6.9M  482M    2% /run
+tmpfs                    489M     0  489M    0% /sys/fs/cgroup
+/dev/sda1               1014M  125M  890M   13% /boot
+tmpfs                     98M     0   98M    0% /run/user/0
+/dev/sdb1                9.8G   13M  9.6G    1% /mydata
+[root@zyw ~]# 
+</code></pre>
+
+<p><strong>3、创建一个大小为1G的swap分区，并启用。</strong></p>
+
+<pre><code>[root@zyw ~]# fdisk /dev/sdb
+欢迎使用 fdisk (util-linux 2.23.2)。
+
+更改将停留在内存中，直到您决定将更改写入磁盘。
+使用写入命令前请三思。
+
+
+命令(输入 m 获取帮助)：n
+Partition type:
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended
+Select (default p): p
+分区号 (2-4，默认 2)：2
+起始 扇区 (20973568-41943039，默认为 20973568)：
+将使用默认值 20973568
+Last 扇区, +扇区 or +size{K,M,G} (20973568-41943039，默认为 41943039)：+1G
+分区 2 已设置为 Linux 类型，大小设为 1 GiB
+
+命令(输入 m 获取帮助)：t
+分区号 (1,2，默认 2)：2
+Hex 代码(输入 L 列出所有代码)：L
+
+ 0  空              24  NEC DOS         81  Minix / 旧 Linu bf  Solaris        
+ 1  FAT12           27  隐藏的 NTFS Win 82  Linux 交换 / So c1  DRDOS/sec (FAT-
+ 2  XENIX root      39  Plan 9          83  Linux           c4  DRDOS/sec (FAT-
+ 3  XENIX usr       3c  PartitionMagic  84  OS/2 隐藏的 C:  c6  DRDOS/sec (FAT-
+ 4  FAT16 &lt;32M      40  Venix 80286     85  Linux 扩展      c7  Syrinx         
+ 5  扩展            41  PPC PReP Boot   86  NTFS 卷集       da  非文件系统数据 
+ 6  FAT16           42  SFS             87  NTFS 卷集       db  CP/M / CTOS / .
+ 7  HPFS/NTFS/exFAT 4d  QNX4.x          88  Linux 纯文本    de  Dell 工具      
+ 8  AIX             4e  QNX4.x 第2部分  8e  Linux LVM       df  BootIt         
+ 9  AIX 可启动      4f  QNX4.x 第3部分  93  Amoeba          e1  DOS 访问       
+ a  OS/2 启动管理器 50  OnTrack DM      94  Amoeba BBT      e3  DOS R/O        
+ b  W95 FAT32       51  OnTrack DM6 Aux 9f  BSD/OS          e4  SpeedStor      
+ c  W95 FAT32 (LBA) 52  CP/M            a0  IBM Thinkpad 休 eb  BeOS fs        
+ e  W95 FAT16 (LBA) 53  OnTrack DM6 Aux a5  FreeBSD         ee  GPT            
+ f  W95 扩展 (LBA)  54  OnTrackDM6      a6  OpenBSD         ef  EFI (FAT-12/16/
+10  OPUS            55  EZ-Drive        a7  NeXTSTEP        f0  Linux/PA-RISC  
+11  隐藏的 FAT12    56  Golden Bow      a8  Darwin UFS      f1  SpeedStor      
+12  Compaq 诊断     5c  Priam Edisk     a9  NetBSD          f4  SpeedStor      
+14  隐藏的 FAT16 &lt;3 61  SpeedStor       ab  Darwin 启动     f2  DOS 次要       
+16  隐藏的 FAT16    63  GNU HURD or Sys af  HFS / HFS+      fb  VMware VMFS    
+17  隐藏的 HPFS/NTF 64  Novell Netware  b7  BSDI fs         fc  VMware VMKCORE 
+18  AST 智能睡眠    65  Novell Netware  b8  BSDI swap       fd  Linux raid 自动
+1b  隐藏的 W95 FAT3 70  DiskSecure 多启 bb  Boot Wizard 隐  fe  LANstep        
+1c  隐藏的 W95 FAT3 75  PC/IX           be  Solaris 启动    ff  BBT            
+1e  隐藏的 W95 FAT1 80  旧 Minix       
+Hex 代码(输入 L 列出所有代码)：82
+已将分区“Linux”的类型更改为“Linux swap / Solaris”
+
+命令(输入 m 获取帮助)：w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+
+WARNING: Re-reading the partition table failed with error 16: 设备或资源忙.
+The kernel still uses the old table. The new table will be used at
+the next reboot or after you run partprobe(8) or kpartx(8)
+正在同步磁盘。
+[root@zyw ~]# free -m
+              total        used        free      shared  buff/cache   available
+Mem:            976         132         691           6         151         682
+Swap:          2047           0        2047
+[root@zyw ~]# swapon /dev/sdb2 
+[root@zyw ~]# free -m
+              total        used        free      shared  buff/cache   available
+Mem:            976         133         691           6         151         681
+Swap:          3071           0        3071
+[root@zyw ~]# 
+</code></pre>
+
+<p><strong>4、编写脚本计算/etc/passwd文件中第10个用户和第20个用户id号之和。</strong></p>
+
+<pre><code>[root@zyw home]# vim sum_userid.sh
+</code></pre>
+
+<blockquote>
+<pre><code>#!/bin/bash
+#
+user10id=$(cat /etc/passwd | head -10 | tail -1 | cut -d: -f3)
+echo &quot;/etc/passwd line10 userid is ${user10id}&quot;
+
+user20id=$(cat /etc/passwd | head -20 | tail -1 | cut -d: -f3)
+echo &quot;/etc/passwd line20 userid is ${user20id}&quot;
+
+echo &quot;/etc/passwd line10 and line20 userid sum is
+</code></pre>
+
+<p>$((${user10id}+${user20id}))&rdquo;</p>
+</blockquote>
+
+<pre><code>[root@zyw home]# sh sum_userid.sh 
+/etc/passwd line10 userid is 11
+/etc/passwd line20 userid is 32
+/etc/passwd line10 and line20 userid sum is 43
+[root@zyw home]# 
+</code></pre>
+
+<p><strong>5、将当前主机名保存至hostName变量中，主机名如果为空，或者为localhost.localdomain则将设置为
+www.magedu.com</strong></p>
+
+<pre><code>[root@zyw home]# hostName=$hostname
+[root@zyw home]# [ -z &quot;$hostName&quot; -o &quot;$hostName&quot; == &quot;localhost.localdomain&quot; -o &quot;$hostName&quot; == &quot;localhost&quot; ] &amp;&amp; hostname www.magedu.com 
+</code></pre>
+
+<p><strong>6、编写脚本，通过命令行参数传入一个用户名，判断id号是偶数还是奇数</strong></p>
+
+<pre><code>[root@zyw home]# vim jo.sh
+</code></pre>
+
+<blockquote>
+<pre><code>#!/bin/bash
+#
+if [ $# != 1 ] ; then
+   echo please input one username
+   exit 2;
+fi
+
+userid=$(grep &quot;^$1&quot; /etc/passwd | cut -d: -f3)
+echo &quot;$1 userid is ${userid}&quot;
+
+if [ $((${userid}%2)) == 0 ] ; then
+    echo &quot;$1 userid is an even num&quot;
+else
+    echo &quot;$1 userid is An odd number&quot;
+fi
+</code></pre>
+</blockquote>
+
+<pre><code>[root@zyw home]# sh jo.sh mail
+mail userid is 8
+mail userid is an even num
+[root@zyw home]# sh jo.sh dbus
+dbus userid is 81
+dbus userid is An odd number
+[root@zyw home]# sh jo.sh
+please input one username
+[root@zyw home]# sh jo.sh root mail
+please input one username
+[root@zyw home]# 
+</code></pre>
+
+<p><strong>7、lvm基本应用以及扩展缩减实现。</strong></p>
+
+<p>LVM: Logical Volume Manager， Version: 2</p>
+
+<p>dm: device mapper，将一个或多个底层块设备组织成一个逻辑设备的模块；</p>
+
+<p>(1)pv管理工具：<br />
+pvs：简要pv信息显示</p>
+
+<pre><code>[root@zyw ~]# pvs
+  PV         VG     Fmt  Attr PSize   PFree
+  /dev/sda2  centos lvm2 a--  &lt;19.00g    0 
+[root@zyw ~]# 
+</code></pre>
+
+<p>pvdisplay：显示pv的详细信息</p>
+
+<pre><code>[root@zyw ~]# pvdisplay
+  --- Physical volume ---
+  PV Name               /dev/sda2
+  VG Name               centos
+  PV Size               &lt;19.00 GiB / not usable 3.00 MiB
+  Allocatable           yes (but full)
+  PE Size               4.00 MiB
+  Total PE              4863
+  Free PE               0
+  Allocated PE          4863
+  PV UUID               qhxnEQ-WUpe-VmhJ-hjvG-yk40-4JZq-WCZqUg
+
+[root@zyw ~]# 
+</code></pre>
+
+<p>pvcreate /dev/DEVICE: 创建pv<br />
+pvmove：移除pv</p>
+
+<p>(2) vg管理工具：<br />
+vgs：简要显示vg信息</p>
+
+<pre><code>[root@zyw ~]# vgs
+  VG     #PV #LV #SN Attr   VSize   VFree
+  centos   1   2   0 wz--n- &lt;19.00g    0 
+[root@zyw ~]# 
+</code></pre>
+
+<p>vgdisplay：详细显示vg信息</p>
+
+<pre><code>[root@zyw ~]# vgdisplay 
+  --- Volume group ---
+  VG Name               centos
+  System ID             
+  Format                lvm2
+  Metadata Areas        1
+  Metadata Sequence No  3
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                0
+  Cur LV                2
+  Open LV               2
+  Max PV                0
+  Cur PV                1
+  Act PV                1
+  VG Size               &lt;19.00 GiB
+  PE Size               4.00 MiB
+  Total PE              4863
+  Alloc PE / Size       4863 / &lt;19.00 GiB
+  Free  PE / Size       0 / 0   
+  VG UUID               xRIWU8-ToaS-jOW4-SZ91-l1AQ-s9Ux-2hew3G
+
+[root@zyw ~]# 
+</code></pre>
+
+<p>vgcreate 创建vg</p>
+
+<pre><code>vgcreate  [-s #[kKmMgGtTpPeE]] VolumeGroupName  PhysicalDevicePath [PhysicalDevicePath...]
+vgextend  VolumeGroupName  PhysicalDevicePath [PhysicalDevicePath...]
+vgreduce  VolumeGroupName  PhysicalDevicePath [PhysicalDevicePath...]
+</code></pre>
+
+<p>vgremove</p>
+
+<p>(3)lv管理工具：<br />
+lvs:简要显示lv信息</p>
+
+<pre><code>[root@zyw ~]# lvs
+  LV   VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root centos -wi-ao---- &lt;17.00g                                                                                              
+[root@zyw ~]# 
+</code></pre>
+
+<p>lvdisplay：详细显示lv信息</p>
+
+<pre><code>[root@zyw ~]# lvdisplay 
+  --- Logical volume ---
+  LV Path                /dev/centos/swap
+  LV Name                swap
+  VG Name                centos
+  LV UUID                F0E4sz-oZLL-Pi6W-WE2V-YDzB-M61L-lzmtKz
+  LV Write Access        read/write
+  LV Creation host, time localhost, 2019-05-05 23:48:06 +0800
+  LV Status              available
+  # open                 2
+  LV Size                2.00 GiB
+  Current LE             512
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     8192
+  Block device           253:1
+
+[root@zyw ~]# 
+</code></pre>
+
+<p>lvcreate：创建lv</p>
+
+<pre><code>lvcreate -L #[mMgGtT] -n NAME VolumeGroup
+</code></pre>
+
+<p>lvremove：移除lv</p>
+
+<pre><code>lvremove /dev/VG_NAME/LV_NAME
+</code></pre>
+
+<p>扩展逻辑卷：</p>
+
+<pre><code># lvextend -L [+]#[mMgGtT] /dev/VG_NAME/LV_NAME
+# resize2fs /dev/VG_NAME/LV_NAME
+</code></pre>
+
+<p>缩减逻辑卷：</p>
+
+<pre><code># umount /dev/VG_NAME/LV_NAME
+# e2fsck -f /dev/VG_NAME/LV_NAME
+# resize2fs /dev/VG_NAME/LV_NAME #[mMgGtT]
+# lvreduce -L [-]#[mMgGtT] /dev/VG_NAME/LV_NAME
+# mount
+</code></pre>
+
+<p>快照：snapshot</p>
+
+<pre><code>lvcreate -L #[mMgGtT] -p r -s -n snapshot_lv_name original_lv_name
+</code></pre>
+
+<p>练习1：创建一个至少有两个PV组成的大小为20G的名为testvg的VG；要求PE大小为16MB,
+而后在卷组中创建大小为5G的逻辑卷testlv；挂载至/users目录；</p>
+
+<pre><code>[root@zyw ~]# fdisk /dev/sdb                        #创建lvm分区
+欢迎使用 fdisk (util-linux 2.23.2)。
+
+更改将停留在内存中，直到您决定将更改写入磁盘。
+使用写入命令前请三思。
+
+Device does not contain a recognized partition table
+使用磁盘标识符 0x02eec3d5 创建新的 DOS 磁盘标签。
+
+命令(输入 m 获取帮助)：p
+
+磁盘 /dev/sdb：26.8 GB, 26843545600 字节，52428800 个扇区
+Units = 扇区 of 1 * 512 = 512 bytes
+扇区大小(逻辑/物理)：512 字节 / 512 字节
+I/O 大小(最小/最佳)：512 字节 / 512 字节
+磁盘标签类型：dos
+磁盘标识符：0x02eec3d5
+
+   设备 Boot      Start         End      Blocks   Id  System
+
+命令(输入 m 获取帮助)：n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): p
+分区号 (1-4，默认 1)：
+起始 扇区 (2048-52428799，默认为 2048)：
+将使用默认值 2048
+Last 扇区, +扇区 or +size{K,M,G} (2048-52428799，默认为 52428799)：+10G
+分区 1 已设置为 Linux 类型，大小设为 10 GiB
+
+命令(输入 m 获取帮助)：n
+Partition type:
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended
+Select (default p): p
+分区号 (2-4，默认 2)：
+起始 扇区 (20973568-52428799，默认为 20973568)：
+将使用默认值 20973568
+Last 扇区, +扇区 or +size{K,M,G} (20973568-52428799，默认为 52428799)：+8G
+分区 2 已设置为 Linux 类型，大小设为 8 GiB
+
+命令(输入 m 获取帮助)：n
+Partition type:
+   p   primary (2 primary, 0 extended, 2 free)
+   e   extended
+Select (default p): 
+Using default response p
+分区号 (3,4，默认 3)：
+起始 扇区 (37750784-52428799，默认为 37750784)：
+将使用默认值 37750784
+Last 扇区, +扇区 or +size{K,M,G} (37750784-52428799，默认为 52428799)：+2G
+分区 3 已设置为 Linux 类型，大小设为 2 GiB
+
+命令(输入 m 获取帮助)：t  
+分区号 (1-3，默认 3)：1
+Hex 代码(输入 L 列出所有代码)：8e
+已将分区“Linux”的类型更改为“Linux LVM”
+
+命令(输入 m 获取帮助)：t
+分区号 (1-3，默认 3)：2
+Hex 代码(输入 L 列出所有代码)：8e
+已将分区“Linux”的类型更改为“Linux LVM”
+
+命令(输入 m 获取帮助)：t
+分区号 (1-3，默认 3)：
+Hex 代码(输入 L 列出所有代码)：8e
+已将分区“Linux”的类型更改为“Linux LVM”
+
+命令(输入 m 获取帮助)：w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+正在同步磁盘。
+
+[root@zyw ~]# pvcreate /dev/sdb1 /dev/sdb2 /dev/sdb3                             #创建pv
+WARNING: ext4 signature detected on /dev/sdb1 at offset 1080. Wipe it? [y/n]: y
+  Wiping ext4 signature on /dev/sdb1.
+WARNING: ext4 signature detected on /dev/sdb2 at offset 1080. Wipe it? [y/n]: y
+  Wiping ext4 signature on /dev/sdb2.
+WARNING: ext4 signature detected on /dev/sdb3 at offset 1080. Wipe it? [y/n]: y
+  Wiping ext4 signature on /dev/sdb3.
+  Physical volume &quot;/dev/sdb1&quot; successfully created.
+  Physical volume &quot;/dev/sdb2&quot; successfully created.
+  Physical volume &quot;/dev/sdb3&quot; successfully created.
+
+[root@zyw ~]# vgcreate testvg -s 16M /dev/sdb1 /dev/sdb2 /dev/sdb3     #创建vg
+  Volume group &quot;testvg&quot; successfully created
+[root@zyw ~]# vgs
+  VG     #PV #LV #SN Attr   VSize   VFree 
+  centos   1   2   0 wz--n- &lt;19.00g     0 
+  testvg   3   0   0 wz--n-  19.95g 19.95g
+
+[root@zyw ~]# lvcreate -L 5G -n testlv testvg     #创建lv
+  Logical volume &quot;testlv&quot; created.
+[root@zyw ~]# lvs
+  LV     VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  root   centos -wi-ao---- &lt;17.00g                                                    
+  swap   centos -wi-ao----   2.00g                                                    
+  testlv testvg -wi-a-----   5.00g 
+
+[root@zyw ~]# mkdir /users
+[root@zyw ~]# mke2fs -t ext4 /dev/testvg/testlv  #格式化逻辑卷
+mke2fs 1.42.9 (28-Dec-2013)
+文件系统标签=
+OS type: Linux
+块大小=4096 (log=2)
+分块大小=4096 (log=2)
+Stride=0 blocks, Stripe width=0 blocks
+327680 inodes, 1310720 blocks
+65536 blocks (5.00%) reserved for the super user
+第一个数据块=0
+Maximum filesystem blocks=1342177280
+40 block groups
+32768 blocks per group, 32768 fragments per group
+8192 inodes per group
+Superblock backups stored on blocks: 
+    32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables: 完成                            
+正在写入inode表: 完成                            
+Creating journal (32768 blocks): 完成
+Writing superblocks and filesystem accounting information: 完成 
+
+[root@zyw ~]# mount /dev/testvg/testlv /users/   #挂载到/users目录下
+[root@zyw ~]# df -h
+文件系统                   容量  已用  可用 已用% 挂载点
+/dev/mapper/centos-root     17G  1.1G   16G    7% /
+devtmpfs                   478M     0  478M    0% /dev
+tmpfs                      489M     0  489M    0% /dev/shm
+tmpfs                      489M  6.8M  482M    2% /run
+tmpfs                      489M     0  489M    0% /sys/fs/cgroup
+/dev/sda1                 1014M  125M  890M   13% /boot
+tmpfs                       98M     0   98M    0% /run/user/0
+/dev/mapper/testvg-testlv  4.8G   20M  4.6G    1% /users
+[root@zyw ~]# 
+</code></pre>
+
+<p>练习2：
+新建用户archlinux，要求其家目录为/users/archlinux，而后su切换至archlinux用户，复制/etc/pam.d目录至自己的家目录；</p>
+
+<pre><code>[root@zyw ~]# useradd  -d /users/archlinux archlinux
+[root@zyw ~]# su - archlinux
+[archlinux@zyw ~]$ pwd
+/users/archlinux
+[archlinux@zyw ~]$ cp -r /etc/pam.d/ /users/archlinux/
+[archlinux@zyw ~]$ ll
+总用量 4
+drwxr-xr-x 2 archlinux archlinux 4096 5月  29 23:03 pam.d
+[archlinux@zyw ~]$ cd pam.d/
+[archlinux@zyw pam.d]$ ll
+总用量 100
+-rw-r--r-- 1 archlinux archlinux  192 5月  29 23:03 chfn
+-rw-r--r-- 1 archlinux archlinux  192 5月  29 23:03 chsh
+-rw-r--r-- 1 archlinux archlinux  232 5月  29 23:03 config-util
+-rw-r--r-- 1 archlinux archlinux  293 5月  29 23:03 crond
+lrwxrwxrwx 1 archlinux archlinux   19 5月  29 23:03 fingerprint-auth -&gt; fingerprint-auth-ac
+...
+ [archlinux@zyw pam.d]$
+</code></pre>
+
+<p>练习3：扩展testlv至7G，要求archlinux用户的文件不能丢失；</p>
+
+<pre><code>[root@zyw /]# lvextend -L 7G /dev/testvg/testlv 
+  Size of logical volume testvg/testlv changed from 5.00 GiB (320 extents) to 7.00 GiB (448 extents).
+  Logical volume testvg/testlv successfully resized.
+[root@zyw /]# e2fsck -f /dev/testvg/testlv
+e2fsck 1.42.9 (28-Dec-2013)
+第一步: 检查inode,块,和大小
+第二步: 检查目录结构
+第3步: 检查目录连接性
+Pass 4: Checking reference counts
+第5步: 检查簇概要信息
+/dev/testvg/testlv: 48/327680 files (0.0% non-contiguous), 58493/1310720 blocks
+[root@zyw /]# resize2fs /dev/testvg/testlv 
+resize2fs 1.42.9 (28-Dec-2013)
+Resizing the filesystem on /dev/testvg/testlv to 1835008 (4k) blocks.
+The filesystem on /dev/testvg/testlv is now 1835008 blocks long.
+
+[root@zyw /]# mount /dev/testvg/testlv /users/
+[root@zyw /]# df -h
+文件系统                   容量  已用  可用 已用% 挂载点
+/dev/mapper/centos-root     17G  1.1G   16G    7% /
+devtmpfs                   478M     0  478M    0% /dev
+tmpfs                      489M     0  489M    0% /dev/shm
+tmpfs                      489M  6.8M  482M    2% /run
+tmpfs                      489M     0  489M    0% /sys/fs/cgroup
+/dev/sda1                 1014M  125M  890M   13% /boot
+tmpfs                       98M     0   98M    0% /run/user/0
+/dev/mapper/testvg-testlv  6.8G   23M  6.4G    1% /users
+[root@zyw /]# ls -a /users/archlinux/
+.bash_history  .bash_logout   .bash_profile  .bashrc        pam.d/         
+[root@zyw /]# ls -a /users/archlinux/
+.  ..  .bash_history  .bash_logout  .bash_profile  .bashrc  pam.d
+[root@zyw /]#
+</code></pre>
+
+<p>练习4：收缩testlv至3G，要求archlinux用户的文件不能丢失；</p>
+
+<pre><code>[root@zyw /]# umount /users/
+[root@zyw /]# e2fsck -f /dev/testvg/testlv 
+e2fsck 1.42.9 (28-Dec-2013)
+第一步: 检查inode,块,和大小
+第二步: 检查目录结构
+第3步: 检查目录连接性
+Pass 4: Checking reference counts
+第5步: 检查簇概要信息
+/dev/testvg/testlv: 48/458752 files (0.0% non-contiguous), 67358/1835008 blocks
+[root@zyw /]# resize2fs /dev/testvg/testlv 3G
+resize2fs 1.42.9 (28-Dec-2013)
+Resizing the filesystem on /dev/testvg/testlv to 786432 (4k) blocks.
+The filesystem on /dev/testvg/testlv is now 786432 blocks long.
+
+[root@zyw /]# lvre
+lvreduce  lvremove  lvrename  lvresize  
+[root@zyw /]# lvreduce -L 3G /dev/testvg/testlv 
+  WARNING: Reducing active logical volume to 3.00 GiB.
+  THIS MAY DESTROY YOUR DATA (filesystem etc.)
+Do you really want to reduce testvg/testlv? [y/n]: y
+  Size of logical volume testvg/testlv changed from 7.00 GiB (448 extents) to 3.00 GiB (192 extents).
+  Logical volume testvg/testlv successfully resized.
+[root@zyw /]# mount /dev/testvg/testlv /users/
+[root@zyw /]# ls -a /users/archlinux/
+.bash_history  .bash_logout   .bash_profile  .bashrc        pam.d/         
+[root@zyw /]# ls -a /users/archlinux/
+.  ..  .bash_history  .bash_logout  .bash_profile  .bashrc  pam.d
+[root@zyw /]# 
+</code></pre>
+
+<p>练习5：对testlv创建快照，并尝试基于快照备份数据，验正快照的功能；</p>
+
+<pre><code>[root@zyw /]# lvcreate -L 10m -p r -s -n snap_testlv /dev/testvg/testlv 
+  Using default stripesize 64.00 KiB.
+  Rounding up size to full physical extent 16.00 MiB
+  Logical volume &quot;snap_testlv&quot; created.
+[root@zyw /]# mkdir /snapshot
+[root@zyw /]# mount /dev/testvg/
+snap_testlv  testlv       
+[root@zyw /]# mount /dev/testvg/snap_testlv /snapshot/
+mount: /dev/mapper/testvg-snap_testlv 写保护，将以只读方式挂载
+[root@zyw /]# df -h
+文件系统                        容量  已用  可用 已用% 挂载点
+/dev/mapper/centos-root          17G  1.1G   16G    7% /
+devtmpfs                        478M     0  478M    0% /dev
+tmpfs                           489M     0  489M    0% /dev/shm
+tmpfs                           489M  6.8M  482M    2% /run
+tmpfs                           489M     0  489M    0% /sys/fs/cgroup
+/dev/sda1                      1014M  125M  890M   13% /boot
+tmpfs                            98M     0   98M    0% /run/user/0
+/dev/mapper/testvg-testlv       2.9G   16M  2.7G    1% /users
+/dev/mapper/testvg-snap_testlv  2.9G   16M  2.7G    1% /snapshot
+[root@zyw /]# ls -a /snapshot/archlinux/
+.  ..  .bash_history  .bash_logout  .bash_profile  .bashrc  pam.d
+[root@zyw /]# 
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

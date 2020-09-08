@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本一键安装mysql数据库已打包成图形化安装 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本一键安装mysql数据库已打包成图形化安装 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本一键安装mysql数据库已打包成图形化安装">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E5%B7%B2%E6%89%93%E5%8C%85%E6%88%90%E5%9B%BE%E5%BD%A2%E5%8C%96%E5%AE%89%E8%A3%85/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本一键安装mysql数据库已打包成图形化安装</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>install_scripts.sh</strong></p>
+
+<p><strong>作用：解压mysql安装包并且注册mysql为一个服务（service），并开机自启动，并且弹出dialog窗体提供安装前配置（用户密码端口配置）。</strong></p>
+
+<pre><code>#!/bin/sh
+
+install_packet_name=&quot;mysql&quot;
+install_packet_tarball_name=$install_packet_name&quot;.tar.gz&quot;
+current_install_user=&quot;root&quot;
+#install_user=&quot;mysql&quot;
+install_user=$current_install_user
+mysql_current_status=0
+
+install_path=/usr/local
+#mysql_path=/usr/local/${install_packet_name}
+mysql_path=/usr/local
+#mysql_data_root=~/tdata
+mysql_data_root=/tdata
+mysql_data_path=$mysql_data_root/data
+mysql_sock_path=$mysql_data_root/mysql.sock
+
+mysql_user=sean
+mysql_port=3306
+mysql_passwd=sean
+mysql_admin_passwd=123456
+
+env_check()
+{
+    current_install_user=$(whoami)
+    if [ &quot;$current_install_user&quot; != &quot;root&quot; ]; then
+        echo &quot;please switch to root user to run this script&quot;
+        exit
+    fi
+
+    if [ &quot;$install_user&quot; != &quot;root&quot; ]; then
+      egrep &quot;^$install_user&quot; /etc/group &gt;&amp; /dev/null
+      if [ $? -ne 0 ]; then
+        groupadd mysql
+      fi
+
+      egrep &quot;^$install_user&quot; /etc/passwd &gt;&amp; /dev/null
+      if [ $? -ne 0 ];then
+        useradd -g mysql mysql
+      fi
+    fi
+#    systemctl stop mysql
+}
+
+mysql_exist_clear()
+{
+  systemctl stop mysql
+
+  test ! -f /etc/rc.d/init.d/mysql || rm -rf /etc/rc.d/init.d/mysql
+  test ! -d $mysql_data_root || rm -rf $mysql_data_root
+  test ! -f /etc/my.cnf || rm -rf /etc/my.cnf
+  test ! -d /usr/local/mysql || rm -rf /usr/local/mysql
+}
+
+slice_the_files()
+{
+  sed -n -e '1,/^Do you understand the feeling of missing someone?$/!p' $0 &gt; $install_path/$install_packet_tarball_name 2&gt;/dev/null
+}
+
+set_mysql_config()
+{
+  cat /dev/null &gt; /tmp/TF_Install.config_db
+  dialog --title &quot;同方泰德视频平台安装服务(数据库安装)&quot; --form &quot;请输入数据库信息:&quot; 12 40 4  \
+  &quot;数据库连接端口:&quot; 1  1 $mysql_port 1  15  15  0  \
+  &quot;数据库管理员密码:&quot; 2  1 $mysql_admin_passwd 2  15  15  0  \
+  &quot;登录用户名:&quot; 3  1 $mysql_user 3  15  15  0  \
+  &quot;登录密码:&quot;    4   1 $mysql_passwd 4  15  15  0 2&gt; /tmp/TF_Install.config_db
+  result=$?
+  if [ $result -eq 1 ]; then
+    exit 1
+  elif [ $result -eq 255 ]; then
+    exit 255
+  fi
+
+  mysql_port=$(cat /tmp/TF_Install.config_db |sed -n &quot;1p&quot;)
+  mysql_admin_passwd=$(cat /tmp/TF_Install.config_db |sed -n &quot;2p&quot;)
+  mysql_user=$(cat /tmp/TF_Install.config_db |sed -n &quot;3p&quot;)
+  mysql_passwd=$(cat /tmp/TF_Install.config_db |sed -n &quot;4p&quot;)
+
+  mysql_install_proc
+}
+
+mysql_install_proc()
+{
+  slice_the_files
+
+  cd ${install_path}
+  tar xzvf $install_packet_tarball_name -C $install_path
+
+  if [ $? -ne 0 ]; then
+    echo -e &quot;\e[1;31m[extract packet failure...]\e[0m&quot;
+    exit 1
+  fi
+
+  rm -rf $install_packet_tarball_name
+#  chown -R $current_install_user:$current_install_user $install_packet_name
+  chown -R $install_user:$install_user $install_packet_name
+  cd $install_packet_name &amp;&amp; cp support-files/my-default.cnf ./my.cnf
+  mkdir -p $mysql_data_path
+#  chown -R $current_install_user:$current_install_user $mysql_data_root
+  chown -R $install_user:$install_user $mysql_data_root
+
+  sed -i &quot;/mysqld/a\datadir = ${mysql_data_path}&quot;  my.cnf
+  sed -i &quot;/mysqld/a\basedir = ${install_path}/$install_packet_name&quot; my.cnf
+  sed -i &quot;/mysqld/a\user = ${install_user}&quot; my.cnf
+  sed -i &quot;/mysqld/a\character-set-server=utf8&quot; my.cnf
+  sed -i &quot;/mysqld/a\port = ${mysql_port}&quot; my.cnf
+  sed -i &quot;/mysqld/a\socket = ${mysql_sock_path}&quot; my.cnf
+  sed -i &quot;/mysqld/i\[mysql]&quot; my.cnf
+  sed -i &quot;/mysqld/i\default-character-set=utf8&quot; my.cnf
+  sed -i &quot;/mysqld/i\socket = ${mysql_sock_path}&quot; my.cnf
+
+  sed -i &quot;/mysqld/i\ &quot; my.cnf
+
+  test ! -f /etc/my.cnf || rm -rf /etc/my.cnf
+  cp my.cnf /etc/my.cnf
+
+  scripts/mysql_install_db --basedir=$install_path/$install_packet_name --user=$install_user --defaults-file=$install_path/$install_packet_name/my.cnf
+
+  if [ $? -ne 0 ]; then
+    echo -e &quot;\e[1;31m[MySQL install init failure...]\e[0m&quot;
+    exit 1
+  fi
+
+  cd $install_path/$install_packet_name
+
+  echo &quot;Set mysql as system service&quot;
+  cp support-files/mysql.server /etc/rc.d/init.d/mysql
+  chmod +x /etc/rc.d/init.d/mysql
+  chkconfig mysql on
+  systemctl start mysql
+
+  run_status=$(systemctl status $install_packet_name|grep running)
+  echo $run_status
+  if [ &quot;$run_status&quot; == &quot;&quot; ]; then
+    echo -e &quot;\e[1;31m[MySQL start failure...]\e[0m&quot;
+    exit 1
+  else
+    echo -e &quot;\e[1;32m[MySQL start secessful]\e[0m&quot;
+  fi
+
+  export PATH=$PATH:$install_path/$install_packet_name/bin 
+
+  mysql -uroot  -e  &quot;CREATE USER 'sean'@'%' IDENTIFIED BY 'sean';grant all on *.* to 'sean'@'%';CREATE USER 'sean'@'localhost' IDENTIFIED BY 'sean';grant all on *.* to 'sean'@'localhost';flush privileges;&quot;
+  if [ $? -eq 0 ]; then
+    echo &quot;Set mysql user sean password and create default database successfully!&quot;
+  fi
+
+  exit 0
+}
+
+mysql_exist_check()
+{
+  run_status=$(systemctl status $install_packet_name|grep running)
+  echo $run_status
+  if [ &quot;$run_status&quot; != &quot;&quot; ]; then
+    #mysql_current_status=0
+    dialog --title &quot;检测到数据库已经存在&quot; --backtitle &quot;同方泰德视频平台安装服务(数据库安装)&quot; --yesno &quot;是否重新安装?\n&quot; 16 51
+    result=$?
+    if [ $result -eq 1 ];then
+      exit 1;
+    elif [ $result -eq 255 ];then
+      exit 255;
+    fi
+
+
+    echo &quot;start to downloading.......\n&quot;
+    
+    mysql_exist_clear
+  fi
+    set_mysql_config
+}
+
+
+if [ ! -n &quot;$1&quot; ];then
+  gnome-terminal -x bash -c &quot;./同方泰德数据库安装服务\(mysql\).x -r; exec bash;&quot;
+else
+  env_check
+  mysql_exist_check  
+fi
+</code></pre>
+
+<p><strong>build_script.sh</strong></p>
+
+<p><strong>作用：构建.x安装文件，使用到了shc命令（具体参考shc加密的使用）来加密上面install_scripts.sh脚本，并且和mysql压缩包（版本mysql-5.6.38-linux-
+glibc2.12-x86_64.tar）一块打包成为一个可执行文件，注意还有被打包进去的
+slice.txt文件里面就写了一串英文句子，目的就是sed分离安装包的时候能够以这句话为分割标记点，从而可以分别sed分离出安装包里的脚本文件和压缩包，因此cat写入安装包的时候也是先写入install_scripts.sh脚本，然后是分割标记文件slice.txt,最后才是mysql二进制压缩包。拼接分割文件具体可以参考sed的使用。</strong></p>
+
+<hr />
+
+<pre><code>#!/bin/sh
+
+
+CFLAGS=-static shc -v -r -T -f install_script.sh
+cat install_script.sh.x slice.txt mysql.tar.gz &gt; 同方泰德数据库安装服务\(mysql\).x
+chmod +x 同方泰德数据库安装服务\(mysql\).x
+</code></pre>
+
+<p>最后注意的是
+.x可执行文件要拷贝到桌面上双击运行，不是桌面下无法弹出窗体。弹出界面后直接输入设定mysql用户名密码和端口，不修改的话就默认下一步就行，一直enter下一步就成功了。
+如果提示没有权限就赋读写权限，实在不行用root用户执行。</p>
+
+<p><strong>需要的文件目录</strong></p>
+
+<hr />
+
+<p><a href="https://img.it610.com/image/info8/c143db7f22f84a55b18361edb289d25b.jpg"><img src="https://img.it610.com/image/info8/c143db7f22f84a55b18361edb289d25b.jpg" alt="shell
+脚本一键安装mysql数据库（已打包成图形化安装）_第1张图片" /></a></p>
+
+<p>install_script.sh.x 和install_scripts.sh.x.c是临时文件，是用shc加密
+install_script.sh而产生的中间文件，这两个文件不用管，没有用。
+有用的就是最下面那个可执行文件，如果要修改安装脚本则修改完install_script.sh文件然后运行build_scripts.sh就会产生新的可执行文件。注意两个脚本文件中
+数据库安装服务(mysql).x的名字要一致，改成什么名字看个人需要，其他地方的名字也可以随便改了。</p>
+
+<p>运行效果：</p>
+
+<p><a href="https://img.it610.com/image/info8/a58b6b07299c4c22926423c02c809e38.jpg"><img src="https://img.it610.com/image/info8/a58b6b07299c4c22926423c02c809e38.jpg" alt="shell
+脚本一键安装mysql数据库（已打包成图形化安装）_第2张图片" /></a></p>
+
+<p>资源下载地址》》》》》资源下载地址</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

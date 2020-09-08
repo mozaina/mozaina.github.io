@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>日志文件分析shell脚本六次提速过程 | 开发者问答集锦</title>
+    <meta property="og:title" content="日志文件分析shell脚本六次提速过程 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="日志文件分析shell脚本六次提速过程">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6%E5%88%86%E6%9E%90shell%E8%84%9A%E6%9C%AC%E5%85%AD%E6%AC%A1%E6%8F%90%E9%80%9F%E8%BF%87%E7%A8%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">日志文件分析shell脚本六次提速过程</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>做性能调优，常常面对超大日志文件的分析问题，别指望什么vi或者ultraedit可以搞定。还得自己写代码。</p>
+
+<p>题目的提出：</p>
+
+<p>事情很简单，一个后台模块需要进行性能测试后的日志分析，这个后台模块进行转发，所以日志中同时有发送和接收的日志，示例如下：</p>
+
+<p>[2012-07-23 14:15:20.734][PID.100][DEBUG]: Start
+Time:20120723141520730,callid:1-1987@191.8.2.157,title:INVITE
+sip:44636130000001@191.8.2.158:5060 SIP/2.0,cseq:1 INVITE</p>
+
+<p>[2012-07-23 14:15:20.741][PID.100][DEBUG]: Send Message
+Time:20120723141520741,callid:1-1987@191.8.2.157,title:SIP/2.0 100
+Trying,cseq:1 INVITE</p>
+
+<p>[2012-07-23 14:15:20.826][PID.100][DEBUG]: End
+Time:20120723141520826,callid:1-1987@191.8.2.157,title:INVITE
+sip:44636130000001@191.8.2.158:5060 SIP/2.0,cseq:1 INVITE</p>
+
+<p>[2012-07-23 14:15:20.849][PID.100][DEBUG]: Send Message
+Time:20120723141520849,callid:1-1987@191.8.2.157,title:SIP/2.0 180
+Ringing,cseq:1 INVITE</p>
+
+<p>[2012-07-23 14:15:20.851][PID.100][DEBUG]: Start
+Time:20120723141520851,callid:1-1987@191.8.2.157,title:PRACK
+sip:44636130000001@191.8.2.158:5060 SIP/2.0,cseq:2 PRACK</p>
+
+<p>[2012-07-23 14:15:20.876][PID.100][DEBUG]: End
+Time:20120723141520876,callid:1-1987@191.8.2.157,title:PRACK
+sip:44636130000001@191.8.2.158:5060 SIP/2.0,cseq:2 PRACK</p>
+
+<p>[2012-07-23 14:15:20.895][PID.100][DEBUG]: Send Message
+Time:20120723141520895,callid:1-1987@191.8.2.157,title:SIP/2.0 200 OK,cseq:2
+PRACK</p>
+
+<p>[2012-07-23 14:15:20.930][PID.100][DEBUG]: Send Message
+Time:20120723141520930,callid:1-1987@191.8.2.157,title:SIP/2.0 200 OK,cseq:1
+INVITE</p>
+
+<p>[2012-07-23 14:15:20.932][PID.100][DEBUG]: Start
+Time:20120723141520932,callid:1-1987@191.8.2.157,title:ACK
+sip:44636130000001@191.8.2.158:5060 SIP/2.0,cseq:3 ACK</p>
+
+<p>[2012-07-23 14:15:20.971][PID.100][DEBUG]: End
+Time:20120723141520970,callid:1-1987@191.8.2.157,title:ACK
+sip:44636130000001@191.8.2.158:5060 SIP/2.0,cseq:3 ACK</p>
+
+<p>[2012-07-23 14:16:20.928][PID.100][DEBUG]: Start
+Time:20120723141620928,callid:1-1987@191.8.2.157,title:BYE
+sip:44636130000001@191.8.2.158:5060 SIP/2.0,cseq:4 BYE</p>
+
+<p>[2012-07-23 14:16:20.929][PID.100][DEBUG]: End
+Time:20120723141620929,callid:1-1987@191.8.2.157,title:BYE
+sip:44636130000001@191.8.2.158:5060 SIP/2.0,cseq:4 BYE</p>
+
+<p>[2012-07-23 14:16:21.057][PID.100][DEBUG]: Send Message
+Time:20120723141621057,callid:1-1987@191.8.2.157,title:SIP/2.0 200 OK,cseq:4
+BYE</p>
+
+<p>[2012-07-23 14:15:20.825][PID.100][DEBUG]: Send Message
+Time:20120723141520825,callid:1-1987@191.8.2.158,title:INVITE
+sip:30000001@191.8.2.157:5060 SIP/2.0,cseq:1 INVITE</p>
+
+<p>[2012-07-23 14:15:20.827][PID.100][DEBUG]: Start
+Time:20120723141520827,callid:1-1987@191.8.2.158,title:SIP/2.0 100
+Trying,cseq:1 INVITE</p>
+
+<p>[2012-07-23 14:15:20.828][PID.100][DEBUG]: End
+Time:20120723141520828,callid:1-1987@191.8.2.158,title:SIP/2.0 100
+Trying,cseq:1 INVITE</p>
+
+<p>[2012-07-23 14:15:20.829][PID.100][DEBUG]: Start
+Time:20120723141520828,callid:1-1987@191.8.2.158,title:SIP/2.0 180
+Ringing,cseq:1 INVITE</p>
+
+<p>[2012-07-23 14:15:20.829][PID.100][DEBUG]: End
+Time:20120723141520829,callid:1-1987@191.8.2.158,title:SIP/2.0 180
+Ringing,cseq:1 INVITE</p>
+
+<p>[2012-07-23 14:15:20.871][PID.100][DEBUG]: Send Message
+Time:20120723141520871,callid:1-1987@191.8.2.158,title:PRACK
+sip:30000001@191.8.2.157:5060 SIP/2.0,cseq:2 PRACK</p>
+
+<p>[2012-07-23 14:15:20.873][PID.100][DEBUG]: Start
+Time:20120723141520872,callid:1-1987@191.8.2.158,title:SIP/2.0 200 OK,cseq:2
+PRACK</p>
+
+<p>[2012-07-23 14:15:20.873][PID.100][DEBUG]: Start
+Time:20120723141520873,callid:1-1987@191.8.2.158,title:SIP/2.0 200 OK,cseq:1
+INVITE</p>
+
+<p>[2012-07-23 14:15:20.874][PID.100][DEBUG]: End
+Time:20120723141520874,callid:1-1987@191.8.2.158,title:SIP/2.0 200 OK,cseq:1
+INVITE</p>
+
+<p>[2012-07-23 14:15:20.874][PID.100][DEBUG]: End
+Time:20120723141520874,callid:1-1987@191.8.2.158,title:SIP/2.0 200 OK,cseq:2
+PRACK</p>
+
+<p>[2012-07-23 14:15:20.965][PID.100][DEBUG]: Send Message
+Time:20120723141520965,callid:1-1987@191.8.2.158,title:ACK
+sip:30000001@191.8.2.157:5060 SIP/2.0,cseq:3 ACK</p>
+
+<p>[2012-07-23 14:16:20.929][PID.100][DEBUG]: Send Message
+Time:20120723141620929,callid:1-1987@191.8.2.158,title:BYE
+sip:30000001@191.8.2.157:5060 SIP/2.0,cseq:4 BYE</p>
+
+<p>[2012-07-23 14:16:20.930][PID.100][DEBUG]: Start
+Time:20120723141620930,callid:1-1987@191.8.2.158,title:SIP/2.0 200 OK,cseq:4
+BYE</p>
+
+<p>[2012-07-23 14:16:21.068][PID.100][DEBUG]: End
+Time:20120723141621068,callid:1-1987@191.8.2.158,title:SIP/2.0 200 OK,cseq:4
+BYE</p>
+
+<hr />
+
+<p>现在需要得到的是：</p>
+
+<p>呼叫的各个步骤的次数；</p>
+
+<p>查找开始了没结束的记录，检查哪些呼叫没有正常结束，然后对这些呼叫进行细节分析；</p>
+
+<p>同时记录有结束没有开始的记录，这种情况通常没有，除非日志是半截的；</p>
+
+<p>对呼叫的响应时间进行统计。</p>
+
+<p>返回结果类似：</p>
+
+<p>logfilename : TONGJI RESULT</p>
+
+<p>INVITE:xxx</p>
+
+<p>Trying:xxx</p>
+
+<p>Ringing:xxx</p>
+
+<p>PRACK:xxx</p>
+
+<p>200 OK(1:INVITE):xxx</p>
+
+<p>200 OK(2:PRACK):xxx</p>
+
+<p>ACK:xxx</p>
+
+<p>BYE:xxx</p>
+
+<p>200 OK(3:BYE):xxx</p>
+
+<p>callid:xxx</p>
+
+<p>send INVITE:xxx</p>
+
+<p>send 200 OK(BYE):xxx</p>
+
+<p>cost time [0s&ndash;1s]: xxx</p>
+
+<p>cost time [1s&ndash;2s]: xxx</p>
+
+<p>cost time [2s&ndash;3s]: xxx</p>
+
+<p>cost time [3s&ndash;4s]: xxx</p>
+
+<p>cost time [4s&ndash; ]: xxx</p>
+
+<hr />
+
+<p>当然还会将有开始没结束或者有结束没开始的呼叫打印出来。</p>
+
+<p>六次提速贴出脚本来就一大堆了，看也看不过来了，细节看后面的附件吧。只说算法和要点了。</p>
+
+<p>版本一：</p>
+
+<p>为了效率着想，尽可能使用c效率的awk，避免使用shell命令组合，那效率实在难以忍受。</p>
+
+<p>在这个版本中，awk同时处理两个文件，但是遇到一个技术瓶颈，就是在awk中如何计算时间相减。找到了date可以实现相减，但是悲剧的是不知道如何将使用date相减的结果传递给awk的变量。挠头了半天，想出来一个馊主意：直接拼接字符串，输出到一个shell脚本中，然后再执行该脚本，生成结果文件，格式为：callid，消耗时间。</p>
+
+<p>最后，悲催的发现生成的shell脚本不但很大，执行起来真的不是一般的慢，想想还要写一个脚本来对结果文件进行统计，算了吧，forget it。</p>
+
+<p>参看一下生成脚本：</p>
+
+<p>awk&hellip;{</p>
+
+<p>etime=substr(arr1[i],index(arr1[i],&rdquo;[&ldquo;)+1,index(arr1[i],&ldquo;]&rdquo;)-index(arr1[i],&rdquo;[&ldquo;)-1);</p>
+
+<p>stime=substr($0,index($0,&rdquo;[&ldquo;)+1,index($0,&rdquo;]&ldquo;)-index($0,&rdquo;[&ldquo;)-1);</p>
+
+<p>print &ldquo;st=<code>date +%s -d \&quot;&quot; stime &quot;\&quot;</code>&rdquo;;</p>
+
+<p>print &ldquo;et=<code>date +%s -d \&quot;&quot; etime &quot;\&quot;</code>&rdquo;;</p>
+
+<p>print &ldquo;printf \&ldquo;&ldquo;callid1&rdquo;:\&ldquo;&gt;&gt;time.log&rdquo;;</p>
+
+<p>print &ldquo;echo \&ldquo;$et-$st\&rdquo; | bc&gt;&gt;time.log&rdquo;;</p>
+
+<p>} file1 file2 |tee -a difftime.sh</p>
+
+<p>chmod +x difftime.sh</p>
+
+<p>./difftime.sh</p>
+
+<hr />
+
+<p>这个版本的速度，怎么说呢，发起呼叫文件或结束呼叫文件大约4200条记录，你就算吃顿饭回来也未必能执行完。</p>
+
+<p>版本二：</p>
+
+<p>这个版本总算解决了在awk中将时间相减，并返回给awk的变量，于是改写了白痴的版本一，这样也就可以在一个脚本中实现呼叫的响应时间统计。</p>
+
+<p>技术要点如下：</p>
+
+<p>etime=substr(arr1[i],index(arr1[i],&rdquo;[&ldquo;)+1,index(arr1[i],&ldquo;]&rdquo;)-index(arr1[i],&rdquo;[&ldquo;)-1);</p>
+
+<p>stime=substr($0,index($0,&rdquo;[&ldquo;)+1,index($0,&rdquo;]&ldquo;)-index($0,&rdquo;[&ldquo;)-1);</p>
+
+<p>syscmd=&ldquo;st=<code>date +%s -d \&quot;&quot;stime&quot;\&quot;</code>;et=<code>date +%s -d \&quot;&quot;etime&quot;\&quot;</code>;echo
+\&ldquo;$et-$st\&rdquo; | bc&rdquo;;</p>
+
+<p>##print syscmd;</p>
+
+<p>syscmd|getline dualtime;</p>
+
+<p>##print &ldquo;dualtime:&ldquo;dualtime;</p>
+
+<hr />
+
+<p>这个版本测试了一下，当然比上一个版本强多了，不过也差不多需要一次大便的时间，要知道这才4200多条记录，如果10w条记录甚至更多呢，那你需要100000/4200=23.8次大便才能完成。这事不靠谱。</p>
+
+<p>版本三：</p>
+
+<p>再次改进，将预处理的程度加深，最终开始呼叫文件和结束呼叫文件只剩下时间和呼叫ID两个字段，避免了awk中大量的字符串运算。这个没啥特别的技术，参考：</p>
+
+<p>grep &lsquo;SIP/2.0,cseq:1 INVITE&rsquo; $IN_FILE|grep &lsquo;Send Message&rsquo;|awk -F&rdquo;@&rdquo; &lsquo;{print
+$1}&lsquo;&gt;$START_FILE.tmp</p>
+
+<p>grep &lsquo;SIP/2.0 200 OK,cseq:4 BYE&rsquo; $IN_FILE|grep &lsquo;Send Message&rsquo;|awk -F&rdquo;@&rdquo;
+&lsquo;{print $1}&rsquo; &gt;$STOP_FILE.tmp</p>
+
+<p>awk -F&rdquo;:&rdquo; &lsquo;{print(substr($0,2,23)&ldquo;,&rdquo;$NF);}&rsquo; $START_FILE.tmp&gt;$START_FILE</p>
+
+<p>awk -F&rdquo;:&rdquo; &lsquo;{print(substr($0,2,23)&ldquo;,&rdquo;$NF);}&rsquo; $STOP_FILE.tmp&gt;$STOP_FILE</p>
+
+<hr />
+
+<p>测试了一下速度：</p>
+
+<p><sup>4289</sup>&frasl;<sub>122</sub>=35.15573770491803条/秒</p>
+
+<p><sup>100000</sup>&frasl;<sub>35</sub>.15573770491803=2844.48589414782秒/60=47.408098235797分</p>
+
+<p>介个。。。。。。革命尚未成功，继续努力吧。</p>
+
+<p>版本四：</p>
+
+<p>开始和结束呼叫两个文件都是4289条记录，每次都需要对比，次数就需要4289*4289=18395521次，很多记录是已经比对成功了的，都是无效比对的。所以改进算法，将stopfile导入数组后，用一个变量记录数组匹配上的最新位置，一旦有匹配上就和未匹配上的最顶值交换，循环就从匹配上的最新位置加一再开始，由于两个文件基本上是按照时间排序的，所以实际比对的次数可能也就和之前的零头相当，估计不超过5000次。</p>
+
+<p>技术要点参考：</p>
+
+<p>for(i=y;i&lt;=x;i++){</p>
+
+<p>if(arr2[i]==$2){</p>
+
+<p>&hellip;&hellip;</p>
+
+<p>sw=arr2[y];</p>
+
+<p>arr2[y]=arr2[i];</p>
+
+<p>arr2[i]=sw;</p>
+
+<p>y=y+1;</p>
+
+<p>break;</p>
+
+<p>}</p>
+
+<p>}</p>
+
+<hr />
+
+<p>测试速度：</p>
+
+<p><sup>4289</sup>&frasl;<sub>112</sub>=38.29464285714286</p>
+
+<p><sup>100000</sup>&frasl;<sub>38</sub>.29464285714286=2611秒</p>
+
+<p><sup>2611</sup>&frasl;<sub>60</sub>=43.51666666666667分</p>
+
+<p>还是不能接受，看来数据量不够大，效果不明显，最大的瓶颈必然不是awk中的比对。想起来了，因为两个文件的数据都基本上是位置相一致的，加上匹配上就break出了for循环，所以实际循环数比之前推算的少很多。</p>
+
+<p>版本五：</p>
+
+<p>改进：</p>
+
+<p>怀疑开启子进程计算时间相减导致效率很低，所以预先处理时间，生成秒值，awk中就直接减就行了</p>
+
+<p>另外将截取时间的方法写成了硬编码：</p>
+
+<p>substr($0,index($0,&rdquo;[&ldquo;)+1,index($0,&rdquo;]&ldquo;)-index($0,&rdquo;[&ldquo;)-1); 改为了：substr($0,2,23)</p>
+
+<p>读书人，别那么迂腐，此时不用硬编码更待何时？</p>
+
+<p>技术要点：</p>
+
+<p>awk -F&rdquo;:&rdquo; &lsquo;{print(substr($0,2,23)&ldquo;,&rdquo;$NF);}&rsquo; $START_FILE.tmp1&gt;$START_FILE.tmp2</p>
+
+<p>awk -F&rdquo;:&rdquo; &lsquo;{print(substr($0,2,23)&ldquo;,&rdquo;$NF);}&rsquo; $STOP_FILE.tmp1&gt;$STOP_FILE.tmp2</p>
+
+<p>awk -F&rdquo;,&rdquo; &lsquo;{syscmd=&ldquo;date +%s -d \&ldquo;&rdquo;$1&rdquo;\&ldquo;&rdquo;;syscmd|getline var;print var&rdquo;,&ldquo;$2}&rsquo;
+$START_FILE.tmp2&gt;$START_FILE</p>
+
+<p>awk -F&rdquo;,&rdquo; &lsquo;{syscmd=&ldquo;date +%s -d \&ldquo;&rdquo;$1&rdquo;\&ldquo;&rdquo;;syscmd|getline var;print var&rdquo;,&ldquo;$2}&rsquo;
+$STOP_FILE.tmp2&gt;$STOP_FILE</p>
+
+<hr />
+
+<p>速度虽然有所提高，但是没有质的改变，不过总算进了30分钟，但是实际情况中10w条记录几乎是下限，得100w级别才有实际价值：</p>
+
+<p><sup>4289</sup>&frasl;<sub>76</sub>=56.43421052631579</p>
+
+<p><sup>100000</sup>&frasl;<sub>56</sub>.43421052631579=1771.<sup>974819305199</sup>&frasl;<sub>60</sub>=29.53291365508665分</p>
+
+<p>终极版本六：</p>
+
+<p>现在已经非常清楚了，就是时间相减导致了无法实现速度质的提升，date的方法不够用。土法上马，降低严谨程度，直接awk中计算一个出来，减一个秒值出来，毫秒对于我没有意义。</p>
+
+<p>技术要点：</p>
+
+<p>et=substr(arr1[i],9,2)*86400+substr(arr1[i],12,2)*3600+substr(arr1[i],15,2)*60+substr(arr1[i],18,2);</p>
+
+<p>st=substr($1,9,2)*86400+substr($1,12,2)*3600+substr($1,15,2)*60+substr($1,18,2);</p>
+
+<p>dualtime=et-st;</p>
+
+<hr />
+
+<p>测试速度，果然耳目一新：</p>
+
+<p><sup>4289</sup>&frasl;<sub>3</sub>=1429.666666666667</p>
+
+<p><sup>100000</sup>&frasl;<sub>1429</sub>.666666666667=69.94637444625785秒</p>
+
+<p>也就是说如果资源够用，100w条记录也能一个小时左右就搞定，这个差不多能满足需求了。</p>
+
+<p>效率、代码严谨和规范，每件事都重要，但是总得有取舍，都重要里面也有最重要的。</p>
+
+<p>GOD BLESS U !!!</p>
+
+<p>附件：</p>
+
+<p><a href="http://download.csdn.net/detail/testingba/4450278">http://download.csdn.net/detail/testingba/4450278</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

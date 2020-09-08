@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>GitLab系列4GitLabShell | 开发者问答集锦</title>
+    <meta property="og:title" content="GitLab系列4GitLabShell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="GitLab系列4GitLabShell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/gitlab%E7%B3%BB%E5%88%974gitlabshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">GitLab系列4GitLabShell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>看了前三期 GitLab 相关解析的读者（假装有读者）</p>
+
+<ul>
+<li>GitLab系列1 基础功能及架构简介</li>
+<li>GitLab系列2 GitLab Workhorse</li>
+<li>GitLab系列3 Unicorn</li>
+</ul>
+
+<p>都会发现我总会贴 GitLab 的架构图。至此我们将 GitLab 如何处理 HTTP/HTTPS 请求的过程解释了“一半”：用户请求从
+HTTP/HTTPS 入口进来，经由 nginx 到达 gitlab-workhorse ，如果能处理的请求自己优先处理，不能处理的请求再交给
+unicorn ，unicorn 可以认为是一层外壳，保障了请求能高效地调度与处理，而真正处理请求的内核主要还是看 GitLab Rails ，即
+gitlab-ce ，请求处理的“另一半”就交给 gitlab-ce 去处理了</p>
+
+<p>本期我并不打算介绍 GitLab Rails ,因为这个项目实在太庞大和复杂了(当然也可以简单地看成是一个需要持久化数据库 PostgreSQL
+和分布式缓存 Redis 支撑的 web 应用)，完全可以另起一个专题进行介绍。而且本系列打算尽可能介绍 GitLab
+每一个组件的功能(而不是介绍开源项目的代码结构等)，刚才也说了 GitLab Rails 相当于 GitLab
+的真内核，大部分用户请求的处理逻辑都在这里实现了(有个打算是，未来将结合某些业务场景对 gitlab-ce 做源码跟踪及分析)</p>
+
+<p>那本期介绍什么呢？别忘了前几期都是讲 http/https 的路由情况，那 ssh 的呢？ <strong>从架构图上看，ssh 入口的第一站即是 GitLab
+Shell</strong> 。本节主要讲解理解 GitLab-Shell 运作原理的预备知识</p>
+
+<p>一谈到 Shell，我们可能会联想到类似 bash 或 zsh 这样的命令行终端，某种程度上 GitLab Shell
+也可以被看成是一系列预定义命令的集大成者，但也不止是这样</p>
+
+<h1 id="gitlab-shell-是-shell">GitLab Shell 是 shell ?</h1>
+
+<p>还记得之前第一期的时候贴的这张解释 SSH 利用对称加密算法登录登录服务器的流程吗？回顾一下：
+<strong>其实整个过程主要使用了公钥加密、私钥解密的对称加密算法：用户将自己本机的 SSH
+公钥上传至远程服务器上(远程服务器的<code>$HOME/.ssh/authorized_keys</code>
+文件将保存用户上传的公钥，一般情况直接追加到文件末尾即可)登录的时候远程服务器向用户发送一段随机序列，用户用自己本机的 SSH
+私钥加密后发回远程服务器，远程服务器用事先储存的公钥进行解密，如果成功就证明用户是可信的，允许你登录并且不再要求密码</strong></p>
+
+<p>那当我们在本机执行 git-over-ssh 操作的时候，难道就能登录到服务器的 bash
+终端搞事情吗？显然是不可能的：服务器不可能让我们用户登录终端执行一切命令，除非服务器管理人员想让用户体验 <code>rm -rf /*</code> 删库跑路的感觉</p>
+
+<p>因此 GitLab 使用了 SSH 的一个特性： <strong>通过 authorized_keys 指定登录后要执行的命令</strong>
+。之前登录的时候远程服务器是直接将用户公钥追加到 <code>$HOME/.ssh/authorized_keys</code> 文件末尾</p>
+
+<p>而现在作为服务器管理人员，你肯定是不希望用户登录到你服务器的终端乱搞的，所以思路就是 <strong>仅允许用户执行管理员所指定的 shell
+命令，达到安全控制的作用</strong> ，如下图所示</p>
+
+<p>上图主要是说，当我们在 <code>$HOME/.ssh/authorized_keys</code> 末尾追加如下格式的内容：</p>
+
+<pre><code># command=&quot;./cmd ssh-rsa &quot;
+command=&quot;/home/git/gitlab-shell/bin/gitlab-shell key-10&quot;,no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-rsa 
+复制代码
+</code></pre>
+
+<p><strong>用户就没办法用 ssh 登录到服务器终端搞事情了，用户登录后只能执行这条命令，执行完毕就退出</strong></p>
+
+<pre><code>/home/git/gitlab-shell/bin/gitlab-shell key-10
+复制代码
+</code></pre>
+
+<p>这就是为什么 GitLab Shell 如此命名，其实还是很形象的： <strong>仅允许你在服务器执行 GitLab Shell ，别的 Shell
+命令，比如<code>rm -rf /*</code> 一把梭的用户少给我乱来</strong>，其中这个 <code>key-10</code>就是 <code>/home/git/gitlab-
+shell/bin/gitlab-shell</code> 命令的执行参数 <code>ARGV</code>，表示的当然是用户的密钥标识</p>
+
+<p>接下来我们来看看 <code>/home/git/gitlab-shell/bin/gitlab-shell</code> 的代码</p>
+
+<p>注意，我们还能用 <code>$SSH_ORIGINAL_COMMAND</code> 变量取到客户端发来的命令，现在做个实验：打印出 <code>/home/git/gitlab-
+shell/bin/gitlab-shell</code> 的 <code>who</code> 和 <code>original</code> 变量值</p>
+
+<pre><code># 打印变量值
+File.write(&quot;/tmp/git_original_cmd&quot;, original_cmd)
+File.write(&quot;/tmp/git_who&quot;, who)
+复制代码
+</code></pre>
+
+<p>当我在本地分别执行 <code>git push</code> | <code>git fetch</code> | <code>git pull</code> | <code>git clone</code> 的时候，打印的值分别是：</p>
+
+<pre><code>// action =&gt; original_cmd who
+git push =&gt; git-receive-pack 'BradeHyj/ToyProject.git' key-11
+git fetch =&gt; git-upload-pack 'BradeHyj/ToyProject.git' key-11
+git pull =&gt; git-upload-pack 'BradeHyj/ToyProject.git' key-11
+git clone =&gt; git-upload-pack 'BradeHyj/ToyProject.git' key-11
+复制代码
+</code></pre>
+
+<blockquote>
+<p>git-receive-pack - Receive what is pushed into the repository</p>
+
+<p>git-upload-pack - Send objects packed back to git-fetch-pack</p>
+</blockquote>
+
+<p>上述说明了什么？ <strong>当我们在本地执行 git push 操作的时候，包含了登录服务器执行命令的操作(而且这个登录操作后面是带 gitlab-shell
+所能识别的命令)</strong> ，写具体点就是：</p>
+
+<pre><code># git push
+ssh user@host:port git-receive-pack 'BradeHyj/ToyProject.git'
+复制代码
+</code></pre>
+
+<p>以上，针对 GitLab Shell 是如何接收到客户端 ssh 请求，我们做了相应的解释，我们再回头看变量 <code>who</code> 和 <code>original_cmd</code>：</p>
+
+<ul>
+<li>who : sshd 调用 GitLab Shell 时传入的参数</li>
+<li>original_cmd : 前面提到的 <code>$SSH_ORIGINAL_COMMAND</code> 变量，取到后即移除</li>
+</ul>
+
+<p>感兴趣的可以深入研究 Pro git 2 关于 ssh 智能传输协议的介绍，具体如下：git-scm.com/book/zh/v1/…</p>
+
+<blockquote>
+<p>凡是经过 gitlab-shell 执行的 git 命令，在真正执行前都会进行校验权限的操作，具体如下代码所示</p>
+</blockquote>
+
+<pre><code># lib/gitlab-shell.rb
+...
+  def verify_access
+    status = api.check_access(@git_access, nil, @repo_name, @who || @gl_id, '_any', GL_PROTOCOL)
+
+    raise AccessDeniedError, status.message unless status.allowed?
+
+    status
+  end
+复制代码
+</code></pre>
+
+<h1 id="git-钩子为何物">Git 钩子为何物</h1>
+
+<p>GitLab Shell 的处理逻辑是依赖 git 钩子脚本的。 <strong>GitLab 服务器端存储的所有代码仓库的<code>hooks</code> 文件夹都是链接到
+<code>/home/git/gitlab-shell/hooks</code> 中的</strong>，所以理解 gitlab-shell 钩子脚本的执行逻辑非常重要</p>
+
+<p>此处引用 Pro Git 2 对服务端钩子的内容介绍：git-scm.com/book/zh/v2/…</p>
+
+<p>钩子都被存储在 Git 目录下的 hooks 子目录中。 也即绝大部分项目中的 .git/hooks 。 当你用 git init
+初始化一个新版本库时，Git 默认会在这个目录中放置一些示例脚本。这些脚本除了本身可以被调用外，它们还透露了被触发时所传入的参数。 所有的示例都是
+shell 脚本，其中一些还混杂了 Perl 代码，不过，任何正确命名的可执行脚本都可以正常使用 —— 你可以用 Ruby 或
+Python，或其它语言编写它们。 这些示例的名字都是以 .sample 结尾，如果你想启用它们，得先移除这个后缀。</p>
+
+<p>把一个正确命名且可执行的文件放入 Git 目录下的 hooks 子目录中，即可激活该钩子脚本。 这样一来，它就能被 Git 调用</p>
+
+<p>作为系统管理员，你可以使用若干服务器端的钩子对项目强制执行各种类型的策略。 <strong>这些钩子脚本在推送到服务器之前和之后运行</strong>
+。推送到服务器前运行的钩子可以在任何时候以非零值退出，拒绝推送并给客户端返回错误消息，还可以依你所想设置足够复杂的推送策略。</p>
+
+<ul>
+<li><code>pre-receive</code> : 处理来自客户端的推送操作时，最先被调用的脚本是 <code>pre-receive</code>。 它从标准输入获取一系列被推送的引用。如果它以非零值退出，所有的推送内容都不会被接受。 你可以用这个钩子阻止对引用进行非快进（non-fast-forward）的更新，或者对该推送所修改的所有引用和文件进行访问控制。</li>
+<li><code>update</code> : <code>update</code> 脚本和 <code>pre-receive</code> 脚本十分类似，不同之处在于它会为每一个准备更新的分支各运行一次。 假如推送者同时向多个分支推送内容，<code>pre-receive</code> 只运行一次，相比之下 <code>update</code> 则会为每一个被推送的分支各运行一次。 它不会从标准输入读取内容，而是接受三个参数：引用的名字（分支），推送前的引用指向的内容的 SHA-1 值，以及用户准备推送的内容的 SHA-1 值。 如果 <code>update</code> 脚本以非零值退出，只有相应的那一个引用会被拒绝；其余的依然会被更新。</li>
+<li><code>post-receive</code> : <code>post-receive</code> 挂钩在整个过程完结以后运行，可以用来更新其他系统服务或者通知用户。 它接受与 <code>pre-receive</code> 相同的标准输入数据。 它的用途包括给某个邮件列表发信，通知持续集成（continous integration）的服务器，或者更新问题追踪系统（ticket-tracking system） —— 甚至可以通过分析提交信息来决定某个问题（ticket）是否应该被开启，修改或者关闭。 该脚本无法终止推送进程，不过客户端在它结束运行之前将保持连接状态，所以如果你想做其他操作需谨慎使用它，因为它将耗费你很长的一段时间。</li>
+</ul>
+
+<p>咱们先看看 gitlab-shell 的<code>pre-receive</code> 的逻辑(以下示例代码均在 <code>$gitlab-shell/hooks</code>文件夹里)</p>
+
+<p>可以看到在对服务器仓库进行推送(git-receive-pack)之前得先执行用户权限认证及授权等准备工作</p>
+
+<p><code>post-receive</code> 同理，与 <code>pre-receive</code> 的区别主要是执行逻辑不同</p>
+
+<p>对于服务器端仓库操作的任何 git 命令执行完成后，都要调用 GitLab Rails 的 <code>post_receive</code> 接口处理后续逻辑</p>
+
+<h1 id="gitlab-shell-组件简介">GitLab Shell 组件简介</h1>
+
+<p>GitLab Shell 组件用于处理 GitLab 所有的 git SSH 会话。当用户以 SSH 的方式访问 GitLab 时(例如 git
+pull/push over ssh)，GitLab Shell 组件会做下列事情：</p>
+
+<ol>
+<li>限制用户使用预定义的 git 命令(git push, git pull 等)</li>
+<li>调用 GitLab Rails 的 API 接口以检查用户是否已授权，以及判断用户通过哪台 Gitaly 服务器访问代码仓库(Gitaly 组件的主要功能是进行与代码仓库相关的操作)</li>
+<li>在 SSH 客户端和 Gitaly 服务器之间来回拷贝数据</li>
+</ol>
+
+<p>当我们执行 git pull/push over ssh 时，分别发生以下的事情：</p>
+
+<ol>
+<li>git pull over ssh -&gt; gitlab-shell -&gt; 调用 gitlab-rails 的 api 接口以认证用户信息并授权 -&gt; 授权成功或失败 -&gt; 建立 Gitaly 会话</li>
+<li>git push over ssh -&gt; gitlab-shell(此时服务器的 git 命令还未被执行) -&gt; 建立 Gitaly 会话 -&gt; 在 Gitaly 服务器执行 gitlab-shell 的 pre-receive 钩子脚本 -&gt; 调用 gitlab-rails 的 api 接口以认证用户信息并授权 -&gt; 授权成功或失败</li>
+</ol>
+
+<blockquote>
+<p>由于历史原因 gitlab-shell 组件也包含了允许 GitLab 校验用户 git push
+命令的钩子脚本(例如，判断当前用户是否有权限将本地代码变动 push 到某保护分支)，这些钩子脚本同时也能触发 GitLab
+的事件(比如当用户成功推送代码后触发 CI 流水线启动等)。从目前的架构来看，gitlab-shell 的 git 钩子脚本是属于 Gitaly
+组件的，钩子脚本只会运行在 Gitaly 服务器。在 Gitaly 服务器安装 gitlab-shell 组件实属没必要，具体看
+gitlab.com/gitlab-org/…</p>
+</blockquote>
+
+<h1 id="附录">附录</h1>
+
+<p>参考链接</p>
+
+<p>gitlab-shell 官方仓库</p>
+
+<p>Pro git 2</p>
+
+<p>GitLab系列1 基础功能及架构简介<br />
+GitLab系列2 GitLab Workhorse<br />
+GitLab系列3 Unicorn</p>
+
+<p>转载于:<a href="https://juejin.im/post/5cf686b85188253cec305fa7">https://juejin.im/post/5cf686b85188253cec305fa7</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>SHELL脚本expr命令全解 | 开发者问答集锦</title>
+    <meta property="og:title" content="SHELL脚本expr命令全解 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="SHELL脚本expr命令全解">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%ACexpr%E5%91%BD%E4%BB%A4%E5%85%A8%E8%A7%A3/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">SHELL脚本expr命令全解</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>expr命令可以实现数值运算、数值或字符串比较、字符串匹配、字符串提取、字符串长度计算等功能。它还具有几个特殊功能，判断变量或参数是否为整数、是否为空、是否为0等。</p>
+
+<p>先看expr命令的info文档info coreutils &lsquo;expr invocation&rsquo;的翻译。</p>
+
+<pre><code>16.4.1 字符串表达式
+-------------------------
+'expr'支持模式匹配和字符串操作。字符串表达式的优先级高于数值表达式和逻辑关系表达式。
+
+'STRING : REGEX'
+     执行模式匹配。两端参数会转换为字符格式，且第二个参数被视为正则表达式(GUN基本正则)，它默认会隐含前缀&quot;^&quot;。随后将第一个参数和正则模式做匹配。
+
+     如果匹配成功，且REGEX使用了'\('和'\)'，则此表达式返回匹配到的。
+
+     如果匹配失败，如果REGEX中使用了'\('和'\)'，则此表达式返回空字符串，否则返回为0。
+
+     只有第一个'\(...\)'会引用返回的值；其余的'\(...\)'只在正则表达式分组时有意义。
+
+     在正则表达式中，'\+'，'\?'和'\|'分表代表匹配一个或多个，0个或1个以及两端任选其一的意思。
+
+'match STRING REGEX'
+     等价于'STRING : REGEX'。
+
+'substr STRING POSITION LENGTH'
+     返回STRING字符串中从POSITION开始，长度最大为LENGTH的子串。如果POSITION或LENGTH为负数，0或非数值，则返回空字符串。
+
+'index STRING CHARSET'
+     CHARSET中任意单个字符在STRING中最前面的字符位置。如果在STRING中完全不存在CHARSET中的字符，则返回0。见后文示例。
+
+'length STRING'
+     返回STRING的字符长度。
+
+'+ TOKEN'
+     将TOKEN解析为普通字符串，即使TOKEN是像MATCH或操作符&quot;/&quot;一样的关键字。这使得'expr length + &quot;$x&quot;'或'expr + &quot;$x&quot; : '.*/\(.\)''可以正常被测试，即使&quot;$x&quot;的值可能是'/'或'index'关键字。这个操作符是一个GUN扩展。
+     通用可移植版的应该使用'&quot; $token&quot; : ' \(.*\)''来代替'+ &quot;$token&quot;'。
+
+   要让expr将关键字解析为普通的字符，必须使用引号包围。
+
+16.4.2 算术表达式
+--------------------------
+
+'expr'支持普通的算术操作，算术表达式优先级低于字符串表达式，高于逻辑关系表达式。
+
+'+ -'
+     加减运算。两端参数会转换为整数，如果转换失败则报错。
+
+'* / %'
+     乘，除，取模运算。两端参数会转换为整数，如果转换失败则报错。
+
+16.4.3 逻辑关系表达式
+---------------------------
+
+'expr'支持普通的逻辑连接和逻辑关系。它的优先级最低。
+
+'|'
+     如果第一个参数非空且非0，则返回第一个参数的值，否则返回第二个参数的值，但要求第二个参数的值也是非空或非0，否则返回0。如果第一个参数是非空或非0时，不会计算第二个参数。
+
+     经过测试，以上手册内容是错误的。正确的应该是：如果第一个参数非0，则返回第一个参数的值，否则返回第二个参数。但如果任意一个参数为空，则报错。除非空字符串使用引号包围，此时将和0的处理方式一样。
+
+'&amp;'
+     如果两个参数都非空且非0，则返回第一个参数，否则返回0。如果第一个参为0或为空，则不会计算第二个参数。
+
+     经过测试，以上手册内容是错误的。正确的应该是：如果两个参数都非0，则返回第一个参数，否则返回0。但任意一个参数为空，则报错。除非空字符串使用引号包围，此时将和0的处理方式一样。
+
+'&lt; &lt;= = == != &gt;= &gt;'
+     比较两端的参数，如果为true，则返回1，否则返回0。&quot;==&quot;是&quot;=&quot;的同义词。&quot;expr&quot;首先尝试将两端参数转换为整数，并做算术比较，如果转换失败，则按字符集排序规则做字符比较。
+
+括号'()'可以改变优先级，但使用时需要使用反斜线对括号进行转义。
+
+16.4.4 'expr'使用示例
+-------------------------------
+
+以下为expr的一些示例，其中有将shell的元字符使用引号包围的示例。
+
+   将shell中变量'foo'的值增加1：
+
+     foo=$(expr $foo + 1)
+
+   输出变量路径变量'$fname'中不包含'/'的文件名部分：
+
+     expr $fname : '.*/\(.*\)' '|' $fname
+
+     解释：其中的'|'是expr中的连接符，只不过是被引号包围防止被shell解析。例如$fname=/etc/hosts，则此表达式返回hosts，如果$fname=/usr/share/，则此表达式'|'的左边为空，所以返回'|'右边的值，即$fname，即返回/usr/share/。
+
+   An example showing that '\+' is an operator:
+
+     expr aaa : 'a\+'    # 解释：因为REGEX部分没有使用\(\)，所以返回匹配的字符数
+     =&gt; 3
+
+     expr abc : 'a\(.\)c'  # 解释：因为REGEX部分使用了\(\)，所以返回匹配的字符
+     =&gt; b
+     expr index abcdef cz
+     =&gt; 3
+     expr index index a    # 解释：因为第二个index是关键字
+     error-&gt; expr: syntax error
+     expr index + index a  # 解释：使用+将index关键字解析为普通字符串
+     =&gt; 0
+</code></pre>
+
+<p>下面将使用示例来介绍expr的用法，在介绍之前，需要注意三点：</p>
+
+<blockquote>
+<p>(1).数值表达式(&ldquo;+ - * / %&ldquo;)和比较表达式(&rdquo;&lt; &lt;= = == != &gt;=
+&gt;&ldquo;)会先将两端的参数转换为数值，转换失败将报错。所以可借此来判断参数或变量是否为整数。</p>
+
+<p>(2).expr中的很多符号需要转义或使用引号包围。</p>
+
+<p>(3).所有操作符的两边，都需要有空格。</p>
+</blockquote>
+
+<p>以下是expr示例。</p>
+
+<p>(1).&ldquo;string : REGEX&rdquo;字符串匹配示例。要输出匹配到的字符串结果，需要使用&rdquo;\(&ldquo;和&rdquo;\)&ldquo;，否则返回的将是匹配到的字符串数量。</p>
+
+<pre><code>[root@xuexi ~]# expr abcde : 'ab\(.*\)'
+cde
+
+[root@xuexi ~]# expr abcde : 'ab\(.\)'
+c
+
+[root@xuexi ~]# expr abcde : 'ab.*'  
+5
+
+[root@xuexi ~]# expr abcde : 'ab.'   
+3
+
+[root@xuexi ~]# expr abcde : '.*cd*'
+4
+</code></pre>
+
+<p>注意，由于REGEX中隐含了&rdquo;^&ldquo;，所以使得匹配时都是从string首字符开始的。</p>
+
+<pre><code>[root@xuexi ~]# expr abcde : 'cd.*'  
+0
+</code></pre>
+
+<p>之所以为0，是因为真正的正则表达式是&rdquo;^cd.*&ldquo;，而abcde不是c开头而是a开头的，所以无法匹配到任何结果。因此，任何字符串匹配时，都应该从首字符开始。</p>
+
+<p>字符串匹配时，会先将两端参数转换为字符格式。</p>
+
+<p>(2).&ldquo;index string chars&rdquo;用法示例。</p>
+
+<p>该表达式是从string中搜索chars中某个字符的位置，这个字符是string中最靠前的字符。例如：</p>
+
+<pre><code>[root@xuexi ~]# expr index abcde dec
+3
+</code></pre>
+
+<p>该命令将对字符串&rdquo;dec&rdquo;逐字符分解，首先分解得到第一个字符d，从abcde中搜索到d的位置为4，再分解得到第二个字符e，该字符在abcde中的位置为5，最后得到的字符是c，该字符在abcde中的位置为3。其中3是最靠前的字符，所以命令返回的结果为3。</p>
+
+<pre><code>[root@xuexi ~]# expr index abcde xdc
+3
+</code></pre>
+
+<p>如果chars中的所有字符都不存在于string中，则返回0。</p>
+
+<pre><code>[root@xuexi ~]# expr index abcde 1
+0
+
+[root@xuexi ~]# expr index abcde 1x
+0
+</code></pre>
+
+<p>(3).&ldquo;substr string pos len&rdquo;用法示例。</p>
+
+<p>该表达式是从string中取出从pos位置开始长度为len的子字符串。如果pos或len为非正整数时，将返回空字符串。</p>
+
+<pre><code>[root@xuexi ~]# expr substr abcde 2 3
+bcd
+
+[root@xuexi ~]# expr substr abcde 2 4
+bcde
+
+[root@xuexi ~]# expr substr abcde 2 5
+bcde
+
+[root@xuexi ~]# expr substr abcde 2 0
+
+[root@xuexi ~]# expr substr abcde 2 -1  
+</code></pre>
+
+<p>(4).&ldquo;length string&rdquo;用法示例。该表达式是返回string的长度，其中string不允许为空，否则将报错，所以可以用来判断变量是否为空。</p>
+
+<pre><code>[root@xuexi ~]# expr length abcde
+5
+
+[root@xuexi ~]# expr length 111
+3
+
+[root@xuexi ~]# expr length $xxx
+expr: syntax error
+
+[root@xuexi ~]# if [ $? -ne 0 ];then echo '$xxx is null';fi
+$xxx is null
+</code></pre>
+
+<p>(5).&ldquo;+ token&rdquo;用法示例。</p>
+
+<p>expr中有些符号和关键字有特殊意义，如&rdquo;match&rdquo;、&rdquo;index&rdquo;、&rdquo;length&rdquo;，如果要让其成为字符，使用该表达式将任意token强制解析为普通字符串。</p>
+
+<pre><code>[root@xuexi ~]# expr index index d
+expr: syntax error
+
+[root@xuexi ~]# expr index length g
+expr: syntax error
+
+[root@xuexi ~]# expr index + length g
+4
+</code></pre>
+
+<p>其实可以通过字符串匹配的方式，将关键字转换为字符串。例如：</p>
+
+<pre><code>[root@xuexi ~]# expr index 'length : &quot;\(length\)&quot;' g 
+4
+</code></pre>
+
+<p>对值为关键字的变量来说，则无所谓。</p>
+
+<pre><code>[root@xuexi ~]# len=lenght
+
+[root@xuexi ~]# expr index $len g
+4
+</code></pre>
+
+<p>(6).算术运算用法示例。</p>
+
+<pre><code>[root@xuexi ~]# expr 1 + 2
+3
+
+[root@xuexi ~]# a=3
+[root@xuexi ~]# b=4
+
+[root@xuexi ~]# expr $a + $b
+7
+
+[root@xuexi ~]# expr 4 + $a
+7
+
+[root@xuexi ~]# expr $a - $b
+-1
+</code></pre>
+
+<p>算术乘法符号&rdquo;*&ldquo;因为是shell的元字符，所以要转义，可以使用引号包围，或者使用反斜线。</p>
+
+<pre><code>[root@xuexi ~]# expr $a * $b
+expr: syntax error
+
+[root@xuexi ~]# expr $a '*' $b
+12
+
+[root@xuexi ~]# expr $a \* $b
+12
+
+[root@xuexi ~]# expr $b / $a    # 除法只能取整数
+1
+
+[root@xuexi ~]# expr $b % $a
+1
+</code></pre>
+
+<p>任意操作符两端都需要有空格，否则：</p>
+
+<pre><code>[root@xuexi ~]# expr 4+$a 
+4+3
+
+[root@xuexi ~]# expr 4 +$a
+expr: syntax error
+</code></pre>
+
+<p>由于expr在进行算术运算时，首先会将操作符两边的参数转换为整数，任意一端转换失败都将会报错，所以可以用来判断参数或变量是否为整数。</p>
+
+<pre><code>[root@xuexi ~]# expr $a + $c
+expr: non-integer argument
+
+[root@xuexi ~]# if [ $? != 0 ];then echo '$a or $c is non-integer';fi          
+$a or $c is non-integer
+</code></pre>
+
+<p>(7).比较操作符&lt; &lt;= = == != &gt;= &gt;用法示例。其中&rdquo;&ldquo;是正则表达式正的锚定元字符，且&rdquo;</p>
+
+<p>这些操作符会首先会将两端的参数转换为数值，如果转换成功，则采用数值比较，如果转换失败，则按照字符集的排序规则进行字符大小比较。比较的结果若为true，则expr返回1，否则返回0。</p>
+
+<pre><code>[root@xuexi ~]# a=3
+
+[root@xuexi ~]# expr $a = 1
+0
+
+[root@xuexi ~]# expr $a = 3
+1
+
+[root@xuexi ~]# expr $a \* 3 = 9
+1
+
+[root@xuexi ~]# expr abc \&gt; ab
+1
+
+[root@xuexi ~]# expr akc \&gt; ackd
+1
+</code></pre>
+
+<p>(8).逻辑连接符号&rdquo;&amp;&ldquo;和&rdquo;|&ldquo;用法示例。这两个符号都需要转义，或使用引号包围。</p>
+
+<p>以下是官方文档中给出的解释，但实际使用过程中是不完全正确的。</p>
+
+<blockquote>
+<p>&ldquo;&amp;&ldquo;表示如果两个参数同时满足非空且非0，则返回第一个参数的值，否则返回0。且如果发现第一个参数为空或0，则直接跳过第二个参数不做任何计算。</p>
+
+<p>&rdquo;|&ldquo;表示如果第一个参数非空且非0，则返回第一个参数值，否则返回第二个参数值，但如果第二个参数为空或为0，则返回0。且如果发现第一个参数非空或非0，也将直接跳过第二个参数不做任何计算。</p>
+</blockquote>
+
+<p>正确的应该是：</p>
+
+<blockquote>
+<p>&ldquo;&amp;&ldquo;表示如果两个参数都非0，则返回第一个参数，否则返回0。但任意一个参数为空，则expr报错。除非空字符串使用引号包围，则处理方法和0一样。</p>
+
+<p>&rdquo;|&ldquo;表示如果第一个参数非0，则返回第一个参数的值，否则返回第二个参数。但如果任意一个参数为空，则expr报错。除非空字符串使用引号包围，则处理方法和0一样。</p>
+</blockquote>
+
+<pre><code>[root@xuexi ~]# expr $abc '|' 1
+expr: syntax error
+
+[root@xuexi ~]# expr &quot;$abc&quot; '|' 1
+1
+
+[root@xuexi ~]# expr &quot;$abc&quot; '&amp;' 1 
+0
+
+[root@xuexi ~]# expr $abc '&amp;' 1 
+expr: syntax error
+
+[root@xuexi ~]# expr 0 '&amp;' abc
+0
+
+[root@xuexi ~]# expr abc '&amp;' 0
+0
+
+[root@xuexi ~]# expr abc '|' 0
+abc
+
+[root@xuexi ~]# expr 0 '|' abc  
+abc
+
+[root@xuexi ~]# expr abc '&amp;' cde
+abc
+
+[root@xuexi ~]# expr abc '|' cde
+abc
+</code></pre>
+
+<p>回到系列文章大纲：<a href="http://www.cnblogs.com/f-ck-need-u/p/7048359.html">http://www.cnblogs.com/f-ck-need-u/p/7048359.html</a></p>
+
+<h1 id="转载请注明出处-http-www-cnblogs-com-f-ck-need-u-p-7231832-html">转载请注明出处：<a href="http://www.cnblogs.com/f-ck-need-u/p/7231832.html">http://www.cnblogs.com/f-ck-need-u/p/7231832.html</a></h1>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

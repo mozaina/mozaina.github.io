@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>通过configure文件学习shell | 开发者问答集锦</title>
+    <meta property="og:title" content="通过configure文件学习shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="通过configure文件学习shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E9%80%9A%E8%BF%87configure%E6%96%87%E4%BB%B6%E5%AD%A6%E4%B9%A0shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">通过configure文件学习shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>学习语言最好的途径就是阅读源码，这篇文章通过研究configure文件学习shell</p>
+
+<p>编译开源项目时，一般步骤为</p>
+
+<p>1. ./configure</p>
+
+<p>2. make</p>
+
+<p>3. make install</p>
+
+<p>make就是把项目编译成目标文件。而make
+install是将编译生成的二进制或者库文件拷贝到系统对应目录下，同时也会拷贝头文件到系统对应目录，以便用户进行二次开发。</p>
+
+<p>但是configure是在干什么呢？进去看下大概能知道是在进行环境检查和配置，包括编译环境和运行环境。但是具体每条命令在干什么？本文通过解读开源项目CAF的configure文件来学习shell语言。</p>
+
+<p>CAF官网：<a href="http://actor-framework.org/">http://actor-framework.org/</a></p>
+
+<p>源码：<a href="https://github.com/actor-framework/actor-framework.git">https://github.com/actor-framework/actor-framework.git</a></p>
+
+<p>1. 初探</p>
+
+<p>用vi打开configure文件，前几行如下</p>
+
+<pre><code>#!/bin/sh
+# Convenience wrapper for easily viewing/setting options that
+# the project's CMake scripts will recognize.
+</code></pre>
+
+<p>#开头为shell语言的注释，但是第一行很特殊，他告诉系统使用指定的shell解释器执行此文件，这里就是使用/bin/sh来执行</p>
+
+<p>再往下看开始真正的shell代码了</p>
+
+<pre><code># check for `cmake` command
+type cmake &gt; /dev/null 2&gt;&amp;1 || {
+    echo &quot;\
+This package requires CMake, please install it first, then you may
+use this configure script to access CMake equivalent functionality.\
+&quot; &gt;&amp;2;
+    exit 1;
+}
+</code></pre>
+
+<p>第一行仍为注释</p>
+
+<p>第二行有好几处需要解释：type, cmake, &gt;, /dev/null, 2&gt;&amp;1, ||</p>
+
+<pre><code>type： 是一个shell内置命令，用来查看一个命令的类型，同时也可以用于检查这个命令是否存在
+
+cmake：一个编译工具，说明编译CAF这个开源项目需要cmake
+
+&gt;：重定向符号，一般情况下命令的输出都是到标准输出设备（屏幕），但是通过重定向，我们可以将命令的输出放到指定位置（文件或其他设备）
+
+/dev/null：代表空设备文件，结合上下文，就是不要输出 type 命令产生的任何信息
+
+2&gt;&amp;1：这里其实要解释几个东西，1和2在这里不是数字，而是表示文件描述符（FD），&amp;表示等同于，结合起来就是2的输出重定向等同于1
+
+    1：其实是file descriptor 1（fd1），表示stdout标准输出， 系统的默认值为1，就是标准输出。所以&quot;&gt;/dev/null&quot;等价于&quot;1&gt;/dev/null&quot;
+
+    2：就是fd2，表示stderr标准错误。0表示标准输入stdin
+
+    &amp;：表示等同于
+
+||：逻辑或符号，这里其实将前面命令的结果看成一个bool值，如果type命令成功执行，则返回值相当于true，那么就不用执行后面的内容。
+    如果type命令失败（没有找到cmake），就继续执行后面的内容
+</code></pre>
+
+<p>第三行到最后，就是找不到cmake命令时执行</p>
+
+<pre><code>echo：显示一行信息，后面可以跟字符串也可以是变量名
+
+&gt;&amp;2：这里相当于 1&gt;&amp;2，标准输出重定向等同于标准错误，就是将这里的字符串当成error显示
+
+exit 1：由于缺少cmake，编译环境有问题，退出执行
+</code></pre>
+
+<p>2. 再往下看</p>
+
+<pre><code>command=&quot;$0 $*&quot;
+dirname_0=`dirname $0`
+sourcedir=`cd $dirname_0 &amp;&amp; pwd`
+benchmark_suite_options=&quot;&quot;
+if [ -d &quot;$sourcedir/benchmarks/caf&quot; ] ; then
+benchmark_suite_options=&quot;\
+  Benchmark Suite Options:
+    --with-javac=FILE           path to Java compiler
+    --with-java=FILE            path to Java Runtime
+    --with-scalac=FILE          path to Scala compiler
+    --with-erlc=FILE            path to Erlang compiler
+    --with-charmc=FILE          path to Charm++ compiler
+    --with-salsa=FILE           path to SALSA Lite jar
+&quot;
+fi
+usage=&quot;\
+Usage: $0 [OPTION]... [VAR=VALUE]...
+  Build Options:
+    --generator=GENERATOR       set CMake generator (see cmake --help)
+    --build-type=TYPE           set CMake build type [RelWithDebInfo]:
+                                  - Debug: debugging flags enabled
+                                  - MinSizeRel: minimal output size
+                                  - Release: optimizations on, debugging off
+                                  - RelWithDebInfo: release flags plus debugging
+    --build-dir=DIR             place build files in directory [build]
+    --bin-dir=DIR               executable directory [build/bin]
+    --lib-dir=DIR               library directory [build/lib]
+    --with-clang=FILE           path to clang++ executable
+    --with-gcc=FILE             path to g++ executable
+    --dual-build                build using both gcc and clang
+    --build-static              build as static and shared library
+    --build-static-only         build as static library only
+    --more-warnings             enables most warnings
+    --no-compiler-check         disable compiler version check
+    --no-auto-libc++            do not automatically enable libc++ for Clang
+    --warnings-as-errors        enables -Werror
+  Installation Directories:
+    --prefix=PREFIX             installation directory [/usr/local]
+  Remove Standard Features (even if all dependencies are available):
+    --no-memory-management      build without memory management
+    --no-examples               build without examples
+    --no-qt-examples            build without Qt examples
+    --no-protobuf-examples      build without Google Protobuf examples
+    --no-curl-examples          build without libcurl examples
+    --no-unit-tests             build without unit tests
+    --no-opencl                 build without opencl
+    --no-nexus                  build without nexus
+    --no-cash                   build without cash
+    --no-benchmarks             build without benchmarks
+    --no-riac                   build without riac
+  Debugging:
+    --with-runtime-checks       build with requirement checks at runtime
+    --with-log-level=LVL        build with debugging output, possible values:
+                                  - ERROR
+                                  - WARNING
+                                  - INFO
+                                  - DEBUG
+                                  - TRACE
+    --with-address-sanitizer    build with address sanitizer if available
+  Influential Environment Variables (only on first invocation):
+    CXX                         C++ compiler command
+    CXXFLAGS                    C++ compiler flags
+  iOS Build Options (should be used with XCode generator):
+    --sysroot=DIR               set system root for Clang
+                                  - iphoneos: for iOS device
+                                  - iphonesimulator: for iOS simulator
+    --ios-min-ver=VERSION       set the ios deployment target version
+$benchmark_suite_options&quot;
+</code></pre>
+
+<p>这段有点长，但其实大部分都是字符串信息（用于打印使用方法），一行一行看</p>
+
+<p>第一行 command=&ldquo;$0 $*&rdquo;</p>
+
+<pre><code>command是一个定义的变量，这里主要关注它的值，首先看看$0和$*是什么意思（google下？），这两个其实是特殊变量
+$0：正在执行的shell自己的文件名
+$*：执行shell时输入的所有参数列表（不包含文件名）
+这下清楚了，command就是用户执行这个shell时键入的命令的字符串形式，包括shell文件名以及参数
+除了这两个，还有以下特殊变量
+$$：shell本身的PID（进程号）
+$!：让shell运行起来的后台的PID
+$?：最后运行命令的结束代码（返回值）
+$-：使用Set命令设定的Flag一览
+$@：所有参数列表，与$*类似，但是输出形式不同，可以自己试试
+$#：参数个数（不包含shell文件名本身）
+$1~$n：第1到第n个参数
+</code></pre>
+
+<p>第二行 dirname_0=<code>dirname $0</code>，这条语句作用为将shell文件所在的相对目录赋给变量dirname_0</p>
+
+<pre><code>dirname_0同样是一个变量，这行出现了新东西：` 和 dirname
+首先这个符号（`）是键盘左上角那个键，用它将命令包起来，表示获取命令执行后输出的字符串，这里就是获取执行 dirname $0 的结果
+dirname：用于获取文件夹名字（名字可能包含第一个'\')，可以使用dirname --help获取帮助
+</code></pre>
+
+<p>第三行 sourcedir=<code>cd $dirname_0 &amp;&amp; pwd</code>，进入shell所在目录，并且把这个目录的全路径赋给 sourcedir</p>
+
+<pre><code>主要解释新东西：&amp;&amp;， pwd
+&amp;&amp;：逻辑与符号，跟其他语言类似，如果它前面的结果为true，则不用执行之后的语句，如果为false则继续执行之后的语句。但是在这里pwd无论如何都会执行
+pwd：打印出当前目录
+</code></pre>
+
+<p>第四行声明一个空的字符串变量benchmark_suite_options</p>
+
+<pre><code>变量定义(赋值)时需要注意的就是&quot;=&quot;号两边不要有空格,否则会有语法错误
+</code></pre>
+
+<p>第五行开始又有新东西了:)! 这段代码的作用为判断给定的目录是否存在, 如果存在就把字符串赋给变量benchmark_suite_options</p>
+
+<pre><code>if [ -d &quot;$sourcedir/benchmarks/caf&quot; ] ; then
+xxx
+fi
+这行的新玩意儿有:if then fi, -d
+if then fi: 组成条件语句, 中括号里的就是条件表达式, 中间还可以有 else 语句. if 的语法需要注意下: 1) 关键子和中括号两边都有空格; 
+            2) then 之前由分号(;)结束; 3) 最后由 fi 收尾
+-d: 后面跟文件名,用于条件判断.如果文件存在且是一个目录(directory)则返回 true
+</code></pre>
+
+<p>if语句之后这行把一段字符串(用法描述)赋给变量 usage, 注意变量 $0 和 $benchmark_suite_options 也被加进去了</p>
+
+<p>3. 函数初探</p>
+
+<pre><code># Appends a CMake cache entry definition to the CMakeCacheEntries variable.    
+#   $1 is the cache entry variable name    
+#   $2 is the cache entry variable type    
+#   $3 is the cache entry variable value  
+append_cache_entry ()    
+{    
+    case &quot;$3&quot; in    
+        *\ * )    
+            # string contains whitespace    
+            CMakeCacheEntries=&quot;$CMakeCacheEntries -D \&quot;$1:$2=$3\&quot;&quot;    
+            ;;    
+        *)    
+            # string contains whitespace    
+            CMakeCacheEntries=&quot;$CMakeCacheEntries -D $1:$2=$3&quot;    
+            ;;    
+    esac    
+}    
+
+
+
+这里声明和定义了函数 append_cache_entry, 将一个 cache 条目加到变量 CMakeCacheEntries(这个变量是在函数中或别的地方定义的全局变量) 中, 直接看函数怎么声明和定义
+
+
+shell中好像没有声明这一概念, 声明和定义在一起. 声明一个函数就直接提供函数名,后面跟括号就行了,然后在紧接着的花括号中定义函数行为. 
+参数都用$n($0, $1, $2)获取, 函数中可以使用已经定义的全局变量, 也可以自定义局部变量(使用local name=&quot;xxx&quot;), 可以通过return返回值
+</code></pre>
+
+<p>函数内部有一个case语句, 这段代码的主要作用上面已经说明, 它还有一个功能是判断输入的第3个参数是否含有空格&rdquo; &ldquo;, 有和没有处理方法不同</p>
+
+<pre><code>case语句的语法:
+1) 以case开头
+2) case 后面跟变量名 $name
+3) 后面跟关键字 in
+4) 然后就是各个匹配模式了, 每个模式以 &quot;)&quot; 结尾, 它下面就是满足这个条件后要执行的语句序列, 每个模式以 ;; 结尾
+5) 注意这里的匹配模式都是正则表达式
+6) 最后以 esac 结尾
+
+case语句里有两个正则表达式, 正则表达式在shell编程中非常有用, 可通过自学掌握
+*\ *: 表示含有空格的字符串
+*: 任何字符串
+
+这里匹配模式的顺序是有讲究的, 匹配结果小(就是条件更严格)的模式应该在前面, 否则可能会被前面的模式拦截, 永远都不能到达
+</code></pre>
+
+<p>case语句里的两个赋值语句, 一个针对有空格的参数, 一个是没空格的参数. 但是作用都是一样. 就是将一个形如 &ldquo; -D \&ldquo;xx:xx=xx\&ldquo;&rdquo;
+的字符串赋给变量CMakeCacheEntries</p>
+
+<p>4. 一个更复杂的函数</p>
+
+<pre><code># Creates a build directory via CMake.
+#   $1 is the path to a compiler executable.
+#   $2 is the suffix of the build directory.
+#   $3 is the executable output path.
+#   $4 is the library output path.
+#   $5 is the CMake generator.
+configure ()
+{
+
+    CMakeCacheEntries=$CMakeDefaultCache
+
+    if [ -n &quot;$1&quot; ]; then
+        append_cache_entry CMAKE_CXX_COMPILER FILEPATH $1
+    fi
+
+    case &quot;$builddir&quot; in
+        /*)
+            #absolute path given
+            absolute_builddir=&quot;$builddir&quot;
+            ;;
+        *)
+            # relative path given; convert to absolute path
+            absolute_builddir=&quot;$PWD/$builddir&quot;
+            ;;
+    esac
+
+    if [ -n &quot;$2&quot; ]; then
+        workdir=&quot;$absolute_builddir-$2&quot;
+    else
+        workdir=&quot;$absolute_builddir&quot;
+    fi
+    workdirs=&quot;$workdirs $workdir&quot;
+
+    if [ -n &quot;$3&quot; ]; then
+        append_cache_entry EXECUTABLE_OUTPUT_PATH PATH &quot;$3&quot;
+    else
+        append_cache_entry EXECUTABLE_OUTPUT_PATH PATH &quot;$workdir/bin&quot;
+    fi
+
+    if [ -n &quot;$4&quot; ]; then
+        append_cache_entry LIBRARY_OUTPUT_PATH PATH &quot;$4&quot;
+    else
+        append_cache_entry LIBRARY_OUTPUT_PATH PATH &quot;$workdir/lib&quot;
+    fi
+
+    if [ -d &quot;$workdir&quot; ]; then
+        # If a build directory exists, check if it has a CMake cache.
+        if [ -f &quot;$workdir/CMakeCache.txt&quot; ]; then
+            # If the CMake cache exists, delete it so that this configuration
+            # is not tainted by a previous one.
+            rm -f &quot;$workdir/CMakeCache.txt&quot;
+        fi
+    else
+        mkdir -p &quot;$workdir&quot;
+    fi
+
+    cd &quot;$workdir&quot;
+
+    if [ -n &quot;$5&quot; ]; then
+        cmake -G &quot;$5&quot; $CMakeCacheEntries &quot;$sourcedir&quot;
+    else
+        cmake $CMakeCacheEntries &quot;$sourcedir&quot;
+    fi
+
+    echo &quot;# This is the command used to configure this build&quot; &gt; config.status
+    if [ -n &quot;$CC&quot; ]; then
+      printf &quot;CC=%s&quot; $CC &gt;&gt; config.status
+      printf ' ' &gt;&gt; config.status
+    fi
+    if [ -n &quot;$CXX&quot; ]; then
+      printf &quot;CXX=%s&quot; $CXX &gt;&gt; config.status
+      printf ' ' &gt;&gt; config.status
+    fi
+    echo $command &gt;&gt; config.status
+    chmod u+x config.status
+}
+</code></pre>
+
+<p>这个函数最多可接受5个参数，来看看函数用这些参数干什么了</p>
+
+<p>首先函数中定义了一个变量CMakeCacheEntries，这个变量在函数append_cache_entry中也会用到。</p>
+
+<p>接下来处理第一个参数了，同样的函数通过 $1 来获取第一个参数，但是万一我们没有输入任何参数呢？这就是为什么使用参数前会用 if 语句判断该参数是否存在</p>
+
+<pre><code>if [ -n &quot;$1&quot; ]; then
+    append_cache_entry CMAKE_CXX_COMPILER FILEPATH $1
+fi
+其中 -n 就像前文提到的 -d 一样，是条件判断符。-n用于判断变量是否存在
+如果有至少一个参数，则用这个参数加上另外两个字符串调用函数 append_cache_entry，添加一个entry到变量 CMakeCacheEntries 中
+从注释中可以看出，这个参数应该是编译器的路径
+</code></pre>
+
+<p>然后是一个 case 语句，直观上可以看出，它的作用是获取构建目录的绝对路径</p>
+
+<pre><code>case语句中的变量 $sourcedir 应该是调用该函数之前定义好的，这个语句通过判断该变量的第一个字符是否为 &quot;/&quot; 来确定它是不是一个绝对路径。
+如果是则直接赋值给最终变量 absolute_builddir， 如果不是就通过将当前路径与该路径相结合得到绝对路径
+$PWD: 表示当前（运行这个脚本时，或者脚本使用cd更改之后的）路径 
+</code></pre>
+
+<p>接下来开始处理第二个参数</p>
+
+<pre><code>同样先判断第二个参数是否存在，这个参数用来指定构建路径的后缀，当然如果没有后缀就传入空字符串 “”，或者只传一个参数。
+如果有第二个参数，则将它添加到构建路径的最后，作为构建目录的后缀名，然后将最终的构建路径赋值给变量 workdir
+workdir 被添加到一个 workdir 集合: workdirs
+</code></pre>
+
+<p>第三、四个参数处理过程与第一个类似，这个参数指定了编译生成的二进制文件/库文件存储的地方</p>
+
+<pre><code>不同点是如果没有第三个参数，会使用一个默认的 cache entry值，也就是 &quot;$workdir/bin&quot;。
+第四个参数同样，没有的话使用 &quot;$workdir/lib&quot;
+</code></pre>
+
+<p>然后通过一个 if 语句判断 CMake cache 文件是否已经存在于工作目录中了，如果存在就删掉它，以免影响新的cache文件生成。</p>
+
+<pre><code>    if [ -d &quot;$workdir&quot; ]; then
+        # If a build directory exists, check if it has a CMake cache.
+        if [ -f &quot;$workdir/CMakeCache.txt&quot; ]; then
+            # If the CMake cache exists, delete it so that this configuration
+            # is not tainted by a previous one.
+            rm -f &quot;$workdir/CMakeCache.txt&quot;
+        fi
+    else
+        mkdir -p &quot;$workdir&quot;
+    fi
+
+    cd &quot;$workdir&quot;
+
+
+
+这里有两个条件判断，我们前面取得了工作目录的绝对路径，但是并只知道该目录是否存在，第一个 if 语句判断目录是否存在，不存在则创建一个（else语句下）
+第二个 if 有一个新的条件判断符 -f。-d 是判断目录是否存在，-f 则是判断文件（非目录）是否存在。
+删除命令 rm 中也使用了 -f，这里是 -f 是 rm 的选项，意思是 force， 强制删除而不会提示用户。
+处理完后可以确定工作目录以及存在了，接下来进入到工作目录中开始工作
+</code></pre>
+
+<p>`</p>
+
+<p>接着处理第五个参数，这一步就使用 cmake 来生成makefile了（或者其他编译相关的操作）。关于 cmake 的知识可参考官网</p>
+
+<pre><code>第五个参数指定了一个 cmake 生成器（Unix makefiles、eclipse project file、etc。。。），如果没有就是默认的（应该是UNIX makefiles）
+开始跑 cmake 命令生成编译需要的一些东西
+</code></pre>
+
+<p>把一些log信息存到文件 config .status 中</p>
+
+<pre><code>包括一段固定字符串，如果变量 $CC 和 $CXX 存在，则将这两个变量的值也存入文件，跑这个脚本时键入的命令（$command)同样存入文件中
+</code></pre>
+
+<p>最后是改变 log 文件的mode bits，参数 u 表示这个文件的owner，+x表示添加执行mode，结果就是文件的所有者可以执行这个文件。</p>
+
+<ol>
+<li><p>一些杂项</p>
+
+<h1 id="set-defaults">Set defaults.</h1>
+
+<p>builddir=&ldquo;$sourcedir/build&rdquo;
+CMakeCacheEntries=&ldquo;&rdquo;
+append_cache_entry CMAKE_INSTALL_PREFIX        PATH   /usr/local
+append_cache_entry CAF_ENABLE_RUNTIME_CHECKS   BOOL   false</p></li>
+</ol>
+
+<p>这段比较简单，主要是设置一些变量的默认值，添加了两个默认cache entries</p>
+
+<p>下面这段代码设置了 cmake 的默认生成器，如果提供了默认cmake generator的环境变量，就将它设置成默认generator</p>
+
+<pre><code># parse custom environment variable to initialize CMakeGenerator
+if [ -n &quot;$DEFAULT_CMAKE_GENERATOR&quot; ]; then
+  CMakeGenerator=&quot;$DEFAULT_CMAKE_GENERATOR&quot;
+fi
+</code></pre>
+
+<ol>
+<li><p>参数解析</p>
+
+<h1 id="parse-arguments">Parse arguments.</h1>
+
+<p>while [ $# -ne 0 ]; do
+    case &ldquo;$1&rdquo; in
+        -<em>=</em>) optarg=<code>echo &quot;$1&quot; | sed 's/[-_a-zA-Z0-9]*=//'</code> ;;
+        *) optarg= ;;
+    esac</p>
+
+<pre><code>case &quot;$1&quot; in
+    --help|-h)
+        echo &quot;${usage}&quot; 1&gt;&amp;2
+        exit 1
+        ;;
+    --generator=*)
+        CMakeGenerator=&quot;$optarg&quot;
+        ;;
+    --prefix=*)
+        append_cache_entry CMAKE_INSTALL_PREFIX PATH $optarg
+        ;;
+    --with-runtime-checks)
+        append_cache_entry CAF_ENABLE_RUNTIME_CHECKS BOOL yes
+        ;;
+</code></pre>
+
+<p>        &ndash;with-address-sanitizer)
+            append_cache_entry ENABLE_ADDRESS_SANITIZER BOOL yes
+            ;;
+        &ndash;no-memory-management)
+            append_cache_entry CAF_NO_MEM_MANAGEMENT BOOL yes
+            ;;
+        &ndash;more-warnings)
+            append_cache_entry MORE_WARNINGS BOOL yes
+            ;;
+        &ndash;no-compiler-check)
+            append_cache_entry NO_COMPILER_CHECK BOOL yes
+            ;;
+        &ndash;no-auto-libc++)
+            append_cache_entry NO_AUTO_LIBCPP BOOL yes
+            ;;
+        &ndash;warnings-as-errors)
+            append_cache_entry CXX_WARNINGS_AS_ERROS BOOL yes
+            ;;
+        &ndash;sysroot=<em>)
+            append_cache_entry CAF_OSX_SYSROOT PATH &ldquo;$optarg&rdquo;
+            ;;
+        &ndash;ios-min-ver=</em>)
+            append_cache_entry CMAKE_OSX_ARCHITECTURES STRING &ldquo;\$(ARCHS_STANDARD_32_64_BIT)&rdquo;
+            append_cache_entry CAF_IOS_DEPLOYMENT_TARGET STRING &ldquo;$optarg&rdquo;
+            ;;
+        &ndash;with-log-level=*)
+            level=<code>echo &quot;$optarg&quot; | tr '[:lower:]' '[:upper:]'</code>
+            case $level in
+                ERROR)
+                    append_cache_entry CAF_LOG_LEVEL STRING 0
+                    ;;
+                WARNING)
+                    append_cache_entry CAF_LOG_LEVEL STRING 1
+                    ;;
+                INFO)
+                    append_cache_entry CAF_LOG_LEVEL STRING 2
+                    ;;
+                DEBUG)
+                    append_cache_entry CAF_LOG_LEVEL STRING 3
+                    ;;
+                TRACE)
+                    append_cache_entry CAF_LOG_LEVEL STRING 4
+                    ;;
+                <em>)
+                    echo &ldquo;Invalid log level &lsquo;$level&rsquo;. Try &lsquo;$0 &ndash;help&rsquo; to see valid values.&rdquo;
+                    exit 1
+                    ;;
+            esac
+            ;;
+        &ndash;with-clang=</em>)
+            clang=$optarg
+            ;;
+        &ndash;with-gcc=<em>)
+            gcc=$optarg
+            ;;
+        &ndash;build-type=</em>)
+            append_cache_entry CMAKE_BUILD_TYPE STRING $optarg
+            ;;
+        &ndash;build-dir=<em>)
+            builddir=&ldquo;$optarg&rdquo;
+            ;;
+        &ndash;bin-dir=</em>)
+            bindir=&ldquo;$optarg&rdquo;
+            ;;
+        &ndash;lib-dir=<em>)
+            libdir=&ldquo;$optarg&rdquo;
+            ;;
+        &ndash;dual-build)
+            dualbuild=1
+            ;;
+        &ndash;no-examples)
+            append_cache_entry CAF_NO_EXAMPLES BOOL yes
+            ;;
+        &ndash;no-qt-examples)
+            append_cache_entry CAF_NO_QT_EXAMPLES BOOL yes
+            ;;
+        &ndash;no-protobuf-examples)
+            append_cache_entry CAF_NO_PROTOBUF_EXAMPLES BOOL yes
+            ;;
+        &ndash;no-curl-examples)
+            append_cache_entry CAF_NO_CURL_EXAMPLES BOOL yes
+            ;;
+        &ndash;no-unit-tests)
+            append_cache_entry CAF_NO_UNIT_TESTS BOOL yes
+            ;;
+        &ndash;no-opencl)
+            append_cache_entry CAF_NO_OPENCL BOOL yes
+            ;;
+        &ndash;build-static)
+            append_cache_entry CAF_BUILD_STATIC BOOL yes
+            ;;
+        &ndash;build-static-only)
+            append_cache_entry CAF_BUILD_STATIC_ONLY BOOL yes
+            ;;
+        &ndash;with-javac=</em>)
+            append_cache_entry CAF_JAVA_COMPILER FILEPATH &ldquo;$optarg&rdquo;
+            ;;
+        &ndash;with-java=<em>)
+            append_cache_entry CAF_JAVA_BIN FILEPATH &ldquo;$optarg&rdquo;
+            ;;
+        &ndash;with-scalac=</em>)
+            append_cache_entry CAF_SCALA_COMPILER FILEPATH &ldquo;$optarg&rdquo;
+            ;;
+        &ndash;with-erlc=<em>)
+            append_cache_entry CAF_ERLANG_COMPILER FILEPATH &ldquo;$optarg&rdquo;
+            ;;
+        &ndash;with-charmc=</em>)
+            append_cache_entry CAF_CHARM_COMPILER FILEPATH &ldquo;$optarg&rdquo;
+            ;;
+        &ndash;with-salsa=*)
+            append_cache_entry CAF_SALSA_JAR FILEPATH &ldquo;$optarg&rdquo;
+            ;;
+        &ndash;no-nexus)
+            append_cache_entry CAF_NO_NEXUS BOOL yes
+            ;;
+        &ndash;no-cash)
+            append_cache_entry CAF_NO_CASH BOOL yes
+            ;;
+        &ndash;no-benchmarks)
+            append_cache_entry CAF_NO_BENCHMARKS BOOL yes
+            ;;
+        &ndash;no-riac)
+            append_cache_entry CAF_NO_RIAC BOOL yes
+            ;;
+        *)
+            echo &ldquo;Invalid option &lsquo;$1&rsquo;.  Try $0 &ndash;help to see available options.&rdquo;
+            exit 1
+            ;;
+    esac
+    shift
+done</p></li>
+</ol>
+
+<p>这里又有新东西了: while, |, sed, shift</p>
+
+<pre><code>先看看while的语法:
+1) 以while开头
+2) 后面跟用中括号括起来的条件判断, 中括号两边有空格
+3) 条件判断语句(&quot;]&quot;)之后跟&quot;;&quot;
+4) 之后是do, 然后是循环体
+5) 最后以done结尾
+
+
+
+其中条件判断语句中也有新东西: -ne, 表示不等于. $#前面以及提到过, 是表示参数个数的特殊变量. 
+这个条件的意思是参数不为0时执行循环, 每次取一个参数进行解析
+但是我们看到循环体里每次都是取的 $1, 这是第一个参数的意思, 而且如果 $# 一直不变的话, while循环会一直执行下去
+我们需要一个东西来改变循环条件, 这就是 shift的作用
+shift 的语法为 shift [number], 如 shift 2 会将 $3 变成 $1, $4 变成 $2, 并且使 $# 数量减少 [number] 个. 单独的 shift 相当于 shift 1
+据此所知, 每次循环参数个数会减一(也就是 $# = $# - 1), 且 $1 变成下一个参数
+</code></pre>
+
+<p>while循环体的第一段为一个 case 语句, 其作用是提取参数中的选项值信息(等号&rdquo;=&ldquo;之后的信息, 比如参数为 &ndash;prefix=caf,
+那么caf会被赋值给变量 optarg. 这段代码中有几个要解释的地方</p>
+
+<pre><code>-*=*: 表示以&quot;-&quot;开头, 中间有&quot;=&quot;的字符串
+|: 管道符号, 将上一个命令的输出当做下一个命令输入, 这里就是把 $1 代表的字符串当做命令 sed 的输入
+sed: 文本替换命令, 学习shell一定要掌握! 这里的意思是把 &quot;-&quot; 和 &quot;=&quot; 之间的字符串去掉
+</code></pre>
+
+<p>获取到参数中的选项值之后, 通过另一个case语句判断参数类型进行相应操作. 这些选项包括 &ndash;help, &ndash;generator, 等等.
+匹配之后对应的操作之前都讲过, 应该很好懂.</p>
+
+<p>但是有一个地方需要特别提到, 也是一个新命令: tr</p>
+
+<pre><code>tr是translate的缩写, 用于字符转换或删除, 也是必学的命令之一
+tr '[:lower:]' '[:upper:]' 这个语句的意思是将输入字符串中的小写字符转换成大写
+</code></pre>
+
+<ol>
+<li><p>收尾部分</p>
+
+<h1 id="at-this-point-we-save-the-global-cmake-variables-so-that-configure-can">At this point we save the global CMake variables so that configure() can</h1>
+
+<h1 id="later-use-them">later use them.</h1>
+
+<p>CMakeDefaultCache=$CMakeCacheEntries</p>
+
+<p>if [ -n &ldquo;$dualbuild&rdquo; ]; then
+    # Use what we got in $PATH if &ndash;with-clang or &ndash;with-gcc is not specified.
+    if [ -z &ldquo;$clang&rdquo; ]; then
+        clang=clang++
+    fi
+    if [ -z &ldquo;$gcc&rdquo; ]; then
+        gcc=g++
+    fi</p>
+
+<pre><code>for i in gcc clang; do
+    eval &quot;compiler=\$$i&quot;
+    configure $compiler $i &quot;&quot; &quot;&quot; $CMakeGenerator
+done
+</code></pre>
+
+<p>else
+    # Prefer Clang to GCC.
+    if [ -n &ldquo;$clang&rdquo; ]; then
+        compiler=$clang
+    elif [ -n &ldquo;$gcc&rdquo; ]; then
+        compiler=$gcc
+    fi</p>
+
+<p>    configure &ldquo;$compiler&rdquo; &ldquo;&rdquo; &ldquo;$bindir&rdquo; &ldquo;$libdir&rdquo; &ldquo;$CMakeGenerator&rdquo;
+fi</p>
+
+<p>if [ -n &ldquo;$CMakeGenerator&rdquo; ] &amp;&amp; [ &ldquo;$CMakeGenerator&rdquo; != &ldquo;Unix&rdquo; ]; then
+  # skip Makefile-specific code below when not using make
+  exit 0
+fi</p>
+
+<p>printf &ldquo;DIRS := %s\n\n&rdquo; &ldquo;$workdirs&rdquo; &gt; $sourcedir/Makefile
+makefile=`cat &lt;&gt; $sourcedir/Makefile</p></li>
+</ol>
+
+<p>其实这才正真开始进行环境配置(当然前面也有一部分, 比如参数解析), 这段开始定义了一个默认的make cache变量</p>
+
+<p>if语句里设置编译器, 并且运行函数 configure 进行配置</p>
+
+<pre><code>if语句先判断用户有没有指定使用 dualbuild, 如果有则clang和gcc都分别进行配置(执行两遍configure). 如果没有则优先使用 clang, clang没有则使用gcc
+这里面有一个for语句
+for语句语法:
+for i in x1 x2; do
+    [body]
+done
+1) 以关键字for开头
+2) 后面跟循环用到的变量
+3) 然后是in关键字
+4) 后面跟一个参数列表, for循环会将列表里的参数挨个赋值给变量, 并运行循环体
+5) 参数列表后以&quot;;&quot;结尾
+6) 空格后跟关键字 do
+7) 然后是循环体
+8) 最后以done结尾
+
+
+
+
+
+
+-z用于判断字符串是否为0, 为0则返回true
+</code></pre>
+
+<p>接下来的一个if语句用来判断cmake的generator是否是Unix generator, 如果不是则没必要执行之后的生成makefle的命令,
+直接退出.</p>
+
+<p>最后是生成makefile</p>
+
+<p>首先使用printf将所有工作目录记录到Makefile</p>
+
+<p>然后定义了一个变量makefile, 把一些内容赋值给它. 怎么赋值的呢, 注意到等号后有&rdquo;&ldquo;包着的一大段, 前面讲过, &ldquo;`&rdquo;
+这个符号表示获取命令执行的结果, 这里就是获取 cat 执行的结果.</p>
+
+<p>cat用于连接文件内容并显示在标准输出上, 这里没有实体文件, 而是将字符串作为命令的输入. &ldquo;&lt;</p>
+
+<p>这里的意思就是讲EOT之间的这段字符串赋值给变量makefile</p>
+
+<p>而最后这句echo语句则是讲变量$makefile的内容追加(使用&gt;&gt;为追加, 如果使用&gt;则会覆盖之前的内容)到 Makefile</p>
+
+<p>好了, 整个configure 文件分析完了, 虽然涉及的命令不多, 但是从中也可以学习到shell编程的一些技巧. shell学习愉快!</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>spark源码分析一sparkshell启动脚本时候过程 | 开发者问答集锦</title>
+    <meta property="og:title" content="spark源码分析一sparkshell启动脚本时候过程 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="spark源码分析一sparkshell启动脚本时候过程">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/spark%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B8%80sparkshell%E5%90%AF%E5%8A%A8%E8%84%9A%E6%9C%AC%E6%97%B6%E5%80%99%E8%BF%87%E7%A8%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">spark源码分析一sparkshell启动脚本时候过程</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>当我们在命令行中输入spark-shell的时候，会自动转为spark
+shell界面。这个界面中我们可以完成spark的操作。那么，这个过程是怎么进行的呢？</p>
+
+<p>当我们在命令行中输入spark-shell的时候，调用的是spark/bin/spark-shell脚本。以下是spark-shell脚本中的部分代码：</p>
+
+<pre><code>function main() {
+  if $cygwin; then
+    stty -icanonmin 1 -echo &gt; /dev/null 2&gt;&amp;1
+    export SPARK_SUBMIT_OPTS=&quot;$SPARK_SUBMIT_OPTS -Djline.terminal=unix&quot;
+    &quot;$FWDIR&quot;/bin/spark-submit --class org.apache.spark.repl.Main &quot;${SUBMISSION_OPTS[@]}&quot; spark-shell &quot;${APPLICATION_OPTS[@]}&quot;
+sttyicanon echo &gt; /dev/null 2&gt;&amp;1
+  else
+    export SPARK_SUBMIT_OPTS
+    &quot;$FWDIR&quot;/bin/spark-submit --class org.apache.spark.repl.Main &quot;${SUBMISSION_OPTS[@]}&quot; spark-shell &quot;${APPLICATION_OPTS[@]}&quot;
+fi
+}
+</code></pre>
+
+<p>通过上方代码我们可以清楚的看见，main()方法调用了spark-submit脚本。我们前往spark-submit脚本去查看，发现spark-
+submit又调用了spark-class脚本。</p>
+
+<pre><code>exec &quot;$SPARK_HOME&quot;/bin/spark-class org.apache.spark.deploy.SparkSubmit &quot;${ORIG_ARGS[@]}&quot;
+</code></pre>
+
+<p>调用了spark-class脚本，并传入若干个参数，其中一个参数是org.apache.spark.deploy.SparkSubmit。spark-
+class脚本接收到传入的参数，并执行下述语句。</p>
+
+<pre><code>if [ -n &quot;${JAVA_HOME}&quot; ]; then
+  RUNNER=&quot;${JAVA_HOME}/bin/java&quot;
+else
+  if [ `command -v java` ]; then
+    RUNNER=&quot;java&quot;
+  else
+    echo &quot;JAVA_HOME is not set&quot; &gt;&amp;2
+    exit 1
+  fi
+fi
+
+exec &quot;$RUNNER&quot; -cp &quot;$CLASSPATH&quot; $JAVA_OPTS &quot;$@&quot;
+</code></pre>
+
+<p>上述语句的最后一条表示启动java程序（org.apache.spark.deploy.SparkSubmit）。这个时候，我们应该知道Spark启动了以SparkSubmit为主类的jvm进程。</p>
+
+<p>上述是脚本之间的调用，那么进入spark shell环境时候，像系统自动生成的conf，sc又是怎么得到的呢？</p>
+
+<p>通过使用jvisualvm工具来dump main线程的信息，信息显示如下：</p>
+
+<pre><code>&quot;main&quot; - Thread t@1
+   java.lang.Thread.State: RUNNABLE
+        ...
+        at org.apache.spark.repl.SparkILoop.process(SparkILoop.scala:916)
+        at org.apache.spark.repl.SparkILoop.process(SparkILoop.scala:1011)
+        ...
+        at org.apache.spark.repl.Main.main(Main.scala)
+        ...
+        at org.apache.spark.deploy.SparkSubmit$.main(SparkSubmit.scala:75)
+        at org.apache.spark.deploy.SparkSubmit.main(SparkSubmit.scala)
+        ...
+</code></pre>
+
+<p>从main线程的栈信息中看出程序的调用顺序：SparkSubmit.main→repl.Main→SparkILoop.process。SparkILoop.process方法中会调用initializeSpark方法，initializeSpark实现如下：</p>
+
+<pre><code>def initializeSpark() {
+intp.beQuietDuring {
+      command(&quot;&quot;&quot;
+         @transient val sc = {
+           val _sc = org.apache.spark.repl.Main.interp.createSparkContext()
+           println(&quot;Spark context available as sc.&quot;)
+           _sc
+         }
+        &quot;&quot;&quot;)
+      command(&quot;import org.apache.spark.SparkContext._&quot;)
+    }
+  }
+</code></pre>
+
+<p>从上述代码中，我们可以发现sc的创建是通过createSparkContext()方法完成的。然后，输出“Spark context available
+as
+sc.”，并将sc返回，同时导入SparkContext包下的所有类或对象。我们再看下createSparkContext()方法，看看他的内部是怎么实现的。</p>
+
+<pre><code>def createSparkContext(): SparkContext = {
+    val execUri = System.getenv(&quot;SPARK_EXECUTOR_URI&quot;)
+    val jars = SparkILoop.getAddedJars
+    val conf = new SparkConf()
+          .setMaster(getMaster())
+          .setAppName(&quot;Spark shell&quot;)
+          .setJars(jars)
+          .set(&quot;spark.repl.class.uri&quot;, intp.classServer.uri)
+    if (execUri != null) {
+        conf.set(&quot;spark.executor.uri&quot;, execUri)
+    }
+    sparkContext = new SparkContext(conf)
+    logInfo(&quot;Created spark context..&quot;)
+    sparkContext
+  }
+</code></pre>
+
+<p>在这个方法中，我们创建了conf对象，并对conf做了一些配置，比如说setMaster(),setAppName()等操作，然后，调用new
+SparkContext(conf)来创建sc。紧接着，打印出日志“INFO SparkILoop: Created spark
+context..”，并将sc返回。</p>
+
+<p>通过上述的一系列操作，对spark shell环境的初始化就初步完成了。如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/3b8c9929738e40d49ea7fc45a748e4b8.png"><img src="https://img.it610.com/image/info8/3b8c9929738e40d49ea7fc45a748e4b8.png" alt="spark源码分析：（一）spark-
+shell启动脚本时候过程_第1张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

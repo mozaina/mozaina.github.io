@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本定时备份docker部署的MySQL数据库 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本定时备份docker部署的MySQL数据库 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本定时备份docker部署的MySQL数据库">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%9A%E6%97%B6%E5%A4%87%E4%BB%BDdocker%E9%83%A8%E7%BD%B2%E7%9A%84mysql%E6%95%B0%E6%8D%AE%E5%BA%93/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本定时备份docker部署的MySQL数据库</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>之前由于服务器一直被攻击，数据库总是中勒索病毒，在前篇文章中，说了一些提高安全性的办法，但是我认为还是有些不靠谱。也结合之前研究定时备份的脚本，今天来写一篇关于定时备份数据的文章。</p>
+
+<h2 id="一-脚本">一、脚本</h2>
+
+<p>我的MySQL是使用docker部署的，所以备份的命令是要通过docker进入容器，再执行备份命令。</p>
+
+<pre><code>#!/bin/bash
+# 设置mysql的登录用户名和密码(根据实际情况填写)
+mysql_user=&quot;root&quot;
+mysql_password=&quot;root&quot;
+mysql_host=&quot;localhost&quot;
+mysql_port=&quot;3306&quot;
+mysql_charset=&quot;utf8mb4&quot;
+
+# 备份文件存放地址(根据实际情况填写)
+backup_location=/usr/local
+
+# 是否删除过期数据
+expire_backup_delete=&quot;ON&quot;
+expire_days=7
+backup_time=`date +%Y%m%d%H%M`
+backup_dir=$backup_location
+welcome_msg=&quot;Welcome to use MySQL backup tools!&quot;
+# 备份指定数据库中数据(此处假设数据库是mysql_backup_test)
+　docker exec -it mysql mysqldump -h$mysql_host -P$mysql_port -u$mysql_user -p$mysql_password -B test1 &gt; $backup_dir/mysql_backup_test-$backup_time.sql
+
+# 删除过期数据
+if [ &quot;$expire_backup_delete&quot; == &quot;ON&quot; -a  &quot;$backup_location&quot; != &quot;&quot; ];then
+        `find $backup_location/ -type f -mtime +$expire_days | xargs rm -rf`
+        echo &quot;Expired backup data delete complete!&quot;
+fi
+</code></pre>
+
+<p><strong>说明：</strong><br />
+上边主要都是对变量的定义，已经有详细说明了，我这里主要是对备份的命令进行解释</p>
+
+<pre><code>docker exec -it mysql mysqldump -h$mysql_host -P$mysql_port -u$mysql_user -p$mysql_password -B test1 &gt; $backup_dir/mysql_backup_test-$backup_time.sql
+</code></pre>
+
+<p>撇开这些，我们进入容器，来测试一下备份的命令，先对命令拆解分析</p>
+
+<pre><code># docker进入容器的命令
+docker exec -it 容器名
+
+
+
+# 备份数据库的命令
+mysqldump -uroot -p123456 -B 数据库名 &gt; /usr/111.sql
+</code></pre>
+
+<p>连起来就是（这是我这边的命令，你本人根据自己实际情况进行修改）</p>
+
+<pre><code>docker exec -it mysql01 mysqldump -uroot -p123456 -B cj &gt; $backup_dir/cj-$backup_time.sql
+</code></pre>
+
+<h2 id="二-定时任务">二、定时任务</h2>
+
+<pre><code># 启动定时任务
+crontab -e
+
+# 将定时任务写入其中 分 时 日 月 年
+* * * * * /bin/bash /usr/data/backup/backupdb.sh
+
+# 查看定时任务列表
+crontab -l
+</code></pre>
+
+<h1 id="2020年7月6日19-43-44二次补充">2020年7月6日19:43:44二次补充</h1>
+
+<p>今天早上起来进入服务器查看昨晚写的定时备份脚本有没有执行成功，进入备份目录，发现生成了文件，然后cat查看发现没有任何输出，就很奇怪，明明昨天手动执行成功了，可是放进crontab里定时执行就出了问题，为什么？</p>
+
+<p>带着这个问题我百度了好久好久好久好久，网上普遍说的是两种情况，一、mysqldump命令的路径没有给全，二、环境变量没有添加；</p>
+
+<p>结合这两个方向，我进行了所有解决方案的尝试，全部以失败告终；</p>
+
+<p><strong>失败一，补全mysqldump命令的路径</strong><br />
+如果你是直接装在服务器上的MySQL也许这对你而言不会很复杂，网上绝大多数的解决方案也是基于此，但是我的MySQL是docker装的，所以我需要进入容器来找他的mysqldump的位置。然后补全</p>
+
+<pre><code>docker exec -it mysql01 /usr/bin/mysqldump -uroot -p123456 -B cj &gt; $backup_dir/cj-$backup_time.sql
+</code></pre>
+
+<p>其中，/usr/bin 就是容器里mysqldump文件的路径<br />
+<strong>结果：失败</strong></p>
+
+<p><strong>失败二，添加环境变量</strong><br />
+way1：在脚本里添加</p>
+
+<blockquote>
+<p>source /etc/profile<br />
+ 这里被我注释了</p>
+
+<p><a href="https://img.it610.com/image/info8/6c3eb68c8c544eecbf727cec358ec97f.jpg"><img src="https://img.it610.com/image/info8/6c3eb68c8c544eecbf727cec358ec97f.jpg" alt="shell脚本定时备份docker部署的MySQL数据库_第1张图片" /></a></p>
+</blockquote>
+
+<p><strong>结果：失败</strong></p>
+
+<p>way2：在执行任务的脚本里添加</p>
+
+<blockquote>
+<p>crontab -e</p>
+
+<p>*/1 0 * * * source profile；/home/backup/mysql_backup_test_backup.sh 2&gt;&amp;1</p>
+</blockquote>
+
+<p><strong>结果：失败</strong></p>
+
+<p>然后又林林总总找了很多办法，但是出发点和方向都是这两个，而且也一直没有成功，看网上信誓旦旦说的一定成功，评论也有成功的，可是我就成功不了，搞得我很怀疑人生；最后我开始怀疑这个命令是不是有问题？虽然手动执行是正常的，也许因为什么原因，自动执行就出现问题了，于是我开始百度“crontab执行docker”，不得不说，
+<strong>百度对方向</strong> 真的很重要，划重点。一百度就找到问题了</p>
+
+<p><a href="https://img.it610.com/image/info8/88b19cd07636483f90a9d138ab0b1757.jpg"><img src="https://img.it610.com/image/info8/88b19cd07636483f90a9d138ab0b1757.jpg" alt="shell脚本定时备份docker部署的MySQL数据库_第2张图片" /></a><br />
+跟加了 -it参数有关系</p>
+
+<blockquote>
+<p>Your docker exec command says it needs “pseudo terminal and runs in
+interactive mode” (-it flags) while cron doesn’t attach to any TTYs.<br />
+ 大致意思 exec 加了 -it 参数就开启了一个终端，计划任务是无法进入任何终端的。</p>
+</blockquote>
+
+<p>把 docker exec 的参数 -it 去掉后问题解决了。</p>
+
+<p>看了这个我才知道原来是这个原因，然后再想想之前他们的帖子，貌似也确实没有 -it的参数，然后放入定时任务执行，果然成功了，哎，真艰辛！</p>
+
+<pre><code>docker exec mysql01 mysqldump -uroot -p123456 -B cj &gt; $backup_dir/cj-$backup_time.sql
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

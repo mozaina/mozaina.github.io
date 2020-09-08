@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>用shell脚本合并多个文件内容 | 开发者问答集锦</title>
+    <meta property="og:title" content="用shell脚本合并多个文件内容 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="用shell脚本合并多个文件内容">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%94%A8shell%E8%84%9A%E6%9C%AC%E5%90%88%E5%B9%B6%E5%A4%9A%E4%B8%AA%E6%96%87%E4%BB%B6%E5%86%85%E5%AE%B9/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">用shell脚本合并多个文件内容</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>需求描述</strong><br />
+现有多个具有相同命名格式及内容格式的文件，要求编写shell脚本将它们合并到一个文件中。</p>
+
+<p>被合并文件的命名格式为：YYYYMMDDHHMISS.r，例如：20161018030205.r；文件中包含了若干行记录，每行记录包含26个字符，其中第一个字符为标识位，第7到12个字符为时间(格式：YYMMDD)，例如：000000161019002925000003N0，该记录的第一个字符0为标识位，第7到12个字符161019表示时间，即16年的10月19日；合并之后的文件的命名格式为：YYYYMMDD.txt，例如：20161018.txt。</p>
+
+<p>对于合并操作，具体要求为：<br />
+1)当天只合并前一天的文件，如今天(10月20日)只合并昨天(10月19日)的文件，文件时间通过文件命名即可看出。</p>
+
+<p>2)标识位为0的记录会被写到合并之后的文件中，其他记录将被过滤掉。</p>
+
+<p>3)时间(即第7到12个字符的值)为前一天的记录会被写到合并之后的文件中，其他记录将被过滤掉。</p>
+
+<p><strong>shell脚本</strong></p>
+
+<pre><code>#!/bin/bash
+
+srcparh=/home/zhou/src
+exportpath=/home/zhou/export
+linenum=0
+
+return_fail()
+{
+    exit 1
+}
+
+function check_config_dir
+{
+    if [ ! -d ${srcparh} ];then
+        echo &quot;[error]:${srcparh} has not existed!!&quot;
+        return_fail
+    fi
+
+    if [ ! -d ${exportpath}]; then
+        echo &quot;[error]:${exportpath} has not existed!!&quot;
+        return_fail
+    fi
+}
+
+function merge_file
+{
+    ##YESTERDAY DATE YYMMDD
+    YES_DATE_YY=`date -dyesterday +%y%m%d`
+
+    ##YESTERDAY filename
+    YES_FILENAME=`date -dyesterday +%Y%m%d`.txt
+
+    ONE_DAY_AGO=`date -dyesterday +%y%m%d`
+
+    echo&quot;YESTERDAY:${ONE_DAY_AGO}&quot;
+
+    echo &quot;`date+%Y-%m-%d` `date +%T`----begin to merge file&quot;
+
+    if [ -s ${YES_FILENAME}]; then
+        echo &quot;warn:yesterday file ${YES_FILENAME} has existed!! now backup it to${YES_FILENAME}_bak.&quot;
+        mv ${YES_FILENAME}${YES_FILENAME}_bak
+    fi
+
+    cd ${srcparh}
+
+    file_list_temp=`ls | grep-E &quot;${ONE_DAY_AGO}&quot;`
+    file_list_count=`ls |grep -E &quot;${ONE_DAY_AGO}&quot; | wc -l`
+
+    echo &quot; &quot;
+    echo &quot;there are${file_list_count} yesterday file(s) to be merged.&quot;
+    echo &quot; &quot;
+
+    &gt;${exportpath}/${YES_FILENAME}
+
+    for file_name in$file_list_temp
+    do
+         echo &quot;now to merge ${file_name}&quot;
+         cat ${file_name} | grep &quot;^0&quot; &gt;${file_name}_filter_firstline
+
+        while read line
+        do   
+             echo &quot;&quot;
+             echo &quot;nowto deal this line: ${line}&quot;     
+             echo &quot;&quot;
+
+             start_data=+${line:6:6}+
+
+             echo&quot;${start_data}&quot; | grep &quot;+${ONE_DAY_AGO}+&quot;
+             if [ $? -eq 0 ]
+             then   
+                 echo&quot;${line}&quot; &gt;&gt; ${exportpath}/${YES_FILENAME} 
+                            linenum=$[linenum+1]
+             fi            
+        done &lt;${file_name}_filter_firstline
+
+        rm*_filter_firstline  
+    done    
+
+    if [ ${linenum} -gt 0 ]
+    then
+        echo &quot;Totally ${linenum} lines havemerged.&quot;
+    fi
+
+    if [ ! -s${exportpath}/${YES_FILENAME}  ]
+    then
+        echo &quot;warn:there is no yesterday file record!!,${exportpath}/${YES_FILENAME} isblank!&quot;
+        echo &quot; &quot;&gt;${exportpath}/${YES_FILENAME}
+    fi                   
+}  
+
+main()
+{
+    echo &quot;  &quot;
+
+    echo &quot;this mergetool begins running --------------------&quot;
+
+    check_config_dir;
+
+    merge_file;
+
+    echo&quot;-------------end ---------------------&quot;
+}
+
+## Execute main function
+main $*
+</code></pre>
+
+<p><strong>脚本说明</strong><br />
+第一，在脚本的第3到5行，定义了三个变量，其中srcparh用于存放被合并的文件，exportpath用于存放合并之后的文件，linenum用于表示本次写到合并之后的文件中的记录的条数。</p>
+
+<p>第二，return_fail用于在执行出现异常(如srcparh或exportpath所表示的路径不存在)时退出程序而不进行后续处理。</p>
+
+<p>第三，check_config_dir函数用于检查srcparh或exportpath所表示的路径是否存在，如不存在，则不进行后续处理。</p>
+
+<p>第四，merge_file函数是本脚本的核心，它的主要功能是找出srcparh下满足时间条件的文件，并按照需求要求将文件中的记录筛选出来，放到结果文件中。如果有满足条件的记录，那么脚本会显示写入到结果文件中的记录的条数。</p>
+
+<p>第五，main函数是整个程序的入口(就像C语言中的main函数一样)，它调用了check_config_dir和merge_file函数。</p>
+
+<p><strong>脚本执行结果</strong><br />
+第一，当srcparh所表示的路径不存在时，执行结果如下：</p>
+
+<pre><code>&gt; ./file_merge_tool.sh
+
+this merge tool begins running --------------------
+[error]: /home/zhou/src has not existed!!
+</code></pre>
+
+<p>第二，当exportpath所表示的路径不存在时，执行结果如下：</p>
+
+<pre><code>&gt; ./file_merge_tool.sh
+
+this merge tool begins running --------------------
+[error]: /home/zhou/export has not existed!!
+</code></pre>
+
+<p>第三，当srcparh所表示的路径存在但不包含任何文件时，执行结果如下：</p>
+
+<pre><code>&gt; ./file_merge_tool.sh
+
+this merge tool begins running --------------------
+YESTERDAY:161019
+2016-10-20 16:30:06----begin to merge file
+
+there are 0 yesterday file(s) to be merged.
+
+warn: there is no yesterday filerecord!!,/home/zhou/export/20161019.txt is blank!
+-------------end ---------------------
+</code></pre>
+
+<p>第四，现有四个文件20161018030205.r、20161019030254.r、20161019182531.r、20161019213456.r，每个文件的内容如下：<br />
+20161018030205.r文件：</p>
+
+<blockquote>
+<p>000000161019002925000003N0<br />
+ 000000161019002931000003N0<br />
+ 300000161018002931000003N0<br />
+ 000000161019002926000009Y0<br />
+ 000000161019003150000003N0</p>
+</blockquote>
+
+<p>20161019030254.r文件：</p>
+
+<blockquote>
+<p>000000161019004925000003N0<br />
+ 000000161019006931000003N0<br />
+ 100000161019006971000004N0<br />
+ 000000161019007926000009Y0<br />
+ 200000161019006871000004N0<br />
+ 000000161019008150000003N0</p>
+</blockquote>
+
+<p>20161019182531.r文件：</p>
+
+<blockquote>
+<p>000000161019001925000003N0<br />
+ 000000161019004931000003N0<br />
+ 000000161018007926000009Y0<br />
+ 000000161019007926000009Y0<br />
+ 000000161019009150000003N0<br />
+ 000000161017007926000009Y0<br />
+ 600000161019007426000009Y0</p>
+</blockquote>
+
+<p>20161019213456.r文件：</p>
+
+<blockquote>
+<p>000000161019002925000003N0<br />
+ 000000161019002931000003N0<br />
+ 000000161019002926000009Y0<br />
+ 800000161019002961000003N0<br />
+ 000000161019003150000003N0</p>
+</blockquote>
+
+<p>将它们上传到srcparh目录下，运行脚本，结果如下：</p>
+
+<pre><code>&gt; ./file_merge_tool.sh
+
+this merge tool begins running --------------------
+YESTERDAY:161019
+2016-10-20 17:08:24----begin to merge file
+
+there are 3 yesterday file(s) to be merged.
+
+now to merge 20161019030254.r
+
+now to deal this line: 000000161019004925000003N0
+
++161019+
+
+now to deal this line: 000000161019006931000003N0
+
++161019+
+
+now to deal this line: 000000161019007926000009Y0
+
++161019+
+
+now to deal this line: 000000161019008150000003N0
+
++161019+
+now to merge 20161019182531.r
+
+now to deal this line: 000000161019001925000003N0
+
++161019+
+
+now to deal this line: 000000161019004931000003N0
+
++161019+
+
+now to deal this line: 000000161018007926000009Y0
+
+
+now to deal this line: 000000161019007926000009Y0
+
++161019+
+
+now to deal this line: 000000161019009150000003N0
+
++161019+
+
+now to deal this line: 000000161017007926000009Y0
+
+now to merge 20161019213456.r
+
+now to deal this line: 000000161019002925000003N0
+
++161019+
+
+now to deal this line: 000000161019002931000003N0
+
++161019+
+
+now to deal this line: 000000161019002926000009Y0
+
++161019+
+
+now to deal this line: 000000161019003150000003N0
+
++161019+
+Totally 12 lines have merged.
+-------------end ---------------------
+</code></pre>
+
+<p>对照被合并的文件和结果文件，一共有4个文件，但只有3个文件(20161019030254.r、20161019182531.r、20161019213456.r)满足时间条件，这3个文件中满足过滤条件(标识位为0、时间为前一天)的记录条数为12条，和脚本执行结果一致。</p>
+
+<p>大家也可对本脚本进行更多的测试。</p>
+
+<p><strong>总结</strong><br />
+shell脚本在基于Linux的开发中有极为广泛的应用，因为它靠近底层，执行效率高、部署方便。本文中的脚本也可以作为定时任务部署到机器上，让它在每天的同一个时间里自动执行。</p>
+
+<p>当然，要想编写出功能强大的shell脚本，其前提条件是大家必须要对shell脚本的语法非常的熟悉，这也可以看出基本功的重要性。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

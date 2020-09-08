@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Android开发使用ADBShell命令实现模拟点击支付宝自动转账实现 | 开发者问答集锦</title>
+    <meta property="og:title" content="Android开发使用ADBShell命令实现模拟点击支付宝自动转账实现 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Android开发使用ADBShell命令实现模拟点击支付宝自动转账实现">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/android%E5%BC%80%E5%8F%91%E4%BD%BF%E7%94%A8adbshell%E5%91%BD%E4%BB%A4%E5%AE%9E%E7%8E%B0%E6%A8%A1%E6%8B%9F%E7%82%B9%E5%87%BB%E6%94%AF%E4%BB%98%E5%AE%9D%E8%87%AA%E5%8A%A8%E8%BD%AC%E8%B4%A6%E5%AE%9E%E7%8E%B0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Android开发使用ADBShell命令实现模拟点击支付宝自动转账实现</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>首先声明，本人反对一切利用技术的违法行为</p>
+
+<p>本文的实现代码已经销毁，本文以介绍流程为主</p>
+
+<p><strong>1. 这里所说的模拟点击不是在自己的APP里点击，点自己APP上的控件没什么好说的</strong></p>
+
+<p>不仅是支付宝转账，其他的获取别人百度云里的某个文件信息，或者获取别人邮箱APP里的邮件等都是可以实现的。</p>
+
+<p>这里我们要实现的是，通过一定的触发条件，开启我们事先嵌入到应用代码里的脚本命令（其实就是Shell语句的代码实现），这个触发条件根据自己的想法随意指定，前提是屏幕必须亮着，才能实现任意位置的模拟点击。下面有几行代码是用来检查屏幕是否点亮并自动解锁点亮屏幕的代码。</p>
+
+<p>接下来就介绍如何模拟点击。当然，我们的应用需要获得root权限。</p>
+
+<p>本文原创，转载请注明出处：<a href="http://blog.csdn.net/seu_calvin/article/details/51916530">http://blog.csdn.net/seu_calvin/article/details/51916530</a></p>
+
+<pre><code>private void checkScreen(Context context){
+        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        if (!pm.isScreenOn()){
+            wakeUpAndUnlock(context);
+        }
+    }
+private void wakeUpAndUnlock(Context context){
+        KeyguardManager km = (KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE);
+        KeyguardManager.KeyguardLock kl = km.newKeyguardLock(&quot;unLock&quot;);
+        // 解锁
+        kl.disableKeyguard();
+        // 获取电源管理器对象
+        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        // 获取PowerManager.WakeLock对象,后面的参数|表示同时传入两个值,最后的是LogCat里用的Tag
+        PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.SCREEN_DIM_WAKE_LOCK, &quot;bright&quot;);
+        // 点亮屏幕
+        wl.acquire();
+        // 释放
+        wl.release();
+    }
+</code></pre>
+
+<p><strong>2. 模拟点击的实现最后需要注意的是：</strong></p>
+
+<p>2.1 模拟点击的位置选取</p>
+
+<p>本例中的模拟点击是基于坐标的模拟点击，所以针对不同的手机分辨率以及不同的应用（此例中为支付宝），要写入代码的坐标也是不一样的。这个需要你们自己去获取。具体可以打开手机的开发者模式，进入开发者选项，打开获取指针位置，便可以拿到要点位置的坐标。</p>
+
+<p>2.2 嵌入代码的脚本命令</p>
+
+<p>首先需要通过代码打开支付宝应用，可以通过以下代码根据支付宝包名打开。</p>
+
+<pre><code>Intent intent = this.getPackageManager().getLaunchIntentForPackage(appPackageName);
+startActivity(intent);
+</code></pre>
+
+<p>继而通过你自己的写的触发条件，当然是写入Service里的，进入我们的脚本逻辑。</p>
+
+<p>使用Java执行Runtime.getRuntime().exec(&ldquo;su&rdquo;).getOutputStream()，获取了一个具有Root权限的Process的输出流对象，向其中写入字符串即可以Root权限被Shell执行。在获取输出流时最好还是判断是否为空，若不为空就没必要每一句shell命令都获取输出流了，这样会很卡。</p>
+
+<p>下面介绍几种常见的模拟点击方式。</p>
+
+<p><strong>3. 模拟点击的不同方式</strong></p>
+
+<p>3.1 模拟点击</p>
+
+<pre><code>//点击坐标点x=50  y=250的位置
+adb shell input tap 50 250 
+</code></pre>
+
+<p>3.2 模拟长按（这个比较复杂，后面会写文介绍）</p>
+
+<p>3.3 模拟滑动</p>
+
+<pre><code>//划屏操作，前四个数为坐标点，后面是滑动的时间（单位毫秒）
+adb shell input swipe 50 250 250 250 500 
+</code></pre>
+
+<p>3.4 模拟输入字符串（有无双引号均可）这个功能可以在被控手机上填入我们的支付宝帐号</p>
+
+<pre><code>//输入字符abc
+adb shell input text abc
+</code></pre>
+
+<p>3.5 模拟点击手机自带的功能键，Home，Menu，Back等</p>
+
+<pre><code>//实现点击功能键, KeyCode为功能键   本文最后会列举出所有的keyCode对应的功能
+input keyevent keyCode
+</code></pre>
+
+<p>**<br />
+**</p>
+
+<p><strong>4.</strong> <strong>功能实现</strong></p>
+
+<p>通过2.2中拿到的输出流即可把上述Shell语句写入代码，我们几乎完成了针对支付宝转账的所有过程，包括唤醒屏幕，进入应用，点击转账，输入帐号，点击确定都是可以完成的。同理可以拿到别人邮箱APP里的邮件了。这里可能要问了，如何获取对方的支付宝密码呢。因为支付宝密码肯定是被保存在服务器端的，我们无法获取。所以我们可以通过监听用户的支付行为，记录下可能的支付密码，再根据密码选取点击的位置即可。</p>
+
+<p>如何获取用户支付密码，可以查看Android开发——后台获取用户点击位置坐标（可获取用户支付宝密码）。</p>
+
+<p><strong>5. 最后记录以下KeyCode对应的功能列表</strong></p>
+
+<pre><code>KEYCODE_UNKNOWN=0;   
+
+KEYCODE_SOFT_LEFT=1;   
+
+KEYCODE_SOFT_RIGHT=2;   
+
+KEYCODE_HOME=3;   
+
+KEYCODE_BACK=4;   
+
+KEYCODE_CALL=5;   
+
+KEYCODE_ENDCALL=6;   
+
+KEYCODE_0=7;   
+
+KEYCODE_1=8;   
+
+KEYCODE_2=9;   
+
+KEYCODE_3=10;   
+
+KEYCODE_4=11;   
+
+KEYCODE_5=12;   
+
+KEYCODE_6=13;   
+
+KEYCODE_7=14;   
+
+KEYCODE_8=15;   
+
+KEYCODE_9=16;   
+
+KEYCODE_STAR=17;   
+
+KEYCODE_POUND=18;   
+
+KEYCODE_DPAD_UP=19;   
+
+KEYCODE_DPAD_DOWN=20;   
+
+KEYCODE_DPAD_LEFT=21;   
+
+KEYCODE_DPAD_RIGHT=22;   
+
+KEYCODE_DPAD_CENTER=23;   
+
+KEYCODE_VOLUME_UP=24;   
+
+KEYCODE_VOLUME_DOWN=25;   
+
+KEYCODE_POWER=26;   
+
+KEYCODE_CAMERA=27;   
+
+KEYCODE_CLEAR=28;   
+
+KEYCODE_A=29;   
+
+KEYCODE_B=30;   
+
+KEYCODE_C=31;   
+
+KEYCODE_D=32;   
+
+KEYCODE_E=33;   
+
+KEYCODE_F=34;   
+
+KEYCODE_G=35;   
+
+KEYCODE_H=36;   
+
+KEYCODE_I=37;   
+
+KEYCODE_J=38;   
+
+KEYCODE_K=39;   
+
+KEYCODE_L=40;   
+
+KEYCODE_M=41;   
+
+KEYCODE_N=42;   
+
+KEYCODE_O=43;   
+
+KEYCODE_P=44;   
+
+KEYCODE_Q=45;   
+
+KEYCODE_R=46;   
+
+KEYCODE_S=47;   
+
+KEYCODE_T=48;   
+
+KEYCODE_U=49;   
+
+KEYCODE_V=50;   
+
+KEYCODE_W=51;   
+
+KEYCODE_X=52;   
+
+KEYCODE_Y=53;   
+
+KEYCODE_Z=54;   
+
+KEYCODE_COMMA=55;   
+
+KEYCODE_PERIOD=56;   
+
+KEYCODE_ALT_LEFT=57;   
+
+KEYCODE_ALT_RIGHT=58;   
+
+KEYCODE_SHIFT_LEFT=59;   
+
+KEYCODE_SHIFT_RIGHT=60;   
+
+KEYCODE_TAB=61;   
+
+KEYCODE_SPACE=62;   
+
+KEYCODE_SYM=63;   
+
+KEYCODE_EXPLORER=64;   
+
+KEYCODE_ENVELOPE=65;   
+
+KEYCODE_ENTER=66;   
+
+KEYCODE_DEL=67;   
+
+KEYCODE_GRAVE=68;   
+
+KEYCODE_MINUS=69;   
+
+KEYCODE_EQUALS=70;   
+
+KEYCODE_LEFT_BRACKET=71;   
+
+KEYCODE_RIGHT_BRACKET=72;   
+
+KEYCODE_BACKSLASH=73;   
+
+KEYCODE_SEMICOLON=74;   
+
+KEYCODE_APOSTROPHE=75;   
+
+KEYCODE_SLASH=76;   
+
+KEYCODE_AT=77;   
+
+KEYCODE_NUM=78;   
+
+KEYCODE_HEADSETHOOK=79;   
+
+KEYCODE_FOCUS=80;//*Camera*focus   
+
+KEYCODE_PLUS=81;   
+
+KEYCODE_MENU=82;   
+
+KEYCODE_NOTIFICATION=83;   
+
+KEYCODE_SEARCH=84;   
+
+KEYCODE_MEDIA_PLAY_PAUSE=85;   
+
+KEYCODE_MEDIA_STOP=86;   
+
+KEYCODE_MEDIA_NEXT=87;   
+
+KEYCODE_MEDIA_PREVIOUS=88;   
+
+KEYCODE_MEDIA_REWIND=89;   
+
+KEYCODE_MEDIA_FAST_FORWARD=90;   
+
+KEYCODE_MUTE=91; 
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/92a2979b4777474d9d12f6f043244e03.jpg"><img src="https://img.it610.com/image/info8/92a2979b4777474d9d12f6f043244e03.jpg" alt="Android开发——使用ADB
+Shell命令实现模拟点击（支付宝自动转账实现）_第1张图片" /></a></p>
+
+<p>转载于:<a href="https://www.cnblogs.com/qitian1/p/6461617.html">https://www.cnblogs.com/qitian1/p/6461617.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

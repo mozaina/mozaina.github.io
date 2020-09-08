@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Android程序中如何执行shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="Android程序中如何执行shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Android程序中如何执行shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/android%E7%A8%8B%E5%BA%8F%E4%B8%AD%E5%A6%82%E4%BD%95%E6%89%A7%E8%A1%8Cshell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Android程序中如何执行shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>在做Android应用时，经常需要执行shell脚本，以快速实现某些功能；</p>
+
+<p>在Android应用程序中执行shell脚本可以省去一大堆繁琐的代码，还可以避免不必要的错误；</p>
+
+<p>比如：拷贝文件夹时，可以执行shell命令中的 cp 命令达到目的；而在代码中实现拷贝文件夹时，不仅需要编写一大堆繁琐的代码，还容易陷入递归死循环的错误中；</p>
+
+<p>比如：获取文件系统的读写权限，只需要执行shell脚本中一句 mount -o rw,remount / 就能轻松搞定；</p>
+
+<p>比如：删除文件夹下某一个文件、或者某一类文件、或者全部文件，只需要执行shell脚本中的一句 rm -f *(利用*通配符进行匹配) 就能轻松搞定；</p>
+
+<p>再比如：静默安装时，只需要执行shell脚本中一句 pm install -r 便可达到目的；</p>
+
+<p>如果这些都用代码来实现，不仅代码量增加，还容易造成很多bug，吃力不讨好！</p>
+
+<p>如果能在android应用中执行shell脚本来达到目的，可以省去一大堆代码，避免很多易犯的错误，简洁高效，何乐而不为呢？！</p>
+
+<p>下面给出一个在Android应用中执行shell脚本的工具类的示例，供大家参考：</p>
+
+<pre><code>package com.example.test;
+
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+
+import android.util.Log;
+
+/**
+ * 执行shell脚本工具类
+ * @author Mountain
+ *
+ */
+public class CommandExecution {
+
+    public static final String TAG = &quot;CommandExecution&quot;;
+
+    public final static String COMMAND_SU       = &quot;su&quot;;
+    public final static String COMMAND_SH       = &quot;sh&quot;;
+    public final static String COMMAND_EXIT     = &quot;exit\n&quot;;
+    public final static String COMMAND_LINE_END = &quot;\n&quot;;
+
+    /**
+     * Command执行结果
+     * @author Mountain
+     *
+     */
+    public static class CommandResult {
+        public int result = -1;
+        public String errorMsg;
+        public String successMsg;
+    }
+
+    /**
+     * 执行命令—单条
+     * @param command
+     * @param isRoot
+     * @return
+     */
+    public static CommandResult execCommand(String command, boolean isRoot) {
+        String[] commands = {command};
+        return execCommand(commands, isRoot);
+    }
+
+    /**
+     * 执行命令-多条
+     * @param commands
+     * @param isRoot
+     * @return
+     */
+    public static CommandResult execCommand(String[] commands, boolean isRoot) {
+        CommandResult commandResult = new CommandResult();
+        if (commands == null || commands.length == 0) return commandResult;
+        Process process = null;
+        DataOutputStream os = null;
+        BufferedReader successResult = null;
+        BufferedReader errorResult = null;
+        StringBuilder successMsg = null;
+        StringBuilder errorMsg = null;
+        try {
+            process = Runtime.getRuntime().exec(isRoot ? COMMAND_SU : COMMAND_SH);
+            os = new DataOutputStream(process.getOutputStream());
+            for (String command : commands) {
+                if (command != null) {
+                    os.write(command.getBytes());
+                    os.writeBytes(COMMAND_LINE_END);
+                    os.flush();
+                }
+            }
+            os.writeBytes(COMMAND_EXIT);
+            os.flush();
+            commandResult.result = process.waitFor();
+            //获取错误信息
+            successMsg = new StringBuilder();
+            errorMsg = new StringBuilder();
+            successResult = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            errorResult = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+            String s;
+            while ((s = successResult.readLine()) != null) successMsg.append(s);
+            while ((s = errorResult.readLine()) != null) errorMsg.append(s);
+            commandResult.successMsg = successMsg.toString();
+            commandResult.errorMsg = errorMsg.toString();
+            Log.i(TAG, commandResult.result + &quot; | &quot; + commandResult.successMsg
+                    + &quot; | &quot; + commandResult.errorMsg);
+        } catch (IOException e) {
+            String errmsg = e.getMessage();
+            if (errmsg != null) {
+                Log.e(TAG, errmsg);
+            } else {
+                e.printStackTrace();
+            }
+        } catch (Exception e) {
+            String errmsg = e.getMessage();
+            if (errmsg != null) {
+                Log.e(TAG, errmsg);
+            } else {
+                e.printStackTrace();
+            }
+        } finally {
+            try {
+                if (os != null) os.close();
+                if (successResult != null) successResult.close();
+                if (errorResult != null) errorResult.close();
+            } catch (IOException e) {
+                String errmsg = e.getMessage();
+                if (errmsg != null) {
+                    Log.e(TAG, errmsg);
+                } else {
+                    e.printStackTrace();
+                }
+            }
+            if (process != null) process.destroy();
+        }
+        return commandResult;
+    }
+
+}
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

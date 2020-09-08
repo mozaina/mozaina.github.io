@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>常用排序算法的c实现冒泡选择插入堆shell快速归并与sort对比 | 开发者问答集锦</title>
+    <meta property="og:title" content="常用排序算法的c实现冒泡选择插入堆shell快速归并与sort对比 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="常用排序算法的c实现冒泡选择插入堆shell快速归并与sort对比">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%B8%B8%E7%94%A8%E6%8E%92%E5%BA%8F%E7%AE%97%E6%B3%95%E7%9A%84c%E5%AE%9E%E7%8E%B0%E5%86%92%E6%B3%A1%E9%80%89%E6%8B%A9%E6%8F%92%E5%85%A5%E5%A0%86shell%E5%BF%AB%E9%80%9F%E5%BD%92%E5%B9%B6%E4%B8%8Esort%E5%AF%B9%E6%AF%94/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">常用排序算法的c实现冒泡选择插入堆shell快速归并与sort对比</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>偶然在书上看到句话，“为C++程序员所津津乐道的一件事，就是sort()全面打败c语言的quicksort”，于是决定亲自测试下，正好将其他的排序也一并测试了，当做当初没写的补偿吧。</p>
+
+<p>测试文件的一些说明：</p>
+
+<p>1、 测试中如果用数组，当MAX达到1000000时，会stack over，所以这里全部用了vector。</p>
+
+<p>2、随机数用一个全局vector保存，单独排序时直接vector
+v(orited)，就这但来说c++确实很方便啊，因为有的递归调用，调用过程中vector为多大都不确定，用数组怎么初始化就成为了一个问题。</p>
+
+<p>3、测试排序的函数命名全部为下划线分割的方式，如select_sort（）。</p>
+
+<p>4、排序结果经过写入文件验证。</p>
+
+<p>5、文件在win7，vs6，vs08，以及gcc下编译通过。vs08下，最初用的文件操作用FILE，会有错，可以加以修改为stream，比如打开和判空修改如下：</p>
+
+<pre><code>FILE *fp =fopen(&quot;data.txt&quot;,&quot;wr&quot;);
+ofstream fp(&quot;data.txt&quot;);
+
+
+if (fp==NULL)
+if (fp.fail())
+</code></pre>
+
+<p>写入文件两个的对应部分，当然读出的时候  ip &gt;&gt; temp;  v.push_back(temp);即可</p>
+
+<pre><code>fp &lt;&lt; orited[i] &lt;&lt; &quot; &quot;;//这里最好加上个空格，不然文件中连起来的数字也没意义
+fprintf(fp,&quot;%d &quot;,orited[i]);
+//关闭
+//  fclose(fp);
+    fp.close();
+</code></pre>
+
+<p>最终修改的标准c++测试文件如下</p>
+
+<pre><code>//============================================================================
+// Name        : sort.cpp
+// Author      : xia
+// Version     : 1.0
+// Copyright   : NUAA
+// Description : 各种排序算法的比较(冒泡，选择，快速，希尔，堆，归并以及algorithm的sort)
+//============================================================================
+#include 
+#include 
+#include 
+#include 
+#include 
+using namespace std;
+
+const int MAX = 1000;//当MAX为一百万，用数组会stack overflow,所以全部用vector
+vector orited;//全局原始未排序vector
+
+void randNum()
+{//产生随机数存于vector
+    ofstream fp(&quot;data.txt&quot;);
+    if (fp.fail())
+    {
+        cout &lt;&lt; &quot;open data error &quot; &lt;&lt; endl;
+        exit(EXIT_FAILURE);
+    }
+    srand((unsigned)time(NULL));
+    for (int i=0 ; i &amp;v ,int low ,int high)
+{//对vector进行划分，返回枢轴下标
+    int pivotkey;
+    pivotkey = v[low] ;
+    while ( low &lt; high )
+    {
+        while (low &lt; high &amp;&amp; v[high] &gt;= pivotkey)
+            high -- ;
+        v[low] = v[high];
+        while (low &lt; high &amp;&amp; v[low] &lt;= pivotkey )
+            low ++ ;
+        v[high] = v[low];   
+    }
+    v[low] = pivotkey ;
+    return low ;
+}
+void quickSort(vector &amp;number ,int left ,int right)
+{//用引用解决传参问题，以下类似
+    if ( left &lt; right )
+    {
+        int i = Partion(number , left, right) ; 
+        quickSort(number, left, i-1);   // 对左边进行递归 
+        quickSort(number, i+1, right);  // 对右边进行递归  
+    }
+}
+void quick_sort()
+{//快速排序测试程序
+    double start ,end ;
+    vector v(orited);//直接用全局orited初始化v
+    start = clock() ;
+    quickSort(v,0,MAX-1);
+    end = clock();
+    cout &lt;&lt; &quot;quick  sort cost : &quot; &lt;&lt; end - start &lt;&lt; endl;
+}
+/************************************************************************/
+/*      插入排序                                                        */
+/************************************************************************/
+void InsertSort(vector &amp;v)
+{ //对vector做插入排序
+    int i,j;
+    int key;
+    for(i=1 ; i &lt; v.size() ; i++)
+        if ( v[i] &lt; v[i-1] )// &quot; v(orited);
+    double start ,end;
+    start = clock();
+    InsertSort(v);
+    end = clock();
+    cout &lt;&lt; &quot;insert sort cost : &quot; &lt;&lt;  end - start &lt;&lt; endl;
+}
+/************************************************************************/
+/*     algorithm的sort方法                                              */
+/************************************************************************/
+void vector_sort()
+{
+    double start ,end ;
+    vector v(orited);
+    start = clock();
+    sort(v.begin(),v.end());
+    end = clock();
+    cout &lt;&lt; &quot;vector sort cost : &quot; &lt;&lt; end - start &lt;&lt; endl;
+}
+/************************************************************************/
+/*        冒泡排序                                                      */
+/************************************************************************/
+void bubble_sort()
+{
+    int i,j;
+    vector v(orited);
+    double start ,end;
+
+    start = clock();
+    for ( i=0 ; i&lt; MAX ; i++)
+    {
+        for (j=i+1 ; j&lt; MAX ; j++)
+        {
+            if (v[i] &gt; v[j])//最小的往左冒泡
+            {
+                swap(v[i],v[j]);
+            }
+        }
+    }
+    end = clock();
+    cout &lt;&lt; &quot;bubble sort cost : &quot; &lt;&lt;  end - start &lt;&lt; endl;
+}
+/************************************************************************/
+/*      选择排序                                                        */
+/************************************************************************/
+void select_sort()
+{
+    int i,j,min;
+    vector v(orited);
+    double start ,end;
+    start = clock();
+    for (i=0 ; i&lt; MAX ; i++)
+    {
+        min = i ;
+        for (j=i+1 ; j &amp;array,int start ,int mid ,int end)
+{//合并vector的start-mid和mid-end两段
+    int j,k,l;
+    vector temp(array); //引入temp，方便用array作为汇总
+    for( j=mid+1,k=start ; start&lt;=mid&amp;&amp;j&lt;=end ; k++ ) 
+    {
+        if ( temp[start] &lt; temp[j] )
+            array[k] = temp[start++];
+        else
+            array[k] = temp[j++];
+    }
+    if( start &lt;= mid )
+    {
+        for( l=0 ; l &lt;= mid-start ; l++)
+            array[k+l] = temp[start+l]; //将剩余0至min-start的复制到array
+    }
+    if( j &lt;= end )
+    {
+        for( l=0 ; l&lt;=end-j ; l++ )
+            array[k+l]= temp[j+l]; //复制j至end到array
+    }
+}
+void MergeSort( vector &amp;v, int low ,int high )
+{
+    if (low &lt; high)
+    {       
+        int mid = ( low + high )/2; //平分
+        MergeSort( v , low , mid ); //递归合并低段
+        MergeSort( v , mid+1 , high ); //递归合并高段
+        Merge( v , low , mid , high ) ; //合并排序后两段
+    }
+}
+//归并排序的测试函数
+void  merge_sort()
+{
+    vector v( orited );
+    double start ,end;
+    start = clock();
+    MergeSort(v,0,MAX-1);
+    end = clock();
+    cout &lt;&lt; &quot;merge  sort cost : &quot; &lt;&lt;  end - start &lt;&lt; endl;
+}
+/************************************************************************/
+/*      希尔排序                                                        */
+/************************************************************************/
+const int SORTCOUNT = 20;//希尔排序的排序次数
+const int dlta[SORTCOUNT] = {2,3,2,3,2,3,2,3,2,3,2,3,2,3,2,3,2,3,2,3};//增量数组
+void ShellInsert(vector &amp;v , int dk)
+{//对v做一趟shell插入排序，增量为dk，不是1；j&lt;=0时，找到插入位置
+    int i,j;
+    for ( i=dk ; i &lt; v.size() ; i++)
+    {
+        if (v[i] &lt; v[i-dk])
+        {
+            int temp = v[i];//暂存
+            for (j=i-dk ; j&gt;0 &amp;&amp; temp &lt; v[j] ; j -= dk)
+                v[j+dk] = v[j] ;//记录后移，查找插入位置 
+            v[j+dk] = temp; //插入
+        }
+    }
+}
+void ShellSort(vector &amp;v ,const int dlta[] ,int t)
+{//希尔排序
+    for (int k=0 ; k &lt; t ; k++)
+        ShellInsert(v,dlta[k]) ;//一趟增量为dlta[k]的插入排序
+}
+void shell_sort()
+{
+    vector v( orited );
+    double start ,end;
+    start = clock();
+    ShellSort(v,dlta,SORTCOUNT);
+    end = clock();
+    cout &lt;&lt; &quot;shell  sort cost : &quot; &lt;&lt;  end - start &lt;&lt; endl;  
+}
+/************************************************************************/
+/*       堆排序                                                         */
+/************************************************************************/
+void HeapAdjust(vector &amp;v ,int s ,int m)//将堆用数组表示，此处为vector
+{//调整为大顶堆
+    int rc,j;
+    rc = v[s];
+    for ( j=2*s ; j&lt;= m ; j *= 2 )
+    {//沿key较大的孩子结点向下筛选
+        if (j= v[j] )
+            break;// rc应插入在位置s上 
+        v[s] = v[j] ;
+        s = j;
+    }
+    v[s] = rc ; //插入
+}
+void HeapSort(vector &amp;v)
+{ // 对vector进行堆排序
+    int t , i;
+    for( i=v.size()/2 ; i&gt;0 ; i--) // 把v建成大顶堆
+        HeapAdjust( v,i,v.size()-1 );
+    for( i=v.size()-1 ; i&gt;0 ; i-- )
+    {//将堆顶记录和当前未经排序子序列[0..i]中最后一个记录相互交换
+        t = v[0];
+        v[0] = v[i];
+        v[i] = t ;
+        HeapAdjust(v,0,i-1); // 将v[0..i-1]重新调整为大顶堆 
+    }
+}
+//堆排序测试函数
+void heap_sort()
+{
+    vector v( orited );
+    double start ,end;
+    start = clock();
+    HeapSort(v);
+    end = clock();
+    cout &lt;&lt; &quot;heap   sort cost : &quot; &lt;&lt;  end - start &lt;&lt; endl;  
+}
+int main(int argc, char* argv[])
+{
+    randNum();    //每次更新MAX，重新生成随机数，存到vector
+    vector_sort();
+    quick_sort(); 
+    bubble_sort();
+    select_sort();
+    merge_sort(); 
+    shell_sort(); 
+    heap_sort();  
+    insert_sort();
+    return 0;
+}
+</code></pre>
+
+<p>关于sort()，这里 默认是按照升序排列的，如果想按照降序排列，可添加函数：</p>
+
+<pre><code>bool compare(int a ,int b)
+{
+    return a&gt;b;//a&gt;b降序 a ****
+</code></pre>
+
+<p>并调用时</p>
+
+<pre><code>    sort(v.begin(),v.end(),compare);
+</code></pre>
+
+<p>即可。</p>
+
+<p>在程序的main部分给出了部分测试结果，其中shell的不具有太大参考性，于是没列（用书的原话说，shell排序的分析是一个复杂的问题，因为时间是所取增量序列的函数，这涉及一些数学上尚未解决的问题），将排序结果保存在文件中观看，可以看到，shell的结果，不像快速排序似的能完全正确，概率问题。</p>
+
+<p>vc6测试结果如下：</p>
+
+<p>|</p>
+
+<p>Sort()</p>
+
+<p>|</p>
+
+<p>Quick</p>
+
+<p>|</p>
+
+<p>Bubble</p>
+
+<p>|</p>
+
+<p>Select</p>
+
+<p>|</p>
+
+<p>Merge</p>
+
+<p>|</p>
+
+<p>Shell</p>
+
+<p>|</p>
+
+<p>heap</p>
+
+<p>|</p>
+
+<p>insert</p>
+
+<p>&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;</p>
+
+<p>1k</p>
+
+<p>|</p>
+
+<p>0</p>
+
+<p>|</p>
+
+<p>1</p>
+
+<p>|</p>
+
+<p>78</p>
+
+<p>|</p>
+
+<p>35</p>
+
+<p>|</p>
+
+<p>107</p>
+
+<p>|</p>
+
+<p>14</p>
+
+<p>|</p>
+
+<p>2</p>
+
+<p>|</p>
+
+<p>21</p>
+
+<p>1w</p>
+
+<p>|</p>
+
+<p>2</p>
+
+<p>|</p>
+
+<p>12</p>
+
+<p>|</p>
+
+<p>4883</p>
+
+<p>|</p>
+
+<p>3099</p>
+
+<p>|</p>
+
+<p>7947</p>
+
+<p>|</p>
+
+<p>1135</p>
+
+<p>|</p>
+
+<p>34</p>
+
+<p>|</p>
+
+<p>2274</p>
+
+<p>10w</p>
+
+<p>|</p>
+
+<p>26</p>
+
+<p>|</p>
+
+<p>142</p>
+
+<p>|</p>
+
+<p>410630</p>
+
+<p>|</p>
+
+<p>385299</p>
+
+<p>|</p>
+
+<p>774607</p>
+
+<p>|</p>
+
+<p>108289</p>
+
+<p>|</p>
+
+<p>267</p>
+
+<p>|</p>
+
+<p>220359</p>
+
+<p>vs08下测试结果如下：(vs08 下，insert会有部分错误，所以未列出)</p>
+
+<p>|</p>
+
+<p>Sort()</p>
+
+<p>|</p>
+
+<p>Quick</p>
+
+<p>|</p>
+
+<p>Bubble</p>
+
+<p>|</p>
+
+<p>Select</p>
+
+<p>|</p>
+
+<p>Merge</p>
+
+<p>|</p>
+
+<p>Shell</p>
+
+<p>|</p>
+
+<p>heap</p>
+
+<p>&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;</p>
+
+<p>1k</p>
+
+<p>|</p>
+
+<p>26</p>
+
+<p>|</p>
+
+<p>2</p>
+
+<p>|</p>
+
+<p>193</p>
+
+<p>|</p>
+
+<p>291</p>
+
+<p>|</p>
+
+<p>15</p>
+
+<p>|</p>
+
+<p>90</p>
+
+<p>|</p>
+
+<p>8</p>
+
+<p>1w</p>
+
+<p>|</p>
+
+<p>302</p>
+
+<p>|</p>
+
+<p>29</p>
+
+<p>|</p>
+
+<p>12674</p>
+
+<p>|</p>
+
+<p>8203</p>
+
+<p>|</p>
+
+<p>216</p>
+
+<p>|</p>
+
+<p>3010</p>
+
+<p>|</p>
+
+<p>57</p>
+
+<p>10w</p>
+
+<p>|</p>
+
+<p>3624</p>
+
+<p>|</p>
+
+<p>378</p>
+
+<p>|</p>
+
+<p>1.02754e+006</p>
+
+<p>|</p>
+
+<p>804142</p>
+
+<p>|</p>
+
+<p>804142</p>
+
+<p>|</p>
+
+<p>804142</p>
+
+<p>|</p>
+
+<p>713</p>
+
+<p>gcc下测试结果：</p>
+
+<p>|</p>
+
+<p>Sort()</p>
+
+<p>|</p>
+
+<p>Quick</p>
+
+<p>|</p>
+
+<p>Bubble</p>
+
+<p>|</p>
+
+<p>Select</p>
+
+<p>|</p>
+
+<p>Merge</p>
+
+<p>|</p>
+
+<p>Shell</p>
+
+<p>|</p>
+
+<p>heap</p>
+
+<p>|</p>
+
+<p>insert</p>
+
+<p>&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;|&mdash;</p>
+
+<p>1k</p>
+
+<p>|</p>
+
+<p>0</p>
+
+<p>|</p>
+
+<p>0</p>
+
+<p>|</p>
+
+<p>9</p>
+
+<p>|</p>
+
+<p>3</p>
+
+<p>|</p>
+
+<p>1</p>
+
+<p>|</p>
+
+<p>2</p>
+
+<p>|</p>
+
+<p>1</p>
+
+<p>|</p>
+
+<p>2</p>
+
+<p>1w</p>
+
+<p>|</p>
+
+<p>2</p>
+
+<p>|</p>
+
+<p>3</p>
+
+<p>|</p>
+
+<p>725</p>
+
+<p>|</p>
+
+<p>452</p>
+
+<p>|</p>
+
+<p>81</p>
+
+<p>|</p>
+
+<p>170</p>
+
+<p>|</p>
+
+<p>4</p>
+
+<p>|</p>
+
+<p>294</p>
+
+<p>10w</p>
+
+<p>|</p>
+
+<p>29</p>
+
+<p>|</p>
+
+<p>27</p>
+
+<p>|</p>
+
+<p>55812</p>
+
+<p>|</p>
+
+<p>34269</p>
+
+<p>|</p>
+
+<p>4390</p>
+
+<p>|</p>
+
+<p>16272</p>
+
+<p>|</p>
+
+<p>45</p>
+
+<p>|</p>
+
+<p>28208</p>
+
+<p>统计结果当然是明显的，除了在vs08中，sort()的确不是一般的快啊（尤其是vc6下，压倒性优势），紧跟其后的是quicksort和heapsort。对于heapsort，这里的堆，直接用顺序表示了，也算省了不少时间。</p>
+
+<p>神奇的是vc6下的merge居然比冒泡还慢，没天理嘛，当然还好gcc这样一个标准的c++测试给了我们信心。</p>
+
+<p>刚统计完发现插入没做，补充上统计结果， 目前就算是这样吧，有什么不对的，请跟帖说明修改啊。</p>
+
+<p>后记：后来改用了双向冒泡，发现比原冒泡快了一倍多，比选择还略快（后来测试，起初的写法出错了，其实和单向冒泡速度是一样的）</p>
+
+<p>代码如下：</p>
+
+<pre><code>    for (i=0 ; i&lt; MAX ; i++)
+    {
+        k = MAX-i-1;
+        for (j=i+1 ; j&lt; k ; j++)//改用双向冒泡
+        {
+            if (v[j] &lt; v[i])
+            {
+                swap(&amp;v[i],&amp;v[j]);
+            }
+            if (v[MAX-j-1] &gt; v[k])
+            {
+                swap(v[MAX-j-1],v[k]);
+            }
+        }
+    }
+</code></pre>
+
+<p>运行时间结果马上更新</p>
+
+<p>本想把选择改为双向选择，min存低位，max存在高位，第二个循环j</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

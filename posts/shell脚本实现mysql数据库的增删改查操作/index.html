@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本实现mysql数据库的增删改查操作 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本实现mysql数据库的增删改查操作 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本实现mysql数据库的增删改查操作">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0mysql%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E5%A2%9E%E5%88%A0%E6%94%B9%E6%9F%A5%E6%93%8D%E4%BD%9C/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本实现mysql数据库的增删改查操作</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>一、shell脚本实现mysql操作</p>
+
+<p>通用的shell语句如下：</p>
+
+<pre><code>mysql -h${HOSTNAME}  -P${PORT}  -u${USERNAME} -p${PASSWORD} -e &quot;${sql}&quot; --default-character-set=UTF8 
+</code></pre>
+
+<p>1、HOSTNAME是主机名，通常是数据库的ip</p>
+
+<p>2、PORT是端口号</p>
+
+<p>3、USERNAME是用户名</p>
+
+<p>4、PASSWORD是密码</p>
+
+<p>5、通过写sql里面的语句可以执行相应的数据库操作，常用的是数据库的增删改查操作。</p>
+
+<p>6、default-character-set是编码方式</p>
+
+<p>我们通常也不会把数据库的连接信息直接写在程序中，而是写在配置文件中，如命名database.conf文件：</p>
+
+<pre><code># 数据库 服务IP 服务端口 数据库用户 数据库密码
+
+student 127.0.0.1 6614 root 1234
+</code></pre>
+
+<p>然后利用initDBinfo函数来获取数据库信息：</p>
+
+<pre><code>function initDBinfo(){
+
+HOSTNAME=`cat ${dbconfPath} | grep ${1} | awk '{print $2}'`
+PORT=`cat ${dbconfPath} | grep ${1} | awk '{print $3}'`
+USERNAME=`cat ${dbconfPath} | grep ${1} | awk '{print $4}'`
+PASSWORD=`cat ${dbconfPath} | grep ${1} | awk '{print $5}'`
+
+}
+</code></pre>
+
+<p>二、shell脚本实现数据库表的增删改查</p>
+
+<p>2.1 数据库表的新增记录</p>
+
+<pre><code>#这里是实现文件入库记录插入到数据表中
+#文件大小，以M为单位
+fileSize=`ls -l ${dataImportFile} | awk '{print int($5/1024)}'`
+#文件行数
+fileLineCount=`cat ${dataImportFile}|wc -l`
+#文件接收时间
+fileRecvTim=`stat ${dataImportFile}| grep Modify | awk '{print $2,$3}' | cut -d&quot;.&quot; -f1`
+#数据库名
+fileDBName=&quot;fileDB&quot;
+#表名
+fileTableName=&quot;file_recv_info&quot;
+#字段列表
+fileTableColumns=&quot;file_nam,file_size,file_line_ctn,file_recv_tim,file_hdl_rst&quot;
+#插入数据库操作
+insert_file_record_sql=&quot;insert into ${fileDBName}.${fileTableName} (${fileTableColumns}) values ('${fileName}',${fileSize},${fileLineCount},'${fileRecvTim}','${fileHdlRst}')&quot;
+</code></pre>
+
+<p>2.2 文件数据导入数据库</p>
+
+<pre><code>#文件数据导入数据表
+#dataImportFile表示导入文件名，IMPORTSTYLE表示导入方式，DBNAME表示数据库名，TABLENAME表示表名，
+#columnSplitSeparator表示列分隔符，常见为，或者|等；rowSplitSeparator为行分隔符
+import_data_sql=&quot;load data low_priority local infile '${dataImportFile}' ${IMPORTSTYLE} into table ${DBNAME}.${TABLENAME}
+ fields terminated by '${columnSplitSeparator}' lines terminated by '${rowSplitSeparator}'&quot;
+
+ #通常行分隔符为\n,linux中表示回车+换行符
+ rowSplitSeparator=&quot;\n&quot;
+</code></pre>
+
+<p>2.3 删除数据库表操作</p>
+
+<pre><code>#这里是删除时间在某个时间段内的记录，实现数据库表的定期清理功能
+#这里OTHERCONDITION可以在配置文件里面配置，添加额外的判断条件
+#limit是限制一次删除的记录条数
+clean_data_sql=&quot;delete from ${DBNAME}.${TABLENAME} where ${TIMECOLUMN} between \&quot;${CLEAN_START_TIME}\&quot; and \&quot;${CLEAN_END_TIME}\&quot; and ${OTHERCONDITION} limit ${CLEAN_NUM}&quot;
+</code></pre>
+
+<p>2.4 修改数据库表操作</p>
+
+<pre><code>#数据库更新操作，修改参数值
+update_param_sql=&quot;update ${DBNAME}.${TABLENAME} set param_val=\&quot;${paramVal}\&quot; where param_key=\&quot;${paramKey}\&quot; &quot;
+current_time=`date &quot;+%Y-%m-%d %T&quot;`
+echo &quot;${current_time} Start to update table ${DBNAME}.${TABLENAME} set paramVal equals ${paramVal}&quot; &gt;&gt; ${logFile}
+initDBinfo ${DBNAME}
+mysql -h${HOSTNAME}  -P${PORT}  -u${USERNAME} -p${PASSWORD} -Nse &quot;${update_param_sql}&quot; --default-character-set=UTF8; &gt;&gt; ${logFile} 2&gt;&amp;1
+</code></pre>
+
+<p>2.5 查询数据库表操作</p>
+
+<pre><code>#查询表中满足条件的记录条数
+count_data_sql=&quot;select count(1) from ${DBNAME}.${TABLENAME} where ${TIMECOLUMN} between \&quot;${CLEAN_START_TIME}\&quot; and \&quot;${CLEAN_END_TIME}\&quot; and ${OTHERCONDITION}&quot;
+</code></pre>
+
+<p>2.6 数据库表数据导出到文件操作</p>
+
+<pre><code>#sql语句
+export_data_sql=&quot;select concat(${COLUMN}) from ${DBNAME}.${TABLENAME}&quot;
+#数据导出开始日志打印
+current_time=`date &quot;+%Y-%m-%d %T&quot;`
+echo &quot;${current_time} Start to export data [${export_data_file_name}] from ${DBNAME}.${TABLENAME}&quot; &gt;&gt; ${logFile}
+#获取数据库连接信息
+initDBinfo ${DBNAME}
+#连接数据库并执行数据导出操作
+mysql -h${HOSTNAME}  -P${PORT}  -u${USERNAME} -p${PASSWORD} -Nse &quot;${export_data_sql}&quot; --default-character-set=UTF8 &gt; ${export_data_file_path}/${export_data_file_name}; &gt;&gt; ${logFile} 2&gt;&amp;1
+#数据导出结束日志打印
+current_time=`date &quot;+%Y-%m-%d %T&quot;`
+#echo &quot;${current_time} Finished export data [${export_data_file_name}] from ${DBNAME}.${TABLENAME}&quot; &gt;&gt; ${logFile}
+</code></pre>
+
+<p>其中数据库表信息也可以放在配置文件中</p>
+
+<pre><code>#导出文件名 数据库表 表名 是否分库分表 时间字段 表字段（导出数据以|分隔）
+A.txt test student N tim ref_id,&quot;|&quot;,IFNULL(stu_id,&quot;&quot;),&quot;|&quot;,IFNULL(nam,&quot;&quot;),&quot;|&quot;,IFNULL(age,&quot;&quot;),&quot;|&quot;,IFNULL(heigth,&quot;&quot;)
+
+#数据库名称
+DBNAME=`cat ${confPath} | grep ${dataExportFile} | awk '{print $2}'`
+#数据库中表的名称
+TABLENAME=`cat ${confPath} | grep ${dataExportFile} | awk '{print $3}'`
+#表是否分库分表：Y表示分库分表；N表示未分库分表; F表示未分库分表且全量导出
+ISSHARDTABLE=`cat ${confPath} | grep ${dataExportFile} | awk '{print $4}'`
+#时间字段
+TIMECOLUMN=`cat ${confPath} | grep ${dataExportFile} | awk '{print $5}'`
+#要导出的字段
+COLUMN=`cat ${confPath} | grep ${dataExportFile} | awk '{print $6}'`
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

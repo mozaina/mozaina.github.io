@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>小众之美Ruby在QA自动化中的应用 | 开发者问答集锦</title>
+    <meta property="og:title" content="小众之美Ruby在QA自动化中的应用 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="小众之美Ruby在QA自动化中的应用">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%B0%8F%E4%BC%97%E4%B9%8B%E7%BE%8Eruby%E5%9C%A8qa%E8%87%AA%E5%8A%A8%E5%8C%96%E4%B8%AD%E7%9A%84%E5%BA%94%E7%94%A8/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">小众之美Ruby在QA自动化中的应用</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="前言">前言</h1>
+
+<p>关于测试领域的自动化，已有很多的文章做过介绍，“黑科技”也比比皆是，如通过Java字节码技术实现接口的录制，Fiddler录制内容转Python脚本，App中的插桩调试等，可见角度不同，对最佳实践的理解也不一样。这里想要阐述的是，外卖（上海）QA团队应用相对“小众”的Ruby，在资源有限的条件下实现自动化测试的一些实践与经验分享。</p>
+
+<h1 id="背景">背景</h1>
+
+<p>加入外卖上海团队时，共2名QA同学，分别负责App与M站的功能测试，自动化测试停留在学习北京侧接口测试框架的阶段，实效上近乎为0，能力结构上在代码这部分是明显薄弱的。而摆在面前的问题是，回归测试的工作量较大，特别是M站渠道众多（4个渠道），移动端API的接口测试需区分多个版本，自动化测试的开展势在必行。在这样的条件下，如何快速且有效地搭建并推广自动化测试体系？在过去对自动化测试的多种尝试及实践的总结后，选择了Ruby。</p>
+
+<h1 id="why-ruby">Why Ruby？</h1>
+
+<p>简单点说就是：并不聪明的大脑加上“好逸恶劳”的思想，促使我在这些年的自动化测试实践中，不断寻找更合适的解决方案。所谓技术，其本质都是站在别人的肩膀上，肩膀的高度也决定了实现目标的快慢，而Ruby正符合所需的一些特征：</p>
+
+<ol>
+<li>效率。自身应该算是“纯粹”的测试人员，在“测试开发”这重职业并不普及的年代，一直希望有种语言可以让测试的开发效率超过研发，Ruby做到了；</li>
+<li>人性化的语法，各种糖。类似1.day.ago，简单的表达不需要解释；</li>
+<li>强大的元编程能力。基于此，DHH放弃了PHP而使用Ruby开发出了Rails，DSL也因此成为Ruby开发的框架中非常普通的特性，而这对于很多主流语言都是种奢望；</li>
+<li>对于测试来说足够充足的社区资源。不涉及科学计算，不涉及服务开发，在没有这些需求的情况下，Python和Java不再是必需。</li>
+</ol>
+
+<p>脱离了开发语言的平台，但在不关注白盒测试的情况下并无太多不妥。当Ruby用于测试开发，基本“屏蔽”了性能上的劣势，充分展现了敏捷、易用的特点，也是选择这一技术路线的主要因素。</p>
+
+<h1 id="接口自动化框架coral-api">接口自动化框架Coral-API</h1>
+
+<h2 id="框架思路">框架思路</h2>
+
+<p>接口自动化测试方案众多，个人认为它们都有自己的适用的范围和优缺点。UI类工具虽轻松实现无码Case，但在处理接口变动和全链路接口流程上多少会显得有些繁琐（尤其在支持数据驱动需求下），过多的规则、变量设置和编码也相差无几；录制类型的方案，更多还是适合回归，对于较全面的接口测试也需要一定的开发量。基于这些权衡考虑，采用一种编码尽可能少、应用面更广的接口自动化框架实现方式，把它命名为Coral-
+API，主要有以下特点：</p>
+
+<ol>
+<li><p>测试数据处理独立</p>
+
+<ul>
+<li>预先生成测试所需的最终数据，区分单接口测试数据（单接口数据驱动测试）与链路测试数据</li>
+<li>通过命令行形式的语句解决了参数的多层嵌套及动态数据生成的问题</li>
+<li>Excel中维护测试数据，最终转化为YML或存入DB，折中解决了JSON形式的数据难维护问题</li>
+</ul></li>
+
+<li><p>学习成本低</p>
+
+<ul>
+<li>框架提供生成通用结构代码的功能，使测试人员更关注于业务逻辑处理</li>
+<li>DSL的书写风格，即便没有Ruby的语言基础，也可以较快掌握基本的接口测试用例编写</li>
+</ul></li>
+
+<li><p>扩展性</p>
+
+<ul>
+<li>支持Java平台的扩展</li>
+<li>支持HTTP/RPC接口，可根据开发框架扩展</li>
+<li>框架基于Rspec，支持多种验证方式（Build-In Matcher），及支持自定义Matcher，目前实现了JSON去噪的Diff，各种复合的条件比较</li>
+</ul></li>
+</ol>
+
+<p>以单个接口测试编写为例，下图描述了具体流程：</p>
+
+<p>从图中可以看到，安装了Coral-API的gem后，可通过命令行 “coral g {apiname}”
+，通过模板来生成测试数据XLS及对应的数据处理文件（例如ApiOne.rb文件），修改并执行ApiOne.rb文件，则可以生成最终的测试数据（YML文件）及测试类和Case文件。如果开发框架支持（有途径可解析出参数），则可以通过脚本直接生成整个服务下所有接口的测试代码，实现自动化Case的同步开发。这种处理过程主要是一并解决了以下几个问题：</p>
+
+<ol>
+<li>复杂结构的测试数据构造</li>
+<li>动态参数的赋值</li>
+<li>测试数据的维护</li>
+<li>测试数据的加载</li>
+</ol>
+
+<p>假设有以下这样一个接口请求格式，包含一个orderInfo的子节点，及payInfo的list，还需要解决一些变化值的问题，如各种id和time（暂且称为动态字段）。一般框架中会以JSON格式来作为测试用例的请求格式，在代码中按变量处理动态字段值。JSON作为请求数据的保存形式，存在一个很大的问题，就是后期维护，尤其是Case数量较多的时候。因此，考虑仍以Excel为数据维护的初始形式（使用上更直观），通过Sheet的嵌套来处理复杂结构，也便于后期接口参数变动后的Case维护。</p>
+
+<pre><code>userId: E000001
+requestId: '1938670097'
+orderInfo:
+ orderId: '6778043386'
+ count: '2'
+ name: testgoods
+payInfo:
+- transactionId: '510455433082284'
+ payTime: '2017-04-04 13:03:34'
+ payType: BOC
+- transactionId: '167338836018587'
+ payTime: '2017-04-04 13:03:34'
+ payType: Wallet
+createTime: '2017-04-04 13:03:34'
+
+复制代码
+</code></pre>
+
+<p>测试数据的Excel做如下设计，Main中为第一层参数结构，预期响应另分一个Sheet，子节点和list节点的内容写在对应的Sheet中，动态值均置为空，在接口数据类中处理，orderInfo节点和payInfo节点均另写在新的Sheet中，用于单接口数据驱动的Case与链路回归用Case分开，当然这会增加一些Case维护的成本，可以选择是否区分。</p>
+
+<p>示例的数据结构，通过以下语句即可实现，如果需要为后续接口测试提供前置步骤的数据，也可以同步实现，下例中为后续接口生成了5条请求数据。针对接口参数变动的情况，可以修改Excel和数据处理类文件，执行一遍即可，也提供了批量重新生成所有接口数据的脚本。</p>
+
+<pre><code>class Demo &lt; ApiCaseBase
+
+  update self.request,:requestId=&gt;'gen_randcode(10)',:createTime=&gt;'get_datetime'
+  add_node self.request,&quot;orderInfo&quot;,:orderId=&gt;'gen_randcode(10)'
+  add_list self.request,&quot;payInfo&quot;,:transactionId=&gt;'gen_randcode(15)',:payTime=&gt;'get_datetime'
+
+  sheetData={'ForApiOther'=&gt;5}
+
+  generate_data self,sheetData do
+    update_force @data,:orderId=&gt;'gen_randcode(10)',:createTime=&gt;'get_datetime'
+    add_node_force @data,&quot;orderInfo&quot;,:orderId=&gt;'gen_randcode(10)'
+    add_list_force @data,&quot;payInfo&quot;,:transactionId=&gt;'gen_randcode(15)',:payTime=&gt;'get_datetime'
+  end
+end
+复制代码
+</code></pre>
+
+<p>Excel作为Case的维护形式，缺点是Case较多情况下频繁读取比较影响时间。在这种情况下，考虑到把数据序列化到YML中，启动执行时接口测试类自动与测试数据进行绑定。在Case中可以直接使用形如
+DemoTest.request[1]的请求数据，提高了速度，结构上也清晰了不少。</p>
+
+<p>接口测试类文件（HTTP接口调用为例）生成的模板如下，修改对应的接口信息即可，支持DB验证（代码块p这部分是目前唯一需要写Ruby代码的地方，当然这是非必需项）。</p>
+
+<pre><code>require 'apicasebase'
+
+class PreviewTest
+
+  include ApiTestBase
+
+  set_cookie
+
+  set_domain &quot;Domain_takeaway&quot;
+
+  set_port 80
+
+  set_path &quot;/waimai/ajax/wxwallet/Preview&quot;
+
+  set_method &quot;get&quot;
+
+  set_sql &quot;select * from table&quot;
+
+  p = proc do |dbres|
+    # do something
+    # return a hash
+  end
+
+  set_p p
+
+end
+复制代码
+</code></pre>
+
+<p>TestCase文件如下，原则上无需修改，只需要在测试数据的Excel中编写匹配规则及预期输出，基本上实现了单个接口无编码的数据驱动测试。</p>
+
+<pre><code>require 'Preview_validate'
+
+RSpec.shared_examples &quot;Preview Example&quot; do |key,requestData,expData|
+
+    it 'CaseNo'+ key.to_s + ': '+expData['memo'] do
+
+      response = PreviewTest.response_of(key)
+
+      expect(response).to eval(&quot;#{expData['matcher']} '#{expData['expection']}'&quot;)
+
+    end
+end
+
+RSpec.describe &quot;Preview接口测试&quot;,:project=&gt;'api_m_auto',:author=&gt;'Neil' do
+  PreviewTest.request.each{|key,parameter|include_examples &quot;Preview Example&quot;,key,PreviewTest.request[key],PreviewTest.expect[key]}
+end
+复制代码
+</code></pre>
+
+<p>接口流程Case编写就是各独立接口的业务逻辑串联，重点是Case的组织，把一些公用的Steps独立出shared_examples，在主流程的Case中include这些shared_examples即可，关联的上下游参数
+通过全局变量来传递。</p>
+
+<pre><code>RSpec.describe &quot;业务流程测试&quot; ,:project=&gt;'api_m_auto',:author =&gt;'Neil' do
+  let(:wm_b_client) { WmBClient.new('自配') }
+
+  before(:context) do
+    init_step
+  end
+
+  context &quot;在线支付-&gt;商家接单-&gt;确认收货-&gt;评价&quot; do
+    include_examples &quot;OrderAndPay Example&quot;,1
+    include_examples &quot;AcceptOrder Example&quot;
+    include_examples &quot;CommentStep Example&quot;
+  end  
+end
+复制代码
+</code></pre>
+
+<p>通过上面的介绍，可以看到，Case的编写大部分可以通过代码生成实现（熟悉以后部分接口也可以根据需要进行操作步骤的取舍，如直接编写YML）。实践下来的情况是，从各方面一无所有，17个人日左右的时间，完成了M站API层接口自动化（业务流程9个，单个接口10个）及点评外卖移动端API的接口自动化（业务流程9个，单个接口20个），实现了外卖业务全链路接口回归，平均每个业务流Case步骤9个左右。期间也培养了一名之前未接触过Ruby的同学，在完成了第一版开发后，两名初级阶段的同学逐步承担起了框架的改进工作，实现了更多有效的验证Matcher，并支持了移动端API多版本的测试。之后的回归测试不仅时间上缩减了50%以上，也通过接口自动化3次发现了问题，其中一次API不同版本导致的Bug充分体现了自动化测试的效率。通过ci_reporter，可以方便地将Rspec的报告格式转为JUnit的XML格式，在Jenkins中做对应的展示。</p>
+
+<h2 id="解决接口多版本测试的例子">解决接口多版本测试的例子</h2>
+
+<p>移动端API自动化中存在的问题就是，一个接口会存在多个版本并存的情况，有header中内容不同的，或formdata内容不同的情况，在接口回归中必须都要照顾到，在Coral-
+API中我们采用以下方式进行处理。</p>
+
+<p>在config.yml中定义各版本的header。</p>
+
+<pre><code>Domain_takeaway_header:
+    v926: '{&quot;connection&quot;:&quot;upgrade&quot;,&quot;x-forwarded-for&quot;:&quot;172.24.121.32, 203.76.219.234&quot;,&quot;mkunionid&quot;:&quot;-113876624192351423&quot;,&quot;pragma-apptype&quot;:&quot;com.dianping.ba.dpscope&quot;,&quot;mktunneltype&quot;:&quot;tcp&quot;,&quot;pragma-dpid&quot;:&quot;-113876624192351423&quot;,&quot;pragma-token&quot;:&quot;e7c10bf505535bfddeba94f5c050550adbd9855686816f58f0b5ca08eed6acc6&quot;,&quot;user-agent&quot;:&quot;MApi 1.1 (dpscope 9.4.0 appstore; iPhone 10.0.1 iPhone9,1; a0d0)&quot;,&quot;pragma-device&quot;:&quot;598f7d44120d0bf9eb7cf1d9774d3ac43faed266&quot;,&quot;pragma-os&quot;:&quot;MApi 1.1 (dpscope 9.2.6 appstore; iPhone 10.0.1 iPhone9,1; a0d0)&quot;,&quot;mkscheme&quot;:&quot;https&quot;,&quot;x-forwarded-for-port&quot;:&quot;60779&quot;,&quot;X-CAT-TRACE-MODE&quot;:&quot;true&quot;,&quot;network-type&quot;:&quot;wifi&quot;,&quot;x-real-ip&quot;:&quot;203.76.219.234&quot;,&quot;pragma-newtoken&quot;:&quot;e7c10bf505535bfddeba94f5c050550adbd9855686816f58f0b5ca08eed6acc6&quot;,&quot;pragma-appid&quot;:&quot;351091731&quot;,&quot;mkoriginhost&quot;:&quot;mobile.dianping.com&quot;,&quot;pragma-unionid&quot;:&quot;91d9c0e21aca4170bf97ab897e5151ae0000000000040786871&quot;}' 
+    v930: '{&quot;connection&quot;:&quot;upgrade&quot;,&quot;x-forwarded-for&quot;:&quot;172.24.121.32, 203.76.219.234&quot;,&quot;mkunionid&quot;:&quot;-113876624192351423&quot;,&quot;pragma-apptype&quot;:&quot;com.dianping.ba.dpscope&quot;,&quot;mktunneltype&quot;:&quot;tcp&quot;,&quot;pragma-dpid&quot;:&quot;-113876624192351423&quot;,&quot;pragma-token&quot;:&quot;e7c10bf505535bfddeba94f5c050550adbd9855686816f58f0b5ca08eed6acc6&quot;,&quot;user-agent&quot;:&quot;MApi 1.1 (dpscope 9.4.0 appstore; iPhone 10.0.1 iPhone9,1; a0d0)&quot;,&quot;pragma-device&quot;:&quot;598f7d44120d0bf9eb7cf1d9774d3ac43faed266&quot;,&quot;pragma-os&quot;:&quot;MApi 1.1 (dpscope 9.3.0 appstore; iPhone 10.0.1 iPhone9,1; a0d0)&quot;,&quot;mkscheme&quot;:&quot;https&quot;,&quot;x-forwarded-for-port&quot;:&quot;60779&quot;,&quot;X-CAT-TRACE-MODE&quot;:&quot;true&quot;,&quot;network-type&quot;:&quot;wifi&quot;,&quot;x-real-ip&quot;:&quot;203.76.219.234&quot;,&quot;pragma-newtoken&quot;:&quot;e7c10bf505535bfddeba94f5c050550adbd9855686816f58f0b5ca08eed6acc6&quot;,&quot;pragma-appid&quot;:&quot;351091731&quot;,&quot;mkoriginhost&quot;:&quot;mobile.dianping.com&quot;,&quot;pragma-unionid&quot;:&quot;91d9c0e21aca4170bf97ab897e5151ae0000000000040786871&quot;}'
+    ......
+复制代码
+</code></pre>
+
+<p>在接口测试类被加载时会进行全局变量赋值，同时替换header里对应节点的token，测试数据YML文件中则做这样的描述，每条数据的header则较方便地被替换。</p>
+
+<pre><code>---
+Main:
+  1: &amp;DEFAULT
+    headers: ''
+    host: mobile.51ping.com
+    port: '80'
+    path: &quot;/deliveryaddresslist.ta&quot;
+    search: &quot;?geotype=2&amp;actuallat=31.217329&amp;actuallng=121.415603&amp;initiallat=31.22167778439444&amp;initiallng=121.42671951083571&quot;
+    method: GET
+    query: '{&quot;geotype&quot;:&quot;2&quot;,&quot;actuallat&quot;:&quot;31.217329&quot;,&quot;actuallng&quot;:&quot;121.415603&quot;,&quot;initiallat&quot;:&quot;31.22167778439444&quot;,&quot;initiallng&quot;:&quot;121.42671951083571&quot;}'
+    formData: &quot;{}&quot;
+    scheme: 'http:'
+  2:
+    &lt;&lt;: class=&quot;hljs-symbol&quot;&gt;headers: ''
+  3:
+    &lt;&lt;: class=&quot;hljs-symbol&quot;&gt;headers: ''
+  4:
+    &lt;&lt;: class=&quot;hljs-symbol&quot;&gt;headers: ''
+  5:
+    &lt;&lt;: class=&quot;hljs-symbol&quot;&gt;headers: ''
+
+复制代码
+</code></pre>
+
+<h2 id="解决rpc接口测试">解决RPC接口测试</h2>
+
+<p>HTTP接口的测试框架选择面还是比较多的，RPC调用的框架如何测试呢？答案就是JRuby +
+Java的反射调用，在Pigeon接口中我们已经试点了这种方式，证明是可行的，针对不同的RPC框架实现不同的Adapter（Jar文件），Coral-
+API传参（JSON格式）给Adapter，Adapter通过解析参数进行反射调用，这样对于框架来说无需改动，只需对部分文件模板稍作调整，也无需在Ruby中混写Java代码，实现了最少的代码量—2行。</p>
+
+<h1 id="ui自动化框架coral-app">UI自动化框架Coral-APP</h1>
+
+<h2 id="框架思想">框架思想</h2>
+
+<p>App的UI自动化，Ruby的简便性更明显，尤其Appium提供了对Ruby良好的支持，各种UI框架的优劣就不在此赘述了。综合比较了Appium与Calabash后，选择了前者，测试框架选用了更适合业务流描述的Cucumber，沿用了以前在Web自动化中使用的对象库概念，将页面元素存储在CSV中，包括了Android与iOS的页面对象描述，满足不同系统平台的测试需要。在针对微信M站的UI自动化方案中，还需解决微信WebView的切换，及多窗口的切换问题，appium_lib都提供了较好的支持，下面介绍下结合了Appium及Cucumber的自动化框架Coral-
+APP。</p>
+
+<p>框架结构如下图：</p>
+
+<p>step_definitions目录下为步骤实现，public_step.rb定义了一些公共步骤，比如微信测试需要用到的上下文切换，Webview里的页面切换功能，也可以通过support目录下的global_method.rb里新增的Kernel中的方法来实现。<br />
+support/native目录下为app测试的配置文件，support/web目录下为h5测试的配置文件。 support/env.rb
+为启动文件，主要步骤如下：</p>
+
+<pre><code>$caps = Appium.load_appium_txt file: File.expand_path('../app/appium.txt', __FILE__), verbose: true
+
+$caps[:caps].store(&quot;chromeOptions&quot;,{&quot;androidProcess&quot;:&quot;com.tencent.mm:tools&quot;})
+
+$driver = Appium::Driver.new($caps,true)
+
+Elements.generate_all_objects
+
+Before{$driver.start_driver}
+
+After{$driver.quit_driver}
+复制代码
+</code></pre>
+
+<p>support/elements下为对象库CSV文件，内容如下图：</p>
+
+<p>support/elements.rb为对象库实现，将CSV中的描述转换为Elements模块中对象的功能，这样在Page中就可以直接使用类似“Elements.微信我”
+这样的对象描述了。</p>
+
+<pre><code>......
+
+def self.define_ui_object(element)
+  case $caps[:caps][:platformName].downcase
+    when &quot;android&quot;
+      idempotently_define_singleton_method(element[&quot;OBJNAME&quot;]){$driver.find_element(:&quot;#{element[&quot;ATTRIBUTE&quot;]}&quot;,&quot;#{element[&quot;ANDROID_IDENTITY&quot;]}&quot;)}
+    else
+      idempotently_define_singleton_method(element[&quot;OBJNAME&quot;]){$driver.find_element(:&quot;#{element[&quot;ATTRIBUTE&quot;]}&quot;,&quot;#{element[&quot;IOS_IDENTITY&quot;]}&quot;)}
+  end
+end
+
+......
+复制代码
+</code></pre>
+
+<p>support/pages为Page层，实现了每个页面下的操作，目前把它实现为Kernel中的方法，采用中文命名，便于阅读使用。</p>
+
+<pre><code>module Kernel
+  def 点击我
+    Elements.微信我.click
+  end
+
+  def 点击收藏按钮
+    Elements.微信收藏.click
+  end
+
+  def 点击收藏项
+    Elements.微信收藏链接.click
+  end
+
+  def 点击收藏中的美团外卖链接
+    Elements.微信收藏链接URL.click
+  end
+end
+复制代码
+</code></pre>
+
+<p>step里的步骤我们可以这样写，封装好足够的公共步骤或方法，Case的编写就是这么简单。</p>
+
+<pre><code>When /^进入美团外卖M站首页$/ do
+
+  点击我
+
+  点击收藏按钮
+
+  点击收藏项
+
+  点击收藏中的美团外卖链接
+
+  等待 5
+
+  step &quot;切换到微信Webview&quot;
+
+  等待 15
+
+  step &quot;切换到美团外卖window&quot;
+
+end
+复制代码
+</code></pre>
+
+<p>最终Feature内容如下：</p>
+
+<pre><code>Feature: 回归下单主流程
+  打开微信-&gt;进入首页-&gt;定位-&gt;进入自动化商户-&gt;下单-&gt;支付-&gt;订单详情
+  Scenario:
+    When 进入美团外卖M站首页
+复制代码
+</code></pre>
+
+<p>相对于其他的UI测试框架，使用接近自然语言的描述，提高了Case可读性，编写上也没有其他框架那么复杂。当然UI自动化中还是有一些小难点的，尤其是Hybrid应用，Appium目前还存在些对使用影响不大的Bug，在框架试用完成的情况下，将在微信入口体验优化项目结束后的进一步使用中去总结与完善。</p>
+
+<h1 id="质量工作的自动化">质量工作的自动化</h1>
+
+<p>都知道在美团点评，QA还担负着质量控制的工作，当功能+自动化+性能+其他测试工作于一身，而且是1:8的测试开发比下，如何去关注质量的改进？答案只有：工具化、自动化。开发这样一个小系统，技术方案选择上考虑主要是效率和学习成本，符合敏捷开发的特点，基于这些因素，应用了被称为“Web开发的最佳实践”的Rails框架。</p>
+
+<p>Rails的设计有些颠覆传统的编程理念，CRUD的实现上不用说了，一行命令即可，数据库层的操作，通过migration搞定，在Mail，Job等功能的实现上也非常方便，框架都有对应的模块，并且提供了大量的组件，Session、Cookie、安全密码、邮件地址校验都有对应的gem，感觉不像是在写代码，更像是在配置项目，不知不觉，一个系统雏形就完成了，整理了下项目中使用到的gem，主要有以下这些。</p>
+
+<p>前端相关：</p>
+
+<ol>
+<li>bootstrap-sass Bootstrap框架</li>
+<li>jquery-rails jQuery框架</li>
+<li>simple_form 优化的form组件</li>
+<li>chartkick 堪称一行代码即可的图表组件</li>
+<li>hightchart 图表组件</li>
+</ol>
+
+<p>后端相关:</p>
+
+<ol>
+<li>validates_email_format_of 邮件地址校验</li>
+<li>has_secure_password 安全密码组件</li>
+<li>mysql2 MySQL连接组件</li>
+<li>cancancan 权限管理组件</li>
+<li>sidekiq 队列中间件</li>
+<li>sidekiq-cron 定时Job组件</li>
+<li>rest-client Http And Rest Client For Ruby</li>
+<li>will_paginate 分页组件</li>
+</ol>
+
+<p>从搭建开发环境、写Demo，自己做产品、开发、测试、搭建生产环境、部署，边参阅文档边实现，总共18个人日左右，实现了平台基础功能、线上故障问题的管理及通知、测试报告的管理及通知、Sonar数据的抽取（Job及邮件）、Bug数据的抽取（Job）、自动化测试项目的接入、质量数据的Dashboard各类数据图表展示等功能，以下为系统功能的两个示例:</p>
+
+<p>后台管理界面</p>
+
+<p>线下缺陷周趋势</p>
+
+<p>应用Rails，团队较快进入了可以通过数据进行质量分析的初级阶段，当然还有很长的路要走，在从0到1的这个过程中，还是较多地体会到了敏捷开发的特性，也充分感受到了DRY理念。</p>
+
+<h1 id="总结">总结</h1>
+
+<p>以上为半年左右时间内，外卖上海QA团队在自动化工作上的一些实践，总的来说，达到一定预期效果，整理这篇文章分享一些心得。所谓的主流与小众并非绝对，主要从几个方面衡量：</p>
+
+<ol>
+<li>应用领域。Ruby因为性能问题，始终不太主流，但并不意味着它一无是处，用在测试领域，开发效率、DSL的友好性、语言的粘合性、使用者的学习低成本，都能发挥很大的优势。</li>
+<li>使用群体。不同的使用群体对于技能掌握的要求也是不同的，能达到同样效果甚至超过预期则就可以选择哪怕“小众”的方案。</li>
+<li>环境背景。其实有很多初创公司选择Ruby作为初期的技术栈有一定的道理，而这与我们当初的情景有相似之处，实际效果也体现了语言的特性。</li>
+</ol>
+
+<p>当然应用“小众”技术，必然要面对不少挑战：如何迅速培养能掌握相关技术的同学，与其他语言平台的衔接问题，面对团队的质疑等。尤其Ruby属于易学难精的那种，从脚本语言应用层次上升到动态语言设计层次还是需要一定的学习曲线的，也就是说对于使用者来说是简单的，对于设计者的能力要求较高，就像流传的Ruby程序员的进阶过程就是魔法师的养成史。</p>
+
+<p>正因为有特色的技术，才值得去研究和学习，就像它的设计者所说，目的就是为了让开发人员觉得编程是件快乐的事情。做了这么些年的测试，还能够不停止写代码的脚步，也是因为几年前开始接触Ruby。不论将来是否成为主流，它仍然是测试领域工具语言的不错选择，不管以后会出现什么样的技术，选型的标准也不会改变。技术的世界没有主流与小众，只有理解正确与否，应用得当与否。</p>
+
+<p><strong>写在最后</strong></p>
+
+<p>美团外卖上海研发中心长期招聘前端、客户端、后端、QA及数据、算法相关的工程师，欢迎有兴趣的同学发送简历到huangzhuolin02@meituan.com。
+<strong>如果对我们团队感兴趣，可以关注我们的专栏。</strong></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

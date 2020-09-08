@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell中while循环的陷阱 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell中while循环的陷阱 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell中while循环的陷阱">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E4%B8%ADwhile%E5%BE%AA%E7%8E%AF%E7%9A%84%E9%99%B7%E9%98%B1/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell中while循环的陷阱</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>**bash &amp;shell系列文章： <strong><a href="http://www.cnblogs.com/f-ck-need-u/p/7048359.html">http://www.cnblogs.com/f-ck-need-u/p/7048359.html</a></strong>**</p>
+
+<hr />
+
+<p>在写while循环的时候，发现了一个问题，在while循环内部对变量赋值、定义变量、数组定义等等环境，在循环外面失效。</p>
+
+<p>一个简单的测试脚本如下：</p>
+
+<pre><code>#!/bin/bash
+echo &quot;abc xyz&quot; | while read line
+do
+    new_var=$line
+done
+echo new_var is null: $new_var?
+</code></pre>
+
+<p>执行结果证明，$new_var的结果是空值。</p>
+
+<p>问题出在管道上。先看看下面的内容。</p>
+
+<p>while循环的写法有好几种，它的语法结构为：</p>
+
+<blockquote>
+<p>while test_cmd_list; do cmd_list; done</p>
+</blockquote>
+
+<p>但更经常地，while循环更多地用于读取标准输入的内容来实现循环。有以下几种写法：</p>
+
+<p>写法一：使用管道传递内容，这是用的最多、但却最烂的写法</p>
+
+<blockquote>
+<p>echo &ldquo;abc xyz&rdquo; | while read line</p>
+
+<p>do</p>
+
+<p>&hellip;</p>
+
+<p>done</p>
+</blockquote>
+
+<p>写法二：</p>
+
+<blockquote>
+<p>while read line</p>
+
+<p>do</p>
+
+<p>&hellip;</p>
+
+<p>done &lt;&lt;&lt; &ldquo;abc xyz&rdquo;</p>
+</blockquote>
+
+<p>写法三：从文件中读取内容</p>
+
+<blockquote>
+<p>while read line</p>
+
+<p>do</p>
+
+<p>&hellip;</p>
+
+<p>done</p>
+</blockquote>
+
+<p>方法四：采用进程替换</p>
+
+<blockquote>
+<p>while read var</p>
+
+<p>do</p>
+
+<p>&hellip;</p>
+
+<p>done &lt;</p>
+</blockquote>
+
+<p>方法五：改变标准输入</p>
+
+<blockquote>
+<p>exec</p>
+
+<p>while read var</p>
+
+<p>do</p>
+
+<p>&hellip;</p>
+
+<p>done</p>
+</blockquote>
+
+<p><strong>尽管写法有多种，但它们并不等价。</strong></p>
+
+<p><strong>陷阱一：</strong></p>
+
+<p><strong>方法一中使用的是管道符号，这使得while语句在子shell中执行，这意味着while语句内部设置的变量、数组、函数等在循环外部都不再生效。</strong>
+这正是文章开头所说的陷阱。更简单的：echo haha |
+a=5，在命令执行结束后，变量a的值也不再是5。其余4种写法，while语句都不在子shell中执行，因此都不会出现文章开头所说的问题。</p>
+
+<p>例如，使用写法二的here string代替写法一：</p>
+
+<pre><code>#!/bin/bash
+while read line
+do
+    new_var=$line
+done &lt;&lt;&lt; &quot;abc xyz&quot;
+echo new_var is null: $new_var?
+</code></pre>
+
+<p>或者使用写法四的进程替换：</p>
+
+<pre><code>#!/bin/bash
+while read line
+do
+    new_var=$line
+done &lt; 
+</code></pre>
+
+<p><strong>陷阱二：</strong></p>
+
+<p>关于这几种while循环的写法，还有一点要注意：写法一和写法四传递数据的源都是一个单独的进程，它们传递的数据一被while循环读取，所有数据就丢弃了，而以实体文件作为重定向传递的数据，while读取了之后并不会丢弃。更标准一些的说法是，当标准输入是非实体文件时(如管道传递的、独立进程产生的)只供一次读取；当标准输入是直接重定向实体文件时，可供多次读取，但只要某一次读取了该文件的全部内容就无法再提供读取。</p>
+
+<p>举个例子，老师让我们听写10个单词，而我记忆力比较烂，他念完10个单词时我可能只写出了3个，剩余的7个因为记不住就没法再写出来。但如果我有小抄，我就可以慢悠悠的一个一个写，写了一个还可以等一段时间再写第二个，但当我写完10个之后，小抄这种东西就应该销毁掉。</p>
+
+<p>回到IO重定向上，
+<strong>无论什么数据资源，只要被读取完毕或者主动丢弃，那么该资源就不可再得。①对于独立进程传递的数据(管道左侧进程产生的数据、进程替换产生的数据)，它们都是&rdquo;虚拟&rdquo;数据，要不被一次读取完毕，要不读一部分剩余的丢弃，这是真正的一次性资源。②而实体文件重定向传递的数据，只要不是一次性被全部读取，它就是可再得资源，直到该文件数据全部读取结束，这是&rdquo;伪&rdquo;一次性资源。其实①是进程间通信时数据传递的现象，只不过这个问题容易被人忽略。</strong></p>
+
+<p>大多数时候，独立进程传递的数据和文件直接传递的数据并没有什么区别，但有些命令可以 <strong>标记当前读取到哪个位置</strong>
+，使得下次该命令的读取动作可以从标记位置处恢复并继续读取，特别是这些命令用在循环中时。据我到目前的总结，这样的命令有&rdquo;head -n N&rdquo;和&rdquo;grep
+-m&rdquo;，经测试，tail并没有位置标记的功能。</p>
+
+<p>说了这么多，现在终于开始验证。下面的循环中，本该head每次读取2行，但实际执行结果中总共就只读取了一次2行。</p>
+
+<pre><code>[root@xuexi ~]# i=0
+[root@xuexi ~]# cat /etc/fstab | while head -n 2 ; [[ &quot;$i&quot; -le 3 ]];do echo $i;let ++i;done     
+
+#
+0
+1
+2
+3
+</code></pre>
+
+<p>使用进程替换的结果是一样的。</p>
+
+<pre><code>[root@xuexi ~]# i=0
+[root@xuexi ~]# while head -n 2; [[ &quot;$i&quot; -le 3 ]];do echo $i;let ++i;done &lt; cat /etc/fstab)
+
+#
+0
+1
+2
+3
+</code></pre>
+
+<p>但如果是直接将实体文件进行重定向传递给head，则结果和上面的不一样。</p>
+
+<pre><code>[root@xuexi ~]# i=0;while head -n 2 ; [[ &quot;$i&quot; -le 3 ]];do echo $i;let ++i;done &lt; /etc/fstab
+
+#
+0
+# /etc/fstab
+# Created by anaconda on Thu May 11 04:17:44 2017
+1
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+2
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+3
+UUID=b2a70faf-aea4-4d8e-8be8-c7109ac9c8b8 /                       xfs     defaults        0 0
+UUID=367d6a77-033b-4037-bbcb-416705ead095 /boot                   xfs     defaults        0 0
+</code></pre>
+
+<p>可以看到结果中每次读取两行并echo一次&rdquo;$i&rdquo;，而且每次读取的两行是不同的，后一次读取的两行是从前一次读取结束的地方开始的，这是因为head有&rdquo;读取到指定行数后做上位置标记&rdquo;的功能。</p>
+
+<p>要确定命令、工具是否具有做位置标记的能力，只需像下面例子一样做个简单的测试。以head和sed为例，即使sed的&rdquo;q&rdquo;命令能让sed匹配到内容就退出，但却不做位置标记，而且数据资源使用一次就丢弃。</p>
+
+<pre><code>[root@xuexi ~]# (head -n 2;head -n 2) fstab 
+
+#
+# /etc/fstab
+# Created by anaconda on Thu May 11 04:17:44 2017
+
+
+[root@xuexi ~]# (sed -n /default/'{p;q}' ;sed -n /default/'{p;q}') fstab     
+UUID=b2a70faf-aea4-4d8e-8be8-c7109ac9c8b8 /                       xfs     defaults        0 0
+</code></pre>
+
+<p>其实在实际应用过程中，这根本就不是个问题，因为搜索和处理文本数据的工具虽然不少，但绝大多数都是用一次文本就&rdquo;丢&rdquo;一次，几乎不可能因此而产生问题。之所以说这么多废话，主要是想说上面的5种while写法中，使用最广泛的写法一虽然最简单、方便，但其实是最烂的一种。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

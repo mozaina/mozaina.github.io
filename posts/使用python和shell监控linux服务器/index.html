@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用python和shell监控linux服务器 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用python和shell监控linux服务器 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用python和shell监控linux服务器">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8python%E5%92%8Cshell%E7%9B%91%E6%8E%A7linux%E6%9C%8D%E5%8A%A1%E5%99%A8/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用python和shell监控linux服务器</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>github欢迎各位大神一起探讨学习~</p>
+
+<h2 id="1-shell监控负载">1、 shell监控负载</h2>
+
+<p>监控原理：使用uptime来获取负载的信息，然后通过字符串截取的方式来获取load值来获取单个核心的负载，在将负载与阈值比较确定是否报警。</p>
+
+<p>loard_monitor.sh脚本：</p>
+
+<pre><code>#!/bin/bash
+#使用uptime命令监控linux系统负载变化
+
+#提取本服务器的IP地址信息
+IP=`ifconfig eth0 | grep &quot;inet addr&quot; | cut -f 2 -d &quot;:&quot; | cut -f 1 -d &quot; &quot;`
+
+#抓取cpu的总核数
+cpu_num=`grep -c 'model name' /proc/cpuinfo`
+
+#抓取当前系统15分钟的平均负载值
+load_15=`uptime | awk '{print $NF}'`
+
+#计算当前系统单个核心15分钟的平均负载值，结果小于1.0时前面个位数补0。
+average_load=`echo &quot;scale=2;a=$load_15/$cpu_num;if(length(a)==scale(a)) print 0;print a&quot; | bc`
+
+#取上面平均负载值的个位整数
+average_int=`echo $average_load | cut -f 1 -d &quot;.&quot;`
+
+
+#当单个核心15分钟的平均负载值大于等于1.0（即个位整数大于0） ，直接发邮件告警
+if (($average_int &gt; 0)); then
+      python  /opt/monitor/monitor.py &quot;服务器15分钟的系统单个核心平均负载为$average_load，超过警戒值1.0，请立即处理！！！&quot;
+
+fi
+</code></pre>
+
+<h2 id="2-python监控-并邮件报警-同时记录jvm等相关参数">2、python监控，并邮件报警，同时记录JVM等相关参数</h2>
+
+<p>原理：使用crontab定时任务来执行python脚本，在脚本中来调用shell命令或jvm命令获取信息，最终使用python发送监控邮件。</p>
+
+<p>monitor.py</p>
+
+<pre><code>#!/usr/bin/env Python
+# coding=utf-8
+&quot;&quot;&quot;
+配合crontab来定时的读取服务器的部分信息
+1、top信息
+2、JVM实例信息
+3、GC信息
+组装成html发送邮件
+&quot;&quot;&quot;
+
+import smtplib
+import os
+import socket
+import fcntl
+import struct
+import time
+import sys
+from email.mime.text import MIMEText
+
+# 获取本机ip和名称
+def get_ip_address(ifname):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', ifname[:15])
+    )[20:24])
+
+
+# 邮件发动方法
+def send_mail(to_list, sub, content):  # to_list：收件人；sub：主题；content：邮件内容
+    me = mail_title + &quot; + mail_user + &quot;@&quot; + mail_postfix + &quot;&gt;&quot;  # 这里的hello可以任意设置，收到信后，将按照设置显示
+    msg = MIMEText(content, _subtype='html', _charset='utf-8')  # 创建一个实例，这里设置为html格式邮件
+    msg['Subject'] = sub  # 设置主题
+    msg['From'] = me
+    msg['To'] = &quot;;&quot;.join(to_list)
+    try:
+        s = smtplib.SMTP()
+        s.connect(mail_host)  # 连接smtp服务器
+        s.login(mail_user, mail_pass)  # 登陆服务器
+        s.sendmail(me, to_list, msg.as_string())  # 发送邮件
+        s.close()
+        return True
+    except Exception, e:
+        print str(e)
+        return False
+
+
+# 根据shell命令返回一个list 文本
+def get_text_sh(bash_sh):
+    result = os.popen(bash_sh).read()
+    return result.split(&quot;\n&quot;)
+
+
+# top信息的获取
+bash_top = &quot;top -bn 1 | head -5 &quot;
+top_arr_txt = get_text_sh(bash_top)
+# 服务器的JVM的pid 并去掉空格
+bash_pid = &quot;/usr/local/java/bin/jps | grep 'Bootstrap' | awk '{print $1}'&quot;
+jvm_pid = os.popen(bash_pid).read().strip()
+
+# 获取JVM中存活得对象
+bash_jmap = &quot;/usr/local/java/bin/jmap -histo:live &quot; + jvm_pid + &quot; | head -13 &quot;
+jvm_instance_arr = get_text_sh(bash_jmap)
+
+# JVM堆信息
+bash_jmap_heap = &quot;/usr/local/java/bin/jmap -heap &quot; + jvm_pid
+jvm_heap_arr = get_text_sh(bash_jmap_heap)
+
+# gc统计，采样时间间隔为250ms，采样数为4
+bash_gc = &quot;/usr/local/java/bin/jstat -gc &quot; + jvm_pid + &quot; 250 4 &quot;
+jvm_gc_arr = get_text_sh(bash_gc)
+
+# JVM线程快照
+bash_jvm_thread = &quot;jstack -l &quot; + jvm_pid
+jvm_thread_arr = get_text_sh(bash_jvm_thread)
+
+# 获取本机名称和IP
+server_name = socket.getfqdn(socket.gethostname())
+# 内网IP
+inner_ip = get_ip_address(&quot;lo&quot;)
+# 公网IP
+out_ip = get_ip_address(&quot;eth0&quot;)
+
+# 邮件接收者
+mailto_list = [&quot;yourname@company.com&quot;]
+# 设置服务器
+mail_host = &quot;smtp.xxx.com&quot;
+# 用户名
+mail_user = &quot;server_monitor&quot;
+# 动态客户端口令
+mail_pass = &quot;#######&quot;
+# 发件箱的后缀
+mail_postfix = &quot;163.com&quot;
+# 标题名称
+mail_title = &quot;ServerMonitor&quot;
+# 标题时间
+mail_time = time.strftime(&quot;%Y-%m-%d %X&quot;, time.localtime(time.time()))
+# 邮件主题
+mail_sub = &quot;【监控邮件】服务器(&quot; + server_name + &quot;)--IP(&quot; + out_ip + &quot;)--时间(&quot; + mail_time + &quot;)&quot;
+# 目录导航
+mail_catalog = &quot;
+
+&quot;
+ \
+               &quot;
+* 服务器top信息
+&quot; \
+               &quot;
+* JVM存活实例
+&quot; \
+               &quot;
+* GC情况
+&quot; \
+               &quot;
+* JVM堆信息
+&quot; \
+               &quot;
+* JVM线程快照及锁
+&quot; \
+               &quot;&quot;
+# 报警内容
+mail_context = &quot;
+
+## &quot;
+
+ + sys.argv[1] + &quot;&quot;
+# 邮件正文
+mail_context += mail_catalog + &quot;
+
+### 服务器top信息:
+
+* * *
+
+&quot;
+
+# 处理top信息
+for line in top_arr_txt:
+    mail_context += &quot;
+
+
+&quot;
+</code></pre>
+
+<p>+ line + &ldquo;`</p>
+
+<p>&rdquo; mail_context += &ldquo;</p>
+
+<h3 id="jvm存活实例10">JVM存活实例10:</h3>
+
+<hr />
+
+<p>&rdquo; # 处理jvm,并将标签退换掉 for line in jvm_instance_arr: # 并將标签符号替换成html的符号
+mail_context += &ldquo;</p>
+
+<pre><code>&quot;
+</code></pre>
+
+<ul>
+<li>line.replace(&ldquo;, &ldquo;&lt;&ldquo;).replace(&rdquo;&gt;&ldquo;, &ldquo;&gt;&rdquo;) + &ldquo;&rdquo; mail_context += &ldquo;</li>
+</ul>
+
+<h3 id="gc情况-采样时间间隔为250ms-采样数为4">GC情况 采样时间间隔为250ms，采样数为4:</h3>
+
+<hr />
+
+<p>&rdquo; # 处理gc信息 for line in jvm_gc_arr: # 并將标签符号替换成html的符号 mail_context += &ldquo;</p>
+
+<pre><code>&quot;
+</code></pre>
+
+<ul>
+<li>line + &ldquo;&rdquo; mail_context += &ldquo;</li>
+</ul>
+
+<h3 id="jvm堆信息">JVM堆信息:</h3>
+
+<hr />
+
+<p>&rdquo; # 处理heap信息 for line in jvm_heap_arr: # 并將标签符号替换成html的符号 mail_context += &ldquo;</p>
+
+<pre><code>&quot;
+</code></pre>
+
+<ul>
+<li>line + &ldquo;&rdquo; mail_context += &ldquo;</li>
+</ul>
+
+<h3 id="jvm线程快照及锁情况">JVM线程快照及锁情况:</h3>
+
+<hr />
+
+<p>&rdquo; # 处理JVM线程快照及锁情况 for line in jvm_thread_arr: # 并將标签符号替换成html的符号 mail_context
++= &ldquo;</p>
+
+<pre><code>&quot;
+</code></pre>
+
+<ul>
+<li><p>line + &ldquo;&rdquo; mail_context += &ldquo;</p>
+
+<p>线程快照过大，暂时未提供显示，如有需要请联系<a href="yourname">your</a></p></li>
+</ul>
+
+<p>&rdquo; # 入口 if <strong>name</strong> == &lsquo;<strong>main</strong>&lsquo;: if send_mail(mailto_list, mail_sub,
+mail_context): print &ldquo;发送成功&rdquo; else: print &ldquo;发送失败&rdquo;</p>
+
+<h2 id="3-crontab定时任务">3、crontab定时任务</h2>
+
+<pre><code>#开始设置定时任务
+crontab -e
+#15分钟执行一次
+0,15,30,45  * * * * python  /opt/monitor/monitor.py 2&gt;&amp;1
+#查看任务
+crontab -l
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

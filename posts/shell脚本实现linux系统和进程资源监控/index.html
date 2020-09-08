@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本实现Linux系统和进程资源监控 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本实现Linux系统和进程资源监控 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本实现Linux系统和进程资源监控">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0linux%E7%B3%BB%E7%BB%9F%E5%92%8C%E8%BF%9B%E7%A8%8B%E8%B5%84%E6%BA%90%E7%9B%91%E6%8E%A7/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本实现Linux系统和进程资源监控</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>在服务器运维过程中，经常需要对服务器的各种资源进行监控，例如：CPU的负载监控，磁盘的使用率监控，进程数目监控等等，以在系统出现异常时及时报警，通知系统管理员。本文介绍在Linux系统下几种常见的监控需求及其shell脚本的编写。</p>
+
+<p>文章目录：</p>
+
+<p>1.Linux使用 Shell 检查进程是否存在<br />
+2.Linux使用 Shell检测进程 CPU 利用率<br />
+3.Linux使用 Shell检测进程内存使用量<br />
+4.Linux使用 Shell检测进程句柄使用量<br />
+5.Linux使用 Shell查看某个 TCP 或 UDP 端口是否在监听<br />
+6.Linux使用 Shell查看某个进程名正在运行的个数<br />
+7.Linux使用 Shell检测系统 CPU 负载<br />
+8.Linux使用 Shell检测系统磁盘空间<br />
+9.总结</p>
+
+<p><strong>检查进程是否存在</strong></p>
+
+<p>在对进程进行监控时，我们一般需要得到该进程的 ID，进程 ID 是进程的唯一标识，但是有时可能在服务器上不同用户下运行着多个相同进程名的进程，下面的函数
+GetPID 给出了获取指定用户下指定进程名的进程 ID 功能（目前只考虑这个用户下启动一个此进程名的进程），它有两个参数为用户名和进程名，它首先使用 ps
+查找进程信息，同时通过 grep 过滤出需要的进程，最后通过 sed 和 awk 查找需要进程的 ID
+值（此函数可根据实际情况修改，比如需要过滤其它信息等）。</p>
+
+<p>清单 1. 对进程进行监控</p>
+
+<p>function GetPID #User #Name<br />
+{<br />
+PsUser=$1<br />
+PsName=$2<br />
+pid=<code>ps -u $PsUser|grep $PsName|grep -v grep|grep -v vi|grep -v dbx\n  
+|grep -v tail|grep -v start|grep -v stop |sed -n 1p |awk '{print $1}'</code><br />
+echo $pid<br />
+}</p>
+
+<p>示例演示：</p>
+
+<p>1）源程序（例如查找用户为 root，进程名为 CFTestApp 的进程 ID）</p>
+
+<p>PID=<code>GetPID root CFTestApp</code></p>
+
+<p>echo $PID</p>
+
+<p>2）结果输出</p>
+
+<p>11426<br />
+[dyu@xilinuxbldsrv shell]$</p>
+
+<p>3）结果分析</p>
+
+<p>从上面的输出可见：11426 为 root 用户下的 CFTestApp 程序的进程 ID。</p>
+
+<p>4）命令介绍</p>
+
+<p>1. ps: 查看系统中瞬间进程信息。 参数：-u&lt; 用户识别码 &gt; 列出属于该用户的程序的状况，也可使用用户名称来指定。 -p&lt; 进程识别码 &gt;
+指定进程识别码，并列出该进程的状况。 -o 指定输出格式 2. grep: 用于查找文件中符合字符串的当前行。 参数：-v 反向选择，亦即显示出没有
+‘搜寻字符串&rsquo; 内容的那一行。 3. sed: 一个非交互性文本编辑器，它编辑文件或标准输入导出的文件，一次只能处理一行内容。 参数：-n
+读取下一个输入行，用下一个命令处理新的行而不是用第一个命令。 p 标志 打印匹配行 4. awk：一种编程语言，用于在 linux/unix
+下对文本和数据进行处理。数据可以来自标准输入、一个或多个文件，或其它命令的输出。它支持用户自定义函数和动态正则表达式等先进功能，是 linux/unix
+下的一个强大编程工具。它在命令行中使用，但更多是作为脚本来使用。awk
+的处理文本和数据的方式：它逐行扫描文件，从第一行到最后一行，寻找匹配的特定模式的行，并在这些行上进行你想要的操作。如果没有指定处理动作，则把匹配的行显示到标准输出
+( 屏幕 )，如果没有指定模式，则所有被操作所指定的行都被处理。 参数：-F fs or –field-separator fs
+：指定输入文件折分隔符，fs 是一个字符串或者是一个正则表达式，如 -F:。<br />
+有时有可能进程没有启动，下面的功能是检查进程 ID 是否存在，如果此进程没有运行输出：</p>
+
+<p>The process does not exist.</p>
+
+<h1 id="检查进程是否存在">检查进程是否存在</h1>
+
+<p>if [ &ldquo;-$PID&rdquo; == &ldquo;-&rdquo; ]<br />
+then<br />
+{<br />
+echo &ldquo;The process does not exist.&rdquo;<br />
+}<br />
+fi</p>
+
+<p><strong>检测进程 CPU 利用率</strong></p>
+
+<p>在对应用服务进行维护时，我们经常遇到由于 CPU 过高导致业务阻塞，造成业务中断的情况。CPU
+过高可能由于业务量过负荷或者出现死循环等异常情况，通过脚本对业务进程 CPU 进行时时监控，可以在 CPU
+利用率异常时及时通知维护人员，便于维护人员及时分析，定位，以及避免业务中断等。下面的函数可获得指定进程 ID 的进程 CPU 利用率。它有一个参数为进程
+ID，它首先使用 ps 查找进程信息，同时通过 grep -v 过滤掉 %CPU 行，最后通过 awk 查找 CPU 利用百分比的整数部分（如果系统中有多个
+CPU，CPU 利用率可以超过 100%）。</p>
+
+<p>清单 2. 对业务进程 CPU 进行实时监控<br />
+function GetCpu<br />
+{<br />
+CpuValue=<code>ps -p $1 -o pcpu |grep -v CPU | awk '{print $1}' | awk - F. '{print
+$1}'</code><br />
+echo $CpuValue<br />
+}<br />
+下面的功能是通过上面的函数 GetCpu 获得此进程的 CPU 利用率，然后通过条件语句判断 CPU 利用率是否超过限制，如果超过
+80%（可以根据实际情况进行调整），则输出告警，否则输出正常信息。</p>
+
+<p>清单 3. 判断 CPU 利用率是否超过限制</p>
+
+<p>function CheckCpu<br />
+{<br />
+PID=$1<br />
+cpu=<code>GetCpu $PID</code><br />
+if [ $cpu -gt 80 ]<br />
+then<br />
+{<br />
+echo “The usage of cpu is larger than 80%”<br />
+}<br />
+else<br />
+{<br />
+echo “The usage of cpu is normal”<br />
+}<br />
+fi<br />
+}</p>
+
+<p>示例演示：</p>
+
+<p>1）源程序（假设上面已经查询出 CFTestApp 的进程 ID 为 11426）<br />
+CheckCpu 11426</p>
+
+<p>2）结果输出<br />
+The usage of cpu is 75<br />
+The usage of cpu is normal<br />
+[dyu@xilinuxbldsrv shell]$<br />
+3）结果分析</p>
+
+<p>从上面的输出可见：CFTestApp 程序当前的 CPU 使用为 75%，是正常的，没有超过 80% 的告警限制。</p>
+
+<p><strong>检测进程内存使用量</strong></p>
+
+<p>在对应用服务进行维护时，也经常遇到由于内存使用过大导致进程崩溃，造成业务中断的情况（例如 32 位程序可寻址的最大内存空间为
+4G，如果超出将申请内存失败，同时物理内存也是有限的）。内存使用过高可能由于内存泄露，消息堆积等情况，通过脚本对业务进程内存使用量进行时时监控，可以在内存使用量异常时及时发送告警（例如通过短信），便于维护人员及时处理。下面的函数可获得指定进程
+ID 的进程内存使用情况。它有一个参数为进程 ID，它首先使用 ps 查找进程信息，同时通过 grep -v 过滤掉 VSZ 行 , 然后通过除 1000
+取以兆为单位的内存使用量。</p>
+
+<p>清单 4. 对业务进程内存使用量进行监控</p>
+
+<p>function GetMem<br />
+{<br />
+MEMUsage=<code>ps -o vsz -p $1|grep -v VSZ</code><br />
+(( MEMUsage /= 1000))<br />
+echo $MEMUsage<br />
+}<br />
+下面的功能是通过上面的函数 GetMem获得此进程的内存使用，然后通过条件语句判断内存使用是否超过限制，如果超过
+1.6G（可以根据实际情况进行调整），则输出告警，否则输出正常信息。</p>
+
+<p>清单 5. 判断内存使用是否超过限制</p>
+
+<p>mem=<code>GetMem $PID</code><br />
+if [ $mem -gt 1600 ]<br />
+then<br />
+{<br />
+echo “The usage of memory is larger than 1.6G”<br />
+}<br />
+else<br />
+{<br />
+echo “The usage of memory is normal”<br />
+}<br />
+fi</p>
+
+<p>示例演示：</p>
+
+<p>1）源程序（假设上面已经查询出 CFTestApp 的进程 ID 为 11426）</p>
+
+<p>mem=<code>GetMem 11426</code></p>
+
+<p>echo &ldquo;The usage of memory is $mem M&rdquo;</p>
+
+<p>if [ $mem -gt 1600 ]<br />
+then<br />
+{<br />
+echo &ldquo;The usage of memory is larger than 1.6G&rdquo;<br />
+}<br />
+else<br />
+{<br />
+echo &ldquo;The usage of memory is normal&rdquo;<br />
+}<br />
+fi</p>
+
+<p>2）结果输出</p>
+
+<p>The usage of memory is 248 M<br />
+The usage of memory is normal<br />
+[dyu@xilinuxbldsrv shell]$</p>
+
+<p>3）结果分析</p>
+
+<p>从上面的输出可见：CFTestApp 程序当前的内存使用为 248M，是正常的，没有超过 1.6G 的告警限制。</p>
+
+<p><strong>检测进程句柄使用量</strong></p>
+
+<p>在对应用服务进行维护时，也经常遇到由于句柄使用 过量导致业务中断的情况。每个平台对进程的句柄使用都是有限的，例如在 Linux 平台，我们可以使用
+ulimit – n 命令（open files (-n) 1024）或者对 /etc/security/limits.conf
+的内容进行查看，得到进程句柄限制。句柄使用过高可能由于负载过高，句柄泄露等情况，通过脚本对业务进程句柄使用量进行时时监控，可以在异常时及时发送告警（例如通过短信），便于维护人员及时处理。下面的函数可获得指定进程
+ID 的进程句柄使用情况。它有一个参数为进程 ID，它首先使用 ls 输出进程句柄信息，然后通过 wc -l 统计输出句柄个数。</p>
+
+<p>function GetDes<br />
+{<br />
+DES=<code>ls /proc/$1/fd | wc -l</code><br />
+echo $DES<br />
+}</p>
+
+<p>下面功能是通过上面的函数 GetDes获得此进程的句柄使用量，然后通过条件语句判断句柄使用是否超过限制，如果超过
+900（可以根据实际情况进行调整）个，则输出告警，否则输出正常信息。<br />
+des=<code>GetDes $PID</code><br />
+if [ $des -gt 900 ]<br />
+then<br />
+{<br />
+echo “The number of des is larger than 900”<br />
+}<br />
+else<br />
+{<br />
+echo “The number of des is normal”<br />
+}<br />
+fi</p>
+
+<p>示例演示：</p>
+
+<p>1）源程序（假设上面查询出 CFTestApp 的进程 ID 为 11426）<br />
+des=<code>GetDes 11426</code></p>
+
+<p>echo &ldquo;The number of des is $des&rdquo;</p>
+
+<p>if [ $des -gt 900 ]<br />
+then<br />
+{<br />
+echo &ldquo;The number of des is larger than 900&rdquo;<br />
+}<br />
+else<br />
+{<br />
+echo &ldquo;The number of des is normal&rdquo;<br />
+}<br />
+fi</p>
+
+<p>2）结果输出</p>
+
+<p>The number of des is 528<br />
+The number of des is normal<br />
+[dyu@xilinuxbldsrv shell]$</p>
+
+<p>3）结果分析</p>
+
+<p>从上面的输出可见：CFTestApp 程序当前的句柄使用为 528 个，是正常的，没有超过 900 个的告警限制。</p>
+
+<p>4）命令介绍</p>
+
+<p>wc: 统计指定文件中的字节数、字数、行数 , 并将统计结果显示输出。 参数：-l 统计行数。 -c 统计字节数。 -w 统计字数。</p>
+
+<p><strong>查看某个 TCP 或 UDP 端口是否在监听</strong></p>
+
+<p>端口检测是系统资源检测经常遇到的，特别是在网络通讯情况下，端口状态的检测往往是很重要的。有时可能进程，CPU，内存等处于正常状态，但是端口处于异常状态，业务也是没有正常运行。下面函数可判断指定端口是否在监听。它有一个参数为待检测端口，它首先使用
+netstat 输出端口占用信息，然后通过 grep, awk,wc 过滤输出监听 TCP 端口的个数，第二条语句为输出 UDP 端口的监听个数，如果
+TCP 与 UDP 端口监听都为 0，返回 0，否则返回 1.</p>
+
+<p>清单 6. 端口检测</p>
+
+<p>function Listening<br />
+{<br />
+TCPListeningnum=<code>netstat -an | grep &quot;:$1 &quot; | \n  
+awk '$1 == &quot;tcp&quot; &amp;&amp; $NF == &quot;LISTEN&quot; {print $0}' | wc -l</code><br />
+UDPListeningnum=<code>netstat -an|grep &quot;:$1 &quot; \n  
+|awk '$1 == &quot;udp&quot; &amp;&amp; $NF == &quot;0.0.0.0:*&quot; {print $0}' | wc -l</code><br />
+(( Listeningnum = TCPListeningnum + UDPListeningnum ))<br />
+if [ $Listeningnum == 0 ]<br />
+then<br />
+{<br />
+echo &ldquo;0&rdquo;<br />
+}<br />
+else<br />
+{<br />
+echo &ldquo;1&rdquo;<br />
+}<br />
+fi<br />
+}<br />
+示例演示：</p>
+
+<p>1）源程序（例如查询 8080 端口的状态是否在监听）</p>
+
+<p>isListen=<code>Listening 8080</code><br />
+if [ $isListen -eq 1 ]<br />
+then<br />
+{<br />
+echo &ldquo;The port is listening&rdquo;<br />
+}<br />
+else<br />
+{<br />
+echo &ldquo;The port is not listening&rdquo;<br />
+}<br />
+fi</p>
+
+<p>2）结果输出</p>
+
+<p>The port is listening<br />
+[dyu@xilinuxbldsrv shell]$</p>
+
+<p>3）结果分析</p>
+
+<p>从上面的输出可见：这个 Linux 服务器的 8080 端口处在监听状态。</p>
+
+<p>4）命令介绍</p>
+
+<p>netstat: 用于显示与 IP、TCP、UDP 和 ICMP 协议相关的统计数据，一般用于检验本机各端口的网络连接情况。 参数：-a 显示所有连线中的
+Socket。 -n 直接使用 IP 地址，而不通过域名服务器。<br />
+下面的功能也是检测某个 TCP 或者 UDP 端口是否处在正常状态。</p>
+
+<p>tcp: netstat -an|egrep $1 |awk &lsquo;$6 == &ldquo;LISTEN&rdquo; &amp;&amp; $1 == &ldquo;tcp&rdquo; {print $0}&rsquo;<br />
+udp: netstat -an|egrep $1 |awk &lsquo;$1 == &ldquo;udp&rdquo; &amp;&amp; $5 == &ldquo;0.0.0.0:*&rdquo; {print $0}&rsquo;</p>
+
+<p>命令介绍</p>
+
+<p>egrep: 在文件内查找指定的字符串。egrep 执行效果如 grep -E，使用的语法及参数可参照 grep 指令，与 grep
+不同点在于解读字符串的方法，egrep 是用扩展的正则表达式语法来解读，而 grep
+则用基本的正则表达式语法，扩展的正则表达式比基本的正则表达式有更完整的表达规范。</p>
+
+<p><strong>查看某个进程名正在运行的个数</strong></p>
+
+<p>有时我们可能需要得到服务器上某个进程的启动个数，下面的功能是检测某个进程正在运行的个数，例如进程名为 CFTestApp。</p>
+
+<p>Runnum=`ps -ef | grep -v vi | grep -v tail | grep &ldquo;[ /]CFTestApp&rdquo; | grep -v
+grep | wc -l</p>
+
+<p>检测系统 CPU 负载</p>
+
+<p>在对服务器进行维护时，有时也遇到由于系统 CPU（利用率）负载 过量导致业务中断的情况。服务器上可能运行多个进程，查看单个进程的 CPU
+都是正常的，但是整个系统的 CPU 负载可能是异常的。通过脚本对系统 CPU
+负载进行时时监控，可以在异常时及时发送告警，便于维护人员及时处理，预防事故发生。下面的函数可以检测系统 CPU 使用情况 . 使用 vmstat 取 5
+次系统 CPU 的 idle 值，取平均值，然后通过与 100 取差得到当前 CPU 的实际占用值。</p>
+
+<p>function GetSysCPU<br />
+{<br />
+CpuIdle=<code>vmstat 1 5 |sed -n '3,$p' \n  
+|awk '{x = x + $15} END {print x/5}' |awk -F. '{print $1}'  
+CpuNum=</code>echo &ldquo;100-$CpuIdle&rdquo; | bc`<br />
+echo $CpuNum<br />
+}</p>
+
+<p>示例演示：</p>
+
+<p>1）源程序</p>
+
+<p>cpu=<code>GetSysCPU</code></p>
+
+<p>echo &ldquo;The system CPU is $cpu&rdquo;</p>
+
+<p>if [ $cpu -gt 90 ]<br />
+then<br />
+{<br />
+echo &ldquo;The usage of system cpu is larger than 90%&rdquo;<br />
+}<br />
+else<br />
+{<br />
+echo &ldquo;The usage of system cpu is normal&rdquo;<br />
+}<br />
+fi</p>
+
+<p>2）结果输出<br />
+The system CPU is 87<br />
+The usage of system cpu is normal<br />
+[dyu@xilinuxbldsrv shell]$</p>
+
+<p>3）结果分析</p>
+
+<p>从上面的输出可见：当前 Linux 服务器系统 CPU 利用率为 87%，是正常的，没有超过 90% 的告警限制。</p>
+
+<p>4）命令介绍</p>
+
+<p>vmstat：Virtual Meomory Statistics（虚拟内存统计）的缩写，可对操作系统的虚拟内存、进程、CPU 活动进行监视。<br />
+参数： -n 表示在周期性循环输出时，输出的头部信息仅显示一次。</p>
+
+<p><strong>检测系统磁盘空间</strong></p>
+
+<p>系统磁盘空间检测是系统资源检测的重要部分，在系统维护维护中，我们经常需要查看服务器磁盘空间使用情况。因为有些业务要时时写话单，日志，或者临时文件等，如果磁盘空间用尽，也可能会导致业务中断，下面的函数可以检测当前系统磁盘空间中某个目录的磁盘空间使用情况
+. 输入参数为需要检测的目录名，使用 df 输出系统磁盘空间使用信息，然后通过 grep 和 awk 过滤得到某个目录的磁盘空间使用百分比。</p>
+
+<p>function GetDiskSpc<br />
+{<br />
+if [ $# -ne 1 ]<br />
+then<br />
+return 1<br />
+fi</p>
+
+<p>Folder=&ldquo;$1$&rdquo;<br />
+DiskSpace=`df -k |grep $Folder |awk &lsquo;{print $5}&rsquo; |awk -F% &lsquo;{print $1}&rsquo;<br />
+echo $DiskSpace<br />
+}</p>
+
+<p>示例演示：</p>
+
+<p>1）源程序（检测目录为 /boot）</p>
+
+<p>Folder=&ldquo;/boot&rdquo;</p>
+
+<p>DiskSpace=<code>GetDiskSpc $Folder</code></p>
+
+<p>echo &ldquo;The system $Folder disk space is $DiskSpace%&rdquo;</p>
+
+<p>if [ $DiskSpace -gt 90 ]<br />
+then<br />
+{<br />
+echo &ldquo;The usage of system disk($Folder) is larger than 90%&rdquo;<br />
+}<br />
+else<br />
+{<br />
+echo &ldquo;The usage of system disk($Folder) is normal&rdquo;<br />
+}<br />
+fi</p>
+
+<p>2）结果输出</p>
+
+<p>The system /boot disk space is 14%<br />
+The usage of system disk(/boot) is normal<br />
+[dyu@xilinuxbldsrv shell]$<br />
+3）结果分析</p>
+
+<p>从上面的输出可见：当前此 Linux 服务器系统上 /boot 目录的磁盘空间已经使用了 14%，是正常的，没有超过使用 90% 的告警限制。</p>
+
+<p>4）命令介绍</p>
+
+<p>df：检查文件系统的磁盘空间占用情况。可以利用该命令来获取硬盘被占用了多少空间，目前还剩下多少空间等信息。 参数：-k 以 k 字节为单位显示。</p>
+
+<p><strong>总结</strong></p>
+
+<p>在 Linux 平台下，shell
+脚本监控是一个非常简单，方便，有效的对服务器，进程进行监控的方法，对系统开发以及进程维护人员非常有帮助。它不仅可以对上面的信息进行监控，发送告警，同时也可以监控进程的日志等等的信息，希望本文对大家有帮助。</p>
+
+<p><a href="https://www.jb51.net/article/61796.htm">https://www.jb51.net/article/61796.htm</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

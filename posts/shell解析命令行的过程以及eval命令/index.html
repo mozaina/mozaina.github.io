@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell解析命令行的过程以及eval命令 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell解析命令行的过程以及eval命令 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell解析命令行的过程以及eval命令">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%A7%A3%E6%9E%90%E5%91%BD%E4%BB%A4%E8%A1%8C%E7%9A%84%E8%BF%87%E7%A8%8B%E4%BB%A5%E5%8F%8Aeval%E5%91%BD%E4%BB%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell解析命令行的过程以及eval命令</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>**bash &amp;shell系列文章： <strong><a href="http://www.cnblogs.com/f-ck-need-u/p/7048359.html">http://www.cnblogs.com/f-ck-need-u/p/7048359.html</a></strong>**</p>
+
+<hr />
+
+<p>本文说明的是一条linux命令在执行时大致要经过哪些过程？以及这些过程的大致顺序。</p>
+
+<h1 id="1-1-shell解析命令行">1.1 shell解析命令行</h1>
+
+<p>shell读取和执行命令时的大致操作过程如下图：</p>
+
+<p><a href="https://img.it610.com/image/info8/9840247db36f41b9a439961c56a0eb23.jpg"><img src="https://img.it610.com/image/info8/9840247db36f41b9a439961c56a0eb23.jpg" alt="shell解析命令行的过程以及eval命令_第1张图片" /></a></p>
+
+<p>(注： <strong>图中没有画出&rdquo;函数&rdquo;的位置。它的位置和别名并列，但优先级低于别名。也就是说，如果函数和命令别名同名，则先执行别名</strong> 。)</p>
+
+<p>以执行以下命令为例：</p>
+
+<pre><code>echo -e &quot;some files:&quot; ~/i* &quot;\nThe date:$(date +%F)\n$name's age is $((a+4))&quot; &gt;/tmp/a.log
+</code></pre>
+
+<p>假设在执行该命令前，已赋值变量&rdquo;name=longshuai&rdquo;和&rdquo;a=24&rdquo;，于是重定向到/tmp/a.log中的结果为：</p>
+
+<pre><code>some files: /root/inotify.sh /root/inotify.sh.ori
+The date:2017-08-14
+longshuai's age is 28
+</code></pre>
+
+<p><strong>(1).读取输入的命令行。</strong></p>
+
+<p><strong>(2).解析引用并分割命令行为各个单词，各单词称为token。其中重定向所在的token会被保存下来，直到扩展步骤(5)结束后才进行相关处理，如进行扩展、截断文件等。</strong></p>
+
+<p>shell中有3种引用方式：反斜线引用、单引号引用和双引号引用。</p>
+
+<p>◇ 反斜线转义：使得元字符变为普通的字面字符。但这只能对反斜线后一个字符进行转义。</p>
+
+<p>◇ 单引号引用：单引号内的所有字符全部变为字面符号符号。但注意：单引号内不能再使用单引号，即使使用了反斜线转义也不允许。</p>
+
+<p>◇ 双引号引用：使双引号内所有字符变为字面符号，但&rdquo;\&ldquo;、&rdquo;$&ldquo;、&rdquo;`&ldquo;(反引号)除外，如果开启了&rdquo;!&ldquo;引用历史命令时，则感叹号也除外。</p>
+
+<p>解析引用后，于是就可以将命令行进行单词分割，分割后的每一部分都称为一个token。分隔时，不仅分割单个命令，还分割命令列表，所以分隔符包括：空格、tab、分号、管道符号、&amp;、&amp;&amp;、||、重定向符号、圆括号等。</p>
+
+<p>于是上述命令分割为以下几个token：</p>
+
+<p><img src="https://img.it610.com/image/info8/326d05df10c54cbaa8d7a4eca4bd8695.jpg" alt="" /></p>
+
+<p>如果分割时发现了管道符号，或者是命令列表等组合了多个命令的情况，则每个命令都的token都相互独立。</p>
+
+<p><strong>(3).检查命令行结构。主要检查是否有命令列表、是否有shell编程结构的命令，如if判断命令、循环结构的for/while/select/until，这些命令属于保留关键字，需要特殊处理。</strong></p>
+
+<p><strong>(4).对第一个token进行别名扩展。如果检查出它是别名，则扩展后回到(2)再次进行token分解过程。如果检查出它是函数，则执行函数体中的复合命令。如果它既是别名，又是函数(即命令别名和函数同名称的情况)，则优先执行别名。在概念上，别名的临时性最强，优先级最高。</strong></p>
+
+<p><strong>(5).进行各种扩展。扩展顺序为：大括号扩展；波浪号扩展；参数、变量和命令替换、算术扩展(如果系统支持，此步还进行进程替换)；单词拆分；文件名扩展。</strong></p>
+
+<p><strong>不同引号的引用方式，将改变扩展的起始步骤，正如上图所画，没有任何引号时将从头到尾全部扩展，使用单引号时将完全不会进行任何扩展，使用双引号时将从变量替换开始继续扩展。</strong></p>
+
+<p>①大括号扩展：如/tmp/{a,b}.log扩展为/tmp/a.log和/tmp/b.log。</p>
+
+<p>②波浪号扩展：扩展为家目录。如root用户下的~/.ssh扩展为/root/.ssh。</p>
+
+<p>③变量扩展：即操作和替换变量值。如$a替换为它的值24， ${name:-longshuai} 替换为longshuai。</p>
+
+<p>④命令替换：此过程将执行命令替换中的命令，并将结果替换到token的对应位置处。</p>
+
+<p>⑤进程替换：将进程的执行结果替换到对应位置。类似于命令替换。替换格式为&rdquo;(cmd_list)&ldquo;，例如 cat cat /etc/hosts)
+。redhat系列应该都支持进程替换。</p>
+
+<p>⑥算术扩展：计算算术值，并将计算结果替换到对应位置处。例如$((a+4))替换为28。</p>
+
+<p>经过以上几种扩展后，得到如下结果：</p>
+
+<p><a href="https://img.it610.com/image/info8/1ace7678354142768633cbfbb1ccee24.jpg"><img src="https://img.it610.com/image/info8/1ace7678354142768633cbfbb1ccee24.jpg" alt="" /></a></p>
+
+<p>⑦单词拆分：扫描变量扩展、命令替换和算术扩展的结果，对非引号内的结果按照$IFS的值对这些结果进行单词分割。</p>
+
+<p>注意，如果没有进行扩展，或者扩展结果使用引号包围了，则不会进行此步的单词拆分。</p>
+
+<p>默认情况下，$IFS值为&rdquo; \t\n&rdquo;，所以扩展结果中每遇到空格、制表符、换行符都将被分割为两个单词。</p>
+
+<p>这一步其实很容易犯错，典型的是test命令。例如变量 name=&ldquo;Ma longshuai&rdquo; ，则 test $name == &ldquo;longshuai&rdquo;
+将报错，因为变量扩展后该语句变为 test Ma longshuai == &ldquo;longshuai&rdquo;
+，由于是变量替换，所以随后进行单词拆分，使得Ma和longshuai被拆分为两个单词，但实际上它们共同组成变量name的值。</p>
+
+<p>所以，为了正确操作变量替换和命令替换，尽量将它们使用引号包围。例如 test &ldquo;$name&rdquo; == &ldquo;longshuai&rdquo; ，这时将不会进行单词拆分。</p>
+
+<p>⑧文件名扩展：对每个token进行搜索，将搜索&rdquo;<em>&ldquo;、&rdquo;?&ldquo;和&rdquo;[&ldquo;符号，搜索到了将进行文件名扩展。例如将上面的&rdquo;/root/i</em>&ldquo;扩展为&rdquo;/root/inotify.sh
+/root/inotify.sh.ori&rdquo;。</p>
+
+<p><strong>(6).引号去除。经过上面的过程，该扩展的都扩展了，不需要的引号在此步就可以去掉了。</strong></p>
+
+<p>所以得到如下结果。</p>
+
+<p><a href="https://img.it610.com/image/info8/1756be76c2b441b1b96a23601e7bf0f3.jpg"><img src="https://img.it610.com/image/info8/1756be76c2b441b1b96a23601e7bf0f3.jpg" alt="" /></a></p>
+
+<p><strong>(7).搜索和执行命令。</strong></p>
+
+<p>单词分割后，复杂的命令行将由各个简单命令结构组成。于是可以搜索每个简单命令结构的第一个token中的命令，同时还带有一系列命令选项。例如上面的&rdquo;echo&rdquo;和&rdquo;-e&rdquo;。</p>
+
+<p>如果命令中不含任何斜杠：</p>
+
+<p>①则先判断是否有此名称的shell function存在，如果有则调用它，否则进行下一步搜索。</p>
+
+<p>②判断该命令是否为bash内置命令，如果是则执行它，否则进行下一步搜索。</p>
+
+<p>③从$PATH的路径下搜索该命令，如果搜索到了，则执行，否则报错。</p>
+
+<p>如果命令中包含一个或多个斜杠，则进行相对路径扩展、绝对路径查找，找到了则执行，否则报错。</p>
+
+<p><strong>(8).返回退出状态码。</strong></p>
+
+<h1 id="1-2-eval命令">1.2 eval命令</h1>
+
+<p>正常情况下，当搜索到命令时将会执行命令，但如果搜索到的命令为eval时，则处理方式有所不同。</p>
+
+<p>它的语法格式为：</p>
+
+<blockquote>
+<p>eval command arguments</p>
+</blockquote>
+
+<p>按照前文所述shell解析过程，将最终得到eval
+command和一系列扩展后的选项、参数，当搜索命令时，搜索到的结果为eval命令，于是eval命令将除了eval命令(以及eval的选项)的所有token再次传递给shell进行二次解析。但重定向所在token除外，因为重定向token早已被shell保存下来，所以不会再次截断文件。</p>
+
+<p>也就是说，&rdquo;command arguments&rdquo;被当作eval命令的参数，被传递给shell进行解析、执行。</p>
+
+<p>执行过程如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/16770d12b63b4d29803cfad688114022.jpg"><img src="https://img.it610.com/image/info8/16770d12b63b4d29803cfad688114022.jpg" alt="shell解析命令行的过程以及eval命令_第2张图片" /></a></p>
+
+<p>使用示例来说明：</p>
+
+<pre><code>[root@xuexi ~]# a=24;name='long$a'     # 注意，使用的是单引号，禁止$a被扩展
+</code></pre>
+
+<p>如果直接执行 echo $name ，则结果为&rdquo;long$a&rdquo;，但如果执行 eval echo $name ，结果将是&rdquo;long24&rdquo;。</p>
+
+<pre><code>[root@xuexi ~]# eval echo $name
+long24
+</code></pre>
+
+<p>首先shell按照正常过程解析，在变量替换时由于使用了单引号，所以$name第一次变量替换的结果为&rdquo;long$a&rdquo;，直到命令搜索时发现搜索到的命令是eval命令，执行eval命令，该命令将其参数
+echo long$a 再次传递给shell，相当于在标准输入中输入了 echo long$a
+，于是shell进行二次解析，这次的变量替换将$a替换为24，最后搜索命令发现是echo命令，于是最终得到&rdquo;long24&rdquo;。</p>
+
+<p>关于eval，更多的用法是间接变量$$var的用法，在bash shell中需要在第一个$前加上反斜线，即 \$$var
+，这么做的原因是显然的：防止第一次shell解析时被当作特殊变量&rdquo;$$&ldquo;被扩展。</p>
+
+<pre><code>[root@xuexi ~]# a=b
+[root@xuexi ~]# b=haha
+
+[root@xuexi ~]# eval echo \$$a
+haha
+</code></pre>
+
+<p><strong>注：本文并非一定准确，只是根据man bash总结而来。如有错误，请明确指出。多谢</strong></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

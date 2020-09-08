@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本实现关闭指定程序名的进程 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本实现关闭指定程序名的进程 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本实现关闭指定程序名的进程">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0%E5%85%B3%E9%97%AD%E6%8C%87%E5%AE%9A%E7%A8%8B%E5%BA%8F%E5%90%8D%E7%9A%84%E8%BF%9B%E7%A8%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本实现关闭指定程序名的进程</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>shell脚本实现关闭指定程序名的进程</strong></p>
+
+<p>1、 基础篇</p>
+
+<p>在Linux系统下，我们进行程序调试或者是进行应用程序升级时，经常需要先对我们的目标程序进行kill关闭。此时最基础的办法就是先查找到目标进程的PID，然后再执行kill命令去关闭目标进程。</p>
+
+<p>如：我们想要关闭掉svn相关的进程，首先执行ps -aux | grep svn找到当前系统中有svnserve的进程，其PID为15889，</p>
+
+<p>接着直接执行kill -9 15889就可以关闭掉此svn的进程了。</p>
+
+<p>2、 实践篇</p>
+
+<p>从上面可以看出，要实现依据进程名来进行进程的关闭其实只要将上述查找和kill的两步合并起来实现即可。</p>
+
+<p>1） command命令执行</p>
+
+<p>ps -ef | grep procedure_name | grep -v grep | awk &lsquo;{print $2}&rsquo; | xargs kill -9</p>
+
+<p>上面指令中的procedure_name 即为所有关闭的进程名</p>
+
+<p>2） shell脚本运行</p>
+
+<p>下面采用一个通用的shell脚本方式，来实现此功能，执行下述脚本</p>
+
+<p>./close_p.sh rocedure_name</p>
+
+<p>注意：因脚本执行时，脚本自身的进程名中会带有待关闭的进程名，需在脚本编写时进行相应的处理。</p>
+
+<p>close_p.sh脚本的实现比较简单，内容如下：</p>
+
+<pre><code>#!/bin/bash
+
+echo &quot;***************************&quot;
+echo &quot;Close the progress by name!&quot;
+echo &quot;eg: ./close_p.sh progressName&quot;
+echo &quot;***************************&quot;
+echo
+
+#echo &quot;PID of this script: $$&quot;
+#echo &quot;PPID of this script: $PPID&quot;
+
+function MsgShow()
+{
+   if [ $# -lt 1 ] ; then
+        echo &quot;Parm err ! Exit the shell !&quot;;
+        exit 1;
+   
+    else
+        case ${1} in
+            PARMMISS)
+                echo &quot;Missing process name to close!&quot; 
+                ;;
+            NOPROSS)
+                echo &quot;No such process[$2]!&quot;
+                ;;
+            MULTIPROSS)
+                echo &quot;There are too many process contains name[$2]&quot;
+                ;;
+            *)
+                echo &quot;Default case!&quot;
+                ;;
+        esac
+        exit 1;
+
+    fi 
+
+}
+
+function PidFind()
+{
+    PIDCOUNT=`ps -ef | grep $1 | grep -v &quot;grep&quot; | grep -v $0 | awk '{print $2}' | wc -l`;
+    if [ ${PIDCOUNT} -gt 1 ] ; then
+        MsgShow MULTIPROSS $1;
+    elif [ ${PIDCOUNT} -le 0 ] ; then
+        MsgShow NOPROSS $1;
+    else
+        PID=`ps -ef | grep $1 | grep -v &quot;grep&quot; | grep -v &quot;.sh&quot; | awk '{print $2}'` ;
+        echo &quot;Find the PID of this progress!--- process:$1 PID=[${PID}] &quot;;
+    fi
+    read -p &quot;Are you sure you want to close this progress[y/n]: &quot;
+    if [ $REPLY = &quot;y&quot; ] || [ $REPLY = &quot;yes&quot; ] ; then
+        echo &quot;Kill the process $1 ...&quot;;
+        kill -9  ${PID};
+        echo &quot;kill -9 ${PID} done!&quot;;
+    else
+        echo &quot;Confirmation of canceling,exit!&quot;;
+        exit 1
+    fi
+    #if we use return ,the return val must between 0 and 255
+}
+
+
+if [ $# -lt 1 ] ; then
+    MsgShow PARMMISS;
+else
+    PidFind $1;
+fi
+ 
+</code></pre>
+
+<p>3、 参考篇</p>
+
+<p>有关Shell脚本知识可以参考：《shell脚本学习指南》</p>
+
+<p>有关awk知识可以参考：《 <em>sed与awk</em> 》</p>
+
+<p>注：若在拷贝上述.sh文件至linux后，需要注意编码格式的问题。</p>
+
+<p>因为脚本在windows下创建编辑然后上传到linux系统的，所以是dos格式的，而linux却是只能执行格式为unix格式的脚本</p>
+
+<p>在linux中采用vim close_p.sh，执行set ff查看当前文件的格式，若为doc格式的话执行将会出现类似的错误：</p>
+
+<p>[root@localhost work]# ./close_p.sh<br />
+-bash: ./close_p.sh: /bin/bash^M: bad interpreter: No such file or directory</p>
+
+<p>此时我们需要执行set ff=unix，然后再次set ff检测文件格式是否已经修改为unix格式，保存文件后并可以正常执行了</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

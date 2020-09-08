@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>玩转shell正则表达式深入学习 | 开发者问答集锦</title>
+    <meta property="og:title" content="玩转shell正则表达式深入学习 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="玩转shell正则表达式深入学习">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%8E%A9%E8%BD%ACshell%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F%E6%B7%B1%E5%85%A5%E5%AD%A6%E4%B9%A0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">玩转shell正则表达式深入学习</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<ul>
+<li>前言</li>
+<li>被语系影响的正则表达式</li>
+<li>贪婪匹配与非贪婪匹配</li>
+<li>要注意的元字符</li>
+<li>容易被误解的地方</li>
+<li>常用正则</li>
+<li>匹配实战</li>
+</ul>
+
+<h1 id="前言">前言</h1>
+
+<p>我们在掌握了如下知识的前提下开始进阶正则的学习或者说小复习</p>
+
+<ul>
+<li>BRE 和 ERE 的正则基本知识：<a href="https://blog.csdn.net/abcnull/article/details/103951287">https://blog.csdn.net/abcnull/article/details/103951287</a></li>
+<li>Linux 一些常见的基本命令的使用</li>
+<li>Linux 三剑客的熟悉了解，因为正则最常用的还是三剑客中的模式匹配</li>
+</ul>
+
+<p>然后我在这里提供一个正则的测试练习网站：在线正则测试</p>
+
+<h1 id="被语系影响的正则表达式">被语系影响的正则表达式</h1>
+
+<p>正则表达式匹配竟然还受到 linux 语系的影响？没错确实如此，</p>
+
+<ul>
+<li><code>LANG=C</code> 字符顺序 ABCD，这样我们写 [a-Z] 时候是正常匹配的</li>
+<li><code>LANG=zh_CN</code> 字符顺序 aAbBcC，这样我们写 [a-Z] 就会出现匹配结果与预期不同的问题了！</li>
+</ul>
+
+<p>本人通过输入 locale 查看 lang 是 LANG=en_US.UTF-8，使用正则时 ok 的</p>
+
+<h1 id="贪婪匹配与非贪婪匹配">贪婪匹配与非贪婪匹配</h1>
+
+<p>贪婪模式和非贪婪模式本质就是 <strong>默认</strong> 是 <strong>最长</strong> 的匹配还是 <strong>最短</strong> 的匹配</p>
+
+<p>比如有表达式<code>abczzzzc</code>，然后我们写几个正则如下</p>
+
+<pre><code># 贪婪匹配，即趋向于最大长度匹配，将最长的作为默认首选，其他的作为备选。也就是说如果最长没有匹配到会自动匹配次长的
+# 匹配到 abczzzzc
+ab.*c
+
+# 非贪婪匹配，一旦匹配到就结束了，趋向于最短的匹配，即最短的作为默认首选，其他作为备选，直接在匹配的次数后加上问号
+# 匹配到 abc
+ab.*?c
+
+# 非贪婪匹配，最终结果可以匹配到 abczzzzc，虽然是非贪婪匹配，默认从最短匹配，但是 2 个匹配不到只能 4 个才匹配得到，但这也是满足条件的
+abcz{2,}?c
+</code></pre>
+
+<h1 id="要注意的元字符">要注意的元字符</h1>
+
+<pre><code># 匹配单词常用，如“ hello ”中匹配出“hello”
+\bhello\b
+
+# 匹配空格
+\s
+
+# 匹配一个数字，\d 等价于 [0-9] 等价于 [0123456789]
+\d
+[0-9]
+[0123456789]
+
+# 匹配字母，数字，下划线，汉字，意思就是不匹配除了下划线外乱七八糟的符号
+\w
+
+# 表示次数的有如下
+{n}
+{n,}
+{n,m}
+?
++
+*
+</code></pre>
+
+<h1 id="容易被误解的地方">容易被误解的地方</h1>
+
+<pre><code># 贪婪匹配和非贪婪匹配，不同只是在于默认取最长还是最短！
+只是默认按最长还是最短来匹配，当最长或最短匹配不到时候，会在区间范围内继续匹配！
+
+# []的多次的匹配，是多个随机的值，而不是一个值重复多遍！
+[0-9]{3} 是指 3 个数，这三个数是可以相同也可以不相同的，形如 [0-9][0-9][0-9]，而不是说同一个数字重复了 3 遍！\d{3} 的逻辑也是一样的！也就是说 {} 或者 * 或者 + 表示把前面表达式抄写了多少遍
+
+# 正则表达式中不要随意加空格，养成良好的编写正则的习惯
+
+# [^] 既不是表示括号中什么以哪一个元素打头，也不是表示括号中随意一个元素不在，而是表示整体取反，比如说下面表示既没有 1 又没有 2 数字，并且中括号里的表示单个字符，下面不是 12，而是 1，2
+[^12]
+</code></pre>
+
+<h1 id="常用正则">常用正则</h1>
+
+<pre><code># 任意多少个什么字符，可以为 0 个，贪婪匹配最长
+.*
+# 非贪婪匹配最短
+.*?
+# 任意多少个什么字符，最少为 1 个，贪婪匹配最长
+.+
+# 非贪婪匹配最短
+.+?
+
+# 代表匹配 n 个，? + * 也都可以表示匹配几个
+{n}
+# 匹配 n 个或者以上，贪婪匹配
+{n,}
+# 非贪婪匹配
+{n,}?
+</code></pre>
+
+<h1 id="匹配实战">匹配实战</h1>
+
+<pre><code># 匹配座机号码 0123-5111111，以 0 打头
+0\d{3}-\d{7}
+0[0-9]{3}-[0-9]{7}
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>breeze配置K8Sdeploy机的shell自动化脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="breeze配置K8Sdeploy机的shell自动化脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="breeze配置K8Sdeploy机的shell自动化脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/breeze%E9%85%8D%E7%BD%AEk8sdeploy%E6%9C%BA%E7%9A%84shell%E8%87%AA%E5%8A%A8%E5%8C%96%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">breeze配置K8Sdeploy机的shell自动化脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>由于按照睿云智和的breeze图形化部署K8S仍然需要准备配置deploy机，所以细化了一下脚本直接完成deploy机器的自动化配置：</p>
+
+<p>使用cobbler或者kickstart安装一台纯净的minimal的deploy机器步骤省略，直接贴deploy机器的配置；</p>
+
+<p>个人懒得写注释了，这是一个母版雏形，可以直接使用，但是不含任何变量，东西都是写死的，所以可以适当扩展增加变量使脚本变得更灵活，例如把版本或者ansible配置都变成传参，在此就不再深入些了，亲测有效：</p>
+
+<pre><code>#!/bin/sh
+
+#Firewall &amp; selinux preparation
+#Pdf provides
+setenforce 0
+sed -ri '/SELINUX=/c\SELINUX=disabled' /etc/selinux/config
+firewall-cmd --set-default-zone=trusted
+firewall-cmd --complete-reload
+
+
+#Install docker-compose
+if [ -e /usr/local/bin/docker-compose ];then
+    echo &quot;docker-compose exists~&quot;
+else
+curl -L https://github.com/docker/compose/releases/download/1.21.2/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose &amp;&amp; chmod +x /usr/local/bin/docker-compose
+fi
+
+#Install docker
+yum remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine -y
+
+yum install -y yum-utils device-mapper-persistent-data lvm2 &amp;&amp; yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo &amp;&amp; yum install docker-ce docker-ce-cli containerd.io -y
+
+systemctl enable docker &amp;&amp; systemctl start docker
+
+#Config Daocloud accelarate
+curl -sSL https://get.daocloud.io/daotools/set_mirror.sh | sh -s http://f1361db2.m.daocloud.io &amp;&amp; systemctl restart docker
+
+#Install ansible
+ssh-keygen -t rsa -P &quot;&quot; -f ~/.ssh/id_rsa
+yum -y install epel-release &amp;&amp; yum -y install ansible
+
+cat &gt;&gt; /etc/ansible/hosts &lt;
+</code></pre>
+
+<p><strong>最后上传部署后的日志：</strong></p>
+
+<pre><code>setenforce: SELinux is disabled
+Warning: ZONE_ALREADY_SET: trusted
+success
+success
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   617    0   617    0     0    435      0 --:--:--  0:00:01 --:--:--   435
+100 10.3M  100 10.3M    0     0   105k      0  0:01:40  0:01:40 --:--:--  108k
+Loaded plugins: fastestmirror
+No Match for argument: docker
+No Match for argument: docker-client
+No Match for argument: docker-client-latest
+No Match for argument: docker-common
+No Match for argument: docker-latest
+No Match for argument: docker-latest-logrotate
+No Match for argument: docker-logrotate
+No Match for argument: docker-engine
+No Packages marked for removal
+Loaded plugins: fastestmirror
+Loading mirror speeds from cached hostfile
+ * base: mirrors.tuna.tsinghua.edu.cn
+ * epel: mirrors.huaweicloud.com
+ * extras: mirrors.tuna.tsinghua.edu.cn
+ * updates: mirrors.huaweicloud.com
+Package yum-utils-1.1.31-50.el7.noarch already installed and latest version
+Package device-mapper-persistent-data-0.7.3-3.el7.x86_64 already installed and latest version
+Package 7:lvm2-2.02.180-10.el7_6.3.x86_64 already installed and latest version
+Nothing to do
+Loaded plugins: fastestmirror
+adding repo from: https://download.docker.com/linux/centos/docker-ce.repo
+grabbing file https://download.docker.com/linux/centos/docker-ce.repo to /etc/yum.repos.d/docker-ce.repo
+repo saved to /etc/yum.repos.d/docker-ce.repo
+Loaded plugins: fastestmirror
+Loading mirror speeds from cached hostfile
+ * base: mirrors.tuna.tsinghua.edu.cn
+ * epel: mirrors.huaweicloud.com
+ * extras: mirrors.tuna.tsinghua.edu.cn
+ * updates: mirrors.huaweicloud.com
+Package 3:docker-ce-18.09.4-3.el7.x86_64 already installed and latest version
+Package 1:docker-ce-cli-18.09.4-3.el7.x86_64 already installed and latest version
+Package containerd.io-1.2.5-3.1.el7.x86_64 already installed and latest version
+Nothing to do
+docker version &gt;= 1.12
+{&quot;registry-mirrors&quot;: [&quot;http://f1361db2.m.daocloud.io&quot;]}
+Success.
+You need to restart docker to take effect: sudo systemctl restart docker 
+Generating public/private rsa key pair.
+/root/.ssh/id_rsa already exists.
+Overwrite (y/n)? n
+Loaded plugins: fastestmirror
+Loading mirror speeds from cached hostfile
+ * base: mirrors.tuna.tsinghua.edu.cn
+ * epel: mirrors.huaweicloud.com
+ * extras: mirrors.tuna.tsinghua.edu.cn
+ * updates: mirrors.huaweicloud.com
+Package epel-release-7-11.noarch already installed and latest version
+Nothing to do
+Loaded plugins: fastestmirror
+Loading mirror speeds from cached hostfile
+ * base: mirrors.tuna.tsinghua.edu.cn
+ * epel: mirrors.huaweicloud.com
+ * extras: mirrors.tuna.tsinghua.edu.cn
+ * updates: mirrors.huaweicloud.com
+Package ansible-2.7.9-1.el7.noarch already installed and latest version
+Nothing to do
+192.168.25.20 | SUCCESS =&gt; {
+    &quot;changed&quot;: false, 
+    &quot;comment&quot;: null, 
+    &quot;exclusive&quot;: false, 
+    &quot;follow&quot;: false, 
+    &quot;key&quot;: &quot;ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCuBxVR5S5usDFsahBsN8nsfgZprQSr+73kxoE6HNs9tqAYzFf9RdsF5J1WkOORWahFbq0gW6oAwlbfvtwwa/td+9SgFr0zeoZdilzvfNsYJN2GqmrY9yNkBHXlQmoj2kZkYSIR9hJpUqY2FGugQBUa7dJEO9+Go9BMJc1Pxtj7ijn7t7PpEn+EhCl2ZxY/xazqzZ+FEOP6z4P5+KB0+j80Ks2xaHGvlu/1S8jMyGFgbrKntjQbpREDweW8/CvssSBkJqpuif66Oaw75hqLVvlaWuwk6GNOc7l7tTGc06MxS9O8kFo47U+41YmNU00Grx2TiuKp/SNYDbY5b8G6AYyr root@deploy&quot;, 
+    &quot;key_options&quot;: null, 
+    &quot;keyfile&quot;: &quot;/root/.ssh/authorized_keys&quot;, 
+    &quot;manage_dir&quot;: true, 
+    &quot;path&quot;: null, 
+    &quot;state&quot;: &quot;present&quot;, 
+    &quot;unique&quot;: false, 
+    &quot;user&quot;: &quot;root&quot;, 
+    &quot;validate_certs&quot;: true
+}
+192.168.25.10 | SUCCESS =&gt; {
+    &quot;changed&quot;: false, 
+    &quot;comment&quot;: null, 
+    &quot;exclusive&quot;: false, 
+    &quot;follow&quot;: false, 
+    &quot;key&quot;: &quot;ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCuBxVR5S5usDFsahBsN8nsfgZprQSr+73kxoE6HNs9tqAYzFf9RdsF5J1WkOORWahFbq0gW6oAwlbfvtwwa/td+9SgFr0zeoZdilzvfNsYJN2GqmrY9yNkBHXlQmoj2kZkYSIR9hJpUqY2FGugQBUa7dJEO9+Go9BMJc1Pxtj7ijn7t7PpEn+EhCl2ZxY/xazqzZ+FEOP6z4P5+KB0+j80Ks2xaHGvlu/1S8jMyGFgbrKntjQbpREDweW8/CvssSBkJqpuif66Oaw75hqLVvlaWuwk6GNOc7l7tTGc06MxS9O8kFo47U+41YmNU00Grx2TiuKp/SNYDbY5b8G6AYyr root@deploy&quot;, 
+    &quot;key_options&quot;: null, 
+    &quot;keyfile&quot;: &quot;/root/.ssh/authorized_keys&quot;, 
+    &quot;manage_dir&quot;: true, 
+    &quot;path&quot;: null, 
+    &quot;state&quot;: &quot;present&quot;, 
+    &quot;unique&quot;: false, 
+    &quot;user&quot;: &quot;root&quot;, 
+    &quot;validate_certs&quot;: true
+}
+192.168.25.12 | SUCCESS =&gt; {
+    &quot;changed&quot;: false, 
+    &quot;comment&quot;: null, 
+    &quot;exclusive&quot;: false, 
+    &quot;follow&quot;: false, 
+    &quot;key&quot;: &quot;ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCuBxVR5S5usDFsahBsN8nsfgZprQSr+73kxoE6HNs9tqAYzFf9RdsF5J1WkOORWahFbq0gW6oAwlbfvtwwa/td+9SgFr0zeoZdilzvfNsYJN2GqmrY9yNkBHXlQmoj2kZkYSIR9hJpUqY2FGugQBUa7dJEO9+Go9BMJc1Pxtj7ijn7t7PpEn+EhCl2ZxY/xazqzZ+FEOP6z4P5+KB0+j80Ks2xaHGvlu/1S8jMyGFgbrKntjQbpREDweW8/CvssSBkJqpuif66Oaw75hqLVvlaWuwk6GNOc7l7tTGc06MxS9O8kFo47U+41YmNU00Grx2TiuKp/SNYDbY5b8G6AYyr root@deploy&quot;, 
+    &quot;key_options&quot;: null, 
+    &quot;keyfile&quot;: &quot;/root/.ssh/authorized_keys&quot;, 
+    &quot;manage_dir&quot;: true, 
+    &quot;path&quot;: null, 
+    &quot;state&quot;: &quot;present&quot;, 
+    &quot;unique&quot;: false, 
+    &quot;user&quot;: &quot;root&quot;, 
+    &quot;validate_certs&quot;: true
+}
+192.168.25.11 | SUCCESS =&gt; {
+    &quot;changed&quot;: false, 
+    &quot;comment&quot;: null, 
+    &quot;exclusive&quot;: false, 
+    &quot;follow&quot;: false, 
+    &quot;key&quot;: &quot;ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCuBxVR5S5usDFsahBsN8nsfgZprQSr+73kxoE6HNs9tqAYzFf9RdsF5J1WkOORWahFbq0gW6oAwlbfvtwwa/td+9SgFr0zeoZdilzvfNsYJN2GqmrY9yNkBHXlQmoj2kZkYSIR9hJpUqY2FGugQBUa7dJEO9+Go9BMJc1Pxtj7ijn7t7PpEn+EhCl2ZxY/xazqzZ+FEOP6z4P5+KB0+j80Ks2xaHGvlu/1S8jMyGFgbrKntjQbpREDweW8/CvssSBkJqpuif66Oaw75hqLVvlaWuwk6GNOc7l7tTGc06MxS9O8kFo47U+41YmNU00Grx2TiuKp/SNYDbY5b8G6AYyr root@deploy&quot;, 
+    &quot;key_options&quot;: null, 
+    &quot;keyfile&quot;: &quot;/root/.ssh/authorized_keys&quot;, 
+    &quot;manage_dir&quot;: true, 
+    &quot;path&quot;: null, 
+    &quot;state&quot;: &quot;present&quot;, 
+    &quot;unique&quot;: false, 
+    &quot;user&quot;: &quot;root&quot;, 
+    &quot;validate_certs&quot;: true
+}
+Loaded plugins: fastestmirror
+Loading mirror speeds from cached hostfile
+ * base: mirrors.tuna.tsinghua.edu.cn
+ * epel: mirrors.huaweicloud.com
+ * extras: mirrors.tuna.tsinghua.edu.cn
+ * updates: mirrors.huaweicloud.com
+Package wget-1.14-18.el7.x86_64 already installed and latest version
+Nothing to do
+File ‘v1.13.4.tar.gz’ already there; not retrieving.
+
+Creating network &quot;breeze-1134_default&quot; with the default driver
+Creating volume &quot;breeze-1134_playbook&quot; with default driver
+Pulling playbook (wise2c/playbook:v1.13.4)...
+v1.13.4: Pulling from wise2c/playbook
+697743189b6d: Pull complete
+87e261fa033b: Pull complete
+c77709860ed9: Pull complete
+5f25f28b376f: Pull complete
+144e5fd29828: Pull complete
+362e7d141286: Pull complete
+aa4d63553217: Pull complete
+418cbcb23cc6: Pull complete
+4783dd8b6f55: Pull complete
+6e9fa4e95c6f: Pull complete
+Digest: sha256:582bf48cfe007ef38270c4d09c60b0e0cbb1722c530c013d6942f2833d02800e
+Status: Downloaded newer image for wise2c/playbook:v1.13.4
+Pulling deploy (wise2c/pagoda:v1.1)...
+v1.1: Pulling from wise2c/pagoda
+a0e0ef996968: Pull complete
+9b3014edd871: Pull complete
+c5eded658159: Pull complete
+c45a1c0c2455: Pull complete
+46399003276c: Pull complete
+ccac9c54f668: Pull complete
+57fd101ecf1c: Pull complete
+0f5ba6f34d40: Pull complete
+b116f6ac6348: Pull complete
+145e9a179549: Pull complete
+2209be18dc9e: Pull complete
+abc4297bec89: Pull complete
+c0c294b79d8d: Pull complete
+81b136d4261f: Pull complete
+a949dbc55c9b: Pull complete
+3936d68676c6: Pull complete
+Digest: sha256:7d7c37b80182e3d97e7fb4de339430d5f3f52d64a375e1ced01d28e9bfa72314
+Status: Downloaded newer image for wise2c/pagoda:v1.1
+Pulling ui (wise2c/deploy-ui:v1.3)...
+v1.3: Pulling from wise2c/deploy-ui
+407ea412d82c: Pull complete
+f1e1d8e69297: Pull complete
+8dbb80bd9ddf: Pull complete
+189c76f3a269: Pull complete
+a772b0dbfb38: Pull complete
+28da0ef10bfe: Pull complete
+Digest: sha256:a199d1d25b135294ea884d25d4c04dfeb14a3a317a115a384a7b55746dee4045
+Status: Downloaded newer image for wise2c/deploy-ui:v1.3
+Pulling yum-repo (wise2c/yum-repo:v1.13.4)...
+v1.13.4: Pulling from wise2c/yum-repo
+6c40cc604d8e: Pull complete
+fe449da6d669: Pull complete
+bf1473f11cd8: Pull complete
+06b03b3b4e39: Pull complete
+70c1bbe94218: Pull complete
+89aa2d966173: Pull complete
+af02dc3cc578: Pull complete
+0362d6b0e18e: Pull complete
+Digest: sha256:9039a04697bed3e09b20320a481d5731192063ea18b4476689d7fb3fb301ad44
+Status: Downloaded newer image for wise2c/yum-repo:v1.13.4
+Creating deploy-playbook ... done
+Creating deploy-yumrepo  ... done
+Creating deploy-main     ... done
+Creating deploy-ui       ... done
+
+CONTAINER ID        IMAGE                     COMMAND                  CREATED                  STATUS                    PORTS                                        NAMES
+4a7447fce196        wise2c/deploy-ui:v1.3     &quot;/root/entrypoint.sh&quot;    Less than a second ago   Up Less than a second                                                  deploy-ui
+feed3a63a121        wise2c/pagoda:v1.1        &quot;sh -c '/root/pagoda…&quot;   1 second ago             Up Less than a second     0.0.0.0:88-&gt;80/tcp, 0.0.0.0:8088-&gt;8080/tcp   deploy-main
+bbc97623a7d0        wise2c/yum-repo:v1.13.4   &quot;nginx -g 'daemon of…&quot;   4 seconds ago            Up 2 seconds              80/tcp, 0.0.0.0:2009-&gt;2009/tcp               deploy-yumrepo
+248a4e66149b        wise2c/playbook:v1.13.4   &quot;sh&quot;                     4 seconds ago            Exited (0) 1 second ago                                                deploy-playbook
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

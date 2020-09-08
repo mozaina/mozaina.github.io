@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>hadoop的核心知识点01Hdfsyarn的原理和执行流程图以及一些简单的shell操作已经基本的API | 开发者问答集锦</title>
+    <meta property="og:title" content="hadoop的核心知识点01Hdfsyarn的原理和执行流程图以及一些简单的shell操作已经基本的API - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="hadoop的核心知识点01Hdfsyarn的原理和执行流程图以及一些简单的shell操作已经基本的API">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/hadoop%E7%9A%84%E6%A0%B8%E5%BF%83%E7%9F%A5%E8%AF%86%E7%82%B901hdfsyarn%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B%E5%9B%BE%E4%BB%A5%E5%8F%8A%E4%B8%80%E4%BA%9B%E7%AE%80%E5%8D%95%E7%9A%84shell%E6%93%8D%E4%BD%9C%E5%B7%B2%E7%BB%8F%E5%9F%BA%E6%9C%AC%E7%9A%84api/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">hadoop的核心知识点01Hdfsyarn的原理和执行流程图以及一些简单的shell操作已经基本的API</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="hdfs-原理和构架图">Hdfs 原理和构架图</h2>
+
+<p><strong>什么是hdfs 概述 以及实际的目标</strong></p>
+
+<p>1，在windows的文件管理系统是NTFS<br />
+<a href="https://img.it610.com/image/info8/faaddf45dda6495586b326c01f9de066.jpg"><img src="https://img.it610.com/image/info8/faaddf45dda6495586b326c01f9de066.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第1张图片" /></a></p>
+
+<p>2,Hadoop的文件管理系统是hdfs</p>
+
+<p><strong>设计理念</strong><br />
+HDFS的设计理念源于非常朴素的思想；当数据集的大小超过单台计算机的存储能力时，就有必要将其进行分区并存储到若干台单独的计算机上，而管理网络中跨多台计算机存储的文件系统称为分布式文件系统。该系统架构与网络之上，势必会引入网络编程的复杂性，因此分布式文件系统比普通文件系统更为复杂。<br />
+准确地说，Hadoop有一个抽象的文件系统的概念，HDFS只是其中的一个实现<br />
+<strong>hdfs的特点</strong><br />
+1，适合存储超大文件<br />
+2，运行于廉价硬件之上<br />
+3，易扩展，为用户提供性能不错的文件存储服务<br />
+3，流式数据访问<br />
+<strong>啧啧，缺点来了！！！！</strong><br />
+1，实施数据访问弱<br />
+2，大量的小文件<br />
+3，多用户写入，任意修改文件<br />
+<strong>来看一下对比哈，下面的是普通系统文件系统设计思路</strong><br />
+<a href="https://img.it610.com/image/info8/57df59ae84e5407897bdb1db49d444a5.jpg"><img src="https://img.it610.com/image/info8/57df59ae84e5407897bdb1db49d444a5.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第2张图片" /></a><br />
+<strong>hdfs的设计思路</strong><br />
+<a href="https://img.it610.com/image/info8/7b3c7dfe953e4fc2beefdda33a816acf.jpg"><img src="https://img.it610.com/image/info8/7b3c7dfe953e4fc2beefdda33a816acf.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第3张图片" /></a><br />
+ps:(hadoop 2以后的128m)<br />
+<strong>一个典型的HDFS集群中，有要有一个NameNode,一个SecondaryNode和至少一个DataNode，而HDFS客户端数量并没有限制。所有的数据均存放在运行DataNode进程的节点块(block)里.</strong></p>
+
+<h2 id="那么什么是-datanode-namenode-secondarynode呢">那么什么是 datanode ,namenode,secondarynode呢？</h2>
+
+<p><strong>DataNode</strong></p>
+
+<p>DataNode被称为数据节点，它是HDFS的主从框架的从角色的扮演者，它在NameNode的指导下完成I/O任务。存放在HDFS的文件都是由HDFS的块组成，所有的块都存放于DataNode节点。实际上，对于DataNode所在的节点来说，块就是一个普通文件，我们可以去DataNode存放块的目录下观察,块的文件名为blk_bklID.<br />
+DataNode会不断向NameNode报告。初始化时，每个DataNode将当前存储的块告知NameNode,在集群正常工作时，DataNode任然会不断地的更新NameNode,为之提供本地修改的相关信息，同时接受来自NameNode的指令，创建、移动或者删除本地磁盘上的块。</p>
+
+<p><strong>块的好处</strong><br />
+1，可以保存比存储节点单一磁盘大的文件<br />
+2，简化存储子系统<br />
+3，容错性高<br />
+<strong>NameNode</strong><br />
+NameNode也被称为名字节点,是HDFS的主从架构的主角色的扮演者。NameNode是HDFS的大脑，它维护着整个文件系统的目录树，以及目录树里所有的文件和目录，这些信息以两种文件存储在本地文件中：一种是命名空间镜像(也称文件系统镜像File
+System
+Image,FSImage),即HDFS元数据的完整快照，每次NameNode启动的时候，默认加载最新的FSImage,另一种是命名控件镜像的编辑日志(edit
+log).<br />
+<strong>SecondaryNameNode</strong></p>
+
+<p>SecondaryNameNode,也称为第二名字节点，是用于定期合并命名空间镜像和命名空间镜像的编辑日志的辅助守护进程。每个HDFS集群有一个SecondaryNameNode,在生产环境下，一般SecondaryNameNode也会单独运行在一台服务器上.<br />
+<strong>NameNode和SecondaryNode交互</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/f0549afc4072472ab3db674ddc9a95e6.jpg"><img src="https://img.it610.com/image/info8/f0549afc4072472ab3db674ddc9a95e6.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第4张图片" /></a><br />
+<strong>Hdfs 客户端</strong><br />
+hdfs 的客户端是指用户和hdfs 交互的手段，hdfs提供了非常多的客户端，包括命令接口，Java Apl …</p>
+
+<p><strong>hdfs 容错</strong><br />
+1，心跳机构<br />
+2，检查文件块的完整性<br />
+3，集群的负载均衡<br />
+4，namenode上的Fsimage 和编辑日志文件<br />
+5，文件的删除<br />
+<strong>yarn的原理和执行流程图</strong><br />
+<a href="https://img.it610.com/image/info8/983a0838aa0a46629fd33ba662806e4a.jpg"><img src="https://img.it610.com/image/info8/983a0838aa0a46629fd33ba662806e4a.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第5张图片" /></a><br />
+<strong>什么是yarn</strong><br />
+YARN的全称(Yet Another Resource
+Negotiator)另一种资源协调者,它是一种统一资源管理和调度平台的实现，类似与本地PC的操作系统<br />
+<strong>ResourceManager</strong><br />
+RM是集中所有资源的管理者，复杂集群中所有资源管理和调度。它定期会接收各个NodeManager的资源汇报信息，并进行汇总，并根据资源使用情况，将资源分配给各个应用的二级调度器(ApplicationMaster)。<br />
+在YARN中，RM主要的职责是资源调度，当多个作业同时提交时，RM在多个竞争的作业之间权衡优先级并进行仲裁资源，当资源分配完成后，RM就不关心应用内部的资源分配，也不关注每个应用的状态，这样的话，RM针对每个应用来说，只进行一次资源分配，大大减轻RM负荷，使得其扩展性大大增强<br />
+<strong>NodeManager</strong><br />
+NM是YARN集群中单个节点的代理，它管理YARN集群中的单个计算节点，它负责保存与RM的同步，跟踪节点的健康状况，管理各个Container的生命周期，监控每个Container的资源使用情况，管理分布式缓存，管理各个Container生成的日志，提供不同YARN应用可能需要的辅助服务。其中Container的管理是NM的核心功能，NM可以接收RM和AM的命令来启动或者销毁容器。<br />
+NM的组件按照功能主要分为与RM进行交互、容器管理、容器操作、Web界面、删除服务、资源本地话、安全等。<br />
+<strong>ApplicationManager</strong><br />
+YARN架构中比较特殊的组件，生命周期随着应用的开始而开始，结束而结束。<br />
+AM是协调集群中应用程序的进程，每个应用程序都有自己专属的AM，不同的计算框架的AM的实现是不同的，它负责向RM申请资源，在对应的NM上启动Container来执行任务，并在应用中不断地监控这些Container的状态。<br />
+AM的启动是由RM完成的。当作业被提交后，RM会在集群中任选一个Container，启动作为AM。<br />
+由于在作业执行过程中，AM会不断获取执行情况 ，所以用户可以访问AM来查看作业的执行情况。</p>
+
+<h2 id="明白了什么是hdfs-开始一些简单的基本文件操作以及hdfs的java-api-操作">明白了什么是Hdfs,开始一些简单的基本文件操作以及Hdfs的java api 操作</h2>
+
+<p>1，需要切换到sbin 目录下执行hadoop 命令<br />
+-help [cmd] :显示命令的帮助信息<br />
+<a href="https://img.it610.com/image/info8/d328f30de83545a79bfa9d44e4e6c300.jpg"><img src="https://img.it610.com/image/info8/d328f30de83545a79bfa9d44e4e6c300.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第6张图片" /></a><br />
+-mkdir :创建文件夹<br />
+<a href="https://img.it610.com/image/info8/b4afa0efe4844a92b2fda52c53988648.jpg"><img src="https://img.it610.com/image/info8/b4afa0efe4844a92b2fda52c53988648.jpg" alt="在这里插入图片描述" /></a><br />
+<a href="https://img.it610.com/image/info8/5425e05f82814d0bb1f3017cd0f1f3cb.jpg"><img src="https://img.it610.com/image/info8/5425e05f82814d0bb1f3017cd0f1f3cb.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第7张图片" /></a><br />
+-ls® :显示当前目录下所有文件，path是hadoop 下的路径<br />
+<a href="https://img.it610.com/image/info8/a3b139644c584632973accb4be060f66.jpg"><img src="https://img.it610.com/image/info8/a3b139644c584632973accb4be060f66.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第8张图片" /></a><br />
+-put:本地文件复制到hdfs<br />
+<a href="https://img.it610.com/image/info8/84900f13272c41468dc9808c1d17933a.jpg"><img src="https://img.it610.com/image/info8/84900f13272c41468dc9808c1d17933a.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第9张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/6f0fdec7a1ca4f4a905c5cd9da363641.jpg"><img src="https://img.it610.com/image/info8/6f0fdec7a1ca4f4a905c5cd9da363641.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第10张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/0f2df88ca3a5426880aeb9b2e15a1e71.jpg"><img src="https://img.it610.com/image/info8/0f2df88ca3a5426880aeb9b2e15a1e71.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第11张图片" /></a><br />
+<strong>如果在上传文件过程中出现以上信息，表示操作hdfs的权限不够，可以在在haoop 配置文件中hdfs-site.xml 中设置权限为false</strong><br />
+<a href="https://img.it610.com/image/info8/b11c52be14f2429784c159bb521dbbd9.jpg"><img src="https://img.it610.com/image/info8/b11c52be14f2429784c159bb521dbbd9.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第12张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/e6969af6765e4c29bdde6ef645533379.jpg"><img src="https://img.it610.com/image/info8/e6969af6765e4c29bdde6ef645533379.jpg" alt="在这里插入图片描述" /></a><br />
+<a href="https://img.it610.com/image/info8/2a78086f6ee34fa7b891d88914f0a4d0.jpg"><img src="https://img.it610.com/image/info8/2a78086f6ee34fa7b891d88914f0a4d0.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第13张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/cd2bbee8a9504cfbb8d88d7f9fd46c8c.jpg"><img src="https://img.it610.com/image/info8/cd2bbee8a9504cfbb8d88d7f9fd46c8c.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第14张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/b8d79e9a6ff342d9b42eb0beda6de5f8.png"><img src="https://img.it610.com/image/info8/b8d79e9a6ff342d9b42eb0beda6de5f8.png" alt="在这里插入图片描述" /></a><br />
+-du(s) ：显示目录中所有文件大小<br />
+<a href="https://img.it610.com/image/info8/0635966d79fa4f798ec453f9f6de5a0d.jpg"><img src="https://img.it610.com/image/info8/0635966d79fa4f798ec453f9f6de5a0d.jpg" alt="在这里插入图片描述" /></a><br />
+-count[-q] ：显示目录中文件数量<br />
+<a href="https://img.it610.com/image/info8/ed2516c0d65d41d1aac12ed62fdd26d5.jpg"><img src="https://img.it610.com/image/info8/ed2516c0d65d41d1aac12ed62fdd26d5.jpg" alt="在这里插入图片描述" /></a><br />
+-mv:移动多个文件到目录<br />
+<a href="https://img.it610.com/image/info8/282b9ece242d4eb3998c421e60686682.jpg"><img src="https://img.it610.com/image/info8/282b9ece242d4eb3998c421e60686682.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第15张图片" /></a><br />
+-cp:复制多个文件到目标目录<br />
+<a href="https://img.it610.com/image/info8/0e5e31512338463aa3d2a118be961714.jpg"><img src="https://img.it610.com/image/info8/0e5e31512338463aa3d2a118be961714.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第16张图片" /></a><br />
+-rm®:删除文件<br />
+<a href="https://img.it610.com/image/info8/d51ce74426854c1295037f5be271bd3f.jpg"><img src="https://img.it610.com/image/info8/d51ce74426854c1295037f5be271bd3f.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第17张图片" /></a><br />
+-moveFromLocal /-moveToLocal ：从本地文件移动到hdfs/从hdfs把文件移动到本地<br />
+<a href="https://img.it610.com/image/info8/9546c710ed6646cfade05e230d244036.jpg"><img src="https://img.it610.com/image/info8/9546c710ed6646cfade05e230d244036.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第18张图片" /></a><br />
+-get [-ignoreCrc] ：复制文件到本地，可以忽略crc校验<br />
+<a href="https://img.it610.com/image/info8/a0bddb8b6360473bbadc70fda3e4bf8f.jpg"><img src="https://img.it610.com/image/info8/a0bddb8b6360473bbadc70fda3e4bf8f.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第19张图片" /></a></p>
+
+<h2 id="hdfs的java-api操作">Hdfs的java api操作</h2>
+
+<p>处理使用Shell方式操作hdfs，通用软件开发者可以通过一组java api来通过java代码操作hdfs<br />
+1，使用eclipse连接hdfs<br />
+2,安装插件<br />
+在…\eclipse\plugins\导入hadoop插件如图：这些插件可在hadoop原生态安装包中找到。具体在apache官网下载对应版本的hadoop安装包的lib中以及cdh的lib<br />
+<a href="https://img.it610.com/image/info8/e36a7a1ead764697ace704c4b346c3c0.jpg"><img src="https://img.it610.com/image/info8/e36a7a1ead764697ace704c4b346c3c0.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第20张图片" /></a><br />
+3，CDH路径导入<br />
+弱第二部插件导入成功的话，在下图会显示hadoop Map/Reduce目录<br />
+<a href="https://img.it610.com/image/info8/df5acc63a423444caa39c47ca3c6d0d2.jpg"><img src="https://img.it610.com/image/info8/df5acc63a423444caa39c47ca3c6d0d2.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第21张图片" /></a><br />
+4，配置属性编辑<br />
+完成第三步之后左击Window–&gt;Show View–&gt;other–&gt;MapReduce
+Tools显示右下角文本框，左击最下方CDH–&gt;Edit填写General属性，CDH5自定义sdzn-
+cdh01为hadoop集群中主节点所在的主机名称，8021、8020为cdh版本的HDFS访问端口，apache版本9001、9000<br />
+<a href="https://img.it610.com/image/info8/8c6edb9b9bef4520b23e6b22979846b9.jpg"><img src="https://img.it610.com/image/info8/8c6edb9b9bef4520b23e6b22979846b9.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第22张图片" /></a><br />
+5，成功连接hdfs</p>
+
+<p><a href="https://img.it610.com/image/info8/c003d827cb1649deb4ff4e5d1f69b3cf.jpg"><img src="https://img.it610.com/image/info8/c003d827cb1649deb4ff4e5d1f69b3cf.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第23张图片" /></a><br />
+6,使用eclipse操作hdfs<br />
+导入hadoop 操作的jar包<br />
+<a href="https://img.it610.com/image/info8/231c38c6159643e59a2a4c30d316e609.jpg"><img src="https://img.it610.com/image/info8/231c38c6159643e59a2a4c30d316e609.jpg" alt="hadoop 的核心知识点 01
+Hdfs，yarn的原理和执行流程图，以及一些简单的shell操作已经基本的API_第24张图片" /></a><br />
+8，使用api操作的hdfs<br />
+Configuration类<br />
+FileSystem类<br />
+mkdirs()方法<br />
+create()方法<br />
+open()方法<br />
+rename()方法<br />
+copyFromLocalFile()方法<br />
+copyToLocalFile()方法<br />
+listStatus()方法<br />
+delete()方法</p>
+
+<ul>
+<li>昨天顺序写反了，·····</li>
+<li>明天写hive</li>
+</ul>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

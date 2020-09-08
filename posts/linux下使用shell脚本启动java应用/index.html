@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux下使用Shell脚本启动Java应用 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux下使用Shell脚本启动Java应用 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux下使用Shell脚本启动Java应用">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E4%B8%8B%E4%BD%BF%E7%94%A8shell%E8%84%9A%E6%9C%AC%E5%90%AF%E5%8A%A8java%E5%BA%94%E7%94%A8/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux下使用Shell脚本启动Java应用</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<blockquote>
+<p>最近项目有需要的关系，就抽出点时间研究了一下 Linux 下使用脚本启动Java应用的方式。很简单，大家作为参考。</p>
+</blockquote>
+
+<p>这个脚本是在网上找到一个挺好的通用 shell
+脚本。只需要修改一些配置变量，就可以用来做起动脚本了。并且除了能起动、还支持关闭、重启、查看是否正在运行的功能。</p>
+
+<p>start 函数中，nohup 部分其实也可以提出来放入一个配置变量中。</p>
+
+<h4 id="项目介绍">项目介绍</h4>
+
+<hr />
+
+<blockquote>
+<p>示例项目源码地址：<a href="https://gitee.com/liupeifeng3514/Linux_Java_Shell">https://gitee.com/liupeifeng3514/Linux_Java_Shell</a></p>
+</blockquote>
+
+<h5 id="项目说明">项目说明</h5>
+
+<p>这是一个Web项目，在其中提供了一个包含main方法的Java类作为启动类。项目的功能就是每隔两秒钟打印日志到 /tmp/Alog.log 文件中。</p>
+
+<h5 id="项目源码">项目源码</h5>
+
+<p><a href="https://img.it610.com/image/info8/77f32b5f465a4d98928fdc5964d5bfed.png"><img src="https://img.it610.com/image/info8/77f32b5f465a4d98928fdc5964d5bfed.png" alt="Linux
+下使用Shell脚本启动Java应用_第1张图片" /></a></p>
+
+<pre><code>/**
+ * 启动类
+ */
+public class Test {
+
+    public static void main(String[] args) throws InterruptedException {
+
+        while (true) {
+            // 每两秒打印一次日志
+            Thread.sleep(2000);
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    // 打印日志
+                    new ClassA().printLog();
+                }
+            }).start();
+        }
+    }
+}
+
+
+import org.apache.log4j.Logger;
+
+/**
+ * 打印日志的类
+ */
+public class ClassA {
+
+    private static Logger logger = Logger.getLogger(ClassA.class);
+
+    public void printLog() {
+        // 记录debug级别的信息
+        logger.debug(&quot;这是 debug 消息。&quot;);
+    }
+}
+</code></pre>
+
+<p>log4j.properties 文件</p>
+
+<pre><code>### 输出信息到控制抬 ###
+log4j.appender.stdout = org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.Target = System.out
+log4j.appender.stdout.layout = org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern = [%-5p] %d{yyyy-MM-dd HH:mm:ss,SSS} method:%l%n%m%n
+
+### 输出DEBUG 级别以上的日志到=E://logs/Alog.log ###
+log4j.logger.com.lpf.ClassA= DEBUG, A, stdout
+log4j.appender.A=org.apache.log4j.FileAppender
+log4j.appender.A.File=/tmp/Alog.log
+log4j.appender.A.layout=org.apache.log4j.PatternLayout
+log4j.appender.A.layout.ConversionPattern=%d %p [%c] - %m%n
+</code></pre>
+
+<p>代码很简单，就不做过多的解释了。</p>
+
+<h5 id="打包方式">打包方式</h5>
+
+<p>选中项目—&gt;右键—&gt;Export—&gt;WAR file</p>
+
+<h5 id="部署项目">部署项目</h5>
+
+<p>将打包好的项目上传到 Linux 服务器上，使用如下命令解压：</p>
+
+<pre><code>[root@peipei3514 src]# unzip -oq Linux_Java_Shell.war -d /usr/local/Linux_Java_Shell
+</code></pre>
+
+<p>命令解释：</p>
+
+<ul>
+<li>-o 不必先询问用户，unzip执行后覆盖原有文件；</li>
+<li>-q 执行时不显示任何信息；</li>
+<li>-d 指定文件解压缩后所要存储的目录。</li>
+</ul>
+
+<h4 id="启动脚本">启动脚本</h4>
+
+<hr />
+
+<pre><code>#!/bin/sh
+#该脚本为Linux下启动java程序的通用脚本。既可以作为开机自启动service脚本被调用，
+#也可以作为启动java程序的独立脚本来使用。
+#
+#警告!!!：该脚本stop部分使用系统kill命令来强制终止指定的java程序进程。
+#在杀死进程前，未作任何条件检查。在某些情况下，如程序正在进行文件或数据库写操作，
+#可能会造成数据丢失或数据不完整。如果必须要考虑到这类情况，则需要改写此脚本，
+#增加在执行kill命令前的一系列检查。
+#
+#
+###################################
+#环境变量及程序执行参数
+#需要根据实际环境以及Java程序名称来修改这些参数
+###################################
+#JDK所在路径
+JAVA_HOME=&quot;/usr/local/jdk1.8.0_161/&quot;
+
+#执行程序启动所使用的系统用户，考虑到安全，推荐不使用root帐号
+RUNNING_USER=root
+
+#Java程序所在的目录（classes的上一级目录）
+APP_HOME=/usr/local/Linux_Java_Shell/WEB-INF/
+
+#需要启动的Java主程序（main方法类）
+APP_MAINCLASS=com.lpf.Test
+
+#拼凑完整的classpath参数，包括指定lib目录下所有的jar
+CLASSPATH=$APP_HOME/classes
+for i in &quot;$APP_HOME&quot;/lib/*.jar; do
+   CLASSPATH=&quot;$CLASSPATH&quot;:&quot;$i&quot;
+done
+
+#java虚拟机启动参数
+JAVA_OPTS=&quot;-ms512m -mx512m -Xmn256m -Djava.awt.headless=true -XX:MaxPermSize=128m&quot;
+
+###################################
+#(函数)判断程序是否已启动
+#
+#说明：
+#使用JDK自带的JPS命令及grep命令组合，准确查找pid
+#jps 加 l 参数，表示显示java的完整包路径
+#使用awk，分割出pid ($1部分)，及Java程序名称($2部分)
+###################################
+#初始化psid变量（全局）
+psid=0
+
+checkpid() {
+   javaps=`$JAVA_HOME/bin/jps -l | grep $APP_MAINCLASS`
+
+   if [ -n &quot;$javaps&quot; ]; then
+      psid=`echo $javaps | awk '{print $1}'`
+   else
+      psid=0
+   fi
+}
+
+###################################
+#(函数)启动程序
+#
+#说明：
+#1. 首先调用checkpid函数，刷新$psid全局变量
+#2. 如果程序已经启动（$psid不等于0），则提示程序已启动
+#3. 如果程序没有被启动，则执行启动命令行
+#4. 启动命令执行后，再次调用checkpid函数
+#5. 如果步骤4的结果能够确认程序的pid,则打印[OK]，否则打印[Failed]
+#注意：echo -n 表示打印字符后，不换行
+#注意: &quot;nohup 某命令 &gt;/dev/null 2&gt;&amp;1 &amp;&quot; 的用法
+###################################
+start() {
+   checkpid
+
+   if [ $psid -ne 0 ]; then
+      echo &quot;================================&quot;
+      echo &quot;warn: $APP_MAINCLASS already started! (pid=$psid)&quot;
+      echo &quot;================================&quot;
+   else
+      echo -n &quot;Starting $APP_MAINCLASS ...&quot;
+      JAVA_CMD=&quot;nohup $JAVA_HOME/bin/java $JAVA_OPTS -classpath $CLASSPATH $APP_MAINCLASS &gt;/dev/null 2&gt;&amp;1 &amp;&quot;
+      su - $RUNNING_USER -c &quot;$JAVA_CMD&quot;
+      checkpid
+      if [ $psid -ne 0 ]; then
+         echo &quot;(pid=$psid) [OK]&quot;
+      else
+         echo &quot;[Failed]&quot;
+      fi
+   fi
+}
+
+###################################
+#(函数)停止程序
+#
+#说明：
+#1. 首先调用checkpid函数，刷新$psid全局变量
+#2. 如果程序已经启动（$psid不等于0），则开始执行停止，否则，提示程序未运行
+#3. 使用kill -9 pid命令进行强制杀死进程
+#4. 执行kill命令行紧接其后，马上查看上一句命令的返回值: $?
+#5. 如果步骤4的结果$?等于0,则打印[OK]，否则打印[Failed]
+#6. 为了防止java程序被启动多次，这里增加反复检查进程，反复杀死的处理（递归调用stop）。
+#注意：echo -n 表示打印字符后，不换行
+#注意: 在shell编程中，&quot;$?&quot; 表示上一句命令或者一个函数的返回值
+###################################
+stop() {
+   checkpid
+
+   if [ $psid -ne 0 ]; then
+      echo -n &quot;Stopping $APP_MAINCLASS ...(pid=$psid) &quot;
+      su - $RUNNING_USER -c &quot;kill -9 $psid&quot;
+      if [ $? -eq 0 ]; then
+         echo &quot;[OK]&quot;
+      else
+         echo &quot;[Failed]&quot;
+      fi
+
+      checkpid
+      if [ $psid -ne 0 ]; then
+         stop
+      fi
+   else
+      echo &quot;================================&quot;
+      echo &quot;warn: $APP_MAINCLASS is not running&quot;
+      echo &quot;================================&quot;
+   fi
+}
+
+###################################
+#(函数)检查程序运行状态
+#
+#说明：
+#1. 首先调用checkpid函数，刷新$psid全局变量
+#2. 如果程序已经启动（$psid不等于0），则提示正在运行并表示出pid
+#3. 否则，提示程序未运行
+###################################
+status() {
+   checkpid
+
+   if [ $psid -ne 0 ];  then
+      echo &quot;$APP_MAINCLASS is running! (pid=$psid)&quot;
+   else
+      echo &quot;$APP_MAINCLASS is not running&quot;
+   fi
+}
+
+###################################
+#(函数)打印系统环境参数
+###################################
+info() {
+   echo &quot;System Information:&quot;
+   echo &quot;****************************&quot;
+   echo `head -n 1 /etc/issue`
+   echo `uname -a`
+   echo
+   echo &quot;JAVA_HOME=$JAVA_HOME&quot;
+   echo `$JAVA_HOME/bin/java -version`
+   echo
+   echo &quot;APP_HOME=$APP_HOME&quot;
+   echo &quot;APP_MAINCLASS=$APP_MAINCLASS&quot;
+   echo &quot;****************************&quot;
+}
+
+###################################
+#读取脚本的第一个参数($1)，进行判断
+#参数取值范围：{start|stop|restart|status|info}
+#如参数不在指定范围之内，则打印帮助信息
+###################################
+case &quot;$1&quot; in
+   'start')
+      start
+      ;;
+   'stop')
+     stop
+     ;;
+   'restart')
+     stop
+     start
+     ;;
+   'status')
+     status
+     ;;
+   'info')
+     info
+     ;;
+esac
+     echo &quot;Usage: $0 {start|stop|restart|status|info}&quot;
+     exit 1
+</code></pre>
+
+<p>赋予脚本可执行权限：</p>
+
+<ul>
+<li>chmod 555 scriptname 允许任何人都具有可读权和执行权限；</li>
+<li>chmod +rx scriptname 允许任何人都具有可读权和执行权限；</li>
+<li>chmod u+rx scriptname 只给脚本的所有者可读和执行权限。</li>
+</ul>
+
+<p>查看环境信息：</p>
+
+<pre><code>[root@peipei3514 Linux_Java_Shell]# ./Linux_Java_Shell.sh info
+System Information:
+****************************
+\S
+Linux peipei3514 3.10.0-693.21.1.el7.x86_64 #1 SMP Wed Mar 7 19:03:37 UTC 2018 x86_64 x86_64 x86_64 GNU/Linux
+
+JAVA_HOME=/usr/local/jdk1.8.0_161/
+java version &quot;1.8.0_161&quot;
+Java(TM) SE Runtime Environment (build 1.8.0_161-b12)
+Java HotSpot(TM) 64-Bit Server VM (build 25.161-b12, mixed mode)
+
+
+APP_HOME=/usr/local/Linux_Java_Shell/WEB-INF/
+APP_MAINCLASS=com.lpf.Test
+****************************
+Usage: ./Linux_Java_Shell.sh {start|stop|restart|status|info}
+</code></pre>
+
+<p>启动应用：</p>
+
+<pre><code>[root@peipei3514 Linux_Java_Shell]# ./Linux_Java_Shell.sh start
+Starting com.lpf.Test ...(pid=1408) [OK]
+Usage: ./Linux_Java_Shell.sh {start|stop|restart|status|info}
+</code></pre>
+
+<p>停止应用：</p>
+
+<pre><code>[root@peipei3514 Linux_Java_Shell]# ./Linux_Java_Shell.sh stop
+Stopping com.lpf.Test ...(pid=1408) [OK]
+Usage: ./Linux_Java_Shell.sh {start|stop|restart|status|info}
+</code></pre>
+
+<p>启动应用后，可以看到日志的输出：</p>
+
+<pre><code>[root@peipei3514 Linux_Java_Shell]# tail -f /tmp/Alog.log
+2018-05-06 18:58:53,128 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:58:54,723 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:58:56,805 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:58:58,803 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:59:00,795 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:59:02,783 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:59:04,806 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:59:06,809 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:59:08,812 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:59:10,794 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:59:12,796 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:59:14,792 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+2018-05-06 18:59:16,795 DEBUG [com.lpf.ClassA] - 这是 debug 消息。
+</code></pre>
+
+<h4 id="脚本中的问题">脚本中的问题</h4>
+
+<hr />
+
+<h5 id="bin-sh-m-坏的解释器-没有那个文件或目录">/bin/sh^M: 坏的解释器: 没有那个文件或目录</h5>
+
+<p>执行脚本的时候可能会报这样的错误：</p>
+
+<pre><code>-bash: ./Linux_Java_Shell.sh: /bin/sh^M: 坏的解释器: 没有那个文件或目录
+</code></pre>
+
+<p>这是因为 .sh文件是从windows拷贝过来的，所以多了\r，执行：</p>
+
+<pre><code>sed -i 's/\r$//' Linux_Java_Shell.sh
+</code></pre>
+
+<p>会把 Linux_Java_Shell.sh 中的\r 替换成空白，再次执行则成功！</p>
+
+<blockquote>
+<p>在windows下编辑的时候，换行结尾是 \n\r ， 而在linux下是 \n，所以才会有多出来的 \r</p>
+</blockquote>
+
+<h5 id="java-awt-headless-模式">java.awt.headless 模式</h5>
+
+<p>参考文章：java.awt.headless 模式</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

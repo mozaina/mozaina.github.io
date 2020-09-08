@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>PART1Shell提示符的实现 | 开发者问答集锦</title>
+    <meta property="og:title" content="PART1Shell提示符的实现 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="PART1Shell提示符的实现">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/part1shell%E6%8F%90%E7%A4%BA%E7%AC%A6%E7%9A%84%E5%AE%9E%E7%8E%B0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">PART1Shell提示符的实现</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<blockquote>
+<p>这篇文章是《动手写 Shell》系列文章的第 <1> 篇，在这篇文章中，我们先完成一个 Shell 中最基本的功能 - Shell
+提示符的实现。在这篇文章中，我会介绍一下实现的思路，以及介绍下用到的系统 API 和一些 C 语言中的库函数。</p>
+</blockquote>
+
+<h1 id="shell-提示符">Shell 提示符</h1>
+
+<p>用过 Linux 的人都知道当我们打开终端时，在命令行中会出现一行字，后边会有光标在一直删，那一行字就是 Shell 的提示符。</p>
+
+<h2 id="提示符格式">提示符格式</h2>
+
+<p>我们通常看到的 Shell 提示符的格式如下所示：</p>
+
+<pre><code>username@hostname:~/path$
+</code></pre>
+
+<p>我们要写的 Shell 的第一步就是来实现这个东西。</p>
+
+<h2 id="实现思路">实现思路</h2>
+
+<p>从提示符的格式中我们就知道我们首先需要得到：</p>
+
+<ul>
+<li><strong>用户名</strong></li>
+<li><strong>主机名</strong></li>
+<li><strong>当前路径</strong></li>
+</ul>
+
+<p>我们主要通过调用 Linux 系统 API 的方式来完成上述功能。</p>
+
+<h1 id="所需要的功能">所需要的功能</h1>
+
+<h2 id="0x00-得到当前用户名">0x00 得到当前用户名</h2>
+
+<h3 id="passwd-结构体">passwd 结构体</h3>
+
+<p>在 Linux 中定义了一个 <code>passwd</code> 结构体，该结构体定义了与用户有关的信息，在 <code>/usr/include/pwd.h</code> 中</p>
+
+<p>该结构体定义如下：</p>
+
+<pre><code>/* The passwd structure.  */
+struct passwd
+{
+  char *pw_name;        /* Username.  */
+  char *pw_passwd;      /* Password.  */
+  __uid_t pw_uid;       /* User ID.  */
+  __gid_t pw_gid;       /* Group ID.  */
+  char *pw_gecos;       /* Real name.  */
+  char *pw_dir;         /* Home directory.  */
+  char *pw_shell;       /* Shell program.  */
+};
+</code></pre>
+
+<h3 id="getpwuid-与-getuid-函数">getpwuid() 与 getuid() 函数</h3>
+
+<ul>
+<li><strong>getuid():</strong> 用来获取当前用户的 ID</li>
+<li><strong>getpwuid(uid_t uid):</strong> 根据用户 ID 来获取 <code>passwd</code> 结构体</li>
+</ul>
+
+<p>用法：</p>
+
+<pre><code>#include 
+#include 
+#include 
+int main()
+{
+    uid_t my_uid;
+    structpasswd *my_info;
+    my_info =getpwuid(getuid());
+    printf( &quot;my name = [%s]\n&quot;, my_info-&gt;pw_name );
+    printf( &quot;my passwd = [%s]\n&quot;, my_info-&gt;pw_passwd );
+    printf( &quot;my uid = [%d]\n&quot;, my_info-&gt;pw_uid );
+    printf( &quot;my gid = [%d]\n&quot;, my_info-&gt;pw_gid );
+    printf( &quot;my gecos = [%s]\n&quot;, my_info-&gt;pw_gecos );
+    printf( &quot;my dir = [%s]\n&quot;, my_info-&gt;pw_dir );
+    printf( &quot;my shell = [%s]\n&quot;, my_info-&gt;pw_shell );
+    return0;
+}
+</code></pre>
+
+<h2 id="0x02-得到当前主机名">0x02 得到当前主机名</h2>
+
+<p>通过 <code>gethostname()</code> 函数我们可以获得当前主机名</p>
+
+<pre><code>int max_name_len = 256;
+char hostname[max_name_len];
+gethostname(hostname, max_path_len);
+</code></pre>
+
+<h2 id="0x03-获取当前路径">0x03 获取当前路径</h2>
+
+<p>通过 <code>getced()</code> 函数我们可以获得当前路径</p>
+
+<pre><code>int max_path_len = 1024;
+char pathname[max_path_len];
+getcwd(pathname, max_path_len);
+</code></pre>
+
+<h2 id="0x04-需要处理的其它问题">0x04 需要处理的其它问题</h2>
+
+<h3 id="当前用户目录下的显示">当前用户目录下的显示</h3>
+
+<p>对于在当前目录下的提示符我们采用将用户主目录用 <code>~</code> 来代替，对于不在当前目录下的提示符我们再使用完整的目录来进行显示，这也是目前 Ubuntu
+中的默认终端所采取的提示符显示格式。</p>
+
+<p>实现策略：</p>
+
+<ul>
+<li>如果当前目录前面一部分同用户主目录路径不相符，则显示完整目录</li>
+<li>如果当前目录的长度小于用户主目录路径，则显示完整目录</li>
+<li>其他情况，将当前目录与用户主目录相同部分用 <code>~</code> 代替</li>
+</ul>
+
+<p>实现方法：</p>
+
+<ul>
+<li>获取用户主目录：</li>
+</ul>
+
+<p>我们通过访问 <code>passwd</code> 结构体的方式来获取用户主目录路径：</p>
+
+<pre><code>char home_dir[1024];
+pwd = getpwuid(getuid());
+home_dir = pwd-&gt;pw_dir;
+</code></pre>
+
+<h3 id="是否是-root-用户">是否是 root 用户</h3>
+
+<p>对于是 root 用户的提示符我们将使用 <code>#</code> 来进行表示，对于其他用户使用 <code>$</code> 来表示。</p>
+
+<p>实现方法：</p>
+
+<p>我们使用 <code>getuid()</code> 函数来判断当前用户是否是 root 用户， 如果返回值为 0，则是 root 用户。</p>
+
+<h1 id="用到的c库函数">用到的C库函数</h1>
+
+<h2 id="sprintf">sprintf()</h2>
+
+<h3 id="功能">功能</h3>
+
+<p>它的功能是把格式化的数据写入某个字符串缓冲区。</p>
+
+<h3 id="头文件">头文件</h3>
+
+<p><code>stdio.h</code></p>
+
+<h3 id="原型">原型</h3>
+
+<p><code>int sprintf( char *buffer, const char *format, [ argument] … );</code></p>
+
+<h3 id="参数列表">参数列表</h3>
+
+<ul>
+<li><strong>buffer：</strong> char型指针，指向将要写入的字符串的缓冲区。</li>
+<li><strong>format：</strong> 格式化字符串。</li>
+<li><strong>[argument]…：</strong> 可选参数，可以是任何类型的数据。</li>
+</ul>
+
+<h2 id="strncmp">strncmp()</h2>
+
+<h3 id="功能-1">功能</h3>
+
+<p>这个函数用来比较 s1 和 s2 字符串的前 num 个字符。如果两个字符串相等的话，strncmp 将返回0。</p>
+
+<h3 id="头文件-1">头文件</h3>
+
+<p><code>string.h</code></p>
+
+<h3 id="原型-1">原型</h3>
+
+<p><code>int strncmp ( const char * str1, const char * str2, size_t num );</code></p>
+
+<h3 id="参数列表-1">参数列表</h3>
+
+<ul>
+<li><strong>str1:</strong> 待比较字符串 1</li>
+<li><strong>str2:</strong> 待比较字符串 2</li>
+<li><strong>num:</strong> 比较的位数</li>
+</ul>
+
+<h1 id="参考代码">参考代码</h1>
+
+<p>下面贴上实现 Shell 提示符的代码：</p>
+
+<p>详见： <strong><a href="https://github.com/luoyhang003/linux_kernel_expriment/tree/master/exp2">https://github.com/luoyhang003/linux_kernel_expriment/tree/master/exp2</a></strong></p>
+
+<pre><code>/*
+ *      prompt.c ---- Description
+ *------------------------------------------------------------
+ * Date: April 8th, 2016
+ * Copyright: Written by Jason Luo - luoyhang003@hotmail.com
+ * Function: Promption of the Shell
+ *------------------------------------------------------------
+ */
+
+#include&quot;lshell.h&quot;
+
+const int max_name_len = 256;
+const int max_path_len = 1024;
+
+void get_prompt(char *prompt)
+{
+    extern struct passwd *pwd;
+    char hostname[max_name_len];
+    char pathname[max_path_len];
+    int prompt_length;
+
+    pwd = getpwuid(getuid());
+    getcwd(pathname, max_path_len);
+
+    if(gethostname(hostname, max_path_len) == 0)
+    {
+        sprintf(prompt, &quot;lshell&gt;%s@%s:&quot;, pwd-&gt;pw_name, hostname);
+    }
+    else
+    {
+        sprintf(prompt, &quot;lshell&gt;%s@unknown:&quot;, pwd-&gt;pw_name);
+    }
+    prompt_length = strlen(prompt);
+
+
+    if(strlen(pathname) &lt; strlen(pwd-&gt;pw_dir) || (strncmp(pathname, pwd-&gt;pw_dir, strlen(pwd-&gt;pw_dir))) != 0)
+    {
+        sprintf(prompt + prompt_length, &quot;%s&quot;, pathname);
+    }
+    else
+    {
+        sprintf(prompt + prompt_length, &quot;~%s&quot;, pathname + strlen(pwd-&gt;pw_dir));
+    }
+    prompt_length = strlen(prompt);
+    if(geteuid() != 0)
+    {
+        sprintf(prompt + prompt_length, &quot;$&quot;);
+    }
+    else
+    {
+        sprintf(prompt + prompt_length, &quot;#&quot;);
+    }
+    return;
+}
+</code></pre>
+
+<hr />
+
+<blockquote>
+<p>本文的版权归作者 罗远航 所有，采用 Attribution-NonCommercial 3.0
+License。任何人可以进行转载、分享，但不可在未经允许的情况下用于商业用途；转载请注明出处。感谢配合！</p>
+</blockquote>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>应用版日常linux系统巡检shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="应用版日常linux系统巡检shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="应用版日常linux系统巡检shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%BA%94%E7%94%A8%E7%89%88%E6%97%A5%E5%B8%B8linux%E7%B3%BB%E7%BB%9F%E5%B7%A1%E6%A3%80shell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">应用版日常linux系统巡检shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>查看linux磁盘脚本</p>
+
+<pre><code>#!/bin/bash
+
+#脚本功能描述:监控服务器主要性能参数指标
+#监控项目:内核信息,主机名称,IP地址,登录账户,内存与swap信息,磁盘信息,CPU负载
+#内核信息
+kernel=$(uname -r)
+
+#操作系统版本
+release=$(cat /etc/redhat-release)
+
+#主机名称
+hostname=$HOSTNAME
+
+#本地IP地址列表
+localip=$(ip a s | awk '/inet /{print $2}')
+
+#总内存容量
+mem_total=$(free | awk '/Mem/{print $2}')
+
+#剩余内存容量
+mem_free=$(free | awk '/Mem/{print $NF}')
+
+#总swap容量
+swap_total=$(free | awk '/Swap/{print $2}')
+
+#剩余swap容量
+swap_free=$(free | awk '/Swap/{print $NF}')
+
+#磁盘信息
+disk=$(df | awk '/^\/dev/{print $1,$2,$4}'|column -t)
+
+#CPU最近1分钟的平均负载
+load1=$(uptime | sed 's/,//g' | awk '{print $(NF-2)}')
+
+#CPU最近5分钟的平均负载
+load5=$(uptime | sed 's/,//g' | awk '{print $(NF-1)}')
+
+#CPU最近15分钟的平均负载
+load15=$(uptime | sed 's/,//g' | awk '{print $(NF)}')
+
+#登录用户数量
+login_users=$(who | wc -l)
+
+#进程数量
+procs=$(ps aux | wc -l)
+
+#系统总账户数量
+users=$(sed -n '$=' /etc/passwd)
+
+#CPU型号
+cpu_info=$(LANG=C lscpu |awk -F: '/Model name/ {print $2}')
+
+#CPU内核数量
+cpu_core=$(awk '/processor/{core++} END{print core}' /proc/cpuinfo)
+
+#安装性能监控软件
+yum -y -q  install sysstat &amp;&gt;/dev/null
+
+echo -e &quot;\033[34m提取磁盘性能指标,请稍后...\033[0m&quot;
+
+tps=$(LANG=C sar -d -p 1 6 | awk '/Average/' | tail -n +2 |awk '{print &quot;[&quot;$2&quot;]磁盘平均IO数量:&quot;$3}') &amp;
+
+read_write=$(LANG=C sar -d -p 1 6 |awk '/Average/' | tail -n +2 | awk '{print &quot;[&quot;$2&quot;]平均每秒读写扇区量:&quot;$4,$5}') &amp;
+
+#中断数量
+irq=$(vmstat 1 2 |tail -n +4 | awk '{print $11}')
+
+#上下文切换数量
+cs=$(vmstat 1 2|tail -n +4 | awk '{print $12}')
+
+#占用内存资源最多的10个进程列表
+top_proc_mem=$(ps --no-headers -eo comm,rss | sort -k2 -n |tail -10)
+
+#占用内存资源最多的10个进程列表
+top_proc_cpu=$(ps --no-headers -eo comm,rss | sort -k2 -n |tail -10)
+
+#获取网卡流量信息,接收|发送的数据流量,单位为字节(bytes)
+net_monitor=$(cat /proc/net/dev | tail -n +3 |awk 'BEGIN{ print &quot;网卡名称 入站数据流量(bytes) 出站数据流量(bytes)&quot;} {print $1,$2,$10}' | column -t)
+
+#输出数据信息
+echo -e &quot;\033[32m************************本机主要参数列表********************\033[0m&quot;
+
+echo -e &quot;本机IP地址列表:\033[32m$localip\033[0m&quot;
+
+echo -e &quot;本机主机名称:\033[32m$hostname\033[0m&quot;
+
+echo -e &quot;操作系统版本为:\033[32m$release\033[0m,内核版本:\033[32m$kernel\033[0m&quot;
+
+echo -e &quot;CPU型号为:\033[32m$cpu_info\033[0m,CPU内核数量:\033[32$kernel\033[0m&quot;
+
+echo -e &quot;本机总内存容量:\033[32m$mem_total\033[0m,剩余可用内存容量:\033[32m$mem_free\033[0m&quot;
+
+echo -e &quot;本机swap总容量:\033[32m$swap_local\033[0m,剩余swap容量:\033[32m$swap_free\033[0m&quot;
+
+echo -e &quot;CPU最近1分钟,5分钟,15分钟的平均负载分别为:\033[32m$load1 $load5 $load15\033[0m&quot;
+
+echo -e &quot;本机总账户数量为:\033[32m$users\033[0m,当前登录系统的账户数量:\033[32m$login_users\033[0m&quot;
+
+echo -e &quot;当前系统中启动的进程数量:\033[32m$procs\033[0m&quot;
+
+echo -e &quot;占用CPU资源最多的10个进程列表为:&quot;
+
+echo -e &quot;\033[32m$top_proc_cpu\033[0m&quot;
+
+echo -e &quot;占用CPU内存资源最多的10个进程列表为:&quot;
+
+echo -e &quot;\033[32m$top_proc_mem\033[0m&quot;
+
+echo -e &quot;CPU中断数量为:\033[32m$irq\033[0m,CPU上下文切换数量:\033[32m$cs\033[0m&quot;
+
+echo -e &quot;每个磁盘分区的总容量与剩余容量信息如下:&quot;
+
+echo -e &quot;$disk&quot;
+
+echo -e &quot;$tps&quot;
+
+echo -e &quot;$read_write&quot;
+
+echo -e &quot;$net_monitor&quot;
+
+echo -e &quot;\033[32m************************巡检结束********************\033[0m&quot;
+</code></pre>
+
+<p>执行结果 ：<br />
+CentOS 7.5<br />
+<a href="https://img.it610.com/image/info8/df503d0f697744d8a68c610137b4ba97.jpg"><img src="https://img.it610.com/image/info8/df503d0f697744d8a68c610137b4ba97.jpg" alt="应用版日常linux系统巡检shell脚本_第1张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/baec9723597e4b3e960dfd0e75666a38.jpg"><img src="https://img.it610.com/image/info8/baec9723597e4b3e960dfd0e75666a38.jpg" alt="应用版日常linux系统巡检shell脚本_第2张图片" /></a><br />
+Ubuntu 16.04执行结果<br />
+<a href="https://img.it610.com/image/info8/a045ee6d5dd244069a5cff4f9e17335a.jpg"><img src="https://img.it610.com/image/info8/a045ee6d5dd244069a5cff4f9e17335a.jpg" alt="应用版日常linux系统巡检shell脚本_第3张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/7a0c43528c034d15b77ca8f3e688a066.jpg"><img src="https://img.it610.com/image/info8/7a0c43528c034d15b77ca8f3e688a066.jpg" alt="应用版日常linux系统巡检shell脚本_第4张图片" /></a></p>
+
+<h1 id="网卡流量监控脚本">网卡流量监控脚本</h1>
+
+<p>适用于ubantu和centos系统</p>
+
+<pre><code>统计一下指定网卡的一段时间内的数据：
+有哪些IP的哪些端口连接到了我们的80端口，连接数的top10
+服务器网络连接状态统计，有多少FIN-WAIT-2
+10秒内服务器和客户端各端口流量统计
+ctrl + c 停止排查。
+
+
+
+git clone https://github.com/luckman666/networkAnalysis.git
+
+cd networkAnalysis &amp;&amp; chmod -R netAnalysis.sh
+
+./netAnalysis.sh
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/a22ddfe4c3094f96a77e06a7d9620f5b.png"><img src="https://img.it610.com/image/info8/a22ddfe4c3094f96a77e06a7d9620f5b.png" alt="应用版日常linux系统巡检shell脚本_第5张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/7cf04fa444234ff689a4fe5d60ae6b02.jpg"><img src="https://img.it610.com/image/info8/7cf04fa444234ff689a4fe5d60ae6b02.jpg" alt="应用版日常linux系统巡检shell脚本_第6张图片" /></a></p>
+
+<h1 id="系统巡检脚本">系统巡检脚本</h1>
+
+<p>适用于ubantu和centos系统<br />
+执行后功能列表：<br />
+<a href="https://img.it610.com/image/info8/96af4d6388d745598ab1252dccf8f4d3.png"><img src="https://img.it610.com/image/info8/96af4d6388d745598ab1252dccf8f4d3.png" alt="应用版日常linux系统巡检shell脚本_第7张图片" /></a><br />
+选择1<br />
+<a href="https://img.it610.com/image/info8/aa3ecc5de5ae4c169fd5410824fa2c84.jpg"><img src="https://img.it610.com/image/info8/aa3ecc5de5ae4c169fd5410824fa2c84.jpg" alt="应用版日常linux系统巡检shell脚本_第8张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/52c01891ade84ed68c1bdfdb4d6c2bd3.jpg"><img src="https://img.it610.com/image/info8/52c01891ade84ed68c1bdfdb4d6c2bd3.jpg" alt="应用版日常linux系统巡检shell脚本_第9张图片" /></a></p>
+
+<h1 id="shell脚本根据pid查看所有信息">shell脚本根据PID查看所有信息</h1>
+
+<p>适用于ubantu和centos系统</p>
+
+<pre><code># git clone https://github.com/luckman666/PidInfo.git &amp;&amp; chmod -R 755  PidInfo
+
+#! /bin/bash
+# 根据用户输入的PID，过滤出该PID所有的信息
+read -p &quot;请输入要查询的PID: &quot; P
+n=`ps -aux| awk '$2~/^'$P'$/{print $11}'|wc -l`
+if [ $n -eq 0 ];then
+ echo &quot;该PID不存在！！&quot;
+ exit
+fi
+echo &quot;--------------------------------&quot;
+echo &quot;进程PID: $P&quot;
+echo &quot;进程命令：`ps -aux| awk '$2~/^'$P'$/{print $11}'`&quot;
+echo &quot;进程所属用户: `ps -aux| awk '$2~/^'$P'$/{print $1}'`&quot;
+echo &quot;CPU占用率：`ps -aux| awk '$2~/^'$P'$/{print $3}'`%&quot;
+echo &quot;内存占用率：`ps -aux| awk '$2~/^'$P'$/{print $4}'`%&quot;
+echo &quot;进程开始运行的时刻：`ps -aux| awk '$2~/^'$P'$/{print $9}'`&quot;
+echo &quot;进程运行的时间：`ps -aux| awk '$2~/^'$P'$/{print $10}'`&quot;
+echo &quot;进程状态：`ps -aux| awk '$2~/^'$P'$/{print $8}'`&quot;
+echo &quot;进程虚拟内存：`ps -aux| awk '$2~/^'$P'$/{print $5}'`&quot;
+echo &quot;进程共享内存：`ps -aux| awk '$2~/^'$P'$/{print $6}'`&quot;
+echo &quot;--------------------------------&quot;
+</code></pre>
+
+<p>PID：<br />
+<a href="https://img.it610.com/image/info8/b2fb98df0a8f487b9acb38c978b153c1.jpg"><img src="https://img.it610.com/image/info8/b2fb98df0a8f487b9acb38c978b153c1.jpg" alt="应用版日常linux系统巡检shell脚本_第10张图片" /></a><br />
+然后我们执行脚本写上PID。<br />
+<a href="https://img.it610.com/image/info8/a87f62fad9c1485cb5af56d9b6ed388f.jpg"><img src="https://img.it610.com/image/info8/a87f62fad9c1485cb5af56d9b6ed388f.jpg" alt="应用版日常linux系统巡检shell脚本_第11张图片" /></a></p>
+
+<h1 id="批量添加用户">批量添加用户</h1>
+
+<p>CentOS &amp;&amp; Ubuntu</p>
+
+<pre><code>git clone https://github.com/luckman666/mUser.git
+chmod -R 755  mUser
+
+添加用户 : 
+mUser.sh --add name1,name2,…………
+
+删除用户: 
+mUser.sh --del name1,name2
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/57ca54ec22774c0c86cad6e24ca5b726.png"><img src="https://img.it610.com/image/info8/57ca54ec22774c0c86cad6e24ca5b726.png" alt="应用版日常linux系统巡检shell脚本_第12张图片" /></a></p>
+
+<h1 id="批量部署k8s脚本">批量部署k8s脚本</h1>
+
+<p>k8s集群部署脚本一键部署(多版本)kubernetes集群部署脚本<br />
+注意 ： 仅限CentOS<br />
+咱们要做就做到底，把K8s部署、升级、扩容这块的脚本一气写完，之前波哥出的k8s集群部署脚本都是指定版本的。<br />
+<a href="https://img.it610.com/image/info8/b59b50395b564519833f6eace003f8ba.jpg"><img src="https://img.it610.com/image/info8/b59b50395b564519833f6eace003f8ba.jpg" alt="应用版日常linux系统巡检shell脚本_第13张图片" /></a></p>
+
+<pre><code>git clone https://github.com/luckman666/k8sDeploy.git &amp;&amp; chmod -R 755 k8sDeploy &amp;&amp; cd k8sDeploy
+# ./k8sDeploy.sh   #安装
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/0262d10992994f5cab27a8970f401d36.jpg"><img src="https://img.it610.com/image/info8/0262d10992994f5cab27a8970f401d36.jpg" alt="应用版日常linux系统巡检shell脚本_第14张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/de3099980f3f4af889ce5aac2fb9fd68.jpg"><img src="https://img.it610.com/image/info8/de3099980f3f4af889ce5aac2fb9fd68.jpg" alt="在这里插入图片描述" /></a><br />
+<a href="https://img.it610.com/image/info8/39c8a900f73f48348681d4acd94e4054.jpg"><img src="https://img.it610.com/image/info8/39c8a900f73f48348681d4acd94e4054.jpg" alt="应用版日常linux系统巡检shell脚本_第15张图片" /></a></p>
+
+<h1 id="k8s集群一键新加node节点脚本">k8s集群一键新加node节点脚本</h1>
+
+<p>继推出k8s集群一键升级脚本之后,k8s在线扩容节点的需求<br />
+<a href="https://img.it610.com/image/info8/fb3d87da189141dd8e5acc34aa9a8548.jpg"><img src="https://img.it610.com/image/info8/fb3d87da189141dd8e5acc34aa9a8548.jpg" alt="应用版日常linux系统巡检shell脚本_第16张图片" /></a><br />
+跟以往一下我们有个base.config文件，修改上面的参数。这里我写好了自己的例子还有相关注释。</p>
+
+<p>配置完毕后执行这个脚本就行了<br />
+<a href="https://img.it610.com/image/info8/a54b5cf0b91944b6b0eee4e595105622.jpg"><img src="https://img.it610.com/image/info8/a54b5cf0b91944b6b0eee4e595105622.jpg" alt="在这里插入图片描述" /></a><br />
+执行效果：<br />
+<a href="https://img.it610.com/image/info8/f54f98dde2a54952bfb4064611559d5b.jpg"><img src="https://img.it610.com/image/info8/f54f98dde2a54952bfb4064611559d5b.jpg" alt="应用版日常linux系统巡检shell脚本_第17张图片" /></a><br />
+箭头所指就是我们新增的node节点</p>
+
+<pre><code># git clone https://github.com/luckman666/k8sExt.git &amp;&amp; chmod -R 755 k8sExt &amp;&amp; cd k8sExt
+# k8sExt.sh
+</code></pre>
+
+<h1 id="漏洞扫描">漏洞扫描</h1>
+
+<p>注意 ： CentOS &amp;&amp; Ubuntu</p>
+
+<pre><code>一键安装命令
+docker run -d -p 8000:80 -v /opt/data:/data ysrc/xunfeng:latest
+
+仓库地址：https://github.com/ysrc/xunfeng
+</code></pre>
+
+<p>CentOS<br />
+<a href="https://img.it610.com/image/info8/b66b7015b0894e9897185cfb4df1ac94.jpg"><img src="https://img.it610.com/image/info8/b66b7015b0894e9897185cfb4df1ac94.jpg" alt="应用版日常linux系统巡检shell脚本_第18张图片" /></a><br />
+Ubuntu<br />
+<a href="https://img.it610.com/image/info8/8afba0749411411d9c74e1edfbbd7cd3.jpg"><img src="https://img.it610.com/image/info8/8afba0749411411d9c74e1edfbbd7cd3.jpg" alt="应用版日常linux系统巡检shell脚本_第19张图片" /></a></p>
+
+<h1 id="rsync同步脚本">rsync同步脚本</h1>
+
+<p>需求 ：需要临时多台机器同步文件内容。<br />
+配置文件，这里只需要配置这样的参数即可。<br />
+<a href="https://img.it610.com/image/info8/ee991ec211bd4693a3a7717a160ac281.jpg"><img src="https://img.it610.com/image/info8/ee991ec211bd4693a3a7717a160ac281.jpg" alt="在这里插入图片描述" /></a><br />
+注意：</p>
+
+<pre><code>1、因为脚本采用rsync 进行同步，所以源端目标端都必须要安装rsync工具
+
+2、做好源端和目标端单向互信登录，我们之前也推出过一键互信脚本。直接使用即可。
+
+
+
+git clone https://github.com/luckman666/rScript.git
+
+chmod -R 755 rScript &amp;&amp; cd rScript 
+
+修改base.config参数
+
+./rScript.sh            
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/b9958a262904457e986598810ee9f5d9.jpg"><img src="https://img.it610.com/image/info8/b9958a262904457e986598810ee9f5d9.jpg" alt="在这里插入图片描述" /></a><br />
+然后就会直接同步过去，为了更灵活方便。波哥还在脚本里面写了忽略哪些文件夹，当然如果您的源端根本没有，那就也不同同步，如果有其他需要忽略的，可以按这个格式往里添加。<br />
+<a href="https://img.it610.com/image/info8/dfbc6114966948f69e96348df964809c.jpg"><img src="https://img.it610.com/image/info8/dfbc6114966948f69e96348df964809c.jpg" alt="在这里插入图片描述" /></a></p>
+
+<h1 id="超牛x的多线程端口扫描脚本-python3">超牛X的多线程端口扫描脚本（python3）</h1>
+
+<p>注意 ： CentOS &amp;&amp; Ubuntu</p>
+
+<pre><code>脚本后续更新及迭代将由kkitDeploy项目代替
+https://github.com/luckman666/kkitdeploy_server
+请大家持续关注kkitDeploy
+</code></pre>
+
+<p>脚本</p>
+
+<pre><code>git clone https://github.com/luckman666/PortScan.git
+cd PortScan
+# 192.168.1.102 也可以填写域名 1200线程数，9秒timeout
+# 用python3写的请用python3以上版本
+python main.py -d 192.168.1.102 -t 1200 -w 9
+</code></pre>
+
+<p>运行截图：<br />
+<a href="https://img.it610.com/image/info8/22fbac6a771f4a86b29e32783fbe5e0a.jpg"><img src="https://img.it610.com/image/info8/22fbac6a771f4a86b29e32783fbe5e0a.jpg" alt="应用版日常linux系统巡检shell脚本_第20张图片" /></a><br />
+<a href="https://img.it610.com/image/info8/9ef7e265040240c6b365d6c1118b4904.jpg"><img src="https://img.it610.com/image/info8/9ef7e265040240c6b365d6c1118b4904.jpg" alt="应用版日常linux系统巡检shell脚本_第21张图片" /></a></p>
+
+<h1 id="检测网站挂马程序-python">检测网站挂马程序（Python）</h1>
+
+<p>系统管理员通常从svn/git中检索代码，部署站点后通常首先会生成该站点所有文件的MD5值，如果上线后网站页面内容被篡改（如挂马）等，可以比对之前生成MD5值快速查找去那些文件被更改，为了使系统管理员第一时间发现，可结合crontab或nagios等工具。</p>
+
+<p><strong>程序测试如下：</strong></p>
+
+<pre><code># python check_change.py
+    Usage: python check_change.py update /home/wwwroot
+           python check_change.py check /home/wwwroot
+# python check_change.py update /data/www #生成站点的md5值
+# echo ' ' &gt; /data/www/sitemap.html #测试清空文件
+# rm -rf /data/www/sitemap.xml #测试删除文件
+# python check_change.py check /data/www  #查找那些文件被篡改
+/data/www/sitemap.xml
+/data/www/sitemap.html
+</code></pre>
+
+<p><strong>代码如下（check_change.py）：</strong></p>
+
+<pre><code>#!/usr/bin/env python  
+
+import os,sys,subprocess  
+
+def update(path):  
+    f = open(file,'w')  
+    for root,dirs,files in os.walk(path):  
+        for name in files:  
+            line = os.path.join(root, name)  
+            (stdin,stderr) = subprocess.Popen(['md5sum',line],stdout=subprocess.PIPE).communicate()  
+            f.write(stdin)  
+    f.close()  
+
+def check(path):  
+    f = open(file,'r')  
+    for line in f:  
+        check_ok = &quot;&quot;&quot;echo '%s' | md5sum -c &gt; /dev/null 2&gt;&amp;1&quot;&quot;&quot; % line  
+        #print check_ok  
+        if not subprocess.call(check_ok, shell = True) == 0:  
+            abnormal = line.split()  
+            print abnormal[1]  
+    f.close()  
+
+def Usage():  
+    print ''' 
+    Usage: python %s update /home/wwwroot 
+           python %s check /home/wwwroot 
+    ''' % (sys.argv[0],sys.argv[0])  
+    sys.exit()  
+
+if len(sys.argv) != 3:  
+    Usage()  
+
+file = 'file.key'  
+model = sys.argv[1]  
+path = sys.argv[2]  
+
+if os.path.exists(path) == False:  
+    print &quot;\033[;31mThe directory or file does not exist\033[0m&quot;  
+    sys.exit()  
+elif model == 'update':  
+    update(path)  
+elif model == 'check':  
+    check(path)  
+else:  
+    Usage()  
+</code></pre>
+
+<p>#</p>
+
+<p>#</p>
+
+<p>#</p>
+
+<p>参考链接 ：<br />
+<a href="https://www.jianshu.com/p/132154dbffe7">https://www.jianshu.com/p/132154dbffe7</a></p>
+
+<p><strong>linux网络监控流量监控脚本</strong> ：<a href="https://www.jianshu.com/p/49699add574b">https://www.jianshu.com/p/49699add574b</a></p>
+
+<p><a href="https://www.jianshu.com/p/f2778d3e27f7">https://www.jianshu.com/p/f2778d3e27f7</a></p>
+
+<p>检测网站挂马程序（Python） ：<a href="https://www.jianshu.com/p/4d294e1a2b58">https://www.jianshu.com/p/4d294e1a2b58</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

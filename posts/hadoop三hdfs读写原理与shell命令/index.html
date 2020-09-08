@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Hadoop三HDFS读写原理与shell命令 | 开发者问答集锦</title>
+    <meta property="og:title" content="Hadoop三HDFS读写原理与shell命令 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Hadoop三HDFS读写原理与shell命令">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/hadoop%E4%B8%89hdfs%E8%AF%BB%E5%86%99%E5%8E%9F%E7%90%86%E4%B8%8Eshell%E5%91%BD%E4%BB%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Hadoop三HDFS读写原理与shell命令</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="一-hdfs概述">一 HDFS概述</h2>
+
+<h3 id="1-1-hdfs产生背景">1.1 HDFS产生背景</h3>
+
+<p>随着数据量越来越大，在一个操作系统管辖的范围内存不下了，那么就分配到更多的操作系统管理的磁盘中，但是不方便管理和维护，迫切需要一种系统来管理多台机器上的文件，这就是分布式文件管理系统。HDFS只是分布式文件管理系统中的一种。</p>
+
+<h3 id="1-2-hdfs概念">1.2 HDFS概念</h3>
+
+<p>HDFS，它是一个文件系统，用于存储文件，通过目录树来定位文件；其次，它是分布式的，由很多服务器联合起来实现其功能，集群中的服务器有各自的角色。</p>
+
+<p>HDFS的设计适合一次写入，多次读出的场景，且不支持文件的修改。适合用来做数据分析，并不适合用来做网盘应用。</p>
+
+<h3 id="1-3-hdfs优缺点">1.3 HDFS优缺点</h3>
+
+<p>1.3.1 优点</p>
+
+<p>1）高容错性</p>
+
+<p>（1）数据自动保存多个副本。它通过增加副本的形式，提高容错性。</p>
+
+<p>（2）某一个副本丢失以后，它可以自动恢复。</p>
+
+<p>2）适合大数据处理</p>
+
+<p>（1）数据规模：能够处理数据规模达到 GB、TB、甚至PB级别的数据。</p>
+
+<p>（2）文件规模：能够处理百万规模以上的文件数量，数量相当之大。</p>
+
+<p>3）流式数据访问</p>
+
+<p>（1）一次写入，多次读取，不能修改，只能追加。</p>
+
+<p>（2）它能保证数据的一致性。</p>
+
+<p>4）可构建在廉价机器上，通过多副本机制，提高可靠性。</p>
+
+<p>1.3.2 缺点</p>
+
+<p>1）不适合低延时数据访问，比如毫秒级的存储数据，是做不到的。</p>
+
+<p>2）无法高效的对大量小文件进行存储</p>
+
+<p>（1）存储大量小文件的话，它会占用 NameNode大量的内存来存储文件、目录和块信息。这样是不可取的，因为NameNode的内存总是有限的。</p>
+
+<p>（2）小文件存储的寻道时间会超过读取时间，它违反了HDFS的设计目标。</p>
+
+<p>3）并发写入、文件随机修改</p>
+
+<p>（1）一个文件只能有一个写，不允许多个线程同时写。</p>
+
+<p>（2）仅支持数据 append（追加），不支持文件的随机修改。</p>
+
+<h4 id="抛出问题-hdfs文件系统为什么不适用于存储小文件">抛出问题：HDFS文件系统为什么不适用于存储小文件？</h4>
+
+<p>这是和HDFS系统底层设计实现有关系的，HDFS本身的设计就是用来解决海量大文件数据的存储.，他天生喜欢大数据的处理，大文件存储在HDFS中，会被切分成很多的小数据块，任何一个文件不管有多小，都是一个独立的数据块，而这些数据块的信息则是保存在元数据中的，在之前的博客HDFS基础里面介绍过在HDFS集群的namenode中会存储元数据的信息，这里再说一下，元数据的信息主要包括以下3部分：</p>
+
+<p>1）抽象目录树</p>
+
+<p>2）文件和数据块的映射关系，一个数据块的元数据大小大约是150byte</p>
+
+<p>3）数据块的多个副本存储地</p>
+
+<p>而元数据的存储在磁盘（1和2）和内存中（1、2和3），而服务器中的内存是有上限的，举个例子：</p>
+
+<p>有100个1M的文件存储进入HDFS系统，那么数据块的个数就是100个，元数据的大小就是100*150byte，消耗了15000byte的内存，但是只存储了100M的数据。</p>
+
+<p>有1个100M的文件存储进入HDFS系统，那么数据块的个数就是1个，元数据的大小就是150byte，消耗量150byte的内存，存储量100M的数据。</p>
+
+<p>所以说HDFS文件系统不适用于存储小文件。</p>
+
+<h3 id="1-4-hdfs架构">1.4 HDFS架构</h3>
+
+<p>###
+<a href="https://img.it610.com/image/info8/ca6a3f263a734dd2bd81c9cdb4d45833.jpg"><img src="https://img.it610.com/image/info8/ca6a3f263a734dd2bd81c9cdb4d45833.jpg" alt="Hadoop（三）HDFS读写原理与shell命令_第1张图片" /></a></p>
+
+<p>###</p>
+
+<p>1）Client：就是客户端。</p>
+
+<p>（1）文件切分。文件上传 HDFS 的时候，Client 将文件切分成一个一个的Block，然后进行存储。</p>
+
+<p>（2）与NameNode交互，获取文件的位置信息。</p>
+
+<p>（3）与DataNode交互，读取或者写入数据。</p>
+
+<p>（4）Client提供一些命令来管理HDFS，比如启动或者关闭HDFS。</p>
+
+<p>（5）Client可以通过一些命令来访问HDFS。</p>
+
+<p>2）NameNode：就是master，它是一个主管、管理者。</p>
+
+<p>（1）管理HDFS的名称空间。</p>
+
+<p>（2）管理数据块（Block）映射信息</p>
+
+<p>（3）配置副本策略</p>
+
+<p>（4）处理客户端读写请求。</p>
+
+<p>3） DataNode：就是Slave。NameNode下达命令，DataNode执行实际的操作。</p>
+
+<p>（1）存储实际的数据块。</p>
+
+<p>（2）执行数据块的读/写操作。</p>
+
+<p>4） Secondary NameNode：并非NameNode的热备。当NameNode挂掉的时候，它并不能马上替换NameNode并提供服务。</p>
+
+<p>（1）辅助NameNode，分担其工作量。</p>
+
+<p>（2）定期合并Fsimage和Edits，并推送给NameNode。</p>
+
+<p>（3）在紧急情况下，可辅助恢复NameNode。</p>
+
+<h3 id="1-5-hdfs-文件块大小">1.5 HDFS 文件块大小</h3>
+
+<p>HDFS中的文件在物理上是分块存储（block），块的大小可以通过配置参数(
+dfs.blocksize)来规定，默认大小在hadoop2.x版本中是128M，老版本中是64M。</p>
+
+<p>HDFS的块比磁盘的块大，其目的是为了最小化寻址开销。如果块设置得足够大，从磁盘传输数据的时间会明显大于定位这个块开始位置所需的时间。因而，传输一个由多个块组成的文件的时间取决于磁盘传输速率。</p>
+
+<p>如果寻址时间约为10ms，而传输速率为100MB/s，为了使寻址时间仅占传输时间的1%，我们要将块大小设置约为100MB。默认的块大小128MB。</p>
+
+<p>块的大小：10ms*100*100M/s = 100M</p>
+
+<p><a href="https://img.it610.com/image/info8/398384e86f2c4c6ab93316883c173bde.jpg"><img src="https://img.it610.com/image/info8/398384e86f2c4c6ab93316883c173bde.jpg" alt="Hadoop（三）HDFS读写原理与shell命令_第2张图片" /></a></p>
+
+<h2 id="二-hdfs的辅助功能">二 HDFS的辅助功能</h2>
+
+<p>HDFS作为一个文件系统。有两个最主要的功能： <strong>上传和下载</strong> 。而为了保障这两个功能的完美和高效实现，HDFS提供了很多的辅助功能</p>
+
+<h3 id="2-1-心跳机制">2.1.心跳机制</h3>
+
+<p>1、 Hadoop 是 Master/Slave 结构，Master 中有 NameNode 和 ResourceManager，Slave 中有
+Datanode 和 NodeManager</p>
+
+<p>2、 Master 启动的时候会启动一个 IPC（Inter-Process Comunication，进程间通信）server 服 务，等待 slave
+的链接</p>
+
+<p>3、 Slave 启动时，会主动链接 master 的 ipc server 服务，并且每隔 3 秒链接一次 master，这
+个间隔时间是可以调整的，参数为 dfs.heartbeat.interval，这个每隔一段时间去连接一次 的机制，我们形象的称为心跳。Slave
+通过心跳汇报自己的信息给 master，master 也通 过心跳给 slave 下达命令，</p>
+
+<p>4、 NameNode 通过心跳得知 Datanode 的状态 ，ResourceManager 通过心跳得知 NodeManager 的状态</p>
+
+<p>5、 如果 master 长时间都没有收到 slave 的心跳，就认为该 slave 挂掉了。</p>
+
+<p><strong>最终NameNode判断一个DataNode死亡的时间计算公式：</strong></p>
+
+<p><strong>timeout = 10 * 心跳间隔时间 + 2 * 检查一次消耗的时间</strong></p>
+
+<p>心跳间隔时间：dfs.heartbeat.interval 心跳时间：3s，检查一次消耗的时间：heartbeat.recheck.interval
+checktime : 5min，最终宕机之后630s后显示死亡状态。</p>
+
+<h3 id="2-2-安全模式">2.2.安全模式</h3>
+
+<p>1、HDFS的启动和关闭都是先启动NameNode，在启动DataNode，最后在启动secondarynamenode。</p>
+
+<p>2、决定HDFS集群的启动时长会有两个因素：</p>
+
+<p>1）磁盘元数据的大小</p>
+
+<p>2）datanode的节点个数</p>
+
+<p>当元数据很大，或者 节点个数很多的时候，那么HDFS的启动，需要一段很长的时间，那么在还没有完全启动的时候HDFS能否对外提供服务？</p>
+
+<p>在HDFS的启动命令start-dfs.sh执行的时候，HDFS会自动进入安全模式</p>
+
+<p>为了确保用户的操作是可以高效的执行成功的，在HDFS发现自身不完整的时候，会进入安全模式。保护自己。</p>
+
+<p>在正常启动之后，如果HDFS发现所有的数据都是齐全的，那么HDFS会启动的退出安全模式</p>
+
+<p>3、对安全模式进行测试</p>
+
+<p>安全模式常用操作命令：</p>
+
+<pre><code>hdfs dfsadmin -safemode leave //强制 NameNode 退出安全模式
+hdfs dfsadmin -safemode enter //进入安全模式
+hdfs dfsadmin -safemode get //查看安全模式状态
+hdfs dfsadmin -safemode wait //等待，一直到安全模式结束
+</code></pre>
+
+<p>4、安全模式下测试上传下载，得出结论：</p>
+
+<p>如果一个操作涉及到元数据的修改的话。都不能进行操作，如果一个操作仅仅只是查询。那是被允许的。所谓安全模式，仅仅只是保护namenode，而不是保护datanode。</p>
+
+<h3 id="2-3-副本存放策略">2.3.副本存放策略</h3>
+
+<p>第一副本：放置在上传文件的DataNode上；如果是集群外提交，则随机挑选一台磁盘不太慢、CPU不太忙的节点上；<br />
+第二副本：放置在于第一个副本不同的机架的节点上；<br />
+第三副本：与第二个副本相同机架的不同节点上；<br />
+如果还有更多的副本：随机放在节点中；</p>
+
+<p><img src="https://img.it610.com/image/info8/7b4f0e49eb9640e691aeddbcfcc6d6c3.png" alt="" /></p>
+
+<h3 id="2-4-负载均衡">2.4.负载均衡</h3>
+
+<p>负载均衡理想状态：节点均衡、机架均衡和磁盘均衡。</p>
+
+<p>Hadoop的HDFS集群非常容易出现机器与机器之间磁盘利用率不平衡的情况，例如：当集群内新增、删除节点，或者某个节点机器内硬盘存储达到饱和值。当数据不平衡时，Map任务可能会分配到没有存储数据的机器，这将导致网络带宽的消耗，也无法很好的进行本地计算。<br />
+当HDFS负载不均衡时，需要对HDFS进行数据的负载均衡调整，即对各节点机器上数据的存储分布进行调整。从而，让数据均匀的分布在各个DataNode上，均衡IO性能，防止热点的发生。进行数据的负载均衡调整，必须要满足如下原则：</p>
+
+<ul>
+<li>数据平衡不能导致数据块减少，数据块备份丢失</li>
+<li>管理员可以中止数据平衡进程</li>
+<li>每次移动的数据量以及占用的网络资源，必须是可控的</li>
+<li>数据均衡过程，不能影响namenode的正常工作</li>
+</ul>
+
+<h4 id="负载均衡的原理">负载均衡的原理</h4>
+
+<p>数据均衡过程的核心是一个数据均衡算法，该数据均衡算法将不断迭代数据均衡逻辑，直至集群内数据均衡为止。该数据均衡算法每次迭代的逻辑如下：</p>
+
+<p><img src="https://img.it610.com/image/info8/064945dc72ce4022a74b8fed10264664.jpg" alt="" /></p>
+
+<p>步骤分析如下：</p>
+
+<ol>
+<li>数据均衡服务（Rebalancing Server）首先要求 NameNode 生成 DataNode 数据分布分析报告,获取每个DataNode磁盘使用情况</li>
+<li>Rebalancing Server汇总需要移动的数据分布情况，计算具体数据块迁移路线图。数据块迁移路线图，确保网络内最短路径</li>
+<li>开始数据块迁移任务，Proxy Source Data Node复制一块需要移动数据块</li>
+<li>将复制的数据块复制到目标DataNode上</li>
+<li>删除原始数据块</li>
+<li>目标DataNode向Proxy Source Data Node确认该数据块迁移完成</li>
+<li>Proxy Source Data Node向Rebalancing Server确认本次数据块迁移完成。然后继续执行这个过程，直至集群达到数据均衡标准</li>
+</ol>
+
+<h4 id="datanode分组"><strong>DataNode分组</strong></h4>
+
+<p>在第2步中，HDFS会把当前的DataNode节点,根据阈值的设定情况划分到Over、Above、Below、Under四个组中。在移动数据块的时候，Over组、Above组中的块向Below组、Under组移动。四个组定义如下：</p>
+
+<p><img src="https://img.it610.com/image/info8/2128cdbc137346078ca0ac2868998c22.jpg" alt="" /></p>
+
+<ul>
+<li><strong>Over组</strong> ：此组中的DataNode的均满足</li>
+</ul>
+
+<blockquote>
+<p>DataNode_usedSpace_percent <strong>&gt;</strong> Cluster_usedSpace_percent + threshold</p>
+</blockquote>
+
+<ul>
+<li><strong>Above组</strong> ：此组中的DataNode的均满足</li>
+</ul>
+
+<blockquote>
+<p>Cluster_usedSpace<em>percent + threshold <strong>&gt;</strong> DataNode</em> usedSpace _percent
+<strong>&gt;</strong> Cluster_usedSpace_percent</p>
+</blockquote>
+
+<ul>
+<li><strong>Below组</strong> ：此组中的DataNode的均满足</li>
+</ul>
+
+<blockquote>
+<p>Cluster_usedSpace<em>percent <strong>&gt;</strong> DataNode</em> usedSpace<em>percent <strong>&gt;</strong> Cluster</em>
+usedSpace_percent – threshold</p>
+</blockquote>
+
+<ul>
+<li><strong>Under组</strong> ：此组中的DataNode的均满足</li>
+</ul>
+
+<blockquote>
+<p>Cluster_usedSpace_percent – threshold <strong>&gt;</strong> DataNode_usedSpace_percent</p>
+</blockquote>
+
+<h4 id="hadoop-hdfs-数据自动平衡脚本使用方法">Hadoop HDFS 数据自动平衡脚本使用方法</h4>
+
+<p>在Hadoop中，包含一个start-balancer.sh脚本，通过运行这个工具，启动HDFS数据均衡服务。该工具可以做到热插拔，即无须重启计算机和
+Hadoop
+服务。HadoopHome/bin目录下的start−balancer.sh脚本就是该任务的启动脚本。启动命令为：‘HadoopHome/bin目录下的start−balancer.sh脚本就是该任务的启动脚本。启动命令为：‘Hadoop_home/bin/start-
+balancer.sh –threshold`</p>
+
+<p><strong>影响Balancer的几个参数：</strong></p>
+
+<ul>
+<li>-threshold
+
+<ul>
+<li>默认设置：10，参数取值范围：0-100</li>
+<li>参数含义：判断集群是否平衡的阈值。理论上，该参数设置的越小，整个集群就越平衡</li>
+</ul></li>
+<li>dfs.balance.bandwidthPerSec
+
+<ul>
+<li>默认设置：1048576（1M/S）</li>
+<li>参数含义：Balancer运行时允许占用的带宽</li>
+</ul></li>
+</ul>
+
+<p>示例如下：</p>
+
+<pre><code>#启动数据均衡，默认阈值为 10%
+$Hadoop_home/bin/start-balancer.sh
+
+#启动数据均衡，阈值 5%
+bin/start-balancer.sh –threshold 5
+
+#停止数据均衡
+$Hadoop_home/bin/stop-balancer.sh
+</code></pre>
+
+<p>在hdfs-site.xml文件中可以设置数据均衡占用的网络带宽限制</p>
+
+<pre><code>    dfs.balance.bandwidthPerSec
+    1048576
+     Specifies the maximum bandwidth that each datanode can utilize for the balancing purpose in term of the number of bytes per second. 
+</code></pre>
+
+<h2 id="三-hdfs的读写详解">三 HDFS的读写详解</h2>
+
+<h3 id="3-1-hdfs写操作">3.1 HDFS写操作</h3>
+
+<p><a href="https://img.it610.com/image/info8/9e1cb8bc15e54e0ba944c83526531668.jpg"><img src="https://img.it610.com/image/info8/9e1cb8bc15e54e0ba944c83526531668.jpg" alt="Hadoop（三）HDFS读写原理与shell命令_第3张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/fe4b9a9a9faf421dbaf827293d103c4f.jpg"><img src="https://img.it610.com/image/info8/fe4b9a9a9faf421dbaf827293d103c4f.jpg" alt="Hadoop（三）HDFS读写原理与shell命令_第4张图片" /></a></p>
+
+<h4 id="详细文字说明-术语">详细文字说明（术语）</h4>
+
+<p>1、使用 HDFS 提供的客户端 Client，向远程的 namenode 发起 RPC 请求</p>
+
+<p>2、namenode 会检查要创建的文件是否已经存在，创建者是否有权限进行操作，成功则会 为文件创建一个记录，否则会让客户端抛出异常；</p>
+
+<p>3、当客户端开始写入文件的时候，客户端会将文件切分成多个 packets，并在内部以数据队列“data queue（数据队列）”的形式管理这些
+packets，并向 namenode 申请 blocks，获 取用来存储 replicas 的合适的 datanode 列表，列表的大小根据
+namenode 中 replication 的设定而定；</p>
+
+<p>4、开始以 pipeline（管道）的形式将 packet 写入所有的 replicas 中。客户端把 packet 以流的 方式写入第一个
+datanode，该 datanode 把该 packet 存储之后，再将其传递给在此 pipeline 中的下一个 datanode，直到最后一个
+datanode，这种写数据的方式呈流水线的形式。</p>
+
+<p>5、最后一个 datanode 成功存储之后会返回一个 ack packet（确认队列），在 pipeline 里传递
+至客户端，在客户端的开发库内部维护着&rdquo;ack queue&rdquo;，成功收到 datanode 返回的 ack packet 后会从&rdquo;data
+queue&rdquo;移除相应的 packet。</p>
+
+<p>6、如果传输过程中，有某个 datanode 出现了故障，那么当前的 pipeline 会被关闭，出现故 障的 datanode 会从当前的
+pipeline 中移除，剩余的 block 会继续剩下的 datanode 中继续 以 pipeline 的形式传输，同时 namenode
+会分配一个新的 datanode，保持 replicas 设定的 数量。</p>
+
+<p>7、客户端完成数据的写入后，会对数据流调用 close()方法，关闭数据流；</p>
+
+<p>8、只要写入了 dfs.replication.min（最小写入成功的副本数）的复本数（默认为 1），写操作
+就会成功，并且这个块可以在集群中异步复制，直到达到其目标复本数（dfs.replication 的默认值为 3），因为 namenode
+已经知道文件由哪些块组成，所以它在返回成功前只需 要等待数据块进行最小量的复制。</p>
+
+<h4 id="详细文字说明-口语">详细文字说明（口语）</h4>
+
+<p>1、客户端发起请求：hadoop fs -put hadoop.tar.gz /</p>
+
+<blockquote>
+<p><strong>客户端怎么知道请求发给那个节点的哪个进程？</strong></p>
+
+<p>因为客户端会提供一些工具来解析出来你所指定的HDFS集群的主节点是谁，以及端口号等信息，主要是通过URI来确定，</p>
+
+<p>url：hdfs://hadoop1:9000</p>
+
+<p>当前请求会包含一个非常重要的信息： 上传的数据的总大小</p>
+</blockquote>
+
+<p>2、namenode会响应客户端的这个请求</p>
+
+<blockquote>
+<p><strong>namenode的职责：</strong></p>
+
+<p>1 管理元数据（抽象目录树结构）</p>
+
+<p>用户上传的那个文件在对应的目录如果存在。那么HDFS集群应该作何处理，不会处理</p>
+
+<p>用户上传的那个文件要存储的目录不存在的话，如果不存在不会创建</p>
+
+<p>2、响应请求</p>
+
+<p>真正的操作：做一系列的校验，</p>
+
+<p>1、校验客户端的请求是否合理<br />
+2、校验客户端是否有权限进行上传</p>
+</blockquote>
+
+<p>3、如果namenode返回给客户端的结果是 通过， 那就是允许上传</p>
+
+<blockquote>
+<p>namenode会给客户端返回对应的所有的数据块的多个副本的存放节点列表，如：</p>
+
+<p>file1_blk1 hadoop02，hadoop03，hadoop04<br />
+file1_blk2 hadoop03，hadoop04，hadoop05</p>
+</blockquote>
+
+<p>4、客户端在获取到了namenode返回回来的所有数据块的多个副本的存放地的数据之后，就可以按照顺序逐一进行数据块的上传操作</p>
+
+<p>5、对要上传的数据块进行逻辑切片</p>
+
+<blockquote>
+<p>切片分成两个阶段:</p>
+
+<p>1、规划怎么切<br />
+2、真正的切</p>
+
+<p>物理切片： 1 和 2</p>
+
+<p>逻辑切片： 1</p>
+
+<p>file1_blk1 ： file1:0:128<br />
+file1_blk2 ： file1:128:256</p>
+</blockquote>
+
+<p>逻辑切片只是规划了怎么切</p>
+
+<p><a href="https://img.it610.com/image/info8/cfe317f7c2014aeaba97b2d40f07cbee.png"><img src="https://img.it610.com/image/info8/cfe317f7c2014aeaba97b2d40f07cbee.png" alt="" /></a></p>
+
+<p>6、开始上传第一个数据块</p>
+
+<p>7、客户端会做一系列准备操作</p>
+
+<blockquote>
+<p>1、依次发送请求去连接对应的datnaode</p>
+
+<p>pipline : client - node1 - node2 - node3</p>
+
+<p>按照一个个的数据包的形式进行发送的。</p>
+
+<p>每次传输完一个数据包，每个副本节点都会进行校验，依次原路给客户端</p>
+
+<p>2、在客户端会启动一个服务：</p>
+
+<p>用户就是用来等到将来要在这个pipline数据管道上进行传输的数据包的校验信息</p>
+
+<p>客户端就能知道当前从clinet到写node1,2,3三个节点上去的数据是否都写入正确和成功</p>
+</blockquote>
+
+<p>8、clinet会正式的把这个快中的所有packet都写入到对应的副本节点</p>
+
+<blockquote>
+<p>1、block是最大的一个单位，它是最终存储于DataNode上的数据粒度，由 <strong>dfs.block.size</strong> 参数决定，2.x版本默认是
+<strong>128M</strong>
+；注：这个参数由客户端配置决定；如：System.out.println(conf.get(&ldquo;dfs.blocksize&rdquo;));//结果是134217728</p>
+
+<p>2、packet是中等的一个单位，它是数据由DFSClient流向DataNode的粒度，以 <strong>dfs.write.packet.size</strong>
+参数为参考值，默认是 <strong>64K</strong>
+；注：这个参数为参考值，是指真正在进行数据传输时，会以它为基准进行调整，调整的原因是一个packet有特定的结构，调整的目标是这个packet的大小刚好包含结构中的所有成员，同时也保证写到DataNode后当前block的大小不超过设定值；</p>
+
+<p>如：System.out.println(conf.get(&ldquo;dfs.write.packet.size&rdquo;));//结果是65536</p>
+
+<p>3、chunk是最小的一个单位，它是DFSClient到DataNode数据传输中进行数据校验的粒度，由io.bytes.per.checksum参数决定，默认是
+<strong>512B</strong> ；注：事实上一个chunk还包含 <strong>4B的校验值</strong> ，因而chunk写入packet时是 <strong>516B</strong>
+；数据与检验值的比值为128:1，所以对于一个128M的block会有一个1M的校验文件与之对应；</p>
+
+<p>如：System.out.println(conf.get(&ldquo;io.bytes.per.checksum&rdquo;));//结果是512</p>
+</blockquote>
+
+<p>9、clinet进行校验，如果校验通过，表示该数据块写入成功</p>
+
+<p>10、重复7 8 9 三个操作，来继续上传其他的数据块</p>
+
+<p>11、客户端在意识到所有的数据块都写入成功之后，会给namenode发送一个反馈，就是告诉namenode当前客户端上传的数据已经成功。</p>
+
+<h3 id="3-2-hdfs读操作">3.2 HDFS读操作</h3>
+
+<p><a href="https://img.it610.com/image/info8/38667570a2ba4b20bbbef99dab31a7aa.jpg"><img src="https://img.it610.com/image/info8/38667570a2ba4b20bbbef99dab31a7aa.jpg" alt="Hadoop（三）HDFS读写原理与shell命令_第5张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/79536e9852a64f73a40454e954aeb8c5.jpg"><img src="https://img.it610.com/image/info8/79536e9852a64f73a40454e954aeb8c5.jpg" alt="Hadoop（三）HDFS读写原理与shell命令_第6张图片" /></a></p>
+
+<h4 id="数据读取">数据读取</h4>
+
+<p>1、客户端调用FileSystem 实例的open 方法，获得这个文件对应的输入流InputStream。</p>
+
+<p>2、通过RPC 远程调用NameNode ，获得NameNode 中此文件对应的数据块保存位置，包括这个文件的副本的保存位置(
+主要是各DataNode的地址) 。</p>
+
+<p>3、获得输入流之后，客户端调用read 方法读取数据。选择最近的DataNode 建立连接并读取数据。</p>
+
+<p>4、如果客户端和其中一个DataNode 位于同一机器(比如MapReduce 过程中的mapper 和reducer)，那么就会直接从本地读取数据。</p>
+
+<p>5、到达数据块末端，关闭与这个DataNode 的连接，然后重新查找下一个数据块。</p>
+
+<p>6、不断执行第2 - 5 步直到数据全部读完。</p>
+
+<p>7、客户端调用close ，关闭输入流DF S InputStream。</p>
+
+<h2 id="四-hdfs命令行操作">四 HDFS命令行操作</h2>
+
+<h3 id="4-1-基本语法">4.1 基本语法</h3>
+
+<p>bin/hadoop fs 具体命令</p>
+
+<h3 id="4-2-参数大全">4.2 参数大全</h3>
+
+<p>[root@node21 hadoop-2.7.6]$ bin/hadoop fs</p>
+
+<pre><code>[-appendToFile  ... ]
+[-cat [-ignoreCrc]  ...]
+[-checksum  ...]
+[-chgrp [-R] GROUP PATH...]
+[-chmod [-R]  PATH...]
+[-chown [-R] [OWNER][:[GROUP]] PATH...]
+[-copyFromLocal [-f] [-p]  ... ]
+[-copyToLocal [-p] [-ignoreCrc] [-crc]  ... ]
+[-count [-q]  ...]
+[-cp [-f] [-p]  ... ]
+[-createSnapshot  []]
+[-deleteSnapshot  ]
+[-df [-h] [ ...]]
+[-du [-s] [-h]  ...]
+[-expunge]
+[-get [-p] [-ignoreCrc] [-crc]  ... ]
+[-getfacl [-R] ]
+[-getmerge [-nl]  ]
+[-help [cmd ...]]
+[-ls [-d] [-h] [-R] [ ...]]
+[-mkdir [-p]  ...]
+[-moveFromLocal  ... ]
+[-moveToLocal  ]
+[-mv  ... ]
+[-put [-f] [-p]  ... ]
+[-renameSnapshot   ]
+[-rm [-f] [-r|-R] [-skipTrash]  ...]
+[-rmdir [--ignore-fail-on-non-empty]  ...]
+[-setfacl [-R] [{-b|-k} {-m|-x } ]|[--set  ]]
+[-setrep [-R] [-w]   ...]
+[-stat [format]  ...]
+[-tail [-f] ]
+[-test -[defsz] ]
+[-text [-ignoreCrc]  ...]
+[-touchz  ...]
+[-usage [cmd ...]] 
+</code></pre>
+
+<h3 id="4-3常用命令实操">4.3常用命令实操</h3>
+
+<p>（1）-help：输出这个命令参数<br />
+（2）-ls: 显示目录信息<br />
+（3）-mkdir：在hdfs上创建目录<br />
+（4）-moveFromLocal从本地剪切粘贴到hdfs<br />
+（5）-appendToFile ：追加一个文件到已经存在的文件末尾<br />
+（6）-cat ：显示文件内容<br />
+（7）-tail：显示一个文件的末尾<br />
+（8）-chgrp 、-chmod、-chown：linux文件系统中的用法一样，修改文件所属权限<br />
+（9）-copyFromLocal：从本地文件系统中拷贝文件到hdfs路径去<br />
+（10）-copyToLocal：从hdfs拷贝到本地t<br />
+（11）-cp ：从hdfs的一个路径拷贝到hdfs的另一个路径<br />
+（12）-mv：在hdfs目录中移动文件<br />
+（13）-get：等同于copyToLocal，就是从hdfs下载文件到本地<br />
+（14）-getmerge ：合并下载多个文件，比如hdfs的目录 /aaa/下有多个文件:log.1, log.2,log.3,&hellip;<br />
+（15）-put：等同于copyFromLocal<br />
+（16）-rm：删除文件或文件夹<br />
+（17）-rmdir：删除空目录<br />
+（18）-df ：统计文件系统的可用空间信息<br />
+（19）-du统计文件夹的大小信息<br />
+（20）-setrep：设置hdfs中文件的副本数量</p>
+
+<p>转载于:<a href="https://www.cnblogs.com/frankdeng/p/9133394.html">https://www.cnblogs.com/frankdeng/p/9133394.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

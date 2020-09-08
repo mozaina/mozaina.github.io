@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>运维与自动化系列自动化部署基础与shell脚本实现 | 开发者问答集锦</title>
+    <meta property="og:title" content="运维与自动化系列自动化部署基础与shell脚本实现 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="运维与自动化系列自动化部署基础与shell脚本实现">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E8%BF%90%E7%BB%B4%E4%B8%8E%E8%87%AA%E5%8A%A8%E5%8C%96%E7%B3%BB%E5%88%97%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2%E5%9F%BA%E7%A1%80%E4%B8%8Eshell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">运维与自动化系列自动化部署基础与shell脚本实现</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>自动化部署基础与shell脚本实现</p>
+
+<p>关于自动化的基础知识：</p>
+
+<p>1.1：当前代码部署的实现方式：</p>
+
+<p>运维纯手工scp到web服务器<br />
+纯手工登录git服务器执行git pull或svn服务器执行svn update更新代码<br />
+通过xftp上传代码<br />
+开发打压缩包上传到服务器然后解压</p>
+
+<p>缺点：<br />
+1.需要运维全程参与，占用大量的工作时间<br />
+2.上线时间比较慢<br />
+3.人为造成的失误较多，管理比较混乱<br />
+4.回滚复杂而且慢，还不及时</p>
+
+<p>1.2：运行环境规划：<br />
+开发环境：开发者本地有自己的环境，然后运维需要设置开发环境的公用服务，例如开发数据库、redis、memcached等<br />
+测试环境：功能测试环境和性能测试环境<br />
+预生产环境：由生产环境集群中的某一个节点担任测试，此节点只做测试不对外提供服务<br />
+生产环境：直接对外提供服务的环境</p>
+
+<p>为什么有预生产环境？<br />
+可能是生产环境预测试环境的数据库或数据库版本不一样导致语句出现问题<br />
+或者是生产环境调用的接口不一样，例如支付接口在测试环境无法调用</p>
+
+<p>1.3:设计一套生产环境的代码自动化部署系统：</p>
+
+<p>开发环境 &ndash;&gt; 功能测试/性能测试 &ndash;&gt; 预生产环境 &ndash;&gt; 生产环境</p>
+
+<p><a href="https://img.it610.com/image/info8/e1e016a192c3432db48e986f41a5cb86.jpg"><img src="https://img.it610.com/image/info8/e1e016a192c3432db48e986f41a5cb86.jpg" alt="运维与自动化系列③自动化部署基础与shell脚本实现_第1张图片" /></a></p>
+
+<p>1.4：总体规划流程：<br />
+一个服务的集群节点数量，是一次部署还是分次部署<br />
+一键回滚到上个版本<br />
+一键回滚到任意版本<br />
+代码保存在SVN还是Git<br />
+获取指定分支或master的指定版本号的代码，svn指定版本号，git指定tag标签，或直接拉取某个分支<br />
+配置文件差异化，即测试环境和生产环境的配置文件不一样，如IP不一样或主机名不一样或数据库连接不一样等等<br />
+代码仓库和实际的差异，即配置文件是否放在代码仓库中，如果保存在git则所有人都可以从配置文件看到数据库用户密码等信息，可以使用单独分支保存配置文件，或配置文件只在部署服务器的某个项目的目录，比如是config.example<br />
+如何更新代码，java tomcat需要重启<br />
+测试部署后的web页面是否可以正常访问是否是想要的页面<br />
+并行(saltstack)或并行(shell)的问题，涉及到分组部署重启服务<br />
+如何执行，shell执行还是web执行</p>
+
+<p>1.5：总体规划如下：</p>
+
+<p>获取代码(git pull拉取) &ndash;&gt; 是否编译(java需要编译) &ndash;&gt; 配置文件(统一和差异) &ndash;&gt; 打包 &ndash;&gt;
+scp到目标服务器(或者用saltstack) &ndash;&gt; 将服务器移除集群 &ndash;&gt; 解压代码包 &ndash;&gt; 放置到目标目录(如webroot) &ndash;&gt;
+scp差异文件 &ndash;&gt; 重启服务(可选) &ndash;&gt; 测试服务(访问web或者post请求) &ndash;&gt; 将节点重新加入集群</p>
+
+<p><a href="https://img.it610.com/image/info8/07f12e99c8a040e78b8b7384fd8086ec.jpg"><img src="https://img.it610.com/image/info8/07f12e99c8a040e78b8b7384fd8086ec.jpg" alt="运维与自动化系列③自动化部署基础与shell脚本实现_第2张图片" /></a></p>
+
+<p>二：实现代码自动化部署</p>
+
+<p>2.1:通过shell脚本实现，shell脚本规划如下：</p>
+
+<p>2.1.1：各web服务器添加一个uid相同的普通用户，而且所有的web服务都以此普通用户启动，默认情况下所有的wenb服务除了负载均衡之外都不能监听80端口，比如可以监听8008端口</p>
+
+<p>2.1.2：部署服务器的用户登录其他服务器免密码登录，因此需要做秘钥认证，在各主机执行以下命令：</p>
+
+<h1 id="useradd-www-u-1010">useradd www -u 1010</h1>
+
+<h1 id="su-www">su – www</h1>
+
+<p>$ ssh-keygen<br />
+#将部署机www用户的公钥复制到各web服务器的 /home/www/.ssh/authorized_keys或执行ssh-copy-id
+www@192.168.3.13</p>
+
+<p>$ chmod 600 /home/www/.ssh/authorized_keys</p>
+
+<p>2.1.3:测试部署服务器是否可以免秘钥用www用户登录各个web服务器</p>
+
+<p><a href="https://img.it610.com/image/info8/283459200a434360a65ac23f3a3c70ed.png"><img src="https://img.it610.com/image/info8/283459200a434360a65ac23f3a3c70ed.png" alt="运维与自动化系列③自动化部署基础与shell脚本实现_第3张图片" /></a></p>
+
+<p>2.2：编写shell脚本：<br />
+2.2.1：完成框架编写：</p>
+
+<pre><code>#!/bin/bash
+
+#shell env
+SHELL_NAME=&quot;deploy.sh&quot;
+SHELL_DIR=&quot;/home/www/&quot;    # 脚本路径
+SHELL_LOG=&quot;${SHELL_DIR}/${SHELL_NAME}.log&quot;    # 脚本执行日志
+
+# code env 代码变量
+CODE_DIR=&quot;/deploy/code/deploy&quot;    # 代码目录
+CONFIG_DIR=&quot;/deploy/config&quot;    # 配置文件目录
+TMP_DIR=&quot;/deploy/tmp&quot;        # 临时目录
+TAR_DIR=&quot;/deploy/tar&quot;        # 打包目录
+LOCK_FILE=&quot;/tmp/deploy.lock&quot;    # 锁文件标示
+
+# 使用帮助函数
+usage(){    
+    echo $&quot;Usage: $0 [ deploy | rollback ]&quot;
+}
+
+shell_lock(){
+    touch ${LOCK_FILE}
+}
+
+shell_unlock(){
+    rm -f ${LOCK_FILE}
+}
+
+code_get(){
+    echo &quot;code_get&quot;
+    sleep 60
+}
+
+code_build(){
+    echo &quot;code_build&quot;
+}
+
+code_config(){
+    echo &quot;code_config&quot;
+}
+
+code_tar(){
+    echo &quot;code_tar&quot;
+}
+
+code_scp(){
+    echo &quot;code_scp&quot;
+}
+
+cluster_node_remove(){
+    echo &quot;cluster_node_remove&quot;
+}
+
+code_deploy(){
+    echo &quot;code_deploy&quot;
+}
+
+config_diff(){
+    echo &quot;config_diff&quot;
+}
+
+code_test(){
+    echo &quot;code_test&quot;
+}
+
+cluster_node_in(){
+    echo &quot;cluste_node_in&quot;
+}
+
+rollback(){
+    echo &quot;rollback&quot;
+}
+
+# 主函数
+main(){    
+    if [ -f $LOCK_FILE ];then    # 先判断锁文件在不在
+        echo &quot;Deploy is running&quot; &amp;&amp; exit 10;     # 如果有锁文件直接退出
+    fi 
+    DEPLOY_METHOD=$1    # 避免出错误将脚本的第一个参数作为变量
+    case $DEPLOY_METHOD in
+        deploy)        # 如果第一个参数是deploy就执行以下操作
+            shell_lock;    # 执行部署之前创建锁，如果同时有其他人执行则提示锁文件存在避免冲突
+            code_get;
+            code_build;
+            code_config;
+            code_tar;
+            code_scp;
+            cluster_node_remove;
+            code_deploy;
+            config_diff;
+            code_test;
+            cluster_node_in;
+            shell_unlock;
+            ;;
+        rollback)    # 如果第一个参数是rollback就执行以下操作
+            shell_lock;    # 回滚之前也是先创建锁文件
+            rollback;    # 执行完成删除锁文件
+            shell_unlock;
+            ;;
+        *)    # 其他输入执行以下操作
+            usage;
+    esac
+}
+# 执行主函数并把第一个变量当参数
+main $1
+</code></pre>
+
+<p>2.2.2：完成脚本：实现代码部署、测试、回滚等操作：</p>
+
+<p>代码回滚设计：<br />
+正常回滚是回滚已经在web服务器部署过的版本，因此就不需要获取代码打包和部署的过程了</p>
+
+<p>列出回滚版本<br />
+将模板服务器移除集群<br />
+执行回滚<br />
+重启和测试<br />
+将模板服务器加入集群</p>
+
+<pre><code>#!/bin/bash
+
+#Dir List 部署节点(即部署节点需要做的操作)
+# mkdir -p /deploy/code/web-demo
+# mkdir -p /deploy/config/web-demo/base
+# mkdir -p /deploy/config/web-demo/other
+# mkdir /deploy/tmp
+# mkdir /deploy/tar
+
+# chown -R www.www /deploy
+# chown -R www.www /webroot
+# chown -R www.www /opt/webroot/
+# chown -R www.www /webroot
+
+# 需要在客户端节点做的操作
+# mkdir /opt/webroot
+# mkdir /webroot
+# chown -R www.www /webroot
+# chown -R www.www /opt/webroot/
+# chown -R www.www /webroot
+# [www@ ~]$ touch /webroot/web-dem
+
+
+# Node List 服务器节点
+PRE_LIST=&quot;192.168.3.12&quot;        # 预生产节点
+GROUP1_LIST=&quot;192.168.3.12 192.168.3.13&quot;
+GROUP2_LIST=&quot;192.168.3.13&quot;
+ROLLBACK_LIST=&quot;192.168.3.12 192.168.3.13&quot;
+
+# 日志日期和时间变量
+LOG_DATE='date &quot;+%Y-%m-%d&quot;' # 如果执行的话后面执行的时间，此时间是不固定的，这是记录日志使用的时间
+LOG_TIME='date &quot;+%H-%M-%S&quot;'
+
+# 代码打包时间变量
+CDATE=$(date &quot;+%Y-%m-%d&quot;) # 脚本一旦执行就会取一个固定时间赋值给变量，此时间是固定的
+CTIME=$(date +&quot;%H-%M-%S&quot;)
+
+# shell env 脚本位置等变量
+SHELL_NAME=&quot;deploy.sh&quot;    # 脚本名称
+SHELL_DIR=&quot;/home/www/&quot;  # 脚本路径
+SHELL_LOG=&quot;${SHELL_DIR}/${SHELL_NAME}.log&quot; # 脚本执行日志文件路径
+
+# code env 代码变量
+PRO_NAME=&quot;web-demo&quot;    # 项目名称的函数
+CODE_DIR=&quot;/deploy/code/web-demo&quot;    # 从版本管理系统更新的代码目录
+CONFIG_DIR=&quot;/deploy/config/web-demo&quot;    # 保存不同项目的配置文件，一个目录里面就是一个项目的一个配置文件或多个配置文件
+TMP_DIR=&quot;/deploy/tmp&quot;            # 临时目录
+TAR_DIR=&quot;/deploy/tar&quot;            # 打包目录
+LOCK_FILE=&quot;/tmp/deploy.lock&quot; # 锁文件路径
+
+usage(){ # 使用帮助函数
+    echo $&quot;Usage: $0 [ deploy | rollback [ list | version ]&quot;
+}
+
+writelog(){ # 写入日志的函数
+    LOGINFO=$1 # 将参数作为日志输入
+    echo &quot;${CDATE} ${CTIME} : ${SEHLL_NAME} : ${LOGINFO}&quot; &gt;&gt; ${SHELL_LOG}
+}
+
+# 锁函数
+shell_lock(){
+    touch ${LOCK_FILE}
+}
+
+# 解锁函数
+shell_unlock(){
+    rm -f ${LOCK_FILE}
+}
+
+# 获取代码的函数
+code_get(){
+    echo &quot;code_get&quot;
+    writelog code_get
+    cd $CODE_DIR &amp;&amp; echo &quot;git pull&quot; # 进入到代码目录更新代码，此处必须免密码更新，此目录仅用于代码更新不能放其他任何文件
+    cp -rf ${CODE_DIR} ${TMP_DIR}/ # 临时保存代码并重命名，包名为时间+版本号，准备复制到web服务器
+    API_VER=&quot;123&quot;  # 版本号
+}
+
+code_build(){ # 代码编译函数
+    echo code_build
+}
+
+code_config(){ # 配置文件函数
+    writelog code_config
+    /bin/cp -rf ${CONFIG_DIR}/base/* ${TMP_DIR}/&quot;${PRO_NAME}&quot; # 将配置文件放在本机保存配置文件的临时目录，用于暂时保存代码项目
+    PKG_NAME=&quot;${PRO_NAME}&quot;_&quot;$API_VER&quot;_&quot;${CDATE}-${CTIME}&quot;    # 定义代码目录名称
+    cd ${TMP_DIR} &amp;&amp; mv ${PRO_NAME} ${PKG_NAME}    # 重命名代码文件为web-demo_123-20170629-11-19-10格式
+
+}
+
+code_tar(){    # 对代码打包函数
+    writelog code_tar
+    cd ${TMP_DIR} &amp;&amp; tar czf ${PKG_NAME}.tar.gz ${PKG_NAME}
+    writelog &quot;${PKG_NAME}.tar.gz&quot; 
+}
+
+code_scp(){ # 代码压缩包scp到客户端的函数
+    writelog  &quot;code_scp&quot;
+    for node in $PRE_LIST;do # 循环服务器节点列表
+        scp ${TMP_DIR}/${PKG_NAME}.tar.gz $node:/opt/webroot/ # 将压缩后的代码包复制到web服务器的/opt/webroot
+    done
+
+    for node in $GROUP1_LIST;do # 循环服务器节点列表
+        scp ${TMP_DIR}/${PKG_NAME}.tar.gz $node:/opt/webroot/ # 将压缩后的代码包复制到web服务器的/opt/webroot
+    done
+}
+
+
+url_test(){
+    URL=$1
+    curl -s --head $URL |grep '200 OK'
+    if [ $? -ne 0 ];then
+        shell_unlock;
+        writelog &quot;test error&quot; &amp;&amp; exit;
+    fi
+}
+
+cluster_node_add(){ #将web服务器添加至前端负载
+    echo cluster_node_add
+}
+
+cluster_node_remove(){ # 将web服务器从集群移除函数(正在部署的时候应该不处理业务)
+    writelog &quot;cluster_node_remove&quot;
+}
+
+pre_deploy(){
+    writelog &quot;pre_deploy&quot;
+    for node in ${PRE_LIST};do # 循环预生产服务器节点列表
+        cluster_node_remove  ${node} # 部署之前将节点从前端负载删除
+        echo  &quot;pre_deploy, cluster_node_remove ${node}&quot;
+        ssh ${node} &quot;cd /opt/webroot &amp;&amp; tar zxf ${PKG_NAME}.tar.gz&quot; #分别到web服务器执行压缩包解压命令
+        ssh ${node} &quot;rm -f /webroot/web-demo &amp;&amp; ln -s /opt/webroot/${PKG_NAME} /webroot/web-demo&quot; # 整个自动化的核心，创建软连接
+        done
+}
+
+pre_test(){ # 预生产主机测试函数
+    for node in ${PRE_LIST};do # 循环预生产主机列表
+        curl -s --head http://${node}:9999/index.html | grep &quot;200 OK&quot; # 测试web界面访问
+            if [ $? -eq 0 ];then  # 如果访问成功
+                writelog &quot; ${node} Web Test OK!&quot; # 记录日志
+                echo &quot; ${node} Web Test OK!&quot;
+                cluster_node_add ${node} # 测试成功之后调用添加函数把服务器添加至节点,
+                writelog &quot;pre,${node} add to cluster OK!&quot; # 记录添加服务器到集群的日志
+            else # 如果访问失败
+                writelog &quot;${node} test no OK&quot; # 记录日志
+                echo &quot;${node} test not OK&quot;
+                shell_unlock # 调用删除锁文件函数
+            break # 结束部署
+        fi
+    done
+
+}
+
+group1_deploy(){ # 代码解压部署函数
+    writelog &quot;group1_code_deploy&quot;
+    for node in ${GROUP1_LIST};do # 循环生产服务器节点列表
+        cluster_node_remove $node  
+        echo &quot;group1, cluster_node_remove $node&quot;
+        ssh ${node} &quot;cd /opt/webroot &amp;&amp; tar zxf ${PKG_NAME}.tar.gz&quot; # 分别到各web服务器节点执行压缩包解压命令
+        ssh ${node} &quot;rm -f /webroot/web-demo &amp;&amp; ln -s /opt/webroot/${PKG_NAME} /webroot/web-demo&quot; # 整个自动化的核心，创建软连接
+    done
+    scp ${CONFIG_DIR}/other/192.168.3.13.server.xml 192.168.3.13:/webroot/web-demo/server.xml  # 将差异项目的配置文件scp到此web服务器并以项目结尾
+}    
+
+group1_test(){ # 生产主机测试函数
+    for node in ${PRE_LIST};do # 循环生产主机列表
+        curl -s --head http://${node}:9999/index.html | grep &quot;200 OK&quot; #测试web界面访问
+        if [ $? -eq 0 ];then  #如果访问成功
+            writelog &quot; ${node} Web Test OK!&quot; #记录日志
+            echo &quot;group1_test,${node} Web Test OK!&quot;
+            cluster_node_add
+            writelog &quot; ${node} add to cluster OK!&quot; #记录将服务器 添加至集群的日志
+        else #如果访问失败
+            writelog &quot;${node} test no OK&quot; #记录日志
+            echo &quot;${node} test no OK&quot;
+            shell_unlock # 调用删除锁文件函数
+            break # 结束部署
+        fi
+    done
+}
+
+rollback_fun(){ 
+    for node in $ROLLBACK_LIST;do # 循环服务器节点列表
+        # 注意一定要加&quot;号，否则无法在远程执行命令
+        ssh $node &quot;rm -f /webroot/web-demo &amp;&amp; ln -s /opt/webroot/$1 /webroot/web-demo&quot; # 立即回滚到指定的版本，$1即指定的版本参数
+        echo &quot;${node} rollback success!&quot;
+        done
+}
+
+rollback(){ # 代码回滚主函数
+    if [ -z $1 ];then
+        shell_unlock # 删除锁文件
+        echo &quot;Please input rollback version&quot; &amp;&amp; exit 3;
+    fi
+    case $1 in # 把第二个参数做当自己的第一个参数 
+        list)
+            ls -l /opt/webroot/*.tar.gz
+            ;;
+        *)
+            rollback_fun $1
+    esac
+
+}
+
+main(){
+    if [ -f $LOCK_FILE ] ;then # 先判断锁文件在不在,如果有锁文件直接退出
+        echo &quot;Deploy is running&quot; &amp;&amp; exit 10
+    fi
+    DEPLOY_METHOD=$1 # 避免出错误将脚本的第一个参数作为变量
+    ROLLBACK_VER=$2
+    case $DEPLOY_METHOD in
+        deploy) # 如果第一个参数是deploy就执行以下操作
+            shell_lock; # 执行部署之前创建锁。如果同时有其他人执行则提示锁文件存在
+            code_get; # 获取代码
+            code_build; # 如果要编译执行编译函数
+            code_config; # cp配置文件
+            code_tar;    # 打包
+            code_scp;    # scp到服务器
+            pre_deploy;  # 预生产环境部署
+            pre_test;    # 预生产环境测试
+            group1_deploy; # 生产环境部署
+            group1_test;   # 生产环境测试
+            shell_unlock; # 执行完成后删除锁文件
+            ;;
+        rollback) # 如果第一个参数是rollback就执行以下操作
+            shell_lock; # 回滚之前也是先创建锁文件
+            rollback $ROLLBACK_VER;
+            shell_unlock; # 执行完成删除锁文件
+            ;;
+        *)
+            usage;
+    esac
+}
+main $1 $2
+</code></pre>
+
+<p>3.通过刚才编写的shell脚本将html官网页面部署到nginx中</p>
+
+<p>①将代码上传到部署节点的/deploy/code/web-demo目录中</p>
+
+<pre><code>[www@master web-demo]$ pwd
+/deploy/code/web-demo
+[www@master web-demo]$ ll
+total 20
+drwxr-xr-x 6 www www 4096 Jun 6 13:46 assets
+-rw-r--r-- 1 www www 1150 Jun 6 17:59 favicon.ico
+drwxr-xr-x 2 www www 4096 Jun 6 15:32 images
+-rw-r--r-- 1 www www 4323 Jun 6 16:19 index.html
+</code></pre>
+
+<p>部署节点执行以下操作：</p>
+
+<pre><code># mkdir -p /deploy/code/web-demo
+# mkdir -p /deploy/config/web-demo/base
+# mkdir -p /deploy/config/web-demo/other
+# mkdir /deploy/tmp
+# mkdir /deploy/tar
+
+# chown -R www.www /deploy
+# chown -R www.www /webroot
+# chown -R www.www /opt/webroot/
+</code></pre>
+
+<p>②需要在客户端做的操作</p>
+
+<h1 id="安装nginx">安装nginx</h1>
+
+<h1 id="yum-install-y-nginx">yum install -y nginx</h1>
+
+<p>编辑nginx</p>
+
+<pre><code>vim /etc/nginx/conf.d/cloudeye.conf
+
+server {
+        listen 9999;
+        server_name 192.168.3.13; # 实际生产环境中需要填写域名
+
+        location / {
+                alias /webroot/web-demo/; # 这个web-demo目录不需要创建，有软链接指向/webroot/web-demo目录
+                index index.html;
+        }
+}
+</code></pre>
+
+<p>创建相关目录并修改权限</p>
+
+<pre><code>mkdir /opt/webroot
+mkdir /webroot
+chown -R www.www /webroot
+chown -R www.www /opt/webroot/
+[www@ ~]$ touch /webroot/web-demo
+</code></pre>
+
+<p>③执行脚本<br />
+测试部署：</p>
+
+<pre><code>[www@master ~]$ ./deploy.sh deploy
+code_get
+git pull
+code_build
+web-demo_123_2017-06-26-12-18-09.tar.gz 100% 1214KB 1.2MB/s 00:00 
+web-demo_123_2017-06-26-12-18-09.tar.gz 100% 1214KB 1.2MB/s 00:00 
+web-demo_123_2017-06-26-12-18-09.tar.gz 100% 1214KB 1.2MB/s 00:00 
+pre_deploy, cluster_node_remove 192.168.3.12
+HTTP/1.1 200 OK
+192.168.3.12 Web Test OK!
+cluster_node_add
+group1, cluster_node_remove 192.168.3.12
+group1, cluster_node_remove 192.168.3.13
+/deploy/config/web-demo/other/192.168.3.13.server.xml: No such file or directory
+HTTP/1.1 200 OK
+group1_test,192.168.3.12 Web Test OK!
+cluster_node_add
+</code></pre>
+
+<p>访问客户端，可以看到能够正常访问，说明部署成功<br />
+<a href="http://192.168.3.13:9999">http://192.168.3.13:9999</a></p>
+
+<p><a href="https://img.it610.com/image/info8/b3eb8457da8847a2bf37be48371b5c8e.jpg"><img src="https://img.it610.com/image/info8/b3eb8457da8847a2bf37be48371b5c8e.jpg" alt="运维与自动化系列③自动化部署基础与shell脚本实现_第4张图片" /></a></p>
+
+<p>修改代码，测试回滚效果</p>
+
+<pre><code>[www@master ~]$ vim /deploy/code/web-demo/index.html 
+[www@master ~]$ ./deploy.sh deploy
+code_get
+git pull
+code_build
+web-demo_123_2017-06-26-12-18-57.tar.gz 100% 1214KB 1.2MB/s 00:00 
+web-demo_123_2017-06-26-12-18-57.tar.gz 100% 1214KB 1.2MB/s 00:00 
+web-demo_123_2017-06-26-12-18-57.tar.gz 100% 1214KB 1.2MB/s 00:00 
+pre_deploy, cluster_node_remove 192.168.3.12
+HTTP/1.1 200 OK
+192.168.3.12 Web Test OK!
+cluster_node_add
+group1, cluster_node_remove 192.168.3.12
+group1, cluster_node_remove 192.168.3.13
+/deploy/config/web-demo/other/192.168.3.13.server.xml: No such file or directory
+HTTP/1.1 200 OK
+group1_test,192.168.3.12 Web Test OK!
+cluster_node_add
+
+[www@master ~]$ ./deploy.sh rollback list
+-rw-rw-r-- 1 www www 1243347 Jun 26 11:36 /opt/webroot/web-demo_123_2017-06-26-11-36-44.tar.gz
+-rw-rw-r-- 1 www www 1243347 Jun 26 11:39 /opt/webroot/web-demo_123_2017-06-26-11-39-02.tar.gz
+-rw-rw-r-- 1 www www 1243351 Jun 26 12:04 /opt/webroot/web-demo_123_2017-06-26-12-04-19.tar.gz
+-rw-rw-r-- 1 www www 1243347 Jun 26 12:16 /opt/webroot/web-demo_123_2017-06-26-12-16-49.tar.gz
+-rw-rw-r-- 1 www www 1243347 Jun 26 12:18 /opt/webroot/web-demo_123_2017-06-26-12-18-09.tar.gz
+-rw-rw-r-- 1 www www 1243369 Jun 26 12:18 /opt/webroot/web-demo_123_2017-06-26-12-18-57.tar.gz
+</code></pre>
+
+<p>修改部署成功页面</p>
+
+<p><a href="https://img.it610.com/image/info8/f0312388ce864f468868d2a71451ea68.jpg"><img src="https://img.it610.com/image/info8/f0312388ce864f468868d2a71451ea68.jpg" alt="运维与自动化系列③自动化部署基础与shell脚本实现_第5张图片" /></a></p>
+
+<p>测试回滚，页面再次回到修改前，说明回滚成功</p>
+
+<pre><code>[www@master ~]$ ./deploy.sh rollback web-demo_123_2017-06-26-12-18-09
+192.168.3.12 rollback success!
+192.168.3.13 rollback success!
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/383cdfd1cd084a0c84428a2e4e8cf9ab.jpg"><img src="https://img.it610.com/image/info8/383cdfd1cd084a0c84428a2e4e8cf9ab.jpg" alt="运维与自动化系列③自动化部署基础与shell脚本实现_第6张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/e17fa315803040268b9df4ec4f6da9cf.jpg"><img src="https://img.it610.com/image/info8/e17fa315803040268b9df4ec4f6da9cf.jpg" alt="运维与自动化系列③自动化部署基础与shell脚本实现_第7张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

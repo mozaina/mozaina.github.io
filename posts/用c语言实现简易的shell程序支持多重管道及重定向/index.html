@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>用C语言实现简易的shell程序支持多重管道及重定向 | 开发者问答集锦</title>
+    <meta property="og:title" content="用C语言实现简易的shell程序支持多重管道及重定向 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="用C语言实现简易的shell程序支持多重管道及重定向">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%94%A8c%E8%AF%AD%E8%A8%80%E5%AE%9E%E7%8E%B0%E7%AE%80%E6%98%93%E7%9A%84shell%E7%A8%8B%E5%BA%8F%E6%94%AF%E6%8C%81%E5%A4%9A%E9%87%8D%E7%AE%A1%E9%81%93%E5%8F%8A%E9%87%8D%E5%AE%9A%E5%90%91/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">用C语言实现简易的shell程序支持多重管道及重定向</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<ul>
+<li>* 1 简介
+
+<ul>
+<li>2 功能</li>
+<li>3 效果展示
+
+<ul>
+<li>* 3.1 启动myshell</li>
+<li>3.2 执行cd命令</li>
+<li>3.3 执行外部命令</li>
+<li>3.4 重定向</li>
+<li>3.5 管道</li>
+<li>3.6 exit命令</li>
+</ul></li>
+<li>4 关键代码
+
+<ul>
+<li>* 4.1 获取用户名、主机名及当前工作路径</li>
+<li>4.2 以空格分割命令</li>
+<li>4.3 执行exit命令</li>
+<li>4.4 执行cd命令</li>
+<li>4.5 判断命令是否存在</li>
+<li>4.6 执行外部命令 ——callCommand()函数</li>
+<li>4.7 可处理多重管道的callCommandWithPipe()函数</li>
+<li>4.8 可处理重定向的callCommandWithRedi()函数</li>
+</ul></li>
+<li>5 结尾</li>
+</ul></li>
+</ul>
+
+<h2 id="1-简介">1 简介</h2>
+
+<blockquote>
+<p>用C语言实现的一个简易的shell，能够接受用户输入的命令并执行操作，支持多重管道及重定向。</p>
+
+<p>程序运行后，会模拟shell用绿色字体显示当前的用户名、主机名和路径，等待用户输入命令。程序逐次读取用户输入的指令后，将指令按空格拆分成多个字符串命令，然后判断该命令的类型。若命令有误，则用红色字体打印出错误信息。</p>
+
+<ul>
+<li>若命令为exit，则调用自定义的exit函数，向该程序进程发送terminal信号结束该进程。</li>
+<li>若命令为cd，则判断参数，调用chdir()函数修改当前的路径，并返回相应的结果。若修改成功，则使用getcwd()函数更新当前路径。
+*
+若为其它命令，则先判断是否有合法的管道。若有管道，则在子进程中执行管道符号前面的命令，父进程等待子进程结束后，递归处理管道符号后面的命令。若没有管道，则直接执行命令。在执行命令的时候，先判断该命令是否存在，以及是否有合法的重定向，再使用execvp()执行相应的操作。</li>
+</ul>
+</blockquote>
+
+<hr />
+
+<h2 id="2-功能">2 功能</h2>
+
+<blockquote>
+<ul>
+<li>显示当前用户名、主机名和工作路径</li>
+<li>exit命令</li>
+<li>cd命令</li>
+<li>判断命令是否存在</li>
+<li>执行外部命令</li>
+<li>实现输入、输出重定向</li>
+<li>递归实现多重管道</li>
+</ul>
+</blockquote>
+
+<hr />
+
+<h2 id="3-效果展示">3 效果展示</h2>
+
+<h4 id="3-1-启动myshell">3.1 启动myshell</h4>
+
+<p><a href="https://img.it610.com/image/info8/358822dd857543cb9b7f80f03a8bd1dc.jpg"><img src="https://img.it610.com/image/info8/358822dd857543cb9b7f80f03a8bd1dc.jpg" alt="启动myshell" /></a></p>
+
+<blockquote>
+<p>图中第一行为系统shell，为了与系统区分开，我将自定义的shell的默认信息显示全部设为绿色。由于该路径是个链接，链接到/mnt/g/os_homework/myshell，因此显示出来的路径是实际路径。</p>
+</blockquote>
+
+<h4 id="3-2-执行cd命令">3.2 执行cd命令</h4>
+
+<p><a href="https://img.it610.com/image/info8/19e5c19d4bda4533b6d961d9a414d687.jpg"><img src="https://img.it610.com/image/info8/19e5c19d4bda4533b6d961d9a414d687.jpg" alt="用C语言实现简易的shell程序，支持多重管道及重定向_第1张图片" /></a></p>
+
+<blockquote>
+<p>cd命令的参数可以是相对路径，也可以是绝对路径。当参数出错时，会根据情况用红色字体打印出相应的错误信息。</p>
+</blockquote>
+
+<h4 id="3-3-执行外部命令">3.3 执行外部命令</h4>
+
+<p><a href="https://img.it610.com/image/info8/fc43281c29514db5ba54eb65ca9ef86e.jpg"><img src="https://img.it610.com/image/info8/fc43281c29514db5ba54eb65ca9ef86e.jpg" alt="用C语言实现简易的shell程序，支持多重管道及重定向_第2张图片" /></a></p>
+
+<blockquote>
+<p>图中演示了“ls -al”、“rm”，以及自定义的可执行程序sum。sum程序要求输入一个整数n，然后求1~n的和。当命令不存在时，返回错误信息。</p>
+</blockquote>
+
+<h4 id="3-4-重定向">3.4 重定向</h4>
+
+<p><a href="https://img.it610.com/image/info8/a08dd0823e4f4a42877298992fda5f8d.jpg"><img src="https://img.it610.com/image/info8/a08dd0823e4f4a42877298992fda5f8d.jpg" alt="用C语言实现简易的shell程序，支持多重管道及重定向_第3张图片" /></a></p>
+
+<blockquote>
+<p>图中展示了输入、输出重定向，程序还会判断重定向是否合法。</p>
+</blockquote>
+
+<h4 id="3-5-管道">3.5 管道</h4>
+
+<p><a href="https://img.it610.com/image/info8/7fa73e5c919d430895abb8fa5a78713b.jpg"><img src="https://img.it610.com/image/info8/7fa73e5c919d430895abb8fa5a78713b.jpg" alt="用C语言实现简易的shell程序，支持多重管道及重定向_第4张图片" /></a></p>
+
+<blockquote>
+<p>图中展示了多重管道的演示结果，管道与重定向也可以混用。</p>
+</blockquote>
+
+<h4 id="3-6-exit命令">3.6 exit命令</h4>
+
+<p><a href="https://img.it610.com/image/info8/2759873503e24acd8847f04bb2330f6b.jpg"><img src="https://img.it610.com/image/info8/2759873503e24acd8847f04bb2330f6b.jpg" alt="exit命令" /></a></p>
+
+<blockquote>
+<p>程序接收到terminal信号后，退出。</p>
+</blockquote>
+
+<hr />
+
+<h2 id="4-关键代码">4 关键代码</h2>
+
+<p>扯了这么多，总得讲一下代码吧。<br />
+<strong>程序代码已上传到GitHub中~~</strong></p>
+
+<h4 id="4-1-获取用户名-主机名及当前工作路径">4.1 获取用户名、主机名及当前工作路径</h4>
+
+<pre><code>void getUsername() { // 获取当前登录的用户名
+    struct passwd* pwd = getpwuid(getuid());
+    strcpy(username, pwd-&gt;pw_name);
+}
+
+void getHostname() { // 获取主机名
+    gethostname(hostname, BUF_SZ);
+}
+
+int getCurWorkDir() { // 获取当前的工作目录
+    char* result = getcwd(curPath, BUF_SZ);
+    if (result == NULL)
+        return ERROR_SYSTEM;
+    else return RESULT_NORMAL;
+}
+</code></pre>
+
+<h4 id="4-2-以空格分割命令">4.2 以空格分割命令</h4>
+
+<pre><code>int splitCommands(char command[BUF_SZ]) { // 以空格分割命令， 返回分割得到的字符串个数
+    int num = 0;
+    int i, j;
+    int len = strlen(command);
+
+    for (i=0, j=0; iif (command[i] != ' ') {
+            commands[num][j++] = command[i];
+        } else {
+            if (j != 0) {
+                commands[num][j] = '\0';
+                ++num;
+                j = 0;
+            }
+        }
+    }
+    if (j != 0) {
+        commands[num][j] = '\0';
+        ++num;
+    }
+
+    return num;
+}
+</code></pre>
+
+<p>其中字符串数组commands的全局变量，保存分割后的命令。</p>
+
+<h4 id="4-3-执行exit命令">4.3 执行exit命令</h4>
+
+<pre><code>int callExit() { // 发送terminal信号退出进程
+    pid_t pid = getpid();
+    if (kill(pid, SIGTERM) == -1) 
+        return ERROR_EXIT;
+    else return RESULT_NORMAL;
+}
+</code></pre>
+
+<h4 id="4-4-执行cd命令">4.4 执行cd命令</h4>
+
+<pre><code>int callCd(int commandNum) { // 执行cd命令
+    int result = RESULT_NORMAL;
+
+    if (commandNum &lt; 2) {
+        result = ERROR_MISS_PARAMETER;
+    } else if (commandNum &gt; 2) {
+        result = ERROR_TOO_MANY_PARAMETER;
+    } else {
+        int ret = chdir(commands[1]);
+        if (ret) result = ERROR_WRONG_PARAMETER;
+    }
+
+    return result;
+}
+</code></pre>
+
+<h4 id="4-5-判断命令是否存在">4.5 判断命令是否存在</h4>
+
+<p>Linux系统中，判断命令是否存在有多种方法。本程序使用”command -v
+xxx”来判断命令xxx是否存在。若命令存在，则会返回该命令的路径信息；否则，不会返回信息。因此可以用这一点来判断命令是否存在。<br />
+程序中使用管道，在子进程中将程序执行后的输出重定向到输出文件标识符，在父进程中将输入重定向到输入文件标识符，读取子进程返回的信息。若父进程读取的第一个字符就是EOF，则表示子进程没有返回信息，意味着命令不存在。执行完毕后，还原输入输出重定向。</p>
+
+<pre><code>int isCommandExist(const char* command) { // 判断指令是否存在
+    if (command == NULL || strlen(command) == 0) return FALSE;
+
+    int result = TRUE;
+
+    int fds[2];
+    if (pipe(fds) == -1) {
+        result = FALSE;
+    } else {
+        /* 暂存输入输出重定向标志 */
+        int inFd = dup(STDIN_FILENO);
+        int outFd = dup(STDOUT_FILENO);
+
+        pid_t pid = vfork();
+        if (pid == -1) {
+            result = FALSE;
+        } else if (pid == 0) {
+            /* 将结果输出重定向到文件标识符 */
+            close(fds[0]);
+            dup2(fds[1], STDOUT_FILENO);
+            close(fds[1]);
+
+            char tmp[BUF_SZ];
+            sprintf(tmp, &quot;command -v %s&quot;, command);
+            system(tmp);
+            exit(1);
+        } else {
+            waitpid(pid, NULL, 0);
+            /* 输入重定向 */
+            close(fds[1]);
+            dup2(fds[0], STDIN_FILENO);
+            close(fds[0]);
+
+            if (getchar() == EOF) { // 没有数据，意味着命令不存在
+                result = FALSE;
+            }
+
+            /* 恢复输入、输出重定向 */
+            dup2(inFd, STDIN_FILENO);
+            dup2(outFd, STDOUT_FILENO);
+        }
+    }
+
+    return result;
+}
+</code></pre>
+
+<h4 id="4-6-执行外部命令-callcommand-函数">4.6 执行外部命令 ——callCommand()函数</h4>
+
+<p>该程序是给主函数调用的，参数是命令的长度，主要作用是创建子进程，在子进程中调用callCommandWithPipe()函数，该函数可以处理包含管道的命令，父进程获取子进程的返回码，并返回给主函数。</p>
+
+<pre><code>int callCommand(int commandNum) { // 给用户使用的函数，用以执行用户输入的命令
+    pid_t pid = fork();
+    if (pid == -1) {
+        return ERROR_FORK;
+    } else if (pid == 0) {
+        /* 获取标准输入、输出的文件标识符 */
+        int inFds = dup(STDIN_FILENO);
+        int outFds = dup(STDOUT_FILENO);
+
+        int result = callCommandWithPipe(0, commandNum);
+
+        /* 还原标准输入、输出重定向 */
+        dup2(inFds, STDIN_FILENO);
+        dup2(outFds, STDOUT_FILENO);
+        exit(result);
+    } else {
+        int status;
+        waitpid(pid, &amp;status, 0);
+        return WEXITSTATUS(status);
+    }
+}
+</code></pre>
+
+<h4 id="4-7-可处理多重管道的callcommandwithpipe-函数">4.7 可处理多重管道的callCommandWithPipe()函数</h4>
+
+<p>因为要递归处理多重管道，因此将参数设为左闭右开的指令区间。先判断有没有管道符号，若没有，则直接调用callCommandWithRedi()函数去执行命令，该函数可以处理包含重定向信息的命令。若有管道符号，则先判断管道符号后续是否有指令，若没有，则返回错误信息，若有，则执行。<br />
+执行时，先启动管道，在子进程中执行管道符号前半部分的命令，并返回执行后的状态结果。父进程等待子进程退出后，获取子进程的返回码。若子进程没有正常执行，则读取子进程输出的错误信息，并打印到控制台。否则，递归执行管道符号后半部分的命令，并将结果返回给主函数。</p>
+
+<pre><code>int callCommandWithPipe(int left, int right) { // 所要执行的指令区间[left, right)，可能含有管道
+    if (left &gt;= right) return RESULT_NORMAL;
+    /* 判断是否有管道命令 */
+    int pipeIdx = -1;
+    for (int i=left; iif (strcmp(commands[i], COMMAND_PIPE) == 0) {
+            pipeIdx = i;
+            break;
+        }
+    }
+    if (pipeIdx == -1) { // 不含有管道命令
+        return callCommandWithRedi(left, right);
+    } else if (pipeIdx+1 == right) { // 管道命令'|'后续没有指令，参数缺失
+        return ERROR_PIPE_MISS_PARAMETER;
+    }
+
+    /* 执行命令 */
+    int fds[2];
+    if (pipe(fds) == -1) {
+        return ERROR_PIPE;
+    }
+    int result = RESULT_NORMAL;
+    pid_t pid = vfork();
+    if (pid == -1) {
+        result = ERROR_FORK;
+    } else if (pid == 0) { // 子进程执行单个命令
+        close(fds[0]);
+        dup2(fds[1], STDOUT_FILENO); // 将标准输出重定向到fds[1]
+        close(fds[1]);
+
+        result = callCommandWithRedi(left, pipeIdx);
+        exit(result);
+    } else { // 父进程递归执行后续命令
+        int status;
+        waitpid(pid, &amp;status, 0);
+        int exitCode = WEXITSTATUS(status);
+
+        if (exitCode != RESULT_NORMAL) { // 子进程的指令没有正常退出，打印错误信息
+            char info[4096] = {0};
+            char line[BUF_SZ];
+            close(fds[1]);
+            dup2(fds[0], STDIN_FILENO); // 将标准输入重定向到fds[0]
+            close(fds[0]);
+            while(fgets(line, BUF_SZ, stdin) != NULL) { // 读取子进程的错误信息
+                strcat(info, line);
+            }
+            printf(&quot;%s&quot;, info); // 打印错误信息
+
+            result = exitCode;
+        } else if (pipeIdx+1 &lt; right){
+            close(fds[1]);
+            dup2(fds[0], STDIN_FILENO); // 将标准输入重定向到fds[0]
+            close(fds[0]);
+            result = callCommandWithPipe(pipeIdx+1, right); // 递归执行后续指令
+        }
+    }
+
+    return result;
+}
+</code></pre>
+
+<h4 id="4-8-可处理重定向的callcommandwithredi-函数">4.8 可处理重定向的callCommandWithRedi()函数</h4>
+
+<p>函数首先判断指令是否存在。若指令不存在，则直接返回错误信息，不需要再继续执行。<br />
+当指令存在时，先判断是否有合法的重定向，再进行下一步处理。同样，在子进程中执行程序。C语言对于重定向的处理，可以使用文件读写的方式，也可以使用其它。为了使得代码比较简洁，我使用freopen()这一神器来实现输入、输出重定向。随后使用execvp()函数执行命令。若执行失败，则会把错误编号存在errno中，返回errno；若执行成功，则会返回0。<br />
+父进程等待子进程结束，并读取子进程的返回码。若不为0，则使用strerror()函数获取对应的错误信息，并打印到控制台。</p>
+
+<pre><code>int callCommandWithRedi(int left, int right) { // 所要执行的指令区间[left, right)，不含管道，可能含有重定向
+    if (!isCommandExist(commands[left])) { // 指令不存在
+        return ERROR_COMMAND;
+    }   
+
+    /* 判断是否有重定向 */
+    int inNum = 0, outNum = 0;
+    char *inFile = NULL, *outFile = NULL;
+    int endIdx = right; // 指令在重定向前的终止下标
+
+    for (int i=left; iif (strcmp(commands[i], COMMAND_IN) == 0) { // 输入重定向
+            ++inNum;
+            if (i+1 &lt; right)
+                inFile = commands[i+1];
+            else return ERROR_MISS_PARAMETER; // 重定向符号后缺少文件名
+
+            if (endIdx == right) endIdx = i;
+        } else if (strcmp(commands[i], COMMAND_OUT) == 0) { // 输出重定向
+            ++outNum;
+            if (i+1 &lt; right)
+                outFile = commands[i+1];
+            else return ERROR_MISS_PARAMETER; // 重定向符号后缺少文件名
+
+            if (endIdx == right) endIdx = i;
+        }
+    }
+    /* 处理重定向 */
+    if (inNum == 1) {
+        FILE* fp = fopen(inFile, &quot;r&quot;);
+        if (fp == NULL) // 输入重定向文件不存在
+            return ERROR_FILE_NOT_EXIST;
+
+        fclose(fp);
+    }
+
+    if (inNum &gt; 1) { // 输入重定向符超过一个
+        return ERROR_MANY_IN;
+    } else if (outNum &gt; 1) { // 输出重定向符超过一个
+        return ERROR_MANY_OUT;
+    }
+
+    int result = RESULT_NORMAL;
+    pid_t pid = vfork();
+    if (pid == -1) {
+        result = ERROR_FORK;
+    } else if (pid == 0) {
+        /* 输入输出重定向 */
+        if (inNum == 1)
+            freopen(inFile, &quot;r&quot;, stdin);
+        if (outNum == 1)
+            freopen(outFile, &quot;w&quot;, stdout);
+
+        /* 执行命令 */
+        char* comm[BUF_SZ];
+        for (int i=left; icomm[i] = commands[i];
+        comm[endIdx] = NULL;
+        execvp(comm[left], comm+left);
+        exit(errno); // 执行出错，返回errno
+    } else {
+        int status;
+        waitpid(pid, &amp;status, 0);
+        int err = WEXITSTATUS(status); // 读取子进程的返回码
+
+        if (err) { // 返回码不为0，意味着子进程执行出错，用红色字体打印出错信息
+            printf(&quot;\e[31;1mError: %s\n\e[0m&quot;, strerror(err));
+        }
+    }
+
+
+    return result;
+}
+</code></pre>
+
+<hr />
+
+<h2 id="5-结尾">5 结尾</h2>
+
+<p>以上就是简易shell程序的相关内容啦，如果有发现什么问题，欢迎大家一起探讨。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

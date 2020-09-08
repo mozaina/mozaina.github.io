@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本实现es备份导出到本地形成json文件 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本实现es备份导出到本地形成json文件 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本实现es备份导出到本地形成json文件">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0es%E5%A4%87%E4%BB%BD%E5%AF%BC%E5%87%BA%E5%88%B0%E6%9C%AC%E5%9C%B0%E5%BD%A2%E6%88%90json%E6%96%87%E4%BB%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本实现es备份导出到本地形成json文件</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>项目需求：备份es数据，并落实到本地形成文件<br />
+脚本实现：定时备份es数据，定期删除备份文件，自定义文件名称、版本号，可以指定备份索引，也可以备份全部索引<br />
+使用esdump来进行备份：<br />
+ElasticDump是一个ElasticSearch的数据导入导出开源工具包，方便使用。</p>
+
+<p>官方地址：官方地址：<a href="https://github.com/taskrabbit/elasticsearch-dump">https://github.com/taskrabbit/elasticsearch-dump</a></p>
+
+<p>安装方式如下：<br />
+安装NodeJS<br />
+下载源码:wget <a href="http://nodejs.org/dist/v0.10.32/node-v0.10.32-linux-x64.tar.gz">http://nodejs.org/dist/v0.10.32/node-v0.10.32-linux-x64.tar.gz</a><br />
+解压:tar xvf node-v0.10.22-linux-x64.tar.gz<br />
+配置环境变量：<br />
+在/etc/profile文件新增：</p>
+
+<pre><code>export NODE_HOME=/home/node-v0.10.0-linux-x64
+export PATH=$PATH:$NODE_HOME/bin
+export NODE_PATH=$NODE_HOME/lib/node_modules
+</code></pre>
+
+<p>执行 source /etc/profile 命令让环境变量设置生效<br />
+测试：在终端输入node -v如果有版本信息输出，则说明安装成功</p>
+
+<p>安装NPM<br />
+curl -L <a href="https://npmjs.org/install.sh">https://npmjs.org/install.sh</a> | sh</p>
+
+<p>安装ElasticDump<br />
+npm install elasticdump -g<br />
+elasticdump<br />
+脚本内容：</p>
+
+<pre><code>#!/bin/bash
+#全备方式
+#作者：lcm_linux
+#时间：2019.08.06
+. /etc/profile
+. ~/.bash_profile
+source /etc/profile    #加载系统环境变量
+source ~/.bash_profile  #加载用户环境变量
+#set -o nounset       #引用未初始化变量时退出
+#set -o errexit      #执行shell命令遇到错误时退出
+#es备份存储路径,根据需要修改
+backup_path=&quot;/data1/es_data/es_bak/data&quot;
+backup_log_path=&quot;/data1/es_data/es_bak/logs&quot;
+#获取当天日期
+date=$(date +%Y-%m-%d_%H-%M-%S)
+del_date=$(date +%Y-%m)
+#远程访问ES集群的IP，需要按需修改
+export_ip=&quot;192.168.162.222&quot;
+#远程访问ES集群的端口，内部通信，一般不需要修改
+export_port=&quot;9200&quot;
+#备份输出的日志信息
+backup_log=&quot;${backup_log_path}/es_export_${date}.log&quot;
+#backup_error_log=&quot;${backup_path}/es_export_error_${date}.log&quot;
+day=0
+#获取索引列表
+#定义文件1
+list1=${backup_path}/es_export_list1.txt
+#定义文件2
+list2=${backup_path}/es_export_list2.txt
+#定义文件3
+list3=${backup_path}/es_export_list3.txt
+
+function create_list(){
+#获取除了 swordfish 以外的索引名称,可根据具体修改
+#curl http://${export_ip}:${export_port}/_cat/indices |grep -v &quot;swordfish&quot; &gt; ${list1}
+#获取匹配到的所有索引名称 指定索引 grep -i &quot;xxx&quot; 满足任意条件过滤： grep -E &quot;aaa|bbb|ccc*&quot; 带*的要放在最后
+curl http://${export_ip}:${export_port}/_cat/indices | grep -E &quot;k007_dw_net_*&quot; &gt; ${list1}
+cat ${list1} | awk '{print $3 &quot;\t\t&quot; $4}' &gt; ${list2}
+column -t ${list2} &gt;  ${list3}
+cat ${list3} | awk '{print $1}' | sort &gt;&gt; ${backup_path}/list.txt
+rm -rf ${list1} ${list2} ${list3}
+#打印行数
+row=$(cat ${backup_path}/list.txt | wc -l)
+
+echo &quot;=========${date}:索引目录导出完成:此时行数:$row=======&quot; &gt;&gt; ${backup_log}
+
+
+}
+
+#创建备份路径
+if [[ ! -d ${backup_path}/${date} ]];then
+  mkdir -p {$backup_path/${date},$backup_log_path}
+else
+  echo &quot;========${date}:文件夹已经存在=======&quot; &gt;&gt; ${backup_log}
+fi
+
+#清理备份路径下没有备份完全的文件夹
+for f in `ls $backup_path`;
+do
+    if [[ $f = ${del_date}* ]]; then
+        rm -rf $backup_path/$f
+    fi
+done
+
+#创建备份路径
+if [[ ! -d ${backup_path}/${date} ]];then
+  mkdir -p {$backup_path/${date},$backup_log_path}
+else
+  echo &quot;========${date}:文件夹已经存在=======&quot; &gt;&gt; ${backup_log}
+fi
+
+#删除之前的备份
+if [[ -f $backup_path/*.tar.gz ]];then
+    find $backup_path/*.tar.gz -type f -mtime +$day -exec rm -rf {} \; &gt; /dev/null 2&gt;&amp;1
+fi
+
+#===============开始导出数据=======================
+echo &quot;导出开始,结果查看 $backup_log&quot;
+echo &quot;=========${date}:正在导出索引目录=======&quot; &gt;&gt; ${backup_log}
+#清理之前的索引列表文件
+if [[ ! -f &quot;${backup_path}/list.txt&quot; ]]; then
+    echo &quot;正在创建索引list&quot;
+    create_list
+else
+    echo &quot;正在删除旧的list&quot;
+    rm -f ${backup_path}/list.txt
+    echo &quot;删除完成，正在创建索引list&quot;
+    create_list
+fi
+sleep 5
+
+
+#============检查是否存在elasticdump命令=================
+command -v elasticdump &gt;/dev/null 2&gt;&amp;1 || { echo &gt;&amp;2 &quot;环境中没有检测到elasticdump，请确认是否存在，备份已中止！&quot;; exit 1; }
+
+sleep 5
+echo &quot;=========${date}:开始导出索引文件=======&quot;
+echo &quot;=========${date}:开始导出索引文件=======&quot; &gt;&gt; ${backup_log}
+        while read line
+    do
+    elasticdump --input=http://${export_ip}:${export_port}/${line} --output=&quot;${backup_path}/${date}/&quot;${line}_settings.json --type=settings --searchBody '{&quot;query&quot;: { &quot;match_all&quot;: {} }, &quot;stored_fields&quot;: [&quot;*&quot;],&quot;_source&quot;: true }'
+        sleep 5
+    elasticdump --input=http://${export_ip}:${export_port}/${line} --output=&quot;${backup_path}/${date}/&quot;${line}_analyzer.json --type=analyzer --searchBody '{&quot;query&quot;: { &quot;match_all&quot;: {} }, &quot;stored_fields&quot;: [&quot;*&quot;],&quot;_source&quot;: true }'
+        sleep 5
+    elasticdump --input=http://${export_ip}:${export_port}/${line} --output=&quot;${backup_path}/${date}/&quot;${line}_mapping.json --type=mapping --searchBody '{&quot;query&quot;: { &quot;match_all&quot;: {} }, &quot;stored_fields&quot;: [&quot;*&quot;],&quot;_source&quot;: true }' 
+        sleep 5
+    elasticdump --input=http://${export_ip}:${export_port}/${line} --output=&quot;${backup_path}/${date}/&quot;${line}_data.json --type=data --searchBody '{&quot;query&quot;: { &quot;match_all&quot;: {} }, &quot;stored_fields&quot;: [&quot;*&quot;],&quot;_source&quot;: true }'
+  if [[ $? == 0 ]];then
+    cd $backup_path/${date}
+    size1=$(du $backup_path/${date}/${line}_mapping.json -sh | awk '{print $1}')
+    size2=$(du $backup_path/${date}/${line}_data.json -sh | awk '{print $1}')
+    size3=$(du $backup_path/${date}/${line}_settings.json -sh | awk '{print $1}')
+    size4=$(du $backup_path/${date}/${line}_analyzer.json -sh | awk '{print $1}')
+    echo &quot;导出时间:${date} 导出方式:elasticdump 导出索引:${line} mapping大小:$size1 data大小:$size2 settings大小:$size3 analyzer大小:$size4 导出状态:成功！&quot; &gt;&gt;$backup_log
+  else
+    cd $backup_path/${date}
+    echo &quot;导出时间:${date} 导出方式:elasticdump 导出索引:${line} 导出状态:失败,请查看日志.&quot; &gt;&gt;$backup_log
+  fi
+
+  done &lt; ${backup_path}/list.txt
+
+
+  cd $backup_path
+  tar zcpvf elasticdump_$date.tar.gz $date
+  rm -rf $backup_path/$date
+echo &quot;导出结束,结果查看 $backup_log&quot;
+du elasticdump_$date.tar.gz -sh | awk '{print &quot;文件:&quot; $2 &quot;,大小:&quot; $1}'
+echo &quot;==========${date}:导出索引文件完成==========&quot; &gt;&gt;$backup_log
+echo &quot;==========${date}:导出索引文件完成==========&quot;
+</code></pre>
+
+<p>配置定时任务：</p>
+
+<pre><code>55 16 * * * /bin/bash /opt/script/es_shell/es_export.sh
+</code></pre>
+
+<p><strong>附上恢复脚本A</strong> ：<br />
+脚本实现：根据上述备份脚本内容所产生的索引列表list，进行对list中索引数据恢复<br />
+脚本内容：</p>
+
+<pre><code>#!/bin/bash
+
+#作者：lcm_linux
+#时间：2019.08.06
+#此导入脚本要结合导出脚本es_export.sh产生的es列表list.txt来一起使用，最好将两个脚本放在同一个目录下
+source /etc/profile    #加载系统环境变量
+source ~/.bash_profile  #加载用户环境变量
+set -o nounset       #引用未初始化变量时退出
+set -o errexit      #执行shell命令遇到错误时退出
+date=$(date +%Y-%m-%d_%H-%M-%S)
+
+function download(){
+        while read line
+        do
+             elasticdump  --input=${1}/${line}_settings.json --output=http://${2}/${line} --type=settings --searchBody '{&quot;query&quot;: { &quot;match_all&quot;: {} }, &quot;stored_fields&quot;: [&quot;*&quot;],&quot;_source&quot;: true }' 
+                sleep 5
+             elasticdump  --input=${1}/${line}_analyzer.json --output=http://${2}/${line} --type=analyzer --searchBody '{&quot;query&quot;: { &quot;match_all&quot;: {} }, &quot;stored_fields&quot;: [&quot;*&quot;],&quot;_source&quot;: true }' 
+                sleep 5
+             elasticdump  --input=${1}/${line}_mapping.json --output=http://${2}/${line} --type=mapping --searchBody '{&quot;query&quot;: { &quot;match_all&quot;: {} }, &quot;stored_fields&quot;: [&quot;*&quot;],&quot;_source&quot;: true }' 
+                sleep 5
+             elasticdump --input=${1}/${line}_data.json --output=http://${2}/${line} --type=data --searchBody '{&quot;query&quot;: { &quot;match_all&quot;: {} }, &quot;stored_fields&quot;: [&quot;*&quot;],&quot;_source&quot;: true }' 
+        done &lt; list.txt
+}
+
+
+function check(){
+
+        if [ `npm ls elasticdump &gt;/dev/null &amp;&amp; echo $?` != 0 ];then
+                npm install elasticdump
+                cp /node_modules/elasticdump/bin/elasticdump /usr/sbin/
+                echo &quot;elasticdump 安装完成...&quot;
+        else
+                echo &quot;elasticdump 已经正常安装！！&quot;
+        fi
+}
+
+
+read -p &quot;确定elasticdump是否正确安装?(y/n):&quot; judge
+if [ $judge = 'y' -o $judge = 'Y' ];then
+        read -p &quot;请输入es的数据存储的位置 ： &quot; floder
+        read -p &quot;请输入es集群的IP和端口，eg:172.16.3.139:9200 ： &quot; IPinfo
+
+        download ${floder} ${IPinfo}
+
+else
+        echo &quot;检查安装并且开始下载任务&quot;
+        check
+        read -p &quot;请输入es的数据存储的位置 ： &quot; floder
+        read -p &quot;请输入es集群的IP和端口，eg:192.168.162.222:9200 ： &quot; IPinfo
+        download ${floder} ${IPinfo}
+fi
+</code></pre>
+
+<p><strong>附上脚本B：</strong><br />
+脚本实现：根据上述备份脚本所产生的索引文件list，进行对es中索引的删除<br />
+脚本内容：</p>
+
+<pre><code>#!/bin/bash
+while read line
+do
+  curl -X DELETE http://192.168.162.222:9200/${line}
+done &lt; list.txt
+</code></pre>
+
+<p><strong>总结</strong><br />
+1）如果不导入analyzer会怎么样？<br />
+我试过如果只导入data和mapping，则数据会导入，mapping会发生变化，最终的结果没有分词的效果。<br />
+2）如果不导入mapping也不会有分词的效果。<br />
+3）顺序导入最好按照：analyzer，setting，mapping和data这个顺序来，防止出现分词失效的结果。导出顺序没有要求。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

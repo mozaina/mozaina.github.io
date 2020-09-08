@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>理解Linux中子shell的概念 | 开发者问答集锦</title>
+    <meta property="og:title" content="理解Linux中子shell的概念 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="理解Linux中子shell的概念">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%90%86%E8%A7%A3linux%E4%B8%AD%E5%AD%90shell%E7%9A%84%E6%A6%82%E5%BF%B5/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">理解Linux中子shell的概念</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="是什么子shell">是什么子shell</h3>
+
+<p>子shell的概念贯穿整个shell，写shell脚本时更是不可不知。所谓子shell，即从当前shell环境新开一个shell环境，这个新开的shell环境就称为子shell(subshell)，而开启子shell的环境称为该子shell的父shell。子shell和父shell的关系其实就是子进程和父进程的关系，只不过子shell和父shell是关联的进程是bash进程。</p>
+
+<p>子shell会从父shell中继承很多环境，如变量、命令全路径、文件描述符、当前工作目录、陷阱等等，但子shell有很多种类型，不同类型的子shell继承的环境不相同。可以使用$BASH_SUBSHELL变量来查看从当前进程开始的子shell层数，$BASHPID查看当前所处BASH的PID，这不同于特殊变量&rdquo;KaTeX
+parse error: Can&rsquo;t use function &lsquo;\&ldquo;&rsquo; in math mode at position 6:
+&ldquo;值，因为\̲&rdquo;̲&rdquo;会从父进程继承。</p>
+
+<h3 id="何时产生子shell">何时产生子shell</h3>
+
+<p>要解释清楚子shell以及产生何种类型的子shell，需要搞清楚Linux中如何产生子进程。Linux上创建子进程的方式有三种：一种是fork出来的进程，一种是exec出来的进程，一种是clone出来的进程。此处无需关心clone，因为它用来实现Linux中的线程。</p>
+
+<p>(1).fork是复制进程，它会复制当前进程的副本(不考虑写时复制的模式)，以适当的方式将这些资源交给子进程。所以子进程掌握的资源和父进程是一样的，包括内存中的内容，所以也包括环境变量和变量。但父子进程是完全独立的，它们是一个程序的两个实例。</p>
+
+<p>(2).exec是加载另一个应用程序，替代当前运行的进程，也就是说在不创建新进程的情况下加载一个新程序。exec还有一个动作：在进程执行完毕后，退出exec所在的shell环境。</p>
+
+<p>所以为了保证进程安全，若要形成新的且独立的子进程，都会先fork一份当前进程，然后在fork出来的子进程上调用exec来加载新程序替代该子进程。例如在bash下执行cp命令，会先fork出一个bash，然后再exec加载cp程序覆盖子bash进程变成cp进程。</p>
+
+<p>再来说明子shell的问题。一般fork出来的子进程，内容和父进程是一样的(包括变量)，例如执行cp命令时也能获取到父进程的变量。但是cp命令在哪里执行呢？执行cp命令敲入回车后，当前的bash进程fork出一个子bash，然后子bash通过exec加载cp程序替代子bash。这算是进入了子shell吗？更通用的问题是：什么情况下会进入子shell环境，什么时候不进入子shel环境呢？</p>
+
+<p>判断是否进入了子shell的方式非常简单，执行&rdquo;echo
+$BASHPID&rdquo;，如果该值和父bash进程的pid值不同，则表示进入了子shell。在shell中是否进入子shell的情况可以分为几种：</p>
+
+<p>①.执行bash内置命令时.</p>
+
+<p>bash内置命令是非常特殊的，父进程不会创建子进程来执行这些命令，而是直接在当前bash环境中执行。但如果将内置命令放在管道后，则此内置命令将和管道左边的进程同属于一个进程组，所以仍然会创建子shell。</p>
+
+<pre><code>[root@linuxidc ~]# echo $BASHPID   # 当前BASHPID
+65230
+[root@linuxidc ~]# let a=$BASHPID   # bash内置命令，不进入子shell
+[root@linuxidc ~]# echo $a
+65230
+[root@linuxidc ~]# echo $BASHPID
+65230
+[root@linuxidc ~]# cd | expr $BASHPID      # 管道使得任何命令都进入进程组，会进入子shell   
+65603
+</code></pre>
+
+<p>②.执行bash命令本身时。</p>
+
+<p>这是一个很巧合的命令。bash命令本身是bash内置命令，在当前shell环境下执行内置命令本不会创建子shell，也就是说不会有独立的bash进程出现，而实际结果则表现为新的bash是一个子进程。其中一个原因是执行bash命令会加载各种环境配置项，为了父bash的环境得到保护而不被覆盖，所以应该让其以子shell的方式存在。虽然fork出来的bash子进程内容完全继承父shell，但因重新加载了环境配置项，所以子shell没有继承普通变量，更准确的说是覆盖了从父shell中继承的变量。不妨试试在/etc/bashrc文件中定义一个变量，再在父shell中export名称相同值却不同的环境变量，然后到子shell中看看该变量的值为何？</p>
+
+<pre><code>[root@linuxidc ~]# echo &quot;var=55&quot; &gt;&gt;/etc/bashrc
+[root@linuxidc ~]# export var=66
+[root@linuxidc ~]# bash
+[root@linuxidc ~]# echo $var
+55
+</code></pre>
+
+<p>由结果55可知，执行bash时加载的/etc/bashrc中的变量覆盖了父bash中的导出的环境变量值66。</p>
+
+<p>其实执行bash命令，既可以认为进入了子shell，也可以认为没有进入子shell。从bash是内置命令的角度来考虑，它不会进入子shell，这一点在执行bash命令后从变量<br />
+$BASH_SUBSHELL的值为0可以验证出来。但从执行bash命令后进入了新的shell环境来看，它有其父bash进程，且$BASHPID值和父shell不同，所以它算是进入了子shell。</p>
+
+<pre><code>[root@linuxidc ~]# echo $BASHPID
+65230
+[root@linuxidc ~]# bash
+[root@linuxidc ~]# echo $BASHPID
+65534
+</code></pre>
+
+<p>③.执行shell脚本时。</p>
+
+<p>脚本中第一行总是&rdquo;#!/bin/bash&rdquo;或者直接&rdquo;bash
+xyz.sh&rdquo;，这和上面的执行bash进入子shell其实是一回事，都是使用bash命令进入子shell。只不过此时的bash命令和情况②中直接执行bash命令所隐含的选项不一样，所以继承和加载的shell环境也不一样。事实也确实如此，它仅只继承父shell的某些环境变量，其余环境一概初始化。</p>
+
+<p>另外，执行shell脚本相比于直接执行bash命令，还多了一个动作：脚本执行完毕后自动退出子shell。</p>
+
+<pre><code>[root@linuxidc ~]# cat b.sh 
+#!/bin/bash
+echo $BASHPID
+
+[root@linuxidc ~]# echo $BASHPID
+65534
+[root@linuxidc ~]# ./b.sh 
+65570
+</code></pre>
+
+<p>④.执行shell函数时。</p>
+
+<p>其实shell函数就是命令，它和bash内置命令的情况一样。直接执行时不会进入子shell，但放在管道后会进入子shell。</p>
+
+<pre><code>[root@linuxidc ~]# fun_test (){ echo $BASHPID; }   # 定义一个函数，输出BASHPID变量的值
+[root@linuxidc ~]# echo $BASHPID 
+65230
+[root@linuxidc ~]# fun_test      # 说明执行函数不会进入子shell
+65230
+[root@linuxidc ~]# cd | fun_test   # 但放在管道后会进入子shell
+65605
+⑤.执行非bash内置命令时。
+</code></pre>
+
+<p>例如执行cp命令、grep命令等，它们直接fork一份bash进程，然后使用exec加载程序替代该子bash。此类子进程会继承所有父bash的环境。但严格地说，这已经不是子shell，因为exec加载的程序已经把子bash进程替换掉了，这意味着丢失了很多bash环境。在bash文档中，直接称呼这种环境为&rdquo;单独的环境&rdquo;，和子shell的概念类似。</p>
+
+<pre><code>[root@linuxidc ~]# let a=$BASHPID   # let是内置命令
+[root@linuxidc ~]# echo $a
+65230
+[root@linuxidc ~]# echo $BASHPID    # echo是非内置命令，结果是不进入子shell
+65230
+</code></pre>
+
+<p>⑥.命令替换($())。</p>
+
+<p>当命令行中包含了命令替换部分时，将开启一个子shell先执行这部分内容，再将执行结果返回给当前命令。因为这次的子shell不是通过bash命令进入的子shell，所以它会继承父shell的所有变量内容。这也就解释了&rdquo;echo
+$(echo $$)“中”$$&ldquo;的结果是当前bash的pid号，而不是子shell的pid号，但&rdquo;echo $(echo
+$BASHPID)&ldquo;却和父bash进程的pid不同，因为它不是使用bash命令进入的子shell。</p>
+
+<pre><code>[root@linuxidc ~]# echo $BASHPID
+65230
+[root@linuxidc ~]# echo $(echo $BASHPID)      # 使用命令替换$()进入子shell
+65612
+</code></pre>
+
+<p>⑦.使用括号()组合一系列命令。</p>
+
+<p>例如(ls;date;echo haha)，独立的括号将会开启一个子shell来执行括号内的命令。这种情况等同于情况⑤。</p>
+
+<pre><code>[root@linuxidc ~]# echo $BASHPID
+65230
+[root@linuxidc ~]# (echo $BASHPID)  # 使用括号()的命令组合进入子shell
+65613
+</code></pre>
+
+<p>⑧.放入后台运行的任务。</p>
+
+<p>它不仅是一个独立的子进程，还是在子shell环境中运行的。例如&rdquo;echo hahha &amp;&ldquo;。</p>
+
+<pre><code>[root@linuxidc ~]# echo $BASHPID
+65230
+[root@linuxidc ~]# echo $BASHPID &amp;   # 放入后台运行的任务进入子shell
+[1] 65614
+[root@linuxidc ~]# 65614
+
+[1]+  Done                    echo $BASHPID 
+</code></pre>
+
+<p>⑨.进程替换。</p>
+
+<p>既然是新进程了，当然进入子shell执行。例如&rdquo;cat</p>
+
+<pre><code>[root@linuxidc ~]# echo $BASHPID
+65230
+
+[root@linuxidc ~]# cat 
+</code></pre>
+
+<p>需要说明的是，子shell的环境设置不会粘滞到父shell环境，也就是说子shell的变量等不会影响父shell。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

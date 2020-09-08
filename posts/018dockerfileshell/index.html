@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>018DockerfileSHELL | 开发者问答集锦</title>
+    <meta property="og:title" content="018DockerfileSHELL - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="018DockerfileSHELL">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/018dockerfileshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">018DockerfileSHELL</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="语法">语法</h2>
+
+<pre><code>SHELL [&quot;executable&quot;, &quot;parameters&quot;]
+</code></pre>
+
+<h2 id="作用-描述">作用 &amp; 描述</h2>
+
+<p>SHELL 指令允许覆盖用于 shell 形式命令的默认 shell。Linux 上的默认 shell 是 [&ldquo;/bin/sh&rdquo;, “-c”]，在
+Windows 上是 [“cmd”, “/S”, “/C”]。SHELL 指令必须以 JSON 格式写入 Dockerfile。</p>
+
+<p>SHELL 指令在 Windows 上特别有用，其中有两个常用且完全不同的本机 shell: cmd 和 powershell，以及包括 sh 的备用
+shell。</p>
+
+<p>SHELL 指令可以多次出现。每个 SHELL 指令都会覆盖所有先前 SHELL 指令，并影响所有后续指令。例如：</p>
+
+<pre><code>FROM microsoft/windowsservercore
+
+# Executed as cmd /S /C echo default
+RUN echo default
+
+# Executed as cmd /S /C powershell -command Write-Host default
+RUN powershell -command Write-Host default
+
+# Executed as powershell -command Write-Host hello
+SHELL [&quot;powershell&quot;, &quot;-command&quot;]
+RUN Write-Host hello
+
+# Executed as cmd /S /C echo hello
+SHELL [&quot;cmd&quot;, &quot;/S&quot;, &quot;/C&quot;]
+RUN echo hello
+</code></pre>
+
+<p>当在 Dockerfile 中使用它们的shell形式时，SHELL 指令可能会影响以下指令：RUN,CMD 和 ENTRYPOINT。</p>
+
+<p>以下示例时在 Windows 上找到的常见模式，可以使用 SHELL 指令简化:</p>
+
+<pre><code>...
+RUN powershell -command Execute-MyCmdlet -param1 &quot;c:\foo.txt&quot;
+...
+</code></pre>
+
+<p>docker 调用的命令将是:</p>
+
+<pre><code>cmd /S /C powershell -command Execute-MyCmdlet -param1 &quot;c:\foo.txt&quot;
+</code></pre>
+
+<p>由于两个原因，这是低效的。首先，调用一个不必要的 cmd.exe 命令处理器(也就是shell)。其次，shell 形式的每个 RUN 指令都需要一个额外的
+powershell -command 前缀命令。<br />
+为了提高效率，可以采用两种机制中的一种。一种是使用 RUN 命令的 JSON 形式，例如:</p>
+
+<pre><code>...
+RUN [&quot;powershell&quot;, &quot;-command&quot;, &quot;Execute-MyCmdlet&quot;, &quot;-param1 \&quot;c:\\foo.txt\&quot;&quot;]
+...
+</code></pre>
+
+<p>虽然 JSON 表单是明确的，并且不使用不必要的 cmd.exe，但它确实需要通过双引号和转义更加详细。替代机制是使用 SHELL 指令和 shell
+表单，为 Windows 用户提供更自然的语法，特别是与 escape parser 指令结合使用时:</p>
+
+<pre><code># escape=`
+
+FROM microsoft/nanoserver
+SHELL [&quot;powershell&quot;,&quot;-command&quot;]
+RUN New-Item -ItemType Directory C:\Example
+ADD Execute-MyCmdlet.ps1 c:\example\
+RUN c:\example\Execute-MyCmdlet -sample 'hello world'
+</code></pre>
+
+<p>导致:</p>
+
+<pre><code>PS E:\docker\build\shell&gt; docker build -t shell .
+Sending build context to Docker daemon 4.096 kB
+Step 1/5 : FROM microsoft/nanoserver
+ ---&gt; 22738ff49c6d
+Step 2/5 : SHELL powershell -command
+ ---&gt; Running in 6fcdb6855ae2
+ ---&gt; 6331462d4300
+Removing intermediate container 6fcdb6855ae2
+Step 3/5 : RUN New-Item -ItemType Directory C:\Example
+ ---&gt; Running in d0eef8386e97
+
+
+    Directory: C:\
+
+
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+d-----       10/28/2016  11:26 AM                Example
+
+
+ ---&gt; 3f2fbf1395d9
+Removing intermediate container d0eef8386e97
+Step 4/5 : ADD Execute-MyCmdlet.ps1 c:\example\
+ ---&gt; a955b2621c31
+Removing intermediate container b825593d39fc
+Step 5/5 : RUN c:\example\Execute-MyCmdlet 'hello world'
+ ---&gt; Running in be6d8e63fe75
+hello world
+ ---&gt; 8e559e9bf424
+Removing intermediate container be6d8e63fe75
+Successfully built 8e559e9bf424
+PS E:\docker\build\shell&gt;
+</code></pre>
+
+<p>SHELL 指令也可用于修改 shell 的运行方式。例如，在 Windows 上使用 SHELL cmd /S/C/V:
+ON|OFF，可以修改延迟的环境变量扩展寓意。</p>
+
+<p>如果需要备用 shell，例如 zsh, csh, tcsh 等，也可以在 Linux 上使用 SHELL 指令。</p>
+
+<p>在 Docker 1.12 中添加了 SHELL 功能。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/">01Shell入门01bashShell特性</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>ARM裸板开发简单编写实现shell功能 | 开发者问答集锦</title>
+    <meta property="og:title" content="ARM裸板开发简单编写实现shell功能 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="ARM裸板开发简单编写实现shell功能">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/arm%E8%A3%B8%E6%9D%BF%E5%BC%80%E5%8F%91%E7%AE%80%E5%8D%95%E7%BC%96%E5%86%99%E5%AE%9E%E7%8E%B0shell%E5%8A%9F%E8%83%BD/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">ARM裸板开发简单编写实现shell功能</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<ul>
+<li>简单编写实现一个裸板环境下使用的“shell”功能程序，可以控制LED、beep等。
+
+<ul>
+<li>main主程序设计</li>
+<li>主要函数：strcmp实现</li>
+<li>LED初始化及控制功能实现</li>
+<li>UART初始化及控制功能实现</li>
+<li>使用Makefile编译</li>
+<li>执行结果</li>
+</ul></li>
+</ul>
+
+<hr />
+
+<h1 id="简单编写实现一个裸板环境下使用的-shell-功能程序-可以控制led-beep等">简单编写实现一个裸板环境下使用的“shell”功能程序，可以控制LED、beep等。</h1>
+
+<h2 id="main主程序设计">main主程序设计</h2>
+
+<pre><code>#include &quot;uart.h&quot;
+#include &quot;strcmp.h&quot;
+#include &quot;led.h&quot;
+
+//保存从上位机接收的数据信息
+static char buf[32];
+
+void main(void)
+{
+    //1.初始化UART
+    uart_init();
+    //2.初始化LED
+    led_init();
+
+    //3.根据用户需求完成业务
+    while(1) {
+        uart_puts(&quot;\n Shell#&quot;);
+        uart_gets(buf, 32);
+        if(!my_strcmp(buf, &quot;led on&quot;))
+            led_on();
+        else if(!my_strcmp(buf, &quot;led off&quot;))
+            led_off();
+        else
+            uart_puts(&quot;\n Your command is invalid\n&quot;);
+    }
+}
+</code></pre>
+
+<h2 id="主要函数-strcmp实现">主要函数：strcmp实现</h2>
+
+<p>实现strcmp字符串比较函数，用于对比用户命令的输入。</p>
+
+<ul>
+<li><p>strcmp.h</p>
+
+<p>#ifndef __STRCMP_H
+#define __STRCMP_H</p>
+
+<p>/*功能：比较字符串函数声明
+ *返回值：
+    str1=str2:返回0
+    str1&gt;str2:返回大于0
+    str1
+extern int my_strcmp(const char *str1,
+                     const char *str2);
+#endif</p></li>
+
+<li><p>strcmp.c</p>
+
+<p>#include “strcmp.h”
+/<em>str1 = &ldquo;hello&rdquo;, str2 = &ldquo;hfllo&rdquo;</em>/
+int my_strcmp(const char *str1,
+                const char *str2)
+{
+    while(*str1) {
+        if(*str1 != *str2)
+            return *str1 - *str2;
+        str1++;
+        str2++;
+    }
+    return *str1 - *str2;
+}</p></li>
+</ul>
+
+<h2 id="led初始化及控制功能实现">LED初始化及控制功能实现</h2>
+
+<ul>
+<li><p>led.h</p>
+
+<p>#ifndef __LED_H
+#define __LED_H</p>
+
+<p>/<em>声明寄存器的基地址信息</em>/
+#define GPIOCOUT (*(volatile unsigned long <em>)0xC001C000)
+#define GPIOCOUTENB (</em>(volatile unsigned long <em>)0xC001C004)
+#define GPIOCALTFN0 (</em>(volatile unsigned long *)0xC001C020)</p>
+
+<p>/<em>声明操作函数</em>/
+extern void led_init(void);
+extern void led_on(void);
+extern void led_off(void);
+#endif</p></li>
+
+<li><p>led.c</p>
+
+<p>#include &ldquo;led.h&rdquo;</p>
+
+<p>//初始化函数定义
+void led_init(void)
+{
+    //1.配置引脚功能为GPIO功能
+    GPIOCALTFN0 &amp;= ~(3 &lt;&lt; 24);
+    GPIOCALTFN0 |= (1 &lt;&lt; 24);</p>
+
+<pre><code>//2.配置引脚为输出功能
+GPIOCOUTENB |= (1 &lt;&lt; 12);
+</code></pre>
+
+<p>}</p>
+
+<p>//开灯函数定义
+void led_on(void)
+{
+    //1.配置输出寄存器为0
+    GPIOCOUT &amp;= ~(1 &lt;&lt; 12);
+}</p>
+
+<p>//关灯函数定义
+void led_off(void)
+{
+    //1.配置输出寄存器为1
+    GPIOCOUT |= (1 &lt;&lt; 12);
+}</p></li>
+</ul>
+
+<h2 id="uart初始化及控制功能实现">UART初始化及控制功能实现</h2>
+
+<ul>
+<li><p>uart.h</p>
+
+<p>#ifndef __UART_H
+#define __UART_H</p>
+
+<p>/<em>UART相关寄存器定义</em>/
+#define ULCON0 (*(volatile unsigned long <em>)0xC00A1000)
+#define UCON0 (</em>(volatile unsigned long <em>)0xC00A1004)
+#define UTRSTAT0 (</em>(volatile unsigned long <em>)0xC00A1010)
+#define UTXH0 (</em>(volatile unsigned long <em>)0xC00A1020)
+#define URXH0 (</em>(volatile unsigned long <em>)0xC00A1024)
+#define UBRDIV0 (</em>(volatile unsigned long <em>)0xC00A1028)
+#define UFRACVAL0 (</em>(volatile unsigned long <em>)0xC00A102C)
+#define GPIODALTFN0 (</em>(volatile unsigned long <em>)0xC001D020)
+#define GPIODALTFN1 (</em>(volatile unsigned long <em>)0xC001D024)
+#define UARTCLKENB (</em>(volatile unsigned long <em>)0xC00A9000)
+#define UARTCLKGENOL (</em>(volatile unsigned long *)0xC00A9004)</p>
+
+<p>/<em>UART操作函数声明</em>/
+//初始化函数
+extern void uart_init(void);
+//发送字符函数
+extern void uart_putc(char c);
+//发送字符串函数
+extern void uart_puts(char *str);
+//接收字符函数
+extern char uart_getc(void);
+//接收字符串函数
+extern void uart_gets(char buf[], int len);
+#endif</p></li>
+
+<li><p>uart.c</p>
+
+<p>#include &ldquo;uart.h&rdquo;</p>
+
+<p>//初始化函数的定义
+void uart_init(void)
+{
+    //1.配置RX和TX对应的引脚功能分别为UARTRXD0和UARTTXD0功能
+    //GPIOD14配置UARTRXD0
+    //GPIODALTFN0[29:28]=01
+    GPIODALTFN0 &amp;= ~(3 &lt;&lt; 28);
+    GPIODALTFN0 |= (1 &lt;&lt; 28);
+    //GPIOD18配置UARTTXD0
+    //GPIODALTFN1[5:4]=01
+    GPIODALTFN1 &amp;= ~(3 &lt;&lt; 4);
+    GPIODALTFN1 |= (1 &lt;&lt; 4);</p>
+
+<pre><code>//2.配置UART的时钟为50MHZ
+//此时钟给波特率产生器使用
+//PLL[0]=800MHZ
+//n=800MHZ/50MHZ=16
+//n=CLKDIV0+1=&gt;CLKDIV0=15
+//CLKDIV0=UARTCLKGENOL[12:5]
+UARTCLKGENOL &amp;= ~(0xFF &lt;&lt; 5);
+UARTCLKGENOL |= (0xF &lt;&lt; 5);
+
+//3.配置UART的波特率为115200
+//数据位为8
+//不采用奇偶校验
+//停止为为1位
+ULCON0 = 3;
+UCON0 = 5;
+UBRDIV0 = 26; 
+UFRACVAL0=2;
+
+//4.打开UART的时钟
+UARTCLKENB |= (1 &lt;&lt; 2);
+</code></pre>
+
+<p>}</p>
+
+<p>//发送字符函数定义
+//以软件形式将数据放到发送缓冲区
+//发送移位器自动将数据一位一位的
+//发送到TX数据线,速度就是115200
+void uart_putc(char c)
+{
+    //1.由于CPU把数据放到缓存区的速度要远远快于发送移位器把数据放到TX数据线上的速度,CPU再发送下一个字符的时候应该判断一下发送缓冲区是否为空,如果为空,可以发,否则继续死等待
+    while(!(UTRSTAT0 &amp; 0x2));</p>
+
+<pre><code>//2.将数据放到发送缓冲区
+UTXH0 = c;
+
+//3.发送回车字符
+if(c == '\n')
+    uart_putc('\r');
+</code></pre>
+
+<p>}</p>
+
+<p>//发送字符串函数定义
+//str = &ldquo;helloworld\n&rdquo;
+void uart_puts(char *str)
+{
+    while(*str) {
+        uart_putc(*str);
+        str++;
+    }
+}</p>
+
+<p>//获取字符函数定义
+char uart_getc(void)
+{
+    //1.由于CPU读取UART接收缓冲区数据的速度
+    //要远远快于接收移位器从RX数据线获取数据的数据,所以CPU在读取数据的时候,首先要判断
+    //接收移位器的速度由波特率产生器决定
+    //接收缓冲区是否为空
+    //如果为空：CPU在原地死等
+    //如果不为空:CPU就可以读取数据
+    while(!(UTRSTAT0 &amp; 0x1));</p>
+
+<pre><code>//2.从接收缓冲区寄存器读取数据
+return (URXH0 &amp; 0xFF);
+</code></pre>
+
+<p>}</p>
+
+<p>//获取字符串函数定义
+//调用:char buf[32];uart_gets(buf, 32)
+void uart_gets(char buf[], int len)
+{
+    int i;
+    for (i = 0; i &lt; len - 1; i++) {
+        //保存上位机发送的字符
+        buf[i] = uart_getc();
+        //上位机回显
+        uart_putc(buf[i]);
+        //判断输入期间是否有回车操作
+        //如果有,跳出循环
+        if(buf[i] == &lsquo;\r&rsquo;)
+            break;
+    }
+    buf[i] = 0; //最后添加结束符
+}</p></li>
+</ul>
+
+<h2 id="使用makefile编译">使用Makefile编译</h2>
+
+<ul>
+<li><p>Makefile</p>
+
+<p>#定义变量
+NAME=shell
+BIN=$(NAME).bin
+ELF=$(NAME).elf
+OBJ=main.o uart.o led.o strcmp.o</p>
+
+<p>CROSS_COMPILE=arm-cortex_a9-linux-gnueabi-
+CC=$(CROSS_COMPILE)gcc
+LD=$(CROSS_COMPILE)ld
+OBJCOPY=$(CROSS_COMPILE)objcopy
+CP=cp
+RM=rm
+INSTALLPATH=/tftpboot</p>
+
+<p>#链接选项
+LDFLAGS=-nostdlib -nostartfiles -Ttext=0x48000000 -emain
+  #编译选项
+CFLAGS=-nostdlib</p>
+
+<p>#定义编译规则
+shell.bin:shell.elf
+    arm-cortex_a9-linux-gnueabi-objcopy -O binary shell.elf shell.bin</p>
+
+<p>$(BIN):$(ELF)
+    $(OBJCOPY) -O binary $(ELF) $(BIN)
+    $(CP) $(BIN) $(INSTALLPATH)
+#</p>
+
+<h1 id="shell-elf-main-o-uart-o-led-o-strcmp-o">#shell.elf:main.o uart.o led.o strcmp.o</h1>
+
+<h1 id="arm-ld-nostartfiles-nostdlib-o-shell-elf-main-o">arm&hellip;ld -nostartfiles -nostdlib -&hellip; -o shell.elf main.o &hellip;</h1>
+
+<p>$(ELF):$(OBJ)
+    $(LD) $(LDFLAGS) -o $(ELF) $(OBJ)
+#各种.o:各种.c</p>
+
+<h1 id="各种编译">各种编译</h1>
+
+<p>%.o:%.c
+    $(CC) $(CFLAGS) -c -o $@ $&lt;</p>
+
+<h1 id="伪目标">#伪目标</h1>
+
+<p>#当执行make clean时,仅仅执行clean伪目标对应的命令
+clean:
+        $(RM) $(BIN) $(ELF) $(OBJ)</p></li>
+</ul>
+
+<h2 id="执行结果">执行结果</h2>
+
+<p>在板子上uboot界面执行：</p>
+
+<pre><code>tftp 48000000 shell.bin
+go 48000000
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

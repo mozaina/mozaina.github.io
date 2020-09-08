@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>获取音视频时长NAudioShell32FFmpeg | 开发者问答集锦</title>
+    <meta property="og:title" content="获取音视频时长NAudioShell32FFmpeg - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="获取音视频时长NAudioShell32FFmpeg">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E8%8E%B7%E5%8F%96%E9%9F%B3%E8%A7%86%E9%A2%91%E6%97%B6%E9%95%BFnaudioshell32ffmpeg/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">获取音视频时长NAudioShell32FFmpeg</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<blockquote>
+<p>需要用到第三方组件获取多种<code>格式</code>的音视频时长，现分别采用NAudio.dll，Shell32.dll，FFmpeg.exe获取音视频的时长，并对比三者对不同格式文件的支持程度；</p>
+</blockquote>
+
+<p>以下为本次测试用到的音、视频格式：</p>
+
+<ul>
+<li><p><code>audio</code> ：”.wav;.mp3;.wma;.ra;.mid;.ogg;.ape;.au;.aac;”;</p></li>
+
+<li><p><code>vedio</code> ：”.mp4;.mpg;.mpeg;.avi;.rm;.rmvb;.wmv;.3gp;.flv;.mkv;.swf;.asf;”;</p></li>
+</ul>
+
+<p><strong>Note：</strong><br />
+1. 测试音、视频均为对应格式的有效文件（下载自地址：包含了各种可供测试音视频格式，且不断更新中。。）；<br />
+2. 若某音/视频时长为0，表示对应库、组件无法解码文件，即不支持该格式；<br />
+3. 类之间的关系：定义了Duration父类，三个测试方案均继承自Duration，并重写父类GetDuration方法。</p>
+
+<h2 id="获取时长父类">获取时长父类</h2>
+
+<pre><code>public abstract class Duration
+    {
+        /// 
+        /// Abstract method of getting duration(ms) of audio or vedio
+        /// 
+        /// audio/vedio's path
+        /// Duration in original format, duration in milliseconds
+        public abstract Tuple&lt;string, long&gt; GetDuration(string filePath);
+
+        /// 
+        /// Convert format of &quot;00:10:16&quot; and &quot;00:00:19.82&quot; into milliseconds
+        /// 
+        /// 
+        /// Time in milliseconds
+        public long GetTimeInMillisecond(string formatTime)
+        {
+            double totalMilliSecends = 0;
+
+            if (!string.IsNullOrEmpty(formatTime))
+            {
+                string[] timeParts = formatTime.Split(':');
+                totalMilliSecends = Convert.ToInt16(timeParts[0]) * 60 * 60 * 1000
+                    + Convert.ToInt16(timeParts[1]) * 60 * 1000
+                    + Math.Round(double.Parse(timeParts[2]) * 1000);
+            }
+
+            return (long)totalMilliSecends;
+        }
+    }
+</code></pre>
+
+<h3 id="使用naudio-dll">使用NAudio.dll</h3>
+
+<ul>
+<li><p>下载、引用NAudio.dll；</p>
+
+<ul>
+<li>由于NAudio本身主要用于处理音频，用其获取视频时长并不合理（仅作统一测试），所以多数格式不支持，不足为奇；
+
+<br />
+<br /></li>
+</ul>
+
+<p>public class ByNAudio : Duration
+    {
+        ///
+        /// Get duration(ms) of audio or vedio by NAudio.dll
+        ///
+        /// audio/vedio&rsquo;s path
+        /// Duration in original format, duration in milliseconds
+        /// return value from NAudio.dll is in format of: &ldquo;00:00:19.820&rdquo;
+        public override Tuple<string, long> GetDuration(string filePath)
+        {
+            TimeSpan ts;
+            try
+            {
+                using (AudioFileReader audioFileReader = new AudioFileReader(filePath))
+                {
+                    ts = audioFileReader.TotalTime;
+                }
+            }
+            catch (Exception)
+            {
+                /* As NAudio is mainly used for processing audio, so some formats may not surport,
+                 * just use 00:00:00 instead for these cases.
+                 */
+                ts = new TimeSpan();
+                //throw ex;
+            }</p>
+
+<pre><code>        return Tuple.Create(ts.ToString(), GetTimeInMillisecond(ts.ToString()));
+    }
+}
+</code></pre></li>
+</ul>
+
+<p><strong>NAudio结果：</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/750e2fafb59f44528342eac6c755a19b.png"><img src="https://img.it610.com/image/info8/750e2fafb59f44528342eac6c755a19b.png" alt="获取音、视频时长（NAudio，Shell32，FFmpeg）_第1张图片" /></a></p>
+
+<h3 id="使用shell32-dll">使用Shell32.dll</h3>
+
+<ul>
+<li><p>引用Shell32.dll，在COM里；</p>
+
+<ul>
+<li>Windows自带的组件，仅支持常见的音视频格式；
+
+<br />
+<br /></li>
+</ul>
+
+<p>public class ByShell32 : Duration
+    {
+        ///
+        /// Get duration(ms) of audio or vedio by Shell32.dll
+        ///
+        /// audio/vedio&rsquo;s path
+        /// Duration in original format, duration in milliseconds
+        /// return value from Shell32.dll is in format of: &ldquo;00:10:16&rdquo;
+        public override Tuple<string, long> GetDuration(string filePath)
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(filePath);</p>
+
+<pre><code>            // From Add Reference --&gt; COM 
+            Shell32.Shell shell = new Shell32.Shell();
+            Shell32.Folder folder = shell.NameSpace(dir);
+            Shell32.FolderItem folderitem = folder.ParseName(Path.GetFileName(filePath));
+
+            string duration = null;
+
+            // Deal with different versions of OS
+            if (Environment.OSVersion.Version.Major &gt;= 6)
+            {
+                duration = folder.GetDetailsOf(folderitem, 27);
+            }
+            else
+            {
+                duration = folder.GetDetailsOf(folderitem, 21);
+            }
+
+            duration = string.IsNullOrEmpty(duration) ? &quot;00:00:00&quot; : duration;
+            return Tuple.Create(duration, GetTimeInMillisecond(duration));
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+    }
+}
+</code></pre></li>
+</ul>
+
+<p><strong>Shell32结果：</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/fd78291b23b04caf83cd0cb53cfe9e13.png"><img src="https://img.it610.com/image/info8/fd78291b23b04caf83cd0cb53cfe9e13.png" alt="获取音、视频时长（NAudio，Shell32，FFmpeg）_第2张图片" /></a></p>
+
+<h3 id="使用ffmpeg-exe">使用FFmpeg.exe</h3>
+
+<ul>
+<li><p>下载FFmpeg.exe；</p>
+
+<ul>
+<li>异步调用“ffmpeg -i 文件路径”命令，获取返回文本，并解析出Duration部分；</li>
+<li>FFmpeg是对音视频进行各种处理的一套完整解决方案，包含了非常先进的音频/视频编解码库，因此可处理多种格式（本次测试的音、视频格式均可以进行有效解码）。
+
+<br />
+<br /></li>
+</ul>
+
+<p>public class ByFFmpeg : Duration
+    {
+        private StringBuilder result = new StringBuilder(); // Store output text of ffmpeg</p>
+
+<pre><code>    /// 
+    /// Get duration(ms) of audio or vedio by FFmpeg.exe
+    /// 
+    /// audio/vedio's path
+    /// Duration in original format, duration in milliseconds
+    /// return value from FFmpeg.exe is in format of: &quot;00:00:19.82&quot;
+    public override Tuple&lt;string, long&gt; GetDuration(string filePath)
+    {
+        GetMediaInfo(filePath);
+        string duration = MatchDuration(result.ToString());
+
+        return Tuple.Create(duration, GetTimeInMillisecond(duration));
+    }
+
+    // Call exe async
+    private void GetMediaInfo(string filePath)
+    {
+        result.Clear(); // Clear result to avoid previous value's interference
+
+        Process p = new Process();
+        p.StartInfo.FileName = &quot;ffmpeg.exe&quot;;
+        p.StartInfo.RedirectStandardError = true;
+        p.StartInfo.UseShellExecute = false;
+        p.StartInfo.Arguments = string.Concat(&quot;-i &quot;, filePath);
+        p.ErrorDataReceived += new DataReceivedEventHandler(OutputCallback);
+
+        p.Start();
+        p.BeginErrorReadLine();
+
+        p.WaitForExit();
+        p.Close();
+        p.Dispose();
+    }
+
+    // Callback funciton of output stream
+    private void OutputCallback(object sender, DataReceivedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(e.Data))
+        {
+            result.Append(e.Data);
+        }
+    }
+
+    // Match the 'Duration' section in &quot;ffmpeg -i filepath&quot; output text
+    private string MatchDuration(string text)
+    {
+        string pattern = @&quot;Duration:\s(\d{2}:\d{2}:\d{2}.\d+)&quot;;
+        Match m = Regex.Match(text, pattern);
+
+        return m.Groups.Count == 2 ? m.Groups[1].ToString() : string.Empty;
+    }
+}
+</code></pre></li>
+</ul>
+
+<blockquote>
+<p><strong>ffmpeg -i filePath</strong><br />
+ ……[mp3 @ 0233ca60] Estimating duration from bitrate, this may be inaccurate<br />
+ Input #0, mp3, from ‘2012.mp3’:<br />
+ Duration: 00:22:47.07, start: 0.000000, bitrate: 127 kb/s<br />
+ Stream #0:0: Audio: mp3, 44100 Hz, stereo, s16p, 128 kb/s<br />
+ At least one output file must be specified</p>
+</blockquote>
+
+<p><strong>Note:</strong> 以上为ffmpeg -i 命令的输出值，需要匹配到Duration的时长部分。</p>
+
+<p><strong>FFmpeg结果：</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/e6dae01d81714970a0a0ab31113f679a.png"><img src="https://img.it610.com/image/info8/e6dae01d81714970a0a0ab31113f679a.png" alt="获取音、视频时长（NAudio，Shell32，FFmpeg）_第3张图片" /></a></p>
+
+<h3 id="source-code-含测试音-视频文件-github">Source Code（含测试音、视频文件）: Github</h3>
+
+<hr />
+
+<p><strong><em>If you have any questions or any bugs are found, please feel free to
+contact me.</em></strong></p>
+
+<p><strong><em>Your comments and suggestions are welcome!</em></strong></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

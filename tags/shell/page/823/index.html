@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell | 开发者问答集锦</title>
+    <meta property="og:title" content="shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/tags/shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <link rel="alternate" type="application/rss+xml+xml" href="https://zaina.newban.cn/tags/shell/index.xml" title="开发者问答集锦" />
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <h3 class="archive-title">
+        包含标签
+        <span class="keyword">shell</span>
+        的文章
+    </h3>
+    
+
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E4%B8%AD%E5%8F%98%E9%87%8F%E7%9A%84%E4%BD%9C%E7%94%A8%E5%9F%9F%E9%97%AE%E9%A2%98/">shell循环中变量的作用域问题</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            最近实现了一个shell脚本，功能简单来说就是从文件中按行读取然后将所有行拼接成一行写入一个文件，关键代码如下
+path_all=&ldquo;&rdquo;
+cat $1 | while read line
+do
+if [ &ldquo;$path_all&rdquo; == &ldquo;&rdquo; ];then
+path_all=$line
+else
+path_all=$path_all,$line
+fi
+done
+echo $path_all &gt; $one_file
+结果执行结果竟然是空！按照常理shell中的变量默认是全局变量，不会存在变量作用域的问题，于是上网查了下，发现问题出在while上
+while循环读取文件中内容有两种写法，一种是管道符，一种是重定向，写法如下
+管道符：
+cat $file_name | while read line
+do
+#deal with line
+done
+重定向
+while read line
+do
+#deal with line
+done &lt; $file_name
+这两种做法的区别在于，重定向是内建命令，而管道符是非内建命令，
+之所以我写的脚本出现了输出是空的问题，原因就在这里
+linux执行shell时，会创建“子shell”运行shell中的命令，当运行到非内建指令时，会创建“孙shell”运行非内建指令
+变量的作用于在每个shell中有效，所以，非内建指令中定义的这些变量就只能在孙shell运行，而在子shell中不生效，所以，即便我在while中给path_all赋值了，子shell中也不会获取到这个值。
+解决这个问题的办法有两种，如下
+如果不是必须使用管道符的方式写while循环，可以用重定向的写法，这种写法循环内的变量在子shell中是生效的，比较简便
+如果非要使用管道符的方式，可以创建临时文件，用于存放孙shell中的输出
+cat $file_name | while read line
+do
+echo $line &gt;&gt; $tmp_file
+done
+cat $tmp_file &gt;$one_file……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E4%B8%AD%E5%8F%98%E9%87%8F%E7%9A%84%E4%BD%9C%E7%94%A8%E5%9F%9F%E9%97%AE%E9%A2%98/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E4%B8%AD%E5%AE%9E%E7%8E%B0%E5%B1%95%E7%A4%BA%E8%BF%9B%E5%BA%A6%E7%99%BE%E5%88%86%E6%AF%94%E7%9A%84%E8%84%9A%E6%9C%AC%E6%96%B9%E6%B3%95/">Shell循环中实现展示进度百分比的脚本方法</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            Shell 循环中实现展示进度百分比的脚本方法 当我需要处理一个几万行的文件的时候，需要处理的时间是比较长的。我一开始的想法是，没处理一行，就输出一个 # 号。但是这样还是会出现很多很多的 # 号，即便是放在一行，也是非常不优雅的。所以，我想实现一个展示进度百分比的脚本。
+实现思路  获取文件的行数 用 i++ 实现每行处理的计数 当前处理行数*100再除以文件行数+%得到我要输出的百分比结果 我需要在一行展示，而不是一直追加或者每次都显示一行  就是这些需求了。我们来逐渐实现。
+获取文件的行数 这个比较简单，用 wc -l $file 就能获取到了。但是得到的结果我不是很满意:
+ 999 3.log  在结果的前面有几个空格，我得把空格去掉，于是代码就改成了
+wc -l $file | sed 's/^[ \t]*//g'  这样就去掉了开头的空格，然后用空格分割，取第一个就可以了，cut来实现
+wc -l $file | sed 's/^[ \t]*//g' | cut -d ' ' -f1  OK，通过几个命令的组合，很容易的实现了获取行数的数字。
+echo 实现单行显示 echo -en '\b\b\b\b'  如上，就是将光标提前四个位置，并录入内容。\b是提前一个，输入几个就几个，如果已经到了开头了，就不能往前挪了，所以，多输入几个是没问题的。
+最终实现代码如下： # 定义变量 i i=1 # 获取 3.log 这个文件的行数，并把运行结果赋予变量 l l=$(wc -l 3.……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E4%B8%AD%E5%AE%9E%E7%8E%B0%E5%B1%95%E7%A4%BA%E8%BF%9B%E5%BA%A6%E7%99%BE%E5%88%86%E6%AF%94%E7%9A%84%E8%84%9A%E6%9C%AC%E6%96%B9%E6%B3%95/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E4%B9%8Bforwhileuntil/">Shell循环之forwhileuntil</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            一.简介
+Shell编程中循环命令用于特定条件下决定某些语句重复执行的控制方式，在编程语言中，循环语句是最基本的语法之一，在Shell中也不例外。Shell中的循环语句一般有for、while、until这几种，偶尔还有写错语法的时候，这里结合实例来自己总结一下。也为今后使用提供一个快捷的资料获取渠道。有三种常用的循环语句：for、while和until。while循环和for循环属于“当型循环”，而until属于“直到型循环”。
+二.详解
+1.for循环
+for 变量名 in 列表；do
+循环体
+done
+其中；可以换成回车，效果一样的
+（1）最基本的for循环
+#!/bin/bash for varible1 in {1..5}；do echo &quot;Hello, Welcome $varible1 times &quot; done   do和done之间的命令称为循环体，执行次数和list列表中常数或字符串的个数相同。for循环，首先将in后list列表的第一个常数或字符串赋值给循环变量，然后执行循环体，以此执行list，最后执行done命令后的命令序列。 Shell支持列表for循环使用略写的计数方式，1～5的范围用{1..5}表示（大括号不能去掉，否则会当作一个字符串处理）。其中数字也可以使用$（seq）来表示。  （2）Sheel中还支持按规定的步数进行跳跃的方式实现列表for循环， 例如计算1～100内所有的奇数之和。
+#!/bin/bash sum=0 for i in {1..100..2};do let sum+=i done echo &quot;sum=$sum&quot;  通过i按2不断递增，得到1-100的奇数之和。同样我们也可以使用seq来表示：for i in $(seq 1 2 100)，seq表示起始数为1，跳跃的步数为2，到100结束。
+（3）for也可以和其他的选择语句进行搭配使用 ，例如：创建一个脚本名为useradd.sh，当执行- a选项时，会批量创建用户mageuser1~mageuser20，要求mageuserX的uid为200x,mageuserxx的uid为20xx，1~8用户的shell为/sbin/nologin，9~20用户的uid为/bin/bash。最后这20个用户的密码都设置为centos；当执行- d选项时，批量删除用户mageuser1~mageuser20。连同家目录一同删除。
+#!/bin/bash case $1 in -a)for n in {1..20} ;do if [ $n -le 8 ];then useradd -u $[2000+$n] -s /sbin/nologin mageuser$n else useradd -u $(echo &quot;2000+$n&quot;|bc) mageuser$n fi echo &quot;centos&quot; |passwd --stdin mageuser$n &amp;&gt; /dev/null echo &quot;mageuser$n created&quot; done;; -d)for n in {1.……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E4%B9%8Bforwhileuntil/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%88%A4%E6%96%AD%E4%BB%8B%E7%BB%8D%E4%BB%A5%E5%8F%8A%E5%AE%9E%E4%BE%8B/">shell循环判断介绍以及实例</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%88%A4%E6%96%AD%E4%BB%8B%E7%BB%8D%E4%BB%A5%E5%8F%8A%E5%AE%9E%E4%BE%8B/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%88%A4%E6%96%AD%E8%BF%9B%E7%A8%8B%E6%98%AF%E5%90%A6%E5%AD%98%E5%9C%A8/">shell循环判断进程是否存在</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            shell循环判断进程是否存在
+#!/bin/sh while true do process=`ps aux | grep mysqld | grep -v grep`; if [ &quot;$process&quot; == &quot;&quot; ]; then sleep 1; echo &quot;process 不存在,开始执行&quot;; mysql; else echo &quot;process exsits&quot;; break; fi done  ……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%88%A4%E6%96%AD%E8%BF%9B%E7%A8%8B%E6%98%AF%E5%90%A6%E5%AD%98%E5%9C%A8/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%8F%98%E9%87%8F%E4%BC%A0%E9%80%92%E9%97%AE%E9%A2%98/">shell循环变量传递问题</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            如例子中：
+#!/bin/bash file=&quot;/etc/passwd&quot; let num=0 cat $file | while read line do echo -e &quot;hello,`echo $line|cut -d &quot;:&quot; -f 1` \c&quot; echo your UID is `echo $line|cut -d &quot;:&quot; -f 3` num=$[$num+1] echo $num done echo number is $num  执行结果如下（后面一部分）
+hello,hplip your UID is 113 32 hello,saned your UID is 114 33 hello,lsn your UID is 1000 34 hello,sshd your UID is 115 35 number is 0  为什么变量num没有被传递？……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%8F%98%E9%87%8F%E4%BC%A0%E9%80%92%E9%97%AE%E9%A2%98/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%8F%98%E9%87%8F%E4%BD%9C%E7%94%A8%E8%8C%83%E5%9B%B4/">shell循环变量作用范围</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            #!/bin/sh test() { RetVal=0 cat 1.log | while read line do if[ &quot;$line&quot; == &quot;2&quot; ] then RetVal=1 fi done return $RetVal }  很容易写出上述代码，上述代码返回值始终为0。虽然执行了RetVal=1这条语句，但是一出while循环，变量值又变成0了。
+这是因为管道是在子shell中执行的，子shell中的变量对于子shell之外的代码块来说, 是不可见的. 当然, 父进程也不能访问
+这些变量, 父进程指的是产生这个子shell的shell. 事实上, 这些变量都是局部变量。
+#正确做法 test() { RetVal=0 while read line do if[ &quot;$line&quot; == &quot;2&quot; ] then RetVal=1 fi done &lt; 1.log return $RetVal }  ……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%8F%98%E9%87%8F%E4%BD%9C%E7%94%A8%E8%8C%83%E5%9B%B4/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%A4%84%E7%90%86/">Shell循环处理</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            ……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%A4%84%E7%90%86/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%AE%9E%E7%8E%B0/">shell循环实现</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            循环语句:
+Bash Shell中主要提供了三种循环方式：for、while和until。
+一、for循环
+for循环的运作方式，是讲串行的元素意义取出，依序放入指定的变量中，然后重复执行含括的命令区域（在do和done 之间），直到所有元素取尽为止。
+其中，串行是一些字符串的组合，彼此用$IFS所定义的分隔符（如空格符）隔开，这些字符串称为字段。
+for的语法结构如下：
+1
+2
+3
+4
+|
+for 变量 in 串行
+do
+ 执行命令
+done
+&mdash;|&mdash;
+说明：
+行1，讲串行中的字段迭代放入变量中
+行2-4，接着将重复执行do和done之间的命令区域，直到串行中每一个字段军处理过为止。
+流程图：
+用例1
+用for循环在家目录下创建aaa1-aaa10，然后在aaa1-aaa10创建bbb1-bbb10的目录
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+|
+#!/bin/bash
+for k in $( seq 1 10 )
+do
+ mkdir /home/kuangl/aaa ${k}
+ cd /home/kuangl/aaa ${k}
+ for l in $( seq 1 10 )
+ do……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E5%AE%9E%E7%8E%B0/">阅读全文</a></p>
+        </div>
+    </article>
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">
+                <a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E6%89%A7%E8%A1%8C3%E6%AC%A1%E5%91%BD%E4%BB%A4/">Shell循环执行3次命令</a>
+            </h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        <div class="post-content">
+            2019独角兽企业重金招聘Python工程师标准&gt;&gt;&gt; #!/bin/bash for i in 1 2 3; do echo 'Execute 3 times' echo $i pybot --nostatusrc --outputdir /root/.jenkins/workspace/User/report/ --include usertest /root/.jenkins/workspace/User-200 sleep 5s done  1.shell格式：例
+shell脚本开发习惯
+1.指定解释器 #！/bin/bash
+2.脚本开头加版权等信息如：#DATE:时间，#author(作者)#mail：邮箱，#function（功能），#Version：版本
+3.脚本注释（用英文注释 中文可能乱码。）
+4.脚本以.sh结尾 不是必须的
+5.成对的符号，一次性写全，退格补内容。特殊符号[ xxxx ] 中括号中间内容两边都有空格。
+6 .代码有条理性（通过缩进）。
+2.执行 ：1.sh xxx.sh （-x）执行并显示执行过程。
+sh xx.sh(不需要root权限)。全路径执行需要x权限。（chmod a+x xx.sh）当前路径下用点执行（. xx.sh ）或者source xxx.sh （重点）
+注意：两个 脚本 ，当一个脚本需要调用前一个脚本里面的内容时候 。需要source 或者点 “.” 来执行加载才可调用。Sh .xxsh bash xxx 只可执行 不可加载。
+学习在线资料：http://manual.51yip.com/shell/
+https://www.cnblogs.com/wylhome/p/6059840.html
+3.环境变量全局配置地点： 常见的： /etc/profile , /etc/basrc , /etc/profile.……
+            <p class="readmore"><a href="https://zaina.newban.cn/posts/shell%E5%BE%AA%E7%8E%AF%E6%89%A7%E8%A1%8C3%E6%AC%A1%E5%91%BD%E4%BB%A4/">阅读全文</a></p>
+        </div>
+    </article>
+    
+
+    
+
+
+
+<ol class="page-navigator">
+    
+    <li class="prev">
+        <a href="https://zaina.newban.cn/tags/shell/page/822/">上一页</a>
+    </li>
+    
+
+    
+
+    
+        
+        
+    
+    
+
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/">1</a>
+        </li>
+        
+    
+        
+        <li>
+            <span>...</span>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/821/">821</a>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/822/">822</a>
+        </li>
+        
+    
+        
+        
+        <li  class="current">
+            <a href="https://zaina.newban.cn/tags/shell/page/823/">823</a>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/824/">824</a>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/825/">825</a>
+        </li>
+        
+    
+        
+        <li>
+            <span>...</span>
+        </li>
+        
+    
+        
+        
+        <li >
+            <a href="https://zaina.newban.cn/tags/shell/page/1621/">1621</a>
+        </li>
+        
+    
+
+    
+    
+
+    <li class="next">
+        <a href="https://zaina.newban.cn/tags/shell/page/824/">下一页</a>
+    </li>
+    
+</ol>
+
+
+
+
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

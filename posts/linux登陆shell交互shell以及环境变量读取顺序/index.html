@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux登陆shell交互shell以及环境变量读取顺序 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux登陆shell交互shell以及环境变量读取顺序 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux登陆shell交互shell以及环境变量读取顺序">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E7%99%BB%E9%99%86shell%E4%BA%A4%E4%BA%92shell%E4%BB%A5%E5%8F%8A%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F%E8%AF%BB%E5%8F%96%E9%A1%BA%E5%BA%8F/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux登陆shell交互shell以及环境变量读取顺序</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><a href="http://blog.csdn.net/leshami/article/details/77198412">http://blog.csdn.net/leshami/article/details/77198412</a></p>
+
+<p>Linux用户在登陆到Linux服务器时，一些登陆的提示欢迎信息，以及特定的环境配置等等都按预先设定好的配置来生效。Linux中的这个shell环境会读取很多不同的配置文件来达成上述目的，同时还有登陆shell与非登陆shell的区分。本文对此作简要描述，供大家参考！</p>
+
+<h1 id="一-登陆shell与非登陆shell">一、登陆shell与非登陆shell</h1>
+
+<p>登陆shell(login shell)：<br />
+取得 bash 时需要完整的登陆流程的，就称为 login shell<br />
+比如通过ssh方式连接，或者由tty1 ~ tty6 登陆，需要输入用户的账号与密码，此时取得的 bash 就称为login shell</p>
+
+<p>非登陆shell(non-login shell)：<br />
+取得 bash 接口的方法不需要重复登陆的举动<br />
+比如你以 X window 登陆 Linux 后， 再以 X 的图形化接口启动终端机，此时该终端接口无需输入账号与密码，则为non-login shell<br />
+比如你在原本的 bash 环境下再次下达 bash 这个命令，同样的也没有输入账号密码， 那第二个 bash (子程序) 也是 non-login
+shell</p>
+
+<p>查看登陆shell与非登陆shell</p>
+
+<pre><code>###演示环境
+[root@system1 ~]# more /etc/redhat-release 
+Red Hat Enterprise Linux Server release 7.0 (Maipo)
+
+###当前从ssh登陆到服务器
+[root@system1 ~]# tty
+/dev/pts/1
+
+# ### Author : Leshami QQ/Weixin : 645746311
+# ### Blog  : http://blog.csdn.net/leshami
+
+###输入 echo $0， 显示结果为 -bash ，即为登陆shell
+[root@system1 ~]# echo $0
+-bash
+[root@system1 ~]# ps
+  PID TTY          TIME CMD
+77122 pts/1    00:00:00 bash
+77157 pts/1    00:00:00 ps
+
+###下面在X windows打开一个终端，如下，显示为/bin/bash，即非登陆shell
+[root@system1 Desktop]# echo $0
+/bin/bash
+
+[root@system1 ~]# ps -ef|grep pts|grep bash
+root      73245  73241  0 11:49 pts/0    00:00:00 /bin/bash
+root      76511  73245  0 16:19 pts/0    00:00:00 bash
+root      77122  77118  0 17:02 pts/1    00:00:00 -bash
+root      77158  77118  0 17:03 pts/2    00:00:00 -bash
+root      77210  73241  0 17:04 pts/3    00:00:00 /bin/bash
+root      77283  77279  0 17:06 pts/4    00:00:00 -bash
+root      77332  77122  0 17:06 pts/1    00:00:00 grep --color=auto bash 
+###在上传的结果中73245，77210为非登陆shell，77122，77158，77283为登陆shell
+</code></pre>
+
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+<li>4</li>
+<li>5</li>
+<li>6</li>
+<li>7</li>
+<li>8</li>
+<li>9</li>
+<li>10</li>
+<li>11</li>
+<li>12</li>
+<li>13</li>
+<li>14</li>
+<li>15</li>
+<li>16</li>
+<li>17</li>
+<li>18</li>
+<li>19</li>
+<li>20</li>
+<li>21</li>
+<li>22</li>
+<li>23</li>
+<li>24</li>
+<li>25</li>
+<li>26</li>
+<li>27</li>
+<li>28</li>
+<li>29</li>
+<li>30</li>
+<li>31</li>
+<li>32</li>
+</ul>
+
+<h1 id="二-交换shell与非交互shell">二、交换shell与非交互shell</h1>
+
+<p>交互式shell(interactive shell)<br />
+交互式模式就是在终端上执行，shell等待你的输入，并且立即执行你提交的命令。这种模式被称作交互式是因为shell与用户进行交互。这种模式也是大多数用户非常熟悉的：登录、执行一些命令、退出。当你退出后，shell也终止了。</p>
+
+<p>非交互式shell(non-interactive shell)<br />
+shell也可以运行在另外一种模式：非交互式模式，以shell script(非交互)方式执行。在这种模式
+下，shell不与你进行交互，而是读取存放在文件中的命令,并且执行它们。当它读到文件的结尾EOF，shell也就终止了。</p>
+
+<pre><code>###如下，执行 echo $-，查看其中的“i”选项（表示interactive shell）
+[root@system1 ~]# echo $-
+himBH
+
+###如下，为非交互shell
+[root@system1 ~]# echo 'echo $-' | bash
+hB
+</code></pre>
+
+<ul>
+<li>1</li>
+<li>2</li>
+<li>3</li>
+<li>4</li>
+<li>5</li>
+<li>6</li>
+<li>7</li>
+</ul>
+
+<h1 id="三-登陆shell与非登陆shell调用的shell环境读取顺序">三、登陆shell与非登陆shell调用的shell环境读取顺序</h1>
+
+<p><a href="https://img.it610.com/image/info8/137a6e08db764cdf98702fa88dbd5438.jpg"><img src="https://img.it610.com/image/info8/137a6e08db764cdf98702fa88dbd5438.jpg" alt="Linux
+登陆shell，交互shell以及环境变量读取顺序_第1张图片" /></a><br />
+上图列出了登陆shell与非登陆shell读取的不同的shell环境配置文件。<br />
+其中，实线的的方向是主线流程，虚线的方向则是被调用(或读取)的配置文件<br />
+此外，对于登陆shell，读取~/.bash_profile配置文件时，会做出读取顺序判读，如下<br />
+~/.bash_profile —&gt; ~/.bash_login —&gt; ~/.profile<br />
+但 bash 的 login shell 配置只会读取上面三个文件的其中一个， 而读取的顺序则是依照上面的顺序。也就是说，如果
+~/.bash_profile 存在，那么其他两个文件不论有无存在，都不会被读取。 如果 ~/.bash_profile 不存在才会去读取
+~/.bash_login，而前两者都不存在才会读取 ~/.profile 的意思。</p>
+
+<h1 id="四-其他情形">四、其他情形</h1>
+
+<p>1、除了读取上述配置文件之外，在登陆shell中还会读取其他相关配置信息，如读取 ~/.bash_history<br />
+2、对于shell环境变量修改之后需要立即生效的情形，可以使用source来立即生效。<br />
+用法</p>
+
+<h1 id="source-配置文件档名">source 配置文件档名</h1>
+
+<p>###如修改了~/.bash_profile，不重新登陆希望生效的话，执行以下命令</p>
+
+<h1 id="source-bash-profile-下一命令等价">source ~/.bash_profile ###下一命令等价</h1>
+
+<h1 id="bash-profile">. ~/.bash_profile</h1>
+
+<p>3、shell登出<br />
+在shell登出是会读取 ~/.bash_logout</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

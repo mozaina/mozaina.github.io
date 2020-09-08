@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>实例解析shell子进程subshell | 开发者问答集锦</title>
+    <meta property="og:title" content="实例解析shell子进程subshell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="实例解析shell子进程subshell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%AE%9E%E4%BE%8B%E8%A7%A3%E6%9E%90shell%E5%AD%90%E8%BF%9B%E7%A8%8Bsubshell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">实例解析shell子进程subshell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>实例解析shell子进程（subshell )</p>
+
+<p>通过实例，解析个人对shell子进程的一个了解，主要包括以下几个方面</p>
+
+<p>1：什么是shell子进程</p>
+
+<p>2：shell什么情况下会产生子进程</p>
+
+<p>3：子进程的特点与注意事项</p>
+
+<p>4:$变量$$在脚本里的意义，及如何得到子进程里的进程号</p>
+
+<p>参考文档：apue，bash的man和info文档</p>
+
+<p>1：什么是shell子进程</p>
+
+<p>子进程，是从父子进程的概念出发的，unix操作系统的进程从init进程开始（init进程为1,而进程号0为系统原始进程，以下讨论的进程原则上不包括进程0)均有其对应的子进程，就算是由于父进程先行结束导致的孤儿进程，也会被init领养，使其父进程ID为1。</p>
+
+<p>也因为所有的进程均有父进程，事实上，所有进程的创建，都可视为子进程创建过程。在apue一书里提及unix操作系统进程的创建，大抵上的模式都是进行fork+exec类系统调用。</p>
+
+<p>理解子进程的创建执行，需要至少细分到二个步骤，包括</p>
+
+<p>通过fork创建子进程环境，</p>
+
+<p>通过exec加载并执行进程代码。</p>
+
+<p>其间诸如继承的环境变量等细节，可以查看apue第八章相关章节。</p>
+
+<p>而shell子进程（以下均称subshell），顾名思义，就是由“当前shell进程”创建的一个子进程</p>
+
+<p>2：shell什么情况下会产生子进程</p>
+
+<p>以下几个创建子进程的情况。（以下英文摘自info bash)</p>
+
+<p>1：&amp;，提交后台作业</p>
+
+<p>If a command is terminated by the control operator `&amp;&lsquo;, the shell executes the
+command asynchronously in a subshell.</p>
+
+<p>2:管道</p>
+
+<p>Each command in a pipeline is executed in its own subshell</p>
+
+<p>3:括号命令列表</p>
+
+<p>()操作符</p>
+
+<p>Placing a list of commands between parentheses causes a subshell</p>
+
+<p>environment to be created</p>
+
+<p>4：执行外部脚本、程序：</p>
+
+<p>When Bash finds such a file while searching the `$PATH&rsquo; for a command, it
+spawns a subshell to execute it. In other words, executing</p>
+
+<p>filename ARGUMENTS</p>
+
+<p>is equivalent to executing</p>
+
+<p>bash filename ARGUMENTS</p>
+
+<p>说明：大致上子进程的创建包括以上四种情况了。需要说明的是只要是符合上边四种情况之一，便会创建(fork)子进程，不因是否是函数，命令，或程序，也不会因为是内置函数(buitin)或是外部程序。</p>
+
+<p>此外，上边提到子进程创建与执行的二个步骤，shell子进程的创建在步骤之一并无多大差别，一般还是父进程调用fork产生进程环境，估在第二步exec的时候，是存在差别的。</p>
+
+<p>shell做为解释语言程序，提供给第二步exec加载和执行的程序体并不是脚本本身，而是由第一行#!指定的，默认为shell程序,当然也可以是awk,sed等程序，在之前写过的一篇文章里:shell脚本的set
+id如何生效就有提及。这里不再展开讨论。</p>
+
+<p>只不过子进程的执行会根据情况而有所差别，对于内置函数，exec程序体为shell程序，并在会在子shell直接调用内置函数，</p>
+
+<p>而外部函数或程序，在创建了子进程环境后，大致会有二种执行情况：</p>
+
+<p>1：直接exec外部程序，</p>
+
+<p>比如下边例子中直接执行的sleep,pstree命令等</p>
+
+<p>2：subshellexec程序体为shell程序，在此基础上会进一步创建一个子进程以执行函数。</p>
+
+<p>比如下边例子中通过函数提交后台程序中的shell命令等</p>
+
+<p>例：内置函数（直接在subshell里执行，不管是否通过函数）</p>
+
+<p>[root@localhost shell]# mkfifo a</p>
+
+<p>[root@localhost shell]# type echo</p>
+
+<p>echo is a shell builtin</p>
+
+<p>[root@localhost shell]# b(){ echo a&gt;a; }</p>
+
+<p>[root@localhost shell]# b &amp;</p>
+
+<p>[1] 15697</p>
+
+<p>[root@localhost shell]# echo a&gt;a &amp;</p>
+
+<p>[2] 15732</p>
+
+<p>[root@localhost shell]# pstree -pa $$</p>
+
+<p>bash,571</p>
+
+<p>|-bash,15697</p>
+
+<p>|-bash,15732</p>
+
+<p>`-pstree,15734 -pa 571</p>
+
+<p>例：定义函数并提交后台进行</p>
+
+<p>（函数调用中的sleep在subshell之下又创建一个子进程,</p>
+
+<p>而pstree,sleep命令的直接执行，则是直接在子进程上进行）</p>
+
+<p>[root@localhost shell]# a(){ sleep 30; } ;</p>
+
+<p>[root@localhost shell]# sleep 40 &amp;</p>
+
+<p>[1] 15649</p>
+
+<p>[root@localhost shell]# a &amp;</p>
+
+<p>[2] 15650</p>
+
+<p>[root@localhost shell]# pstree -pa $$</p>
+
+<p>bash,571</p>
+
+<p>|-bash,15650</p>
+
+<p>| `-sleep,15651 30</p>
+
+<p>|-pstree,15652 -pa 571</p>
+
+<p>`-sleep,15649 40</p>
+
+<p>对于第四点，要注意，shell脚本的执行模式，在第四点的二种模式下，shell是会创建子进程的：</p>
+
+<p>filename ARGUMENTS</p>
+
+<p>bash filename ARGUMENTS</p>
+
+<p>但shell同时提供二种不创建子程序的进程创建方式</p>
+
+<p>1：source命令，使用方法</p>
+
+<p>Source filename ARGUMENTS</p>
+
+<p>或</p>
+
+<p>.  filename ARGUMENTS</p>
+
+<p>此种方法，直接在当前shell进程中执行filename脚本，filename结束后继续返回当前shell进程</p>
+
+<p>2：exec命令，使用方法</p>
+
+<p>Exec  filename ARGUMENTS</p>
+
+<p>此种方法直接在当前shell进程中执行filname脚本，filename结束后退出当前shell进程</p>
+
+<p>3：子进程的特点与注意事项</p>
+
+<p>这方面不具体展开，只提一点写脚本容易出现的错误。</p>
+
+<p>做为子进程，其进程环境与父进程的环境是独立的， 所以在变量传递过程中，需要注意子进程内部不能更改到父进程的变量。</p>
+
+<p>比如如下通过管道求和并赋给外部变量sum例子，结果sum值并不会因此改变：</p>
+
+<p>[root@localhost shell]# sum=0</p>
+
+<p>[root@localhost shell]# echo &lsquo;1 2 3 4&rsquo; |sed &rsquo;s/ //n/g&rsquo;|while read line; do
+sum+=$line; done</p>
+
+<p>[root@localhost shell]# echo $sum</p>
+
+<p>0</p>
+
+<p>[root@localhost shell]#</p>
+
+<p>4:变量$$在脚本里的意义</p>
+
+<p>变量$$代表的是当前shell进程的进和id，这里要特别留意“当前shell”，</p>
+
+<p>看看info bash里的说明</p>
+
+<p>`$&rsquo;</p>
+
+<p>Expands to the process ID of the shell. In a `()&rsquo; subshell, it</p>
+
+<p>expands to the process ID of the invoking shell, not the subshell.</p>
+
+<p>再看看man bash里的说明</p>
+
+<p>$</p>
+
+<p>Expands to the process ID of the shell. In a () subshell, it expands to the
+process ID of the current shell, not the subshell.</p>
+
+<p>所以在实际环境中，$$并不一定“当前进程”的进程号，而是当前shell进程的进程号。</p>
+
+<p>从文档中，需要留意的便是 invoking shell (info) 或 current shell（man) 与 当前subshell进程的关系了</p>
+
+<p>这就引出了几个问题</p>
+
+<p>1：到底怎么样算是 current shell</p>
+
+<p>2：子进程里的$$对应的是哪个 current shell</p>
+
+<p>3：如何猎取子进程的$$?</p>
+
+<p>做为调试和测试，下边的例子引用几个变量,</p>
+
+<p>BASH_SOURCE&rsquo;</p>
+
+<p>An array variable whose members are the source filenames</p>
+
+<p>corresponding to the elements in the `FUNCNAME&rsquo; array variable.</p>
+
+<p>`BASH_LINENO&rsquo;</p>
+
+<p>An array variable whose members are the line numbers in source</p>
+
+<p>files corresponding to each member of FUNCNAME.</p>
+
+<p>`${BASH_LINENO[$i]}&rsquo; is the line number in the source file where</p>
+
+<p>`${FUNCNAME[$i]}&rsquo; was called. The corresponding source file name</p>
+
+<p>is <code>${BASH_SOURCE[$i]}'. Use</code>LINENO&rsquo; to obtain the current line</p>
+
+<p>number.</p>
+
+<p>`FUNCNAME&rsquo;</p>
+
+<p>An array variable containing the names of all shell functions</p>
+
+<p>currently in the execution call stack. The element with index 0</p>
+
+<p>is the name of any currently-executing shell function. The</p>
+
+<p>bottom-most element is &ldquo;main&rdquo;. This variable exists only when a</p>
+
+<p>shell function is executing. Assignments to `FUNCNAME&rsquo; have no</p>
+
+<p>effect and return an error status. If `FUNCNAME&rsquo; is unset, it</p>
+
+<p>loses its special properties, even if it is subsequently reset.</p>
+
+<p>脚本里set -x,并设置PS4跟踪程序执行过程</p>
+
+<p>PS4=&lsquo;+[$SHELL][$BASH_SUBSHELL][$PPID-$$][$LINENO][&ldquo;${BASH_SOURCE[<em>]}&ldquo;][${FUNCNAME[</em>]}][${BASH_LINENO[*]}]/n
++</p>
+
+<p>PS4设置显示值如下：</p>
+
+<p>[$BASH_SUBSHELL]：子shell路径长度</p>
+
+<p>[$PPID-$$]：父进程id，和变量$$值（current shell进程ID）</p>
+
+<p>[$LINENO]：在当前shell的命令行号</p>
+
+<p>[&ldquo;${BASH_SOURCE[*]}&ldquo;]：源脚本程序文件记录队列</p>
+
+<p>[${FUNCNAME[*]}]：函数调用记录队列</p>
+
+<p>[${BASH_LINENO[*]}]：执行行号记录队列</p>
+
+<p>程序如下：</p>
+
+<p>[root@localhost shell]# cat -n subshell.sh</p>
+
+<p>+[/bin/bash][0][569-571][1060][&ldquo;&rdquo;][][]</p>
+
+<p>+cat -n subshell.sh</p>
+
+<p>1 #!/bin/bash</p>
+
+<p>2</p>
+
+<p>3 set -x</p>
+
+<p>4 sub2() {</p>
+
+<p>5 # sh subshell2.sh</p>
+
+<p>6 sleep 1</p>
+
+<p>7 }</p>
+
+<p>8 sub() {</p>
+
+<p>9 sub2 &amp;</p>
+
+<p>10 sleep 20</p>
+
+<p>11 }</p>
+
+<p>12 sub &amp;</p>
+
+<p>13 pstree -p $PPID</p>
+
+<p>执行结果如下：</p>
+
+<p>[root@localhost shell]# bash subshell.sh</p>
+
+<p>+[/bin/bash][0][569-571][1059][&ldquo;&rdquo;][][]</p>
+
+<p>+bash subshell.sh</p>
+
+<p>+[/bin/bash][0][571-17858][12][&ldquo;subshell.sh&rdquo;][][0]</p>
+
+<p>+sub</p>
+
+<p>+[/bin/bash][0][571-17858][13][&ldquo;subshell.sh&rdquo;][][0]</p>
+
+<p>+pstree -p 571</p>
+
+<p>+[/bin/bash][1][571-17858][10][&ldquo;subshell.sh subshell.sh&rdquo;][sub main][12 0]</p>
+
+<p>+sleep 20</p>
+
+<p>+[/bin/bash][1][571-17858][9][&ldquo;subshell.sh subshell.sh&rdquo;][sub main][12 0]</p>
+
+<p>+sub2</p>
+
+<p>+[/bin/bash][2][571-17858][6][&ldquo;subshell.sh subshell.sh subshell.sh&rdquo;][sub2 sub
+main][9 12 0]</p>
+
+<p>+sleep 1</p>
+
+<p>bash(571)&mdash;bash(17858)-+-bash(17859)-+-bash(17860)&mdash;sleep(17863)</p>
+
+<p>| `-sleep(17862)</p>
+
+<p>`-pstree(17861)</p>
+
+<p>说明：</p>
+
+<p>1：</p>
+
+<p>首先在当前shell（进程id 571)下执行subshell.sh ,产生子进程，</p>
+
+<p>[$PPID-$$]=[571-17858]显示此时执行subshell.sh脚本的进程号为17858，</p>
+
+<p>[][0]显示未进行函数调用，未产生函数记录记录</p>
+
+<p>说明在subshell.sh执行进程里，$$值保存的“current shell”即为本身，17858</p>
+
+<p>[$LINENO]=[12]显示在subshell.sh第12行调用sub函数</p>
+
+<p>sub函数在程序里通过&amp;提交后台方式调用，</p>
+
+<p>进程树显示，sub函数的调用在17858进程后创建子进程17859，执行体为bash</p>
+
+<p>此时，ppid指示父进程为571，$$变量值为17858，</p>
+
+<p>说明对于sub调用产生的进程，其“current shell”仍然为subshell.sh脚本执行进程17858</p>
+
+<p>[$LINENO]=[13]显示在subshell.sh第13行执行pstree命令</p>
+
+<p>pstree命令调用方式是在脚本里直接调用</p>
+
+<p>进程树显示，pstree命令直接在17858进程后创建子进程17861并执行</p>
+
+<p>此时，ppid指示父进程为571，$$变量值为17858，</p>
+
+<p>说明对于这里运行的pstree命令的子进程，其“current shell”仍然为subshell.sh脚本执行进程17858</p>
+
+<p>2：</p>
+
+<p>[sub main][12 0]显示进入sub函数内部</p>
+
+<p>[$LINENO]=[9]显示执行（在sub函数内）脚本第9行，调用sub2函数</p>
+
+<p>进程树显示，sub2函数的调用在17859进程后创建子进程17860，执行体为bash</p>
+
+<p>此时，ppid仍然指示父进程为571，$$变量值为17858，</p>
+
+<p>说明对于sub2调用产生的进程，其“current shell”仍然为subshell.sh脚本执行进程17858</p>
+
+<p>[$LINENO]=[10]显示执行（在sub函数内）脚本第10行，sleep命令</p>
+
+<p>此处sleep命令调用方式是在脚本里的sub函数内直接调用</p>
+
+<p>进程树显示，sleep命令是sub函数调用时创建的进程17859后创建子进程17862并执行</p>
+
+<p>此时，ppid指示父进程为571，$$变量值为17858，</p>
+
+<p>说明对于这里运行的pstree命令的子进程，其“current shell”仍然为subshell.sh脚本执行进程17858</p>
+
+<p>3：</p>
+
+<p>[sub2 sub main][9 12 0]显示进入sub2函数内部</p>
+
+<p>[6]显示执行（在sub2函数内）脚本第6行，sleep 1</p>
+
+<p>此处sleep命令调用方式是在脚本里的sub2函数内直接调用</p>
+
+<p>进程树显示，sleep命令是sub2函数调用时创建的进程17860后创建子进程17863并执行</p>
+
+<p>此时，ppid指示父进程为571，$$变量值为17858，</p>
+
+<p>说明对于这里运行的sleep命令的子进程，其“current shell”仍然为subshell.sh脚本执行进程17858</p>
+
+<p>终上</p>
+
+<p>这里的$$只有二个值，</p>
+
+<p>一个是最初的bash shell: 571,</p>
+
+<p>一个是subshell.sh脚本调用时产生的进程:17858</p>
+
+<p>其他由subshell.sh产生的子进程，无论是函数还是命令运行，$$变量值保存的“current
+shell”均为subshell.sh调用时产生的进程：17858</p>
+
+<p>由此推论出上边提到的四种子shell的创建方法：提交后台，管道，括号命令列表，脚本调用。似乎只有第四种方法--脚本调用--产生的subshell可以做o为“current
+shell”</p>
+
+<p>可以通过以下二个例子再次论证这个推论</p>
+
+<p>例子一:</p>
+
+<p>更改脚本调用方式，</p>
+
+<p>此种方式采用当前shell进程执行subshell.sh，不再创建一个子进程</p>
+
+<p>结果$$变量值保存的“current shell”均为当前进程</p>
+
+<p>[root@localhost shell]# source subshell.sh</p>
+
+<p>+[/bin/bash][0][569-571][1062][&ldquo;&rdquo;][][]</p>
+
+<p>+source subshell.sh</p>
+
+<p>++[/bin/bash][0][569-571][3][&ldquo;subshell.sh&rdquo;][][1062]</p>
+
+<p>+set -x</p>
+
+<p>++[/bin/bash][0][569-571][13][&ldquo;subshell.sh&rdquo;][][1062]</p>
+
+<p>+pstree -p 569</p>
+
+<p>++[/bin/bash][0][569-571][12][&ldquo;subshell.sh&rdquo;][][1062]</p>
+
+<p>+sub</p>
+
+<p>++[/bin/bash][1][569-571][1][&ldquo;subshell.sh subshell.sh&rdquo;][sub source][12 1062]</p>
+
+<p>+sub2</p>
+
+<p>++[/bin/bash][2][569-571][2][&ldquo;subshell.sh subshell.sh subshell.sh&rdquo;][sub2 sub
+source][1 12 1062]</p>
+
+<p>sleep 1</p>
+
+<p>++[/bin/bash][1][569-571][2][&ldquo;subshell.sh subshell.sh&rdquo;][sub source][12 1062]</p>
+
+<p>+sleep 20</p>
+
+<p>sshd(569)&mdash;bash(571)-+-bash(18801)&mdash;sleep(18804)</p>
+
+<p>|-bash(18806)&mdash;bash(18808)&mdash;sleep(18809)</p>
+
+<p>`-pstree(18807)</p>
+
+<p>例子二：</p>
+
+<p>在子进程里边，采用脚本调用方式，或取子进程进程号</p>
+
+<p>为此增加一个脚本subshell2.sh,并在subshell.sh进行调用</p>
+
+<p>+cat -n subshell2.sh</p>
+
+<p>1 #!/bin/bash</p>
+
+<p>2 set -x</p>
+
+<p>3 echo $PPID</p>
+
+<p>4 sleep 10</p>
+
+<p>+cat -n subshell.sh</p>
+
+<p>1 #!/bin/bash</p>
+
+<p>2</p>
+
+<p>3 set -x</p>
+
+<p>4 sub2() {</p>
+
+<p>5 ./subshell2.sh &amp;</p>
+
+<p>6 sleep 1</p>
+
+<p>7 }</p>
+
+<p>8 sub() {</p>
+
+<p>9 sub2 &amp;</p>
+
+<p>10 sleep 20</p>
+
+<p>11 }</p>
+
+<p>12 sub &amp;</p>
+
+<p>13 pstree -pa $PPID</p>
+
+<p>[root@localhost shell]# ./subshell.sh</p>
+
+<p>+[/bin/bash][0][569-571][1138][&ldquo;&rdquo;][][]</p>
+
+<p>+./subshell.sh</p>
+
+<p>+[/bin/bash][0][571-19715][13][&ldquo;./subshell.sh&rdquo;][][0]</p>
+
+<p>+pstree -pa 571</p>
+
+<p>+[/bin/bash][0][571-19715][12][&ldquo;./subshell.sh&rdquo;][][0]</p>
+
+<p>+sub</p>
+
+<p>+[/bin/bash][1][571-19715][9][&ldquo;./subshell.sh ./subshell.sh&rdquo;][sub main][12 0]</p>
+
+<p>+sub2</p>
+
+<p>+[/bin/bash][2][571-19715][5][&ldquo;./subshell.sh ./subshell.sh
+./subshell.sh&rdquo;][sub2 sub main][9 12 0]</p>
+
+<p>./subshell2.sh</p>
+
+<p>+[/bin/bash][2][571-19715][6][&ldquo;./subshell.sh ./subshell.sh
+./subshell.sh&rdquo;][sub2 sub main][9 12 0]</p>
+
+<p>sleep 1</p>
+
+<p>+[/bin/bash][1][571-19715][10][&ldquo;./subshell.sh ./subshell.sh&rdquo;][sub main][12 0]</p>
+
+<p>+sleep 20</p>
+
+<p>+[/bin/bash][0][19718-19719][3][&ldquo;./subshell2.sh&rdquo;][][0]</p>
+
+<p>+echo 19718</p>
+
+<p>19718</p>
+
+<p>+[/bin/bash][0][19718-19719][4][&ldquo;./subshell2.sh&rdquo;][][0]</p>
+
+<p>+sleep 10</p>
+
+<p>bash,571</p>
+
+<p>`-subshell.sh,19715 ./subshell.sh</p>
+
+<p>|-pstree,19717 -pa 571</p>
+
+<p>`-subshell.sh,19716 ./subshell.sh</p>
+
+<p>|-sleep,19721 20</p>
+
+<p>`-subshell.sh,19718 ./subshell.sh</p>
+
+<p>|-sleep,19720 1</p>
+
+<p>`-subshell2.sh,19719 ./subshell2.sh</p>
+
+<p>`-sleep,19722 10</p>
+
+<p>从上边的执行结果可以看出，当程序执行进入subshell2.sh时，创建了进程号19294的进程境，$$变量值保存的“current
+shell”均为更新为subshell2.sh调用时创建的进程：</p>
+
+<p>这样，打出来的subshell2.sh的父进程id,实际上就是sub2调用时创建的进程，这样就把一些$$本来显示不出来的子进程id给显示了出来。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Android启动耗时监测adbshellam代码打点 | 开发者问答集锦</title>
+    <meta property="og:title" content="Android启动耗时监测adbshellam代码打点 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Android启动耗时监测adbshellam代码打点">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/android%E5%90%AF%E5%8A%A8%E8%80%97%E6%97%B6%E7%9B%91%E6%B5%8Badbshellam%E4%BB%A3%E7%A0%81%E6%89%93%E7%82%B9/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Android启动耗时监测adbshellam代码打点</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h5 id="1-应用启动流程">1.应用启动流程</h5>
+
+<p>Android 应用程序的载体是 APK 文件，其中包含了组件和资源，APK 文件可能运行在一个独立的进程中，也有可能产生多个进程，还可以多个 APK
+运行在同一个进程中，可以通过不同的方式来实现。但有两点需要注意，第一，每个应用只对应一个 Application 对象，并且启动应用一定会产生一个
+Application 对象；第二，应用程序可视化组件 Activity
+是应用的基本组成之一。这里不去讲述Application和Activity的生命周期，大家估计都知道。</p>
+
+<h5 id="2-启动耗时监测">2.启动耗时监测</h5>
+
+<p>因为一个应用在启动或者跳入某个页面时是否流畅，时间是否太长，仅仅通过肉眼来观察是非常不准确的，并且在不同设备和环境会有完全不同的表现，所以要准确知道耗时，就需要有效准确的数据，首先通过
+shell 来获取启动耗时。</p>
+
+<ul>
+<li><p>adb shell am<br />
+应用启动的时间会受到很多因素的影响，比如首次安装后需要解压 apk 文件，绘制时GPU 的耗时等，所以在应用层很难获取到启动耗时，但借助 ADB
+可以得到准确的启动时间。使用 adb shell 获得应用真实的启动时间，代码如下：</p>
+
+<p>// 注：启动的activity必须是{ act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] }
+adb shell am start -W com.包名/com.包名.module.start.SplashActivity</p></li>
+</ul>
+
+<p>执行后可以得到以下的数据：</p>
+
+<pre><code>ThisTime: 1042
+TotalTime: 1042
+WaitTime: 1077
+</code></pre>
+
+<ul>
+<li><p>ThisTime：一般和 TotalTime 时间一样，如果在应用启动时开了一个过度的全透明的页面（Activity）预先处理一些事，再显示出主页面（Activity），这样将比 TotalTime 小。</p></li>
+
+<li><p>TotalTime：应用的启动时间，包括创建进程+Application 初始化+Activity</p></li>
+
+<li><p>WaitTime：一般比 TotalTime 大些，包括系统影响的耗时。<br />
+但这个方法只能得到固定的某一个阶段的耗时，不能得到具体哪个方法的耗时，下面介绍第二个方案：代码打点输出耗时。</p></li>
+
+<li><p>代码打点</p></li>
+</ul>
+
+<p>下面是具体的代码结构：</p>
+
+<pre><code>// 统计耗时的数据结构
+public class TimeMonitor {
+
+    private final String TAG = &quot;TimeMonitor&quot;;
+    private int monitorId = -1;
+    private HashMap mTimeTag = new HashMap&lt;&gt;();
+    private long mStartTime = 0;
+
+    public TimeMonitor(int monitorId) {
+        Log.e(TAG, &quot;init TimeMonitor id：&quot; + monitorId);
+        this.monitorId = monitorId;
+    }
+
+    public int getMonitorId() {
+        return monitorId;
+    }
+
+    public void startMonitor() {
+        if (mTimeTag.size() &gt; 0) {
+            mTimeTag.clear();
+        }
+        mStartTime = System.currentTimeMillis();
+    }
+
+    // 打一次点，tag交线需要统计的上层定义
+    public void recodingTimeTag(String tag) {
+        // 检查是否保存过相同的tag
+        if (mTimeTag.get(tag) != null) {
+            mTimeTag.remove(tag);
+        }
+        long time = System.currentTimeMillis() - mStartTime;
+//        Log.e(TAG, tag + &quot;：&quot; + time);
+        mTimeTag.put(tag, time);
+    }
+
+    public void end(String tag, boolean writeLog) {
+        recodingTimeTag(tag);
+        end(writeLog);
+    }
+
+    public void end(boolean writeLog) {
+        if (writeLog) {
+            // 写入到本地文件
+        }
+        showDataToLogcat();
+    }
+
+    private void showDataToLogcat() {
+        if (mTimeTag.size() &lt;= 0) {
+            Log.e(TAG, &quot;mTimeTag is empty&quot;);
+        }
+        Iterator iterator = mTimeTag.keySet().iterator();
+        while (iterator.hasNext()) {
+            String tag = (String) iterator.next();
+            Log.e(TAG, tag + &quot;：&quot; + mTimeTag.get(tag));
+        }
+    }
+
+    public HashMap getmTimeTag() {
+        return mTimeTag;
+    }
+}
+</code></pre>
+
+<p>一个管理id的配置类</p>
+
+<pre><code>public class TimeMonitorConfig {
+    // 应用启动
+    public static final int TIME_MONITOR_ID_APPLICATION_START = 1;
+
+}
+</code></pre>
+
+<p>单例类来管理TimeMonitor类。</p>
+
+<pre><code>public class TimeMonitorManager {
+
+    private static TimeMonitorManager mTimeMonitorManager = null;
+    private static Context mContext = null;
+    private HashMap timeMonitorList = null;
+
+    public synchronized static TimeMonitorManager getInstance() {
+        if (mTimeMonitorManager == null) {
+            mTimeMonitorManager = new TimeMonitorManager();
+        }
+        return mTimeMonitorManager;
+    }
+
+    private TimeMonitorManager() {
+        timeMonitorList = new HashMap&lt;&gt;();
+    }
+
+    // 初始化打点器
+    public void resetTimeMonitor(int id) {
+        TimeMonitor monitor = timeMonitorList.get(id);
+        if (monitor != null) {
+            timeMonitorList.remove(id);
+        }
+        getTimeMonitor(id);
+    }
+
+    public TimeMonitor getTimeMonitor(int id) {
+        TimeMonitor monitor = timeMonitorList.get(id);
+        if (monitor == null) {
+            monitor = new TimeMonitor(id);
+            monitor.startMonitor();
+            timeMonitorList.put(id, monitor);
+        }
+        return monitor;
+    }
+
+}
+</code></pre>
+
+<p>接下来打点，我们监控应用的启动</p>
+
+<pre><code>// Application中，记得在manifest文件配置
+public class App extends Application {
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
+        TimeMonitorManager.getInstance().resetTimeMonitor(TimeMonitorConfig.TIME_MONITOR_ID_APPLICATION_START);
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        init();
+        TimeMonitorManager.getInstance().getTimeMonitor(TimeMonitorConfig.TIME_MONITOR_ID_APPLICATION_START).recodingTimeTag(&quot;ApplicationCreate&quot;);
+    }
+    private void init() {
+
+
+    }
+}
+</code></pre>
+
+<p>启动页打点如下</p>
+
+<pre><code>public class MainActivity extends Activity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+// 打点     TimeMonitorManager.getInstance().getTimeMonitor(TimeMonitorConfig.TIME_MONITOR_ID_APPLICATION_START).recodingTimeTag(&quot;MainActivity_Create_start&quot;);
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+      // .......... 业务代码省略
+// 打点     TimeMonitorManager.getInstance().getTimeMonitor(TimeMonitorConfig.TIME_MONITOR_ID_APPLICATION_START).recodingTimeTag(&quot;MainActivity_Create_over&quot;);
+    }
+
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // 打点     
+        TimeMonitorManager.getInstance().getTimeMonitor(TimeMonitorConfig.TIME_MONITOR_ID_APPLICATION_START).end(&quot;MainActivity_onStart&quot;, false);
+    }
+
+    private static Bitmap getBitmap(Context context, int vectorDrawableId) {
+            // 业务代码省略
+    }
+}
+</code></pre>
+
+<p>最后通过打印存储的数据结果如下：</p>
+
+<pre><code>TimeMonitor: init TimeMonitor id：1
+TimeMonitor: ApplicationCreate：4
+TimeMonitor: MainActivity_Create_start：83
+TimeMonitor: MainActivity_Create_over：148
+TimeMonitor: MainActivity_onStart：150
+</code></pre>
+
+<ul>
+<li>可以在项目核心部分添加打点，插桩也是可以的。（插桩：目标程序代码中某些位置插入或修改成一些代码，从而在目标程序运行过程中获取某些程序状态并加以分析。）</li>
+</ul>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

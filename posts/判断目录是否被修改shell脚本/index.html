@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>判断目录是否被修改shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="判断目录是否被修改shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="判断目录是否被修改shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%88%A4%E6%96%AD%E7%9B%AE%E5%BD%95%E6%98%AF%E5%90%A6%E8%A2%AB%E4%BF%AE%E6%94%B9shell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">判断目录是否被修改shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>此脚本用于检测linux系统重要文件是否被改动，如果发生改动则发送邮件通知进行报警</p>
+
+<pre><code>#!/bin/bash
+#sehn
+FileDir='/var/CheckFile' #定义验证文件所在目录
+HostName=$(hostname) #获取主机名或自己定义
+
+Mail_Smtp=&quot;smtp.163.com&quot; #smtp地址，我这里用的网易邮箱
+Mail_User=&quot;xxx@163.com&quot; #用户
+Mail_Pass=&quot;USRMVWXLCUQTAYGT&quot; #授权密码
+Mail_From=&quot;xxx@163.com&quot; #发件人
+Mail_To=&quot;xxx4@163.com&quot; #收件人
+Mail_Subject=&quot;${HostName}:There are changes to system files&quot; #邮件主题
+Mail_Conntent=&quot;${HostName}:There are changes to system files&quot; #内容
+
+#定义需要验证的文件目录。这里我监控的是/data/test目录
+CheckDir=(
+/data/test
+)
+
+#生成所定义需验证的文件样本日志函数
+OldFile () {
+for i in ${CheckDir[@]}
+do
+/bin/find ${i} -type f |xargs md5sum &gt;&gt; ${FileDir}/old.log
+done
+}
+NewFile () {
+for i in ${CheckDir[@]}
+do
+/bin/find ${i} -type f |xargs md5sum &gt;&gt; ${FileDir}/new.log
+done
+}
+
+#生成所定义文件新日志函数(注意后面发送邮件内容，\n表示换行)
+SendEMail () {
+/usr/local/bin/sendEmail -f $Mail_From -t $Mail_To -s $Mail_Smtp -u $Mail_Subject -xu $Mail_User -xp $Mail_Pass -m &quot;$Mail_Conntent&quot;\n
+}
+if [ ! -d ${FileDir} ]
+then
+mkdir ${FileDir}
+fi
+
+#假如验证文件目录不存在则创建
+if [ ! -f ${FileDir}/old.log ]
+then
+OldFile
+fi
+
+#假如没有安装sendEmail则安装
+if [ ! -f /usr/local/bin/sendEmail ]
+then
+cd /usr/local/src/
+wget http://caspian.dotconf.net/menu/Software/SendEmail/sendEmail-v1.56.tar.gz
+tar -xf sendEmail-v1.56.tar.gz
+cd sendEmail-v1.56
+cp sendEmail /usr/local/bin
+chmod 0755 /usr/local/bin/sendEmail
+fi
+
+#生成新验证日志
+NewFile
+
+#新验证日志与样本日志进行比较
+/usr/bin/diff ${FileDir}/new.log ${FileDir}/old.log &gt;${FileDir}/diff.log
+Status=$?
+
+#假如比较结果有变化，则发送邮件报警
+if [ ${Status} -ne 0 ]
+then
+Mail_Conntent=&quot;$(grep ' ${FileDir}/diff.log |awk '{print $3}')&quot;
+SendEMail
+fi
+
+#清除新旧日志，把比较结果进行备份
+/bin/mv -f ${FileDir}/diff.log ${FileDir}/diff$(date +%F__%T).log
+cat /dev/null &gt; ${FileDir}/old.log
+cat /dev/null &gt; ${FileDir}/new.log
+
+#重新生成样本日志
+OldFile
+
+#删除目录内30天以前的比较结果备份文件
+/bin/find ${FileDir} -type f -mtime +30 |xargs rm -f
+</code></pre>
+
+<p>创建测试目录及文件</p>
+
+<pre><code>[root@localhost ~]# mkdir -p /data/test
+[root@localhost ~]# cd /data/test/
+[root@localhost test]# mkdir aaa
+[root@localhost test]# cd aaa/
+[root@localhost aaa]# echo hello &gt; bbb
+[root@localhost aaa]# ll
+total 4
+-rw-r--r-- 1 root root 6 Aug  8 17:32 bbb
+</code></pre>
+
+<p>运行脚本<br />
+当首次执行脚本的时候，由于所监控的目录下的文件没有变动，所以不会发送邮件</p>
+
+<pre><code>[root@localhost ~]# ll -d /var/CheckFile/
+drwxr-xr-x 2 root root 72 Aug  8 17:33 /var/CheckFile/
+[root@localhost ~]# ll /var/CheckFile/
+total 4
+-rw-r--r-- 1 root root  0 Aug  8 17:33 diff2020-08-08__17:33:09.log
+-rw-r--r-- 1 root root  0 Aug  8 17:33 new.log
+-rw-r--r-- 1 root root 53 Aug  8 17:33 old.log
+[root@localhost ~]# cat /var/CheckFile/diff2020-08-08__17\:33\:09.log
+[root@localhost ~]# cat /var/CheckFile/new.log
+[root@localhost ~]# cat /var/CheckFile/old.log
+b1946ac92492d2347c6235b4d2611184  /data/test/aaa/bbb
+</code></pre>
+
+<p>对测试目录下进行修改，生成两个新文件</p>
+
+<pre><code>[root@localhost ~]# echo nihao &gt; /data/test/ccc.txt
+[root@localhost ~]# echo linux &gt; /data/test/ddd.txt
+</code></pre>
+
+<p>运行脚本，报警邮件已经发送</p>
+
+<pre><code>[root@localhost ~]# sh check.sh
+Aug 08 17:36:36 localhost sendEmail[65921]: Email was sent successfully!
+[root@localhost ~]# ll /var/CheckFile/
+total 8
+-rw-r--r-- 1 root root   0 Aug  8 17:33 diff2020-08-08__17:33:09.log
+-rw-r--r-- 1 root root 116 Aug  8 17:36 diff2020-08-08__17:36:36.log
+-rw-r--r-- 1 root root   0 Aug  8 17:36 new.log
+-rw-r--r-- 1 root root 159 Aug  8 17:36 old.log
+[root@localhost ~]# cat /var/CheckFile/diff2020-08-08__17\:36\:36.log
+2,3d1
+&lt; 0a34a9366d438e6ac5ae3480d024c4ef  /data/test/ccc.txt
+&lt; 5bb062356cddb5d2c0ef41eb2660cb06  /data/test/ddd.txt
+[root@localhost ~]# cat /var/CheckFile/old.log
+b1946ac92492d2347c6235b4d2611184  /data/test/aaa/bbb
+0a34a9366d438e6ac5ae3480d024c4ef  /data/test/ccc.txt
+5bb062356cddb5d2c0ef41eb2660cb06  /data/test/ddd.txt
+[root@localhost ~]# cat /var/CheckFile/new.log
+[root@localhost ~]# 
+</code></pre>
+
+<p>网易邮箱已收到邮件<br />
+<a href="https://img.it610.com/image/info8/b9dc2cf81bf849ba88eb20c92ebd4b9c.jpg"><img src="https://img.it610.com/image/info8/b9dc2cf81bf849ba88eb20c92ebd4b9c.jpg" alt="判断目录是否被修改——shell脚本_第1张图片" /></a></p>
+
+<p>建议用定时任务执行此脚本，如每5分钟执行一次，也可修改此脚本用于死循环检测</p>
+
+<pre><code>[root@localhost ~]# crontab -e
+*/5 * * * *  /bin/bash -x /root/check.sh &gt; /dev/null 2&gt;&amp;1
+</code></pre>
+
+<p>此脚本也可以用于检测linux系统重要文件是否被更改，如配置文件等，只需将检查的目录由脚本中的/data/test改为对应目录即可</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

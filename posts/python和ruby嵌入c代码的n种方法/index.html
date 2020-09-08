@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Python和Ruby嵌入C代码的N种方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="Python和Ruby嵌入C代码的N种方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Python和Ruby嵌入C代码的N种方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/python%E5%92%8Cruby%E5%B5%8C%E5%85%A5c%E4%BB%A3%E7%A0%81%E7%9A%84n%E7%A7%8D%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Python和Ruby嵌入C代码的N种方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>注：本文首发于“ <strong>嵌入式软件实战派</strong> ”公众号，关注该公众号可获得更多精品干货。</p>
+
+<h1 id="很懒很操心"><strong>▍很懒很操心</strong></h1>
+
+<p>有一次，我在项目开发中想监控某段空间数据的大小，即这段空间在MCU中非常有限，希望每个版本在集成软件的时候都想获取其使用了多少空间，防止某些愣头青不珍惜内存，乱塞东西。而这段空间，我定义了一个神一样的结构体映射到这个空间，即其他开发人员只要在结构体增加元素即可（我使用洪荒之力将宏定义发挥到淋漓尽致才做到的<a href="https://img.it610.com/image/info8/ec7fd13eb9f6448f9f6e0156b625b0d9.jpg"><img src="https://img.it610.com/image/info8/ec7fd13eb9f6448f9f6e0156b625b0d9.jpg" alt="" /></a>，至于怎么实现的细节就不在这个文章讨论了，后续再写篇文章装装X）。</p>
+
+<p>计算这个结构体空间，要求：</p>
+
+<ol>
+<li><p>在软件集成阶段就获得这个结构体大小，而不是MCU运行的时候；（自动执行）</p></li>
+
+<li><p>计算这个结构体大小，不要增加删除原程序代码；（悄无声息）</p></li>
+
+<li><p>方便集成工程师使用，不增加使用难度；（简单易用）</p></li>
+
+<li><p>不因为人操作的原因，而导致计算结果不准确，即自动化执行输出结果。（无人为干扰）</p></li>
+</ol>
+
+<p>总之，做这件事的目的是：每次集成的时候自动输出结果（ <em>很懒</em>
+），也不行交给其他小伙伴去手工计算，或者更改原来的结构代码去计算这个空间，怕其乱来搞坏了原来的代码（ <em>很操心</em> ）。</p>
+
+<p>再总之： <strong>能让电脑干的活，干嘛要让人去干！</strong></p>
+
+<p>于是，我就突发奇想，写个脚本呗。</p>
+
+<p>那么啥子脚本可以计算C语言的结构体大小？</p>
+
+<p>身为优秀的“ <strong>嵌入式</strong>
+”工程师<a href="https://img.it610.com/image/info8/ec7fd13eb9f6448f9f6e0156b625b0d9.jpg"><img src="https://img.it610.com/image/info8/ec7fd13eb9f6448f9f6e0156b625b0d9.jpg" alt="" /></a>，对这种将C语言“
+<strong>嵌入</strong> ”到脚本中的事情肯定是要研究一番的。</p>
+
+<p><strong>Note：</strong> 为了方便描述，我将具体项目细节和装X的过程隐去，并将这个神一样的结构体简化为：</p>
+
+<pre><code> typedef struct
+ {
+     unsigned char item_a[2];
+     unsigned char item_b[3];
+     unsigned char item_c[5];
+     unsigned char item_d[8];
+     unsigned char item_e[33];
+     unsigned char item_fxxk[1];
+     unsigned char item_fxxxk[2];
+     unsigned char item_fxxk_any[55];
+     // add items here...
+ }typeStructData;
+</code></pre>
+
+<hr />
+
+<h1 id="将c-c-代码嵌入python"><strong>▍</strong> 将C/C++代码嵌入Python</h1>
+
+<blockquote>
+<p>人生苦短，我用Python</p>
+</blockquote>
+
+<p><strong>温馨提示</strong> ，使用以下方法，请提前安装：</p>
+
+<ol>
+<li><p>Python</p></li>
+
+<li><p>GCC（例如Windows上的MinGW）</p></li>
+
+<li><p>用pip安装pyembedc（<code>pip install pyembedc</code>）</p></li>
+</ol>
+
+<p><em>注意：Python的版本位数要跟GCC的对应，例如都选32位的。</em></p>
+
+<h2 id="方法1-python调用exe方式"><strong>方法1：</strong> <strong>Python调用exe方式</strong></h2>
+
+<p>步骤：</p>
+
+<ol>
+<li><p>在一个临时C文件里，编写临时<code>main</code>函数；</p></li>
+
+<li><p>用GCC构建编译，生成exe；</p></li>
+
+<li><p>通过脚本（此处选择Python）调用运行输出结果；</p></li>
+
+<li><p>删除临时C文件和exe文件。</p></li>
+</ol>
+
+<p>接上代码看看</p>
+
+<pre><code> // struct.h
+ 
+ typedef struct
+ {
+     unsigned char item_a[2];
+     unsigned char item_b[3];
+     unsigned char item_c[5];
+     unsigned char item_d[8];
+     unsigned char item_e[33];
+     unsigned char item_fxxk[1];
+     unsigned char item_fxxxk[2];
+     unsigned char item_fxxk_any[55];
+ }typeStructData;
+
+
+ import os
+ 
+ c_main = r'''
+ #include 
+ #include &quot;struct.h&quot;
+ int main(void)
+ {
+    printf(&quot;size: %d\n&quot;, sizeof(typeStructData));
+    return 0;
+ }
+ '''
+ def cal_struct_size():
+     f_c_main = 'xxxxsizeofstructxxxx.c'
+     f_run = 'xxxxsizeofstructxxxx.exe'
+     with open(f_c_main, 'w') as f: f.write(c_main)
+     gcc_compile = &quot;gcc %s -o %s&quot;%(f_c_main, f_run)
+ 
+     os.system(gcc_compile)
+     os.system(f_run)
+     if os.path.exists(f_c_main): os.remove(f_c_main)
+     if os.path.exists(f_run): os.remove(f_run)
+ 
+ if __name__ == &quot;__main__&quot;:
+     cal_struct_size()
+</code></pre>
+
+<h2 id="方法2-python调用lib方式"><strong>方法2：</strong> <strong>Python调用lib方式</strong></h2>
+
+<p>总觉得用Python调用exe的方式有点low，再进一步，那就调用lib吧，例如调用<code>.so</code>内的函数或者变量。</p>
+
+<p>步骤跟方法1类似：</p>
+
+<ol>
+<li><p>在一个临时C文件里，编写临时<code>main</code>函数；</p></li>
+
+<li><p>用GCC构建编译，生成lib（<code>.so</code>）；</p></li>
+
+<li><p>通过Python调用运行输出结果；</p></li>
+
+<li><p>删除临时C文件。</p></li>
+</ol>
+
+<p>Python调用lib库有个好处，可以调用其里面的具体函数等。</p>
+
+<pre><code> // struct.c
+ 
+ #include 
+ 
+ typedef struct
+ {
+     unsigned char item_a[2];
+     unsigned char item_b[3];
+     unsigned char item_c[5];
+     unsigned char item_d[8];
+     unsigned char item_e[33];
+     unsigned char item_fxxk[1];
+     unsigned char item_fxxxk[2];
+     unsigned char item_fxxk_any[55];
+ }typeStructData;
+ 
+ int get_struct_size(void)
+ {
+     return sizeof(typeStructData);
+ }
+
+
+import ctypes
+ import os
+ 
+ os.system('gcc -shared -Wl,-soname,struct -o struct.so -fPIC struct.c')
+ 
+ struct_size = ctypes.cdll.LoadLibrary('./struct.so')
+ 
+ def cal_struct_size():
+     s = struct_size.get_struct_size()
+ 
+     print(&quot;size: %d&quot;%s)
+ 
+ if __name__ == &quot;__main__&quot;:
+     cal_struct_size()
+     # if os.path.exists('struct.so'): os.remove('struct.so')
+</code></pre>
+
+<p>貌似有个小问题，如果想在脚本里面删除这个.so文件，会出现问题，因为没有办法 <em>unload</em>
+这个<code>.so</code>。另外，关于这个话题，请参考：<a href="https://stackoverflow.com/questions/359498/how-can-i-">https://stackoverflow.com/questions/359498/how-can-i-</a>
+unload-a-dll-using-ctypes-in-python</p>
+
+<h2 id="方法3-python调用c源码方式"><strong>方法3：</strong> <strong>Python调用C源码方式</strong></h2>
+
+<p>调用exe和调用lib，都觉得很low，怎么办，能不能直接插入C源码呢？</p>
+
+<p>那就用 <strong>pyembedc</strong> 吧，Python可以访问C的变量，C也可以访问Python的变量，是不是炫酷吊炸天。</p>
+
+<p><strong>例1</strong> ，访问C内部变量</p>
+
+<pre><code># callstruct_inline1.py
+ 
+ from pyembedc import C
+ 
+ struct_str = r'''
+    typedef struct
+    {
+        unsigned char item_a[2];
+        unsigned char item_b[3];
+        unsigned char item_c[5];
+        unsigned char item_d[8];
+        unsigned char item_e[33];
+        unsigned char item_fxxk[1];
+        unsigned char item_fxxxk[2];
+        unsigned char item_fxxk_any[55];
+    }typeStructData;
+    struct_size = sizeof(typeStructData);
+ 
+ '''
+ struct_size = 0
+ struct_f = C(struct_str)
+ print('size: %d\n'%struct_size)
+</code></pre>
+
+<p><strong>例2</strong> ，访问C内部函数</p>
+
+<pre><code># callstruct_inline2.py
+ 
+ from pyembedc import embed_c
+ 
+ struct_str2 = r'''
+    typedef struct
+    {
+        unsigned char item_a[2];
+        unsigned char item_b[3];
+        unsigned char item_c[5];
+        unsigned char item_d[8];
+        unsigned char item_e[33];
+        unsigned char item_fxxk[1];
+        unsigned char item_fxxxk[2];
+        unsigned char item_fxxk_any[55];
+    }typeStructData;
+     
+    int get_struct_size(void)
+    {
+        return sizeof(typeStructData);
+    }
+ '''
+ struct_c = embed_c(struct_str2)
+ print('size: %d\n'%struct_c.get_struct_size())
+</code></pre>
+
+<p>实际上，以上的操作，也是这个库偷偷地调用了GCC来编译C代码的（只是不是显式让你看到而已），你不安装对应版本的GCC也是做不到的。</p>
+
+<p>顺便说是，这个 <strong>pyembedc</strong> 有几个方式：</p>
+
+<p><strong><code>pyembedc.C(string) -&gt; int</code></strong></p>
+
+<p><strong><code>pyembedc.inline_c(string) -&gt; int</code></strong></p>
+
+<p><strong><code>pyembedc.inline_c_precompile(string) -&gt; int</code></strong></p>
+
+<blockquote>
+<p>These functions will compile <code>string</code> containing the C/C++ code or
+directives (see below) and then link dynamically and run the code.</p>
+
+<p><code>string</code> is C/C++ code that can be used within a function. It can contain
+any valid C/C++ expression that your compiler will support.</p>
+
+<p>The <code>C</code> function will automatically provide references to all local Python
+variables for use in your code to read or write as if they were basic types
+or arrays.</p>
+
+<p>The <code>inline_c</code> and <code>inline_c_precompile</code> fucntion will not provide
+references to local Python variables and thus is faster and consumes less
+memory.</p>
+</blockquote>
+
+<p><strong><code>pyembedc.embed_c(string) -&gt; cdll</code></strong></p>
+
+<p><strong><code>pyembedc.embed_c_precompile(string) -&gt; cdll</code></strong></p>
+
+<blockquote>
+<p>These functions are used to compile code but not execute immediately. They
+return a CDLL object (see the CDLL python module) that can be executed
+later.</p>
+</blockquote>
+
+<p>更多内容，请见：<a href="https://github.com/ftrias/pyembedc">https://github.com/ftrias/pyembedc</a></p>
+
+<hr />
+
+<h1 id="将c-c-代码嵌入ruby"><strong>▍</strong> 将C/C++代码嵌入Ruby</h1>
+
+<blockquote>
+<p>生活诗意，我用Ruby</p>
+</blockquote>
+
+<p>能把C代码塞进Python，当然也能塞进Ruby。对于在Ruby上插入C源码，给大家安利一个库RubyInline。</p>
+
+<blockquote>
+<p>Inline允许您在Ruby代码中编写外部代码。它会自动确定相关代码是否已更改，并仅在必要时进行构建。然后将扩展自动加载到定义扩展的类/模块中。您甚至可以编写额外的构建器，使您可以用任何语言编写Inline代码。使用<code>Inline
+:: C</code>作为Module，并在<code>Module＃inline</code>中查找所需的API。</p>
+</blockquote>
+
+<p>RubyInline还有以下Features：</p>
+
+<ul>
+<li><p>快速，轻松地内嵌在ruby脚本中的C或C ++代码。</p></li>
+
+<li><p>可扩展以与其他语言一起使用。</p></li>
+
+<li><p>Ruby和C基本类型之间的自动转换<code>* char，unsigned，unsigned int，char *，int，long，unsigned long</code></p></li>
+
+<li><p>inline_c_raw用于自动转换不充分时。</p></li>
+
+<li><p>仅当内联代码已更改时才重新编译。</p></li>
+
+<li><p>假装是安全的。</p></li>
+
+<li><p>仅需要标准的ruby库，无需下载其他内容。</p>
+
+<p>require &rdquo;inline&rdquo;
+ class MyTest
+     inline do |builder|
+         builder.c &rdquo;
+            long factorial(int max) {
+                int i=max, result=1;
+                while (i &gt;= 2) { result *= i&ndash;; }
+                return result;
+            }&rdquo;
+         end
+ end
+ t = MyTest.new()
+ factorial_5 = t.factorial(5)</p>
+
+<p>require &rsquo;inline&rsquo;
+ class MyTest
+     inline(:C) do |builder|
+         builder.include &rdquo;
+         builder.add_compile_flags &rsquo;-x c++&lsquo;, &rsquo;-lstdc++&rsquo;
+         builder.c &rsquo;
+            void hello(int i) {
+                while (i&ndash; &gt; 0) {
+                    std::cout &lt;&lt; &ldquo;hello&rdquo; &lt;&lt; std::endl;
+                }
+            }&rsquo;
+     end
+ end
+ t = MyTest.new()
+ t.hello(3)</p></li>
+</ul>
+
+<p>是不是很好玩，是不是很想试试？<br />
+但是我告诉你，我在Windows上没搞成功，但在Linux上搞起来了。<br />
+应了网上某句话：想学Ruby，就用Linux吧，别在Windows上瞎折腾。<br />
+话说回来，这个嵌入式C源码的用法，个人感觉Ruby的比Python的简洁直观。<br />
+该用哪种方法，看实际需要吧。<br />
+更多内容，详见：<a href="https://github.com/seattlerb/rubyinline">https://github.com/seattlerb/rubyinline</a></p>
+
+<hr />
+
+<h1 id="总结"><strong>▍</strong> 总结</h1>
+
+<p>想将C/C++塞进脚本，需要借助GCC，它才是让你装逼让你飞的前提条件。</p>
+
+<p><a href="https://img.it610.com/image/info8/9831903c3374478db24adf309fbb7843.jpg"><img src="https://img.it610.com/image/info8/9831903c3374478db24adf309fbb7843.jpg" alt="Python和Ruby嵌入C代码的N种方法_第1张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

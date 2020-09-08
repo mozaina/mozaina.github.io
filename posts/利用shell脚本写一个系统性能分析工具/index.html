@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>利用shell脚本写一个系统性能分析工具 | 开发者问答集锦</title>
+    <meta property="og:title" content="利用shell脚本写一个系统性能分析工具 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="利用shell脚本写一个系统性能分析工具">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%88%A9%E7%94%A8shell%E8%84%9A%E6%9C%AC%E5%86%99%E4%B8%80%E4%B8%AA%E7%B3%BB%E7%BB%9F%E6%80%A7%E8%83%BD%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">利用shell脚本写一个系统性能分析工具</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="项目实战1-系统性能分析">项目实战1.系统性能分析</h1>
+
+<h2 id="1-利用select循环实现系统工具箱">1.利用select循环实现系统工具箱</h2>
+
+<p>select格式和for格式一致，但是select 变量名 in xxx xxx都将打印成菜单</p>
+
+<pre><code>#!/bin/bash
+PS3=“enter parment: ”
+select xtgjx in disk_info filesystem_info ip_info mem_info cpu_info quit
+do
+        case $xtgjx in
+        disk_info)
+                lsblk
+                ;;
+        filesystem_info)
+                df -HT
+                ;;
+        ip_info)
+                ifconfig | awk '/inet/{if($2~/([0-9]{1,3}.){3}[0-9]{1,3}/){print $2}}'
+                ;;
+        mem_info)
+                free -g
+                ;;
+        cpu_info)
+                uptime
+                ;;
+        quit)
+                break
+                ;;
+        *)
+                echo &quot;error parment&quot;
+        esac
+done
+执行：./select_xtgjx.sh
+1) disk_info        3) ip_info      5) cpu_info
+2) filesystem_info  4) mem_info     6) quit
+#? 1
+NAME            MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda               8:0    0   50G  0 disk 
+├─sda1            8:1    0    1G  0 part /boot
+└─sda2            8:2    0   49G  0 part 
+  ├─centos-root 253:0    0   47G  0 lvm  /
+  └─centos-swap 253:1    0    2G  0 lvm  [SWAP]
+sdb               8:16   0  100G  0 disk 
+└─sdb1            8:17   0  100G  0 part /my_scripts
+sr0              11:0    1  4.3G  0 rom  /media
+#? 
+如果觉得#?不好看可以重新定义PS3的变量值进行更改，定义时变量值一定要加引号
+ ./select_xtgjx.sh
+1) disk_info        3) ip_info      5) cpu_info
+2) filesystem_info  4) mem_info     6) quit
+enter parment: 
+
+如果希望每次执行完都弹出菜单，可以套一个while循环，在没执行完菜单对应的命令后执行一个break跳出当前循环，也就是跳出select循环，虽然跳出了select循环但是还有while循环因此可以实现每执行一部分就显示菜单内容
+
+PS3=&quot;enter parment: &quot;
+while :
+do
+select xtgjx in disk_info filesystem_info ip_info mem_info cpu_info quit
+do
+        case $xtgjx in
+        disk_info)
+                lsblk
+                break
+                ;;
+        filesystem_info)
+                df -HT
+                break
+                ;;
+        ip_info)
+                ifconfig | awk '/inet/{if($2~/([0-9]{1,3}.){3}[0-9]{1,3}/){print $2}}'
+                break
+                ;;
+        mem_info)
+                free -g
+                break
+                ;;
+        cpu_info)
+                uptime
+                break
+                ;;
+        quit)
+                exit
+                ;;
+        *)
+                echo &quot;error parment&quot;
+        esac
+done
+done
+</code></pre>
+
+<h2 id="2-命令技巧">2.命令技巧</h2>
+
+<pre><code>其中使用了NR==3表示遇到第三行才会模式匹配
+UTIL=`vmstat | awk '{if(NR==3){print 100-$15&quot;%&quot;}}'` 
+
+这里用到了iostat命令，-d表示打印磁盘，-x表示列出详细信息
+详细的iostat参数解释参照：https://www.jellythink.com/archives/438
+WRITE=`iostat -d -x | awk '/^[s|v]/{OFS=&quot;:&quot;;print $1,$7&quot;KB&quot;}'` 
+
+过滤出每块磁盘的大小
+这里可以直接/Disk/不用加.*因为我们用到了&amp;&amp;还要匹配下一个规则，因为我们要打印第二列磁盘名字和第三列磁盘的大小，由于磁盘大小由小数点，因此我们使用printf 使用参数%d只显示整数，由于printf将值都显示在一行，因此最后我们使用print打印一个GB然后换行
+精确匹配
+fdisk -l | awk '/^Disk.*bytes/ &amp;&amp; /\/dev/{printf $2&quot; &quot;;printf &quot;%d&quot;,$3;print &quot;GB&quot;}'
+差异匹配1
+fdisk -l | awk '/^Disk/ &amp;&amp; /\/dev/{printf $2;printf &quot;%d&quot;,$3;print &quot;GB&quot;}'
+差异匹配2
+fdisk -l | awk '/^Disk.*bytes/{printf $2&quot; &quot;;printf &quot;%d&quot;,$3;print &quot;GB&quot;}'
+不使用printf实现
+fdisk -l | awk '/^Disk.*bytes/{print $2,int($3)&quot;GB&quot;}'
+
+如果变量内容由多行，引用是请用{}引起来例如
+使用echo -e是为了支持反斜杠中的转义操作例如下面使用的\n表示换行
+echo -e &quot;disk total: \n${DISK_TOTAL}&quot;
+
+1.cpu利用率与负载实现方式：
+定义i的值然后进行while循环，然后使用vmstat+awk过滤出util、user、sys、wait的分别对应的值如vmstat | awk '{if(NR==3){print $13&quot;%&quot;}}'，然后在用echo列出这些变量值
+
+2.磁盘io负载实现方式：
+定义while循环，使用iostat+wak过滤出util、read、write、iowait的列如iostat -d -x | awk '/^[s|v]/{OFS=&quot;: &quot;;print $1,$NF&quot;%&quot;}'然后用echo打印出来
+3.磁盘使用率：
+定义日志文件，然后使用fdisk -l awk过滤出磁盘名、大小，在用df命令过滤出磁盘的使用率，写一个for循环，如果使用率大于90就打印出90的那个磁盘名，最后echo 超过90的磁盘名和实际使用率并输出到日志we文件中，然后循环结束，打印出总量，在判断日志文件是否存在，如果存在就把日志内容输出，不存在则说没有磁盘使用率超过90%
+
+4.求磁盘利用率、磁盘inode节点，一般实现思路为：首先定义日志文件存放路径，然后定义磁盘的空间大小、磁盘使用率（用printf &quot;%d&quot;,$5的形式取出数值）/inode值，然后使用for循环遍历值列表，如果i的值大于90则打印出哪一列对应的磁盘名，最后echo出磁盘名加使用率追加到日志文件中，然后使用if语句判断是否存在该日志文件，如果有则cat这个文件，并删掉，如果没有就提示没有超过90%
+
+5.内存使用率
+使用free -m结合awk打印出total、used、free、cache的值free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$2/1024;print &quot;G&quot;}}'，然后用echo输出
+两种形式显示内存的大小，因为由于是虚拟机因此内存只有512M，所以我们使用printf来打印出浮点数
+保留1位小数点，然后用公式算一下最后打印个G
+free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$2/1024;print &quot;G&quot;}}'
+free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$2/1024}} END{print &quot;G&quot;}'
+
+6.tcp状态
+直接上命令，然后打印netstat -ant | awk '/^tcp/{state[$NF]++} END{for (i in state){print i,state[i]}}'
+
+统计tcp状态
+netstat -ant | awk '/^tcp/{state[$NF]++} END{for (i in state){print i,state[i]}}'
+ss -ant  | awk '!/State/{state[$1]++} END{for(i in state){print i,state[i]}}'
+
+7.打印占用CPU最多的前十个进程
+第一种
+使用ps命令结合awk命令判断第三列如果大于0.1（因为如果CPU不大于0.1，匹配没有意义）那么就使用printf（不会换行）打印“PID：”在打印出第二列的值，在打印一个”CPU：“并且打印出第三列的值，在打印一个----&gt;，清晰，打印完后，我们用到了for循环，因为每一个进程都有不同的参数，所以我们无法确定他有多少列，因此我们使用for循环如果i小于NF也就是字段数，那么每次加1，在使用if判断是否等于NF如果等于那么就说明打印到了最后一个参数，然后我们就换行，否则的话就一直打印，知道打印到最后一列，然后进行换行，这样可以有效地把进程所有参数打印出来
+ps aux | awk '{if($3&gt;0.1){{printf &quot;PID: &quot;$2 &quot; CPU: &quot;$3 &quot;%-----&gt;&quot;}for(i=11;i&lt;=NF;i++)if(i==NF)printf $i&quot;\n&quot;;else printf $i}}'
+第二种比较直观
+ps axu | awk '{if($3&gt;0.1){print &quot;PID: &quot;$2,&quot;CPU: &quot;$3,&quot;------&gt;&quot;,$NF}}' | sort -k4 | head -10
+cputop10实现思路
+首先定义CPU日志文件，然后设置i的值，并开始while循环，$i -le 3循环三次，在循环体中，使用ps命令结合awk命令，打印出pid、cpu、进程命令，使用sort命令排序别结合head只显示前10个，然后追加到日志文件中，在使用if判断，日志文件是否为空，不为空打印文件内容，为空就打印没有进程占用CPU，打印前10个进程占用的命令：ps aux | awk '{if($3&gt;0.1){{printf &quot;PID: &quot;$2 &quot; CPU:&quot; $3 &quot;%---&gt;&quot;}for (i=11;i&lt;=NF;i++)if(i==NF)printf $i&quot;\n&quot;;else printf $i}}',if后面使用双{}是为了将f or也连接在一起，当第一个if成立后面的for才会执行，如果是一个{}那么不管条件成不成立都会全部打印一下最后一列
+也可以直接这看
+ps aux  | awk '{if($3&gt;0.1){print $0}}' | head -10
+
+8.memtop10实现思路和cputop10一样
+
+9.网卡流量
+1M=1024Kb/8bit=128KB
+网卡流量中RX是接受，TX是发送，6和7的位置不同，6中RX、TX位于第8行，RX是第4列，TX是低9列，而7中RX位于第五行TX位于第7行都是第5列
+也可以根据RX或者TX查找
+RX=ifconfig ens33 | awk '/bytes/{if(NR==5){print $5} else if(NR==8){print $4}}'
+TX=ifconfig ens33 | awk '/bytes/{if(NR==7){print $5} else if(NR==8){print $9}}'
+
+网络流量实现方式
+首先写一个死循环，使用read提示用户检查那块网卡的流量，用户输的网卡存在则跳出循环，在写一个循环，循环三次，其中先定义rx和tx的值，然后sleep 1秒在重新定义一个值，因为每秒都会发生改变，最后定义IN的变量（也就是RX）用一秒后的值减去1秒前的值除于1024在除于128，除于1024是为了得到Kb除于128是为了得出多少M最后打印出RX的值和TX的值
+</code></pre>
+
+<h2 id="3-整个脚本实现方式">3.整个脚本实现方式</h2>
+
+<pre><code>#!/bin/bash
+#系统性能分析工具
+#检测操作系统版本
+YELLOW_COLOR='\e[033m'  #黄
+RED_COLOR='\e[031m' #红
+GREEN_COLOR='\e[032m'   #绿  
+BLUE_COLOR='\e[034m'    #蓝
+BLACK_COLOR='\e[0m' #黑
+PINK_COLOR='\e[035m'    #粉
+os_check() {
+    if [ -e /etc/redhat-release ];then
+        LINUX1=$(cat /etc/redhat-release | cut -d' ' -f1)
+    else
+        LINUX2=$(cat /etc/issue | awk '{print $1}')
+    fi
+
+    if [ &quot;$LINUX1&quot; == &quot;CentOS&quot; -o &quot;$LINUX1&quot; == &quot;RedHat&quot; ];then
+        P_M=yum
+    elif [ &quot;$LINUX2&quot; == &quot;Ubuntu&quot; -o &quot;$LINUX2&quot; == &quot;ubuntu&quot; ];then
+        P_M=apt-get
+    else
+        echo &quot;error system&quot;
+        exit 1
+    fi
+}
+
+#检测是否是root登录的系统
+if [ $LOGNAME != root ];then
+    echo -e &quot;${RED_COLOR}请使用root用户操作${BLACK_COLOR}&quot;
+    exit 2
+fi
+
+#检测是否安装vmstat
+if ! which vmstat &amp;&gt;/dev/null;then
+    echo -e &quot;${RED_COLOR}vmstat 命令没有安装，现在开始安装...${BLACK_COLOR}&quot;
+    os_check
+    $P_M -y install vmstat
+    if [ $? -eq 0 ];then
+        echo &quot;-------------------------------------------------------------&quot;
+    fi
+fi
+
+#检测是否安装iostat
+which iostat &amp;&gt;/dev/null
+if [ $? -ne 0 ];then
+    echo -e &quot;${RED_COLOR}iostat 命令没有安装，现在开始安装...${BLACK_COLOR}&quot; 
+    os_check
+    $P_M -y install iostat
+    if [ $? -eq 0 ];then
+        echo &quot;-------------------------------------------------------------&quot;
+    fi
+fi
+
+#使用select构造菜单并添加每个菜单需要执行的命令
+while :
+do
+    select menu in cpu_load disk_load disk_use disk_inode mem_use tcp_status cpu_top10 mem_top10 traffic clearscreen quit 
+    do
+        case $menu in
+        cpu_load)
+            #CPU利用率与负载
+            echo &quot;------------------------------------&quot;
+            i=1
+            while [[ $i -le 3 ]]
+            do
+                echo -e &quot;${GREEN_COLOR}参数值$i ${BLACK_COLOR}&quot;
+                UTIL=`vmstat | awk '{if(NR==3){print 100-$15&quot;%&quot;}}'` #第15列是id对应的列，表示空闲的，用100减去空闲的就是已经使用的
+                USER=`vmstat | awk '{if(NR==3){print $13&quot;%&quot;}}'`     #第13列是us对应的列，这里表示已使用的CPU中用户占用了多少
+                SYS=`vmstat |awk '{if(NR==3){print $14&quot;%&quot;}}'`           #第14列是sy对应的列，这里表示已使用的CPU中系统占了多少
+                IOWAIT=`vmstat | awk '{if(NR==3){print $(NF -1)&quot;%&quot;}}'`  #倒数第二列也就是16列，这里表示IOwait在cpu中占用了多少
+                echo &quot;cpu used: $UTIL&quot;
+                echo &quot;user used: $USER&quot;
+                echo &quot;system used: $SYS&quot;
+                echo &quot;io wait used: $IOWAIT&quot;
+                let i++
+                sleep 1
+            done  
+            echo &quot;------------------------------------&quot;
+            break
+            ;;
+        disk_load)
+            #磁盘I/O负载
+            echo &quot;------------------------------------&quot;
+            i=1
+            while [[ $i -le 3 ]]
+            do
+                echo -e &quot;${GREEN_COLOR}参数值$i ${BLACK_COLOR}&quot;
+                UTIL=`iostat -d -x | awk '/^[s|v]/{OFS=&quot;: &quot;;print $1,$NF&quot;%&quot;}'`  #util是IO消耗的CPU占比，-d，-x参数分别表示只列出磁盘和详细信息
+                READ=`iostat -d -x | awk '/^[s|v]/{OFS=&quot;: &quot;;print $1,$6&quot;KB&quot;}'`  #打印出每秒向磁盘读多少字节数
+                WRITE=`iostat -d -x | awk '/^[s|v]/{OFS=&quot;:&quot;;print $1,$7&quot;KB&quot;}'`  #打印出每秒向磁盘写多少字节数
+                IOWAIT=`vmstat | awk '{if(NR==3){print $(NF-1)&quot;%&quot;}}'`
+                echo -e &quot;UTIL:&quot;     
+                echo -e &quot;${UTIL}&quot;
+                echo -e &quot;io wait used: $IOWAIT&quot;
+                echo -e &quot;Read/s: \n$READ&quot;
+                echo -e &quot;Write/s: \n$WRITE&quot; 
+                i=$(($i+1))
+                sleep 1
+            done
+            echo &quot;------------------------------------&quot;
+            break
+            ;;
+        disk_use)
+            #磁盘使用率
+            DISK_LOG=/tmp/disk_user.log     #磁盘使用日志存放路径
+            DISK_TOTAL=`fdisk -l | awk '/^Disk.*bytes/{print $2,int($3)&quot;GB&quot;}'`  #打印出磁盘对应的大小
+            DISK_USED=`df -h | awk '/^\/dev/{print int($(NF-1))}'`      #打印出磁盘的使用率
+            for i in $DISK_USED         #遍历一下，因为不止一块磁盘
+            do
+                if [ $i -ge 90 ];then
+                    DISK_NAME=`df -h | awk '{if(int($5)=='''$i'''){print $6}}'`     #如果第五列磁盘使用率等于循环中i的值那么就打印第六列
+                    echo &quot;${DISK_NAME} used is ${i}%...&quot; &gt;&gt; $DISK_LOG       #将磁盘的名字和使用率对应起来追加到日志中
+                fi
+            done
+            echo -e &quot;disk total: \n${DISK_TOTAL}&quot;
+            if [ -e $DISK_LOG ];then
+                echo &quot;------------------------------------&quot;
+                df -h | awk '/^\/dev/{print $1&quot;:&quot;,$5}'          #如果使用了df -hT则先是$7,$6
+                echo
+                cat $DISK_LOG
+                echo &quot;------------------------------------&quot;
+                rm -rf $DISK_LOG
+            else
+                echo &quot;------------------------------------&quot;
+                df -h | awk '/^\/dev/{print $1&quot;:&quot;,$5}'          #如果使用了df -hT则先是$7,$6
+                echo
+                echo -e &quot;${BLUE_COLOR}Disk used no more than 90%...${BLACK_COLOR}&quot;      #当前磁盘使用率没有超过90%的
+                echo &quot;------------------------------------&quot;
+            fi
+            break
+            ;;
+        disk_inode)
+            #磁盘inodes
+            DKINODE_LOG=/tmp/disk_inode.log 
+            DISK_INODE=`df -i | akw '/^\/dev/{print int($5)}'`      #df -i表示打印inode节点值
+            for i in $DISK_INODE
+            do
+                if [ $i -ge 90 ];then
+                    DISK_INODE_NAME=`df -i | awk '{if(int($5)=='''$i'''){print $1}}'`
+                    echo &quot;$DISK_INODE_NAME inodes is ${i}%&quot; &gt;&gt; $DKINODE_LOG
+                fi
+            done
+            if [ -e $DKINODE_LOG ];then
+                echo &quot;------------------------------------&quot;
+                df -i | awk '/^\/dev/{print $1&quot;:&quot;$5}'   
+                echo
+                cat $DKINODE_LOG
+                echo &quot;------------------------------------&quot;
+            else
+                echo &quot;------------------------------------&quot;
+                df -i | awk '/^\/dev/{print $1&quot;:&quot;$5}'   
+                echo
+                echo -e &quot;${BLUE_COLOR}Disk inodes no more than 90%...${BLACK_COLOR}&quot;
+                echo &quot;------------------------------------&quot;
+            fi
+            break
+            ;;
+        mem_use)
+            MEM_TOTAL=`free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$2/1024;print &quot;G&quot;}}'`    #%.1f表示取小数点1位
+            MEM_USED=`free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$3/1024}} END{print &quot;G&quot;}'`
+            MEM_FREE=`free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$4/1024;print &quot;G&quot;}}'`
+            MEM_CACHE=`free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$6/1024;print &quot;G&quot;}}'`
+            echo &quot;------------------------------------&quot;
+            echo -e &quot;memory total is ${MEM_TOTAL}&quot;
+            echo -e &quot;memory used is ${MEM_USED}&quot;
+            echo -e &quot;memory free is ${MEM_FREE}&quot;
+            echo -e &quot;memory cache is ${MEM_CACHE}&quot;
+            MEM_FREE_INT=`free -m | awk '{if(NR==2){printf &quot;%d&quot;,$4/1024}}'`
+            if [ $MEM_FREE_INT -le 0 ];then
+                echo -en  &quot;${YELLOW_COLOR}mree memory is very low, if we need to clear the cache [y|n]: ${BLACK_COLOR}&quot; 
+                read action
+                case $action in 
+                y|Y)
+                    sync
+                    echo 3 &gt; /proc/sys/vm/drop_caches
+                    echo -e &quot;${PINK_COLOR}clear mem  ok...${BLACK_COLOR}&quot;
+                    ;;
+                n|N)
+                    ;;
+                esac
+            fi
+            echo &quot;------------------------------------&quot;
+            break
+            ;;
+        tcp_status)
+            #tcp连接状态
+            TCP_CONNECT=`netstat -ant | awk '/^tcp/{state[$NF]++} END{for (i in state){print i,state[i]}}'`
+            echo &quot;------------------------------------&quot;
+            echo -e &quot;${YELLOW_COLOR}tcp connection status: ${BLACK_COLOR} \n$TCP_CONNECT&quot;
+            echo &quot;------------------------------------&quot;
+            break
+            ;;
+        cpu_top10)
+            #查看占用cpu最高的前十个进程
+            echo &quot;------------------------------------&quot;
+            CPU_LOG=/tmp/cpu_top10.log
+            i=1
+            while [[ $i -le 3 ]]
+            do
+                ps aux | awk '{if($3&gt;0.1){{printf &quot;PID: &quot;$2 &quot; CPU: &quot; $3 &quot;%-----&gt;&quot;} for(i=11;i&lt;=NF;i++)if(i==NF)printf $i&quot;\n&quot;;else printf $i}}' | sort -k4 -nr | head -10  &gt;&gt; $CPU_LOG       #循环吃那个11列开始，如果i的值等于最后一列则换行，否则就一直打印直到最后一行
+                if [[ -n `cat $CPU_LOG` ]];then     #查看日志中是否有文件
+                    echo -e &quot;${GREEN_COLOR}参数值$i ${BLACK_COLOR}&quot;
+                    cat $CPU_LOG
+                    &gt; $CPU_LOG
+                else
+                    echo -e &quot;${RED_COLOR}No process using the CPU${BLACK_COLOR}&quot;        #没有进程使用CPU
+                    break
+                fi
+                let i++
+                sleep 1
+            done
+            rm -rf $CPU_LOG
+            echo &quot;------------------------------------&quot;
+            break
+            ;;
+        mem_top10)
+            #查看占用内存最高的前十个进程
+            echo &quot;------------------------------------&quot;
+            MEM_LOG=/tmp/mem_top10.log
+            i=1
+            while [[ $i -le 3 ]]
+            do
+                ps aux | awk '{if($4&gt;0.1){{printf &quot;PID: &quot;$2 &quot; MEM: &quot; $4 &quot;%-----&gt;&quot;} for(i=11;i&lt;=NF;i++)if(i==NF)printf $i&quot;\n&quot;;else printf $i}}' | sort  -k4 -nr | head -10 &gt; $MEM_LOG
+                if [[ -n `cat $MEM_LOG` ]];then
+                    echo -e &quot;${GREEN_COLOR}参数值$i ${BLACK_COLOR}&quot;
+                    cat $MEM_LOG
+                    &gt; $MEM_LOG
+                else
+                    echo -e &quot;${RED_COLOR}No process using the memory${BLACK_COLOR}&quot;
+                fi
+                let i++
+                sleep 1
+            done
+            rm -rf $MEM_LOG
+            echo &quot;------------------------------------&quot;
+            break
+            ;;
+        traffic)
+            #检测网络流量
+            while true ;do
+                echo -en &quot;${YELLOW_COLOR}请输入要检测的网卡名称：${BLACK_COLOR}&quot; 
+                read network_cord
+                NET_CORD_EX=`ifconfig | grep -c &quot;$network_cord&quot;`
+                #if [ `ifconfig | grep -c &quot;$network_cord&quot;` -eq 1 ];then
+                if [ $NET_CORD_EX -eq 1 ];then
+                    break
+                else
+                    echo -e &quot;${RED_COLOR}没有 '${network_cord}' 这块网卡，请重新输入${BLACK_COLOR}&quot;
+                fi
+            done
+            echo &quot;------------------------------------&quot;
+            echo -e &quot;${BLUE_COLOR}IN------OUT${BLACK_COLOR}&quot;
+            i=1
+            while [[ $i -le 3 ]]
+            do
+                #centos6/7中ifconfig显示的内容略有差异
+                #centos6中rx与tx行号位于8 rx是接收也就是in
+                #centos7中rx位于5，tx位于7    tx是发送也就是out
+                RX_IN=`ifconfig $network_cord | awk '/bytes/{if(NR==5){print $5} else if(NR==8){print $4}}'`
+                TX_OUT=`ifconfig $network_cord | awk '/bytes/{if(NR==7){print $5} else if(NR==8){print $9}}'`
+                sleep 1
+                RX_IN_NEW=`ifconfig $network_cord | awk '/bytes/{if(NR==5){print $5} else if(NR==8){print $4}}'`
+                TX_OUT_NEW=`ifconfig $network_cord | awk '/bytes/{if(NR==7){print $5} else if(NR==8){print $9}}'`
+
+                IN=`awk 'BEGIN{printf &quot;%.1f&quot;,'$(($RX_IN_NEW-$RX_IN))'/1024/128}'`
+                OUT=`awk 'BEGIN{printf &quot;%.1f&quot;,'$(($TX_OUT_NEW-$TX_OUT))'/1024/128}'`
+                echo -e &quot;${PINK_COLOR}RX IN is ${IN}MB/s,TX OUT is ${OUT}MB/s${BLACK_COLOR}&quot;
+                let i++
+                sleep 1
+            done
+            echo &quot;------------------------------------&quot;
+            break
+            ;;
+        clearscreen)
+            clear
+            break
+            ;;
+         quit)
+            exit 3
+            ;;
+        *)
+            echo &quot;enter number&quot;
+            ;;
+        esac
+
+    done
+done
+</code></pre>
+
+<h2 id="4-改造成函数">4.改造成函数</h2>
+
+<h3 id="4-1函数文件内容">4.1函数文件内容</h3>
+
+<pre><code>#!/bin/bash
+#系统性能分析工具
+#检测操作系统版本
+os_check() {
+    if [ -e /etc/redhat-release ];then
+        LINUX1=$(cat /etc/redhat-release | cut -d' ' -f1)
+    else
+        LINUX2=$(cat /etc/issue | awk '{print $1}')
+    fi
+
+    if [ &quot;$LINUX1&quot; == &quot;CentOS&quot; -o &quot;$LINUX1&quot; == &quot;RedHat&quot; ];then
+        P_M=yum
+    elif [ &quot;$LINUX2&quot; == &quot;Ubuntu&quot; -o &quot;$LINUX2&quot; == &quot;ubuntu&quot; ];then
+        P_M=apt-get
+    else
+        echo &quot;error system&quot;
+        exit 1
+    fi
+}
+
+cpu_load_fy() {
+    #CPU负载
+    echo &quot;------------------------------------&quot;
+    i=1
+    while [[ $i -le 3 ]]
+    do
+        echo -e &quot;${GREEN_COLOR}参数值$i ${BLACK_COLOR}&quot;
+        UTIL=`vmstat | awk '{if(NR==3){print 100-$15&quot;%&quot;}}'` #第15列是id对应的列，表示空闲的，用100减去空闲的就是已经使用的
+        USER=`vmstat | awk '{if(NR==3){print $13&quot;%&quot;}}'`     #第13列是us对应的列，这里表示已使用的CPU中用户占用了多少
+        SYS=`vmstat |awk '{if(NR==3){print $14&quot;%&quot;}}'`           #第14列是sy对应的列，这里表示已使用的CPU中系统占了多少
+        IOWAIT=`vmstat | awk '{if(NR==3){print $(NF -1)&quot;%&quot;}}'`  #倒数第二列也就是16列，这里表示IOwait在cpu中占用了多少
+        echo &quot;cpu used: $UTIL&quot;
+        echo &quot;user used: $USER&quot;
+        echo &quot;system used: $SYS&quot;
+        echo &quot;io wait used: $IOWAIT&quot;
+        let i++
+        sleep 1
+    done  
+    echo &quot;------------------------------------&quot;
+break
+}
+
+disk_load_fy() {
+    #磁盘I/O负载
+    echo &quot;------------------------------------&quot;
+    i=1
+    while [[ $i -le 3 ]]
+    do
+        echo -e &quot;${GREEN_COLOR}参数值$i ${BLACK_COLOR}&quot;
+        UTIL=`iostat -d -x | awk '/^[s|v]/{OFS=&quot;: &quot;;print $1,$NF&quot;%&quot;}'`  #util是IO消耗的CPU占比，-d，-x参数分别表示只列出磁盘和详细信息
+        READ=`iostat -d -x | awk '/^[s|v]/{OFS=&quot;: &quot;;print $1,$6&quot;KB&quot;}'`  #打印出每秒向磁盘读多少字节数
+        WRITE=`iostat -d -x | awk '/^[s|v]/{OFS=&quot;:&quot;;print $1,$7&quot;KB&quot;}'`  #打印出每秒向磁盘写多少字节数
+        IOWAIT=`vmstat | awk '{if(NR==3){print $(NF-1)&quot;%&quot;}}'`
+        echo -e &quot;UTIL:&quot;     
+        echo -e &quot;${UTIL}&quot;
+        echo -e &quot;io wait used: $IOWAIT&quot;
+        echo -e &quot;Read/s: \n$READ&quot;
+        echo -e &quot;Write/s: \n$WRITE&quot; 
+        i=$(($i+1))
+        sleep 1
+    done
+    echo &quot;------------------------------------&quot;
+    break
+}
+
+disk_use_fy() {
+    #磁盘使用率
+    DISK_LOG=/tmp/disk_user.log     #磁盘使用日志存放路径
+    DISK_TOTAL=`fdisk -l | awk '/^Disk.*bytes/{print $2,int($3)&quot;GB&quot;}'`  #打印出磁盘对应的大小
+    DISK_USED=`df -h | awk '/^\/dev/{print int($(NF-1))}'`      #打印出磁盘的使用率
+    for i in $DISK_USED         #遍历一下，因为不止一块磁盘
+    do
+        if [ $i -ge 90 ];then
+            DISK_NAME=`df -h | awk '{if(int($5)=='''$i'''){print $6}}'`     #如果第五列磁盘使用率等于循环中i的值那么就打印第六列
+            echo &quot;${DISK_NAME} used is ${i}%...&quot; &gt;&gt; $DISK_LOG       #将磁盘的名字和使用率对应起来追加到日志中
+        fi
+    done
+    echo -e &quot;disk total: \n${DISK_TOTAL}&quot;
+    if [ -e $DISK_LOG ];then
+        echo &quot;------------------------------------&quot;
+        df -h | awk '/^\/dev/{print $1&quot;:&quot;,$5}'          #如果使用了df -hT则先是$7,$6
+        echo
+        cat $DISK_LOG
+        echo &quot;------------------------------------&quot;
+        rm -rf $DISK_LOG
+    else
+        echo &quot;------------------------------------&quot;
+        df -h | awk '/^\/dev/{print $1&quot;:&quot;,$5}'          #如果使用了df -hT则先是$7,$6
+        echo
+        echo -e &quot;${BLUE_COLOR}Disk used no more than 90%...${BLACK_COLOR}&quot;      #当前磁盘使用率没有超过90%的
+        echo &quot;------------------------------------&quot;
+    fi
+    break
+}
+
+disk_inode_fy() {
+    #磁盘inodes
+    DKINODE_LOG=/tmp/disk_inode.log 
+    DISK_INODE=`df -i | akw '/^\/dev/{print int($5)}'`      #df -i表示打印inode节点值
+    for i in $DISK_INODE
+    do
+        if [ $i -ge 90 ];then
+            DISK_INODE_NAME=`df -i | awk '{if(int($5)=='''$i'''){print $1}}'`
+            echo &quot;$DISK_INODE_NAME inodes is ${i}%&quot; &gt;&gt; $DKINODE_LOG
+        fi
+    done
+    if [ -e $DKINODE_LOG ];then
+        echo &quot;------------------------------------&quot;
+        df -i | awk '/^\/dev/{print $1&quot;:&quot;$5}'   
+        echo
+        cat $DKINODE_LOG
+        echo &quot;------------------------------------&quot;
+    else
+        echo &quot;------------------------------------&quot;
+        df -i | awk '/^\/dev/{print $1&quot;:&quot;$5}'   
+        echo
+        echo -e &quot;${BLUE_COLOR}Disk inodes no more than 90%...${BLACK_COLOR}&quot;
+        echo &quot;------------------------------------&quot;
+    fi
+    break
+}
+
+mem_use_fy() {
+    MEM_TOTAL=`free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$2/1024;print &quot;G&quot;}}'`    #%.1f表示取小数点1位
+    MEM_USED=`free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$3/1024}} END{print &quot;G&quot;}'`
+    MEM_FREE=`free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$4/1024;print &quot;G&quot;}}'`
+    MEM_CACHE=`free -m | awk '{if(NR==2){printf &quot;%.1f&quot;,$6/1024;print &quot;G&quot;}}'`
+    echo &quot;------------------------------------&quot;
+    echo -e &quot;memory total is ${MEM_TOTAL}&quot;
+    echo -e &quot;memory used is ${MEM_USED}&quot;
+    echo -e &quot;memory free is ${MEM_FREE}&quot;
+    echo -e &quot;memory cache is ${MEM_CACHE}&quot;
+    MEM_FREE_INT=`free -m | awk '{if(NR==2){printf &quot;%d&quot;,$4/1024}}'`
+    if [ $MEM_FREE_INT -le 0 ];then
+        echo -en  &quot;${YELLOW_COLOR}mree memory is very low, if we need to clear the cache [y|n]: ${BLACK_COLOR}&quot; 
+        read action
+        case $action in 
+        y|Y)
+            sync
+            echo 3 &gt; /proc/sys/vm/drop_caches
+            echo -e &quot;${PINK_COLOR}clear mem  ok...${BLACK_COLOR}&quot;
+            ;;
+        n|N)
+            ;;
+        esac
+    fi
+    echo &quot;------------------------------------&quot;
+    break
+}   
+
+tcp_status_fy() {
+    #tcp连接状态
+    TCP_CONNECT=`netstat -ant | awk '/^tcp/{state[$NF]++} END{for (i in state){print i,state[i]}}'`
+    echo &quot;------------------------------------&quot;
+    echo -e &quot;${YELLOW_COLOR}tcp connection status: ${BLACK_COLOR} \n$TCP_CONNECT&quot;
+    echo &quot;------------------------------------&quot;
+    break
+}
+cpu_top10_fy() {
+    #查看占用cpu最高的前十个进程
+    echo &quot;------------------------------------&quot;
+    CPU_LOG=/tmp/cpu_top10.log
+    i=1
+    while [[ $i -le 3 ]]
+    do
+        ps aux | awk '{if($3&gt;0.1){{printf &quot;PID: &quot;$2 &quot; CPU: &quot; $3 &quot;%-----&gt;&quot;} for(i=11;i&lt;=NF;i++)if(i==NF)printf $i&quot;\n&quot;;else printf $i}}' | sort -k4 -nr | head -10  &gt;&gt; $CPU_LOG       #循环吃那个11列开始，如果i的值等于最后一列则换行，否则就一直打印直到最后一行
+        if [[ -n `cat $CPU_LOG` ]];then     #查看日志中是否有文件
+            echo -e &quot;${GREEN_COLOR}参数值$i ${BLACK_COLOR}&quot;
+            cat $CPU_LOG
+            &gt; $CPU_LOG
+        else
+            echo -e &quot;${RED_COLOR}No process using the CPU${BLACK_COLOR}&quot;        #没有进程使用CPU
+            break
+        fi
+        let i++
+        sleep 1
+    done
+    rm -rf $CPU_LOG
+    echo &quot;------------------------------------&quot;
+    break
+}
+
+mem_top10_fy() {
+    #查看占用内存最高的前十个进程
+    echo &quot;------------------------------------&quot;
+    MEM_LOG=/tmp/mem_top10.log
+    i=1
+    while [[ $i -le 3 ]]
+    do
+        ps aux | awk '{if($4&gt;0.1){{printf &quot;PID: &quot;$2 &quot; MEM: &quot; $4 &quot;%-----&gt;&quot;} for(i=11;i&lt;=NF;i++)if(i==NF)printf $i&quot;\n&quot;;else printf $i}}' | sort  -k4 -nr | head -10 &gt; $MEM_LOG
+        if [[ -n `cat $MEM_LOG` ]];then
+            echo -e &quot;${GREEN_COLOR}参数值$i ${BLACK_COLOR}&quot;
+            cat $MEM_LOG
+            &gt; $MEM_LOG
+        else
+            echo -e &quot;${RED_COLOR}No process using the memory${BLACK_COLOR}&quot;
+        fi
+        let i++
+        sleep 1
+    done
+    rm -rf $MEM_LOG
+    echo &quot;------------------------------------&quot;
+    break
+}
+
+traffic_fy() {
+    #检测网络流量
+    while true ;do
+        echo -en &quot;${YELLOW_COLOR}请输入要检测的网卡名称：${BLACK_COLOR}&quot; 
+        read network_cord
+        NET_CORD_EX=`ifconfig | grep -c &quot;$network_cord&quot;`
+        #if [ `ifconfig | grep -c &quot;$network_cord&quot;` -eq 1 ];then
+        if [ $NET_CORD_EX -eq 1 ];then
+            break
+        else
+            echo -e &quot;${RED_COLOR}没有 '${network_cord}' 这块网卡，请重新输入${BLACK_COLOR}&quot;
+        fi
+    done
+    echo &quot;------------------------------------&quot;
+    echo -e &quot;${BLUE_COLOR}IN------OUT${BLACK_COLOR}&quot;
+    i=1
+    while [[ $i -le 3 ]]
+    do
+        #centos6/7中ifconfig显示的内容略有差异
+        #centos6中rx与tx行号位于8 rx是接收也就是in
+        #centos7中rx位于5，tx位于7    tx是发送也就是out
+        RX_IN=`ifconfig $network_cord | awk '/bytes/{if(NR==5){print $5} else if(NR==8){print $4}}'`
+        TX_OUT=`ifconfig $network_cord | awk '/bytes/{if(NR==7){print $5} else if(NR==8){print $9}}'`
+        sleep 1
+        RX_IN_NEW=`ifconfig $network_cord | awk '/bytes/{if(NR==5){print $5} else if(NR==8){print $4}}'`
+        TX_OUT_NEW=`ifconfig $network_cord | awk '/bytes/{if(NR==7){print $5} else if(NR==8){print $9}}'`
+
+        IN=`awk 'BEGIN{printf &quot;%.1f&quot;,'$(($RX_IN_NEW-$RX_IN))'/1024/128}'`
+        OUT=`awk 'BEGIN{printf &quot;%.1f&quot;,'$(($TX_OUT_NEW-$TX_OUT))'/1024/128}'`
+        echo -e &quot;${PINK_COLOR}RX IN is ${IN}MB/s,TX OUT is ${OUT}MB/s${BLACK_COLOR}&quot;
+        let i++
+        sleep 1
+    done
+    echo &quot;------------------------------------&quot;
+    break
+}
+</code></pre>
+
+<h3 id="4-2脚本内容">4.2脚本内容</h3>
+
+<pre><code>#!/bin/bash
+#系统性能分析工具---函数实现
+#检测操作系统版本
+source /my_scripts/d12_xtxnfx/fun_system.fy
+YELLOW_COLOR='\e[033m'  #黄
+RED_COLOR='\e[031m'     #红
+GREEN_COLOR='\e[032m'   #绿     
+BLUE_COLOR='\e[034m'    #蓝
+BLACK_COLOR='\e[0m'     #黑
+PINK_COLOR='\e[035m'    #粉
+
+#检测是否是root登录的系统
+if [ $LOGNAME != root ];then
+        echo -e &quot;${RED_COLOR}请使用root用户操作${BLACK_COLOR}&quot;
+        exit 2
+fi
+
+#检测是否安装vmstat
+if ! which vmstat &amp;&gt;/dev/null;then
+        echo -e &quot;${RED_COLOR}vmstat 命令没有安装，现在开始安装...${BLACK_COLOR}&quot;
+        os_check
+        $P_M -y install vmstat
+        if [ $? -eq 0 ];then
+                echo &quot;-------------------------------------------------------------&quot;
+        fi
+fi
+
+#检测是否安装iostat
+which iostat &amp;&gt;/dev/null
+if [ $? -ne 0 ];then
+        echo -e &quot;${RED_COLOR}iostat 命令没有安装，现在开始安装...${BLACK_COLOR}&quot;        
+        os_check
+        $P_M -y install iostat
+        if [ $? -eq 0 ];then
+                echo &quot;-------------------------------------------------------------&quot;
+        fi
+fi
+
+#使用select构造菜单并添加每个菜单需要执行的命令
+while :
+do
+        select menu in cpu_load disk_load disk_use disk_inode mem_use tcp_status cpu_top10 mem_top10 traffic clearscreen quit
+        do
+                case $menu in
+                cpu_load)
+                        cpu_load_fy
+                        ;;
+                disk_load)
+                        disk_load_fy
+                        ;;
+                disk_use)
+                        disk_use_fy
+                        ;;
+                disk_inode)
+                        disk_inode_fy
+                        ;;
+                mem_use)
+                        mem_use_fy
+                        ;;
+                tcp_status)
+                        tcp_status_fy
+                        ;;
+                cpu_top10)
+                        cpu_top10_fy
+                        ;;
+                mem_top10)
+                        mem_top10_fy
+                        ;;
+                traffic)
+                        traffic_fy
+                        ;;
+                clearscreen)
+                        clear
+                        break
+                        ;;
+                 quit)
+                        exit 3
+                        ;;
+                *)
+                        echo &quot;enter number&quot;
+                        ;;
+                esac
+
+        done
+done
+</code></pre>
+
+<h2 id="6-执行脚本显示所有内容">6.执行脚本显示所有内容</h2>
+
+<p>函数和5的是同一个文件</p>
+
+<pre><code>#!/bin/bash
+#系统性能分析工具
+#执行显示所有内容
+#检测操作系统版本
+source /my_scripts/d12_xtxnfx/fun_system.fy
+YELLOW_COLOR='\e[033m'  #黄
+RED_COLOR='\e[031m'     #红
+GREEN_COLOR='\e[032m'   #绿     
+BLUE_COLOR='\e[034m'    #蓝
+BLACK_COLOR='\e[0m'     #黑
+PINK_COLOR='\e[035m'    #粉
+
+#检测是否是root登录的系统
+if [ $LOGNAME != root ];then
+        echo -e &quot;${RED_COLOR}请使用root用户操作${BLACK_COLOR}&quot;
+        exit 2
+fi
+
+#检测是否安装vmstat
+if ! which vmstat &amp;&gt;/dev/null;then
+        echo -e &quot;${RED_COLOR}vmstat 命令没有安装，现在开始安装...${BLACK_COLOR}&quot;
+        os_check
+        $P_M -y install vmstat
+        if [ $? -eq 0 ];then
+                echo &quot;-------------------------------------------------------------&quot;
+        fi
+fi
+
+#检测是否安装iostat
+which iostat &amp;&gt;/dev/null
+if [ $? -ne 0 ];then
+        echo -e &quot;${RED_COLOR}iostat 命令没有安装，现在开始安装...${BLACK_COLOR}&quot;        
+        os_check
+        $P_M -y install iostat
+        if [ $? -eq 0 ];then
+                echo &quot;-------------------------------------------------------------&quot;
+        fi
+fi
+
+#使用select构造菜单并添加每个菜单需要执行的命令
+echo -e &quot;${YELLOW_COLOR}cpu_load${BLACK_COLOR}&quot;
+cpu_load_fy
+echo
+echo
+echo -e &quot;${YELLOW_COLOR}disk_load${BLACK_COLOR}&quot;
+disk_load_fy
+echo
+echo
+echo -e &quot;${YELLOW_COLOR}disk_use${BLACK_COLOR}&quot;
+disk_use_fy
+echo
+echo
+echo -e &quot;${YELLOW_COLOR}disk_inode${BLACK_COLOR}&quot;
+disk_inode_fy
+echo
+echo
+echo -e &quot;${YELLOW_COLOR}mem_use${BLACK_COLOR}&quot;
+mem_use_fy
+echo
+echo
+echo -e &quot;${YELLOW_COLOR}tcp_status${BLACK_COLOR}&quot;
+tcp_status_fy
+echo
+echo
+echo -e &quot;${YELLOW_COLOR}cpu_top10${BLACK_COLOR}&quot;
+cpu_top10_fy
+echo
+echo
+echo -e &quot;${YELLOW_COLOR}mem_top10${BLACK_COLOR}&quot;
+mem_top10_fy
+echo -e &quot;${YELLOW_COLOR}traffic${BLACK_COLOR}&quot;
+traffic_fy
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

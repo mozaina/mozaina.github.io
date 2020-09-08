@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>监控Oracle数据库的常用shell脚本重要总结 | 开发者问答集锦</title>
+    <meta property="og:title" content="监控Oracle数据库的常用shell脚本重要总结 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="监控Oracle数据库的常用shell脚本重要总结">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%9B%91%E6%8E%A7oracle%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E5%B8%B8%E7%94%A8shell%E8%84%9A%E6%9C%AC%E9%87%8D%E8%A6%81%E6%80%BB%E7%BB%93/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">监控Oracle数据库的常用shell脚本重要总结</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>监控Oracle数据库的常用shell脚本</p>
+
+<p>原文地址：监控Oracle数据库的常用shell脚本 作者：aaron8219</p>
+
+<p>一．脚本来监控Oracle数据库：<br />
+1.检查实例的可用性<br />
+2.检查监听器的可用性<br />
+3.检查alert日志文件中的错误信息<br />
+4.在存放log文件的地方满以前清空旧的log文件<br />
+5.分析table和index以获得更好的性能<br />
+6.检查表空间的使用情况<br />
+7.找出无效的对象<br />
+8.监控用户和事务</p>
+
+<p>二．DBA需要的Unix基本知识<br />
+基本的UNIX命令，以下是一些常用的Unix命令：<br />
+ps&ndash;显示进程<br />
+grep&ndash;搜索文件中的某种文本模式<br />
+mailx&ndash;读取或者发送mail<br />
+cat&ndash;连接文件或者显示它们<br />
+cut&ndash;选择显示的列<br />
+awk&ndash;模式匹配语言<br />
+df&ndash;显示剩余的磁盘空间</p>
+
+<p>以下是DBA如何使用这些命令的一些例子：</p>
+
+<p>1. 显示服务器上的可用实例：<br />
+$ ps –ef | grep smon<br />
+oracle 22086 1 0 02:32:24 ? 0:04 ora_smon_PPRD10<br />
+oracle 5215 28972 0 08:10:19 pts/4 0:00 grep smon</p>
+
+<p>2. 显示服务器上的可用监听器：<br />
+$ ps -ef | grep listener grep -v grep<br />
+（grep命令应该加上-i参数，即grep -i listener，该参数的作用是忽略大小写，因为有些时候listener是大写的，这时就会看不到结果）<br />
+$ ps –ef |grep -i listener<br />
+oracle 9655 1 0 Mar 12 ? 0:01 /data/app/oracle/9.2.0/bin/tnslsnr LISTENER
+-inherit<br />
+oracle 22610 1 0 02:45:02 ? 0:02 /data/app/oracle/10.2.0/bin/tnslsnr LISTENER
+-inherit<br />
+oracle 5268 28972 0 08:13:02 pts/4 0:00 grep -i listener</p>
+
+<p>3. 查看Oracle存档目录的文件系统使用情况<br />
+$ df -k | grep /data<br />
+/dev/md/dsk/d50 104977675 88610542 15317357 86% /data</p>
+
+<p>4. 统计alter.log文件中的行数：<br />
+$ cat alert_PPRD10.log | wc -l<br />
+13124<br />
+$ more alert_PPRD10.log | wc -l<br />
+13124</p>
+
+<p>5. 列出alert.log文件中的全部Oracle错误信息：<br />
+$ grep ORA-* alert.log<br />
+ORA-00600: internal error code, arguments: [kcrrrfswda.1], [], [], [], [], []<br />
+ORA-00600: internal error code, arguments: [1881], [25860496], [25857716], []</p>
+
+<p>6. CRONTAB基本<br />
+一个crontab文件中包含有六个字段：<br />
+分钟 0-59<br />
+小时 0-23<br />
+月中的第几天 1-31<br />
+月份 1 - 12<br />
+星期几 0 - 6, with 0 = Sunday</p>
+
+<p>7. Unix命令或者Shell脚本<br />
+要编辑一个crontab文件，输入： Crontab -e<br />
+要查看一个crontab文件，输入： Crontab -l<br />
+0 4 * * 5 /dba/admin/analyze_table.ksh<br />
+30 3 * * 3,6 /dba/admin/hotbackup.ksh /dev/null 2&gt;&amp;1<br />
+在上面的例子中，第一行显示了一个分析表的脚本在每个星期5的4：00am运行。第二行显示了一个执行热备份的脚本在每个周三和周六的3：00a.m.运行。</p>
+
+<p>三．监控数据库的常用Shell脚本<br />
+以下提供的8个shell脚本覆盖了DBA每日监控工作的90%，你可能还需要修改UNIX的环境变量。</p>
+
+<p>1. 检查Oracle实例的可用性<br />
+oratab文件中列出了服务器上的所有数据库<br />
+$ cat /var/opt/oracle/oratab</p>
+
+<h1 id="this-file-is-used-by-oracle-utilities-it-is-created-by-root-sh">This file is used by ORACLE utilities. It is created by root.sh</h1>
+
+<h1 id="and-updated-by-the-database-configuration-assistant-when-creating">and updated by the Database Configuration Assistant when creating</h1>
+
+<h1 id="a-database">a database.</h1>
+
+<h1 id="a-colon-is-used-as-the-field-terminator-a-new-line-terminates">A colon, &lsquo;:&lsquo;, is used as the field terminator. A new line terminates</h1>
+
+<h1 id="the-entry-lines-beginning-with-a-pound-sign-are-comments">the entry. Lines beginning with a pound sign, &lsquo;#&rsquo;, are comments.</h1>
+
+<h1 id="entries-are-of-the-form">Entries are of the form:</h1>
+
+<h1 id="oracle-sid-oracle-home">$ORACLE_SID:$ORACLE_HOME::</h1>
+
+<h1 id="the-first-and-second-fields-are-the-system-identifier-and-home">The first and second fields are the system identifier and home</h1>
+
+<h1 id="directory-of-the-database-respectively-the-third-filed-indicates">directory of the database respectively. The third filed indicates</h1>
+
+<h1 id="to-the-dbstart-utility-that-the-database-should-y-or-should-not">to the dbstart utility that the database should , &ldquo;Y&rdquo;, or should not,</h1>
+
+<h1 id="n-be-brought-up-at-system-boot-time">&ldquo;N&rdquo;, be brought up at system boot time.</h1>
+
+<h1 id="multiple-entries-with-the-same-oracle-sid-are-not-allowed">Multiple entries with the same $ORACLE_SID are not allowed.</h1>
+
+<h1 id="data-app-oracle-9-2-0-n">*:/data/app/oracle/9.2.0:N</h1>
+
+<p>TRNG:/data/app/oracle/9.2.0:Y<br />
+*:/data/app/oracle/9.2.0:N<br />
+PPRD:/data/app/oracle/10.2.0:Y<br />
+PPRD10:/data/app/oracle/10.2.0:N</p>
+
+<p>以下的脚本检查oratab文件中列出的所有数据库，并且找出该数据库的状态（启动还是关闭）<br />
+###################################################################</p>
+
+<h2 id="ckinstance-ksh">ckinstance.ksh ##</h2>
+
+<p>###################################################################<br />
+ORATAB=/var/opt/oracle/oratab<br />
+echo &ldquo;<code>date</code> &ldquo;<br />
+echo &ldquo;Oracle Database(s) Status <code>hostname</code> :/n&rdquo;<br />
+db=<code>egrep -i &quot;:Y|:N&quot; $ORATAB | cut -d&quot;:&quot; -f1 | grep -v &quot;/#&quot; | grep -v &quot;/*&quot;</code><br />
+pslist=&rdquo;<code>ps -ef | grep pmon</code>&rdquo;<br />
+for i in $db ; do<br />
+echo &ldquo;$pslist&rdquo; | grep &ldquo;ora<em>pmon</em>$i&rdquo; &gt; /dev/null 2&gt;$1<br />
+if (( $? )); then<br />
+echo &ldquo;Oracle Instance - $i: Down&rdquo;<br />
+else<br />
+echo &ldquo;Oracle Instance - $i: Up&rdquo;<br />
+fi<br />
+done</p>
+
+<p>使用以下的命令来确认该脚本是可以执行的：<br />
+$ chmod 744 ckinstance.ksh<br />
+$ ls -l ckinstance.ksh<br />
+-rwxr&ndash;r&ndash; 1 oracle dba 657 Mar 5 22:59 ckinstance.ksh</p>
+
+<p>以下是实例可用性的报表：<br />
+$ sh ckinstance.ksh<br />
+Wed May 13 12:51:20 PDT 2009<br />
+Oracle Database(s) Status gambels :<br />
+Oracle Instance - PPRD: Up<br />
+Oracle Instance - PPRD10: Up</p>
+
+<p>2. 检查Oracle监听器的可用性<br />
+以下有一个类似的脚本检查Oracle监听器。假如监听器停了，该脚本将会重新启动监听器：<br />
+#####################################################################</p>
+
+<h2 id="cklsnr-sh">cklsnr.sh ##</h2>
+
+<p>#####################################################################<br />
+#!/bin/ksh<br />
+TNS_ADMIN=/var/opt/oracle; export TNS_ADMIN<br />
+ORACLE_SID= PPRD10; export ORACLE_SID<br />
+ORAENV_ASK=NO; export ORAENV_ASK<br />
+PATH=$PATH:/bin:/usr/local/bin; export PATH<br />
+. oraenv<br />
+DBALIST=&ldquo;tianlesoftware@vip.qq.com,tianlesoftware@hotmail.com&rdquo;;export DBALIST<br />
+cd /var/opt/oracle<br />
+rm -f lsnr.exist<br />
+ps -ef | grep PPRD10 | grep -v grep &gt; lsnr.exist<br />
+if [ -s lsnr.exist ]<br />
+then<br />
+echo<br />
+else<br />
+echo &ldquo;Alert&rdquo; | mailx -s &ldquo;Listener &lsquo;PPRD10&rsquo; on <code>hostname</code> is down&rdquo; $DBALIST<br />
+lsnrctl start PPRD10<br />
+fi</p>
+
+<p>3. 检查Alert日志（ORA-XXXXX）<br />
+####################################################################</p>
+
+<h2 id="ckalertlog-sh">ckalertlog.sh ##</h2>
+
+<p>####################################################################<br />
+#!/bin/ksh</p>
+
+<p>EDITOR=vi; export EDITOR<br />
+ORACLE_SID=PPRD10; export ORACLE_SID<br />
+ORACLE_BASE=/data/app/oracle; export ORACLE_BASE<br />
+ORACLE_HOME=$ORACLE_BASE/10.2.0; export ORACLE_HOME<br />
+LD_LIBRARY_PATH=$ORACLE_HOME/lib; export LD_LIBRARY_PATH<br />
+TNS_ADMIN=/var/opt/oracle;export TNS_ADMIN<br />
+NLS_LANG=american; export NLS_LANG<br />
+NLS_DATE_FORMAT=&lsquo;Mon DD YYYY HH24:MI:SS&rsquo;; export NLS_DATE_FORMAT<br />
+ORATAB=/var/opt/oracle/oratab;export ORATAB<br />
+PATH=$PATH:$ORACLE_HOME:$ORACLE_HOME/bin:/usr/ccs/bin:/bin:/usr/bin:/usr/sbin:/sbin:/usr/openwin/bin:/opt/bin:.;
+export PATH<br />
+DBALIST=&ldquo;tianlesoftware@vip.qq.com,tianlesoftware@hotmail.com&rdquo;;export DBALIST</p>
+
+<p>cd $ORACLE_BASE/admin/PPRD10/bdump<br />
+if [ -f alert_PPRD10.log ]<br />
+then<br />
+mv alert_PPRD10.log alert_work.log<br />
+touch alert_PPRD10.log<br />
+cat alert_work.log &gt;&gt; alert_PPRD10.hist<br />
+grep ORA- alert_work.log &gt; alert.err<br />
+fi<br />
+if [ <code>cat alert.err | wc -l</code> -gt 0 ]<br />
+then<br />
+mailx -s &ldquo; PPRD10 ORACLE ALERT ERRORS&rdquo; $DBALIST<br />
+fi<br />
+rm -f alert.err<br />
+rm -f alert_work.log</p>
+
+<p>4. 清除旧的归档文件<br />
+以下的脚本将会在log文件达到90%容量的时候清空旧的归档文件：<br />
+$ df -k | grep arch<br />
+Filesystem kbytes used avail capacity Mounted on<br />
+/dev/vx/dsk/proddg/archive 71123968 30210248 40594232 43% /u08/archive</p>
+
+<p>#######################################################################</p>
+
+<h2 id="clean-arch-ksh">clean_arch.ksh ##</h2>
+
+<p>#######################################################################<br />
+#!/bin/ksh<br />
+df -k | grep arch &gt; dfk.result<br />
+archive_filesystem=<code>awk -F&quot; &quot; '{ print $6 }' dfk.result</code><br />
+archive_capacity=<code>awk -F&quot; &quot; '{ print $5 }' dfk.result</code></p>
+
+<p>if [ $archive_capacity &gt; 90% ]<br />
+then<br />
+echo &ldquo;Filesystem ${archive_filesystem} is ${archive_capacity} filled&rdquo;</p>
+
+<h1 id="try-one-of-the-following-option-depend-on-your-need">try one of the following option depend on your need</h1>
+
+<p>find $archive_filesystem -type f -mtime +2 -exec rm -r {} ;<br />
+tar<br />
+rman<br />
+fi</p>
+
+<p>5. 分析表和索引（以得到更好的性能）<br />
+以下我将展示假如传送参数到一个脚本中：<br />
+####################################################################</p>
+
+<h2 id="analyze-table-sh">analyze_table.sh ##</h2>
+
+<p>####################################################################<br />
+#!/bin/ksh</p>
+
+<h1 id="input-parameter-1-password-2-sid">input parameter: 1: passWord # 2: SID</h1>
+
+<p>if (($#&lt;1)) then echo &ldquo;Please enter &lsquo;oracle&rsquo; user password as the first
+parameter !&rdquo; exit 0<br />
+fi<br />
+if (($#&lt;2)) then echo &ldquo;Please enter instance name as the second parameter!&rdquo;
+exit 0<br />
+fi<br />
+要传入参数以执行该脚本，输入：<br />
+$ analyze_table.sh manager oradb1<br />
+脚本的第一部分产生了一个analyze.sql文件，里面包含了分析表用的语句。脚本的第二部分分析全部的表：<br />
+#################################################################</p>
+
+<h2 id="analyze-table-sh-1">analyze_table.sh ##</h2>
+
+<p>#################################################################<br />
+sqlplus -s &lsquo;/ as sysdba&rsquo; &lt;<br />
+set heading off<br />
+set feed off<br />
+set pagesize 200<br />
+set linesize 100<br />
+spool analyze_table.sql<br />
+select &lsquo;ANALYZE TABLE &rsquo; || owner || &lsquo;.&rsquo; || segment_name ||<br />
+&rsquo; ESTIMATE STATISTICS SAMPLE 10 PERCENT;&rsquo;<br />
+from dba_segments<br />
+where segment_type = &lsquo;TABLE&rsquo;<br />
+and owner not in (&lsquo;SYS&rsquo;, &lsquo;SYSTEM&rsquo;);<br />
+spool off<br />
+exit<br />
+EOF<br />
+sqlplus -s &lsquo;/ as sysdba&rsquo; &lt;<br />
+@./analyze_table.sql<br />
+exit<br />
+EOF</p>
+
+<p>以下是analyze.sql的一个例子：<br />
+$ cat analyze.sql<br />
+ANALYZE TABLE HIRWIN.JANUSAGE_SUMMARY ESTIMATE STATISTICS SAMPLE 10 PERCENT;<br />
+ANALYZE TABLE HIRWIN.JANUSER_PROFILE ESTIMATE STATISTICS SAMPLE 10 PERCENT;<br />
+ANALYZE TABLE APPSSYS.HIST_SYSTEM_ACTIVITY ESTIMATE STATISTICS SAMPLE 10
+PERCENT;<br />
+ANALYZE TABLE HTOMEH.QUEST_IM_VERSION ESTIMATE STATISTICS SAMPLE 10 PERCENT;<br />
+ANALYZE TABLE JSTENZEL.HIST_SYS_ACT_0615 ESTIMATE STATISTICS SAMPLE 10
+PERCENT;</p>
+
+<p>6. 检查表空间的使用<br />
+以下的脚本检测表空间的使用。假如表空间只剩下10%，它将会发送一个警告email。<br />
+#####################################################################</p>
+
+<h2 id="ck-tbsp-sh">ck_tbsp.sh ##</h2>
+
+<p>#####################################################################<br />
+#!/bin/ksh</p>
+
+<p>EDITOR=vi; export EDITOR<br />
+ORACLE_SID=PPRD10; export ORACLE_SID<br />
+ORACLE_BASE=/data/app/oracle; export ORACLE_BASE<br />
+ORACLE_HOME=$ORACLE_BASE/10.2.0; export ORACLE_HOME<br />
+LD_LIBRARY_PATH=$ORACLE_HOME/lib; export LD_LIBRARY_PATH<br />
+TNS_ADMIN=/var/opt/oracle;export TNS_ADMIN<br />
+NLS_LANG=american; export NLS_LANG<br />
+NLS_DATE_FORMAT=&lsquo;Mon DD YYYY HH24:MI:SS&rsquo;; export NLS_DATE_FORMAT<br />
+ORATAB=/var/opt/oracle/oratab;export ORATAB<br />
+PATH=$PATH:$ORACLE_HOME:$ORACLE_HOME/bin:/usr/ccs/bin:/bin:/usr/bin:/usr/sbin:/sbin:/usr/openwin/bin:/opt/bin:.;
+export PATH<br />
+DBALIST=&ldquo;tianlesoftware@vip.qq.com,tianlesoftware@hotmail.com&rdquo;;export DBALIST</p>
+
+<p>sqlplus -s &lsquo;/ as sysdba&rsquo; &lt;<br />
+set feed off<br />
+set linesize 100<br />
+set pagesize 200<br />
+column &ldquo;USED (MB)&rdquo; format a10<br />
+column &ldquo;FREE (MB)&rdquo; format a10<br />
+column &ldquo;TOTAL (MB)&rdquo; format a10<br />
+column PER_FREE format a10<br />
+spool tablespace.alert<br />
+SELECT F.TABLESPACE_NAME,<br />
+TO_CHAR ((T.TOTAL_SPACE - F.FREE_SPACE),&lsquo;999,999&rsquo;) &ldquo;USED (MB)&rdquo;,<br />
+TO_CHAR (F.FREE_SPACE, &lsquo;999,999&rsquo;) &ldquo;FREE (MB)&rdquo;,<br />
+TO_CHAR (T.TOTAL_SPACE, &lsquo;999,999&rsquo;) &ldquo;TOTAL (MB)&rdquo;,<br />
+TO_CHAR ((ROUND ((F.FREE_SPACE/T.TOTAL_SPACE)<em>100)),&lsquo;999&rsquo;)||&rsquo; %&rsquo; PER_FREE<br />
+FROM (<br />
+SELECT TABLESPACE_NAME,<br />
+ROUND (SUM (BLOCKS</em>(SELECT VALUE/1024<br />
+FROM V/$PARAMETER<br />
+WHERE NAME = &lsquo;db_block_size&rsquo;)/1024)<br />
+) FREE_SPACE<br />
+FROM DBA_FREE_SPACE<br />
+GROUP BY TABLESPACE_NAME<br />
+) F,<br />
+(<br />
+SELECT TABLESPACE_NAME,<br />
+ROUND (SUM (BYTES/1048576)) TOTAL_SPACE<br />
+FROM DBA_DATA_FILES<br />
+GROUP BY TABLESPACE_NAME<br />
+) T<br />
+WHERE F.TABLESPACE_NAME = T.TABLESPACE_NAME<br />
+AND (ROUND ((F.FREE_SPACE/T.TOTAL_SPACE)*100))<br />
+spool off<br />
+exit<br />
+EOF<br />
+if [ <code>cat tablespace.alert|wc -l</code> -gt 0 ]<br />
+then<br />
+cat tablespace.alert &gt; tablespace.tmp<br />
+mailx -s &ldquo;TABLESPACE ALERT for PPRD10&rdquo; $DBALIST<br />
+fi</p>
+
+<p>警告email输出的例子如下：<br />
+TABLESPACE_NAME USED (MB) FREE (MB) TOTAL (MB) PER_FREE<br />
+-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; &mdash;&mdash;&mdash;- &mdash;&mdash;&mdash;- &mdash;&mdash;&mdash;- &mdash;&mdash;&mdash;-<br />
+SYSTEM 519 401 920 44 %<br />
+MILLDATA 559 441 1,000 44 %<br />
+SYSAUX 331 609 940 65 %<br />
+MILLREPORTS 146 254 400 64 %</p>
+
+<p>7. 查找出无效的数据库对象<br />
+以下查找出无效的数据库对象：<br />
+#####################################################################<br />
+##invalid_object_alert.sh<br />
+#####################################################################<br />
+#!/bin/ksh<br />
+EDITOR=vi; export EDITOR<br />
+ORACLE_SID=PPRD10; export ORACLE_SID<br />
+ORACLE_BASE=/data/app/oracle; export ORACLE_BASE<br />
+ORACLE_HOME=$ORACLE_BASE/10.2.0; export ORACLE_HOME<br />
+LD_LIBRARY_PATH=$ORACLE_HOME/lib; export LD_LIBRARY_PATH<br />
+TNS_ADMIN=/var/opt/oracle;export TNS_ADMIN<br />
+NLS_LANG=american; export NLS_LANG<br />
+NLS_DATE_FORMAT=&lsquo;Mon DD YYYY HH24:MI:SS&rsquo;; export NLS_DATE_FORMAT<br />
+ORATAB=/var/opt/oracle/oratab;export ORATAB<br />
+PATH=$PATH:$ORACLE_HOME:$ORACLE_HOME/bin:/usr/ccs/bin:/bin:/usr/bin:/usr/sbin:/sbin:/usr/openwin/bin:/opt/bin:.;
+export PATH<br />
+DBALIST=&ldquo;tianlesoftware@vip.qq.com,tianlesoftware@hotmail.com&rdquo;;export DBALIST</p>
+
+<p>sqlplus -s &lsquo;/ as sysdba&rsquo; &lt;<br />
+set feed off<br />
+set heading off<br />
+column OWNER format a10<br />
+column OBJECT_NAME format a35<br />
+column OBJECT_TYPE format a10<br />
+column STATUS format a10<br />
+spool invalid_object.alert<br />
+SELECT OWNER, OBJECT_NAME, OBJECT_TYPE, STATUS FROM DBA_OBJECTS WHERE STATUS =
+&lsquo;INVALID&rsquo; ORDER BY OWNER, OBJECT_TYPE, OBJECT_NAME;<br />
+spool off<br />
+exit<br />
+EOF<br />
+if [ <code>cat invalid_object.alert | wc -l</code> -gt 0 ] then<br />
+mailx -s &ldquo;INVALID OBJECTS for PPRD10&rdquo; $DBALIST<br />
+fi</p>
+
+<p>$ more invalid_object.alert</p>
+
+<p>PUBLIC ALL_WM_LOCKED_TABLES SYNONYM INVALID<br />
+PUBLIC ALL_WM_VERSIONED_TABLES SYNONYM INVALID<br />
+PUBLIC DBA_WM_VERSIONED_TABLES SYNONYM INVALID<br />
+PUBLIC SDO_CART_TEXT SYNONYM INVALID<br />
+PUBLIC SDO_GEOMETRY SYNONYM INVALID<br />
+PUBLIC SDO_REGAGGR SYNONYM INVALID<br />
+PUBLIC SDO_REGAGGRSET SYNONYM INVALID<br />
+PUBLIC SDO_REGION SYNONYM INVALID<br />
+PUBLIC SDO_REGIONSET SYNONYM INVALID<br />
+PUBLIC USER_WM_LOCKED_TABLES SYNONYM INVALID<br />
+PUBLIC USER_WM_VERSIONED_TABLES SYNONYM INVALID<br />
+PUBLIC WM_COMPRESS_BATCH_SIZES SYNONYM INVALID</p>
+
+<p>8. 监视用户和事务（死锁等）<br />
+以下的脚本在死锁发生的时候发送一个警告e-mail：<br />
+###################################################################</p>
+
+<h2 id="deadlock-alert-sh">deadlock_alert.sh ##</h2>
+
+<p>###################################################################<br />
+#!/bin/ksh</p>
+
+<p>EDITOR=vi; export EDITOR<br />
+ORACLE_SID=PPRD10; export ORACLE_SID<br />
+ORACLE_BASE=/data/app/oracle; export ORACLE_BASE<br />
+ORACLE_HOME=$ORACLE_BASE/10.2.0; export ORACLE_HOME<br />
+LD_LIBRARY_PATH=$ORACLE_HOME/lib; export LD_LIBRARY_PATH<br />
+TNS_ADMIN=/var/opt/oracle;export TNS_ADMIN<br />
+NLS_LANG=american; export NLS_LANG<br />
+NLS_DATE_FORMAT=&lsquo;Mon DD YYYY HH24:MI:SS&rsquo;; export NLS_DATE_FORMAT<br />
+ORATAB=/var/opt/oracle/oratab;export ORATAB<br />
+PATH=$PATH:$ORACLE_HOME:$ORACLE_HOME/bin:/usr/ccs/bin:/bin:/usr/bin:/usr/sbin:/sbin:/usr/openwin/bin:/opt/bin:.;
+export PATH<br />
+DBALIST=&ldquo;tianlesoftware@vip.qq.com,tianlesoftware@hotmail.com&rdquo;;export DBALIST</p>
+
+<p>sqlplus -s &lsquo;/ as sysdba&rsquo; &lt;<br />
+set feed off<br />
+set heading off<br />
+spool deadlock.alert<br />
+SELECT SID, DECODE(BLOCK, 0, &lsquo;NO&rsquo;, &lsquo;YES&rsquo; ) BLOCKER,<br />
+DECODE(REQUEST, 0, &lsquo;NO&rsquo;,&lsquo;YES&rsquo; ) WAITER<br />
+FROM V/$LOCK<br />
+WHERE REQUEST &gt; 0 OR BLOCK &gt; 0<br />
+ORDER BY block DESC;<br />
+spool off<br />
+exit<br />
+EOF<br />
+if [ <code>cat deadlock.alert | wc -l</code> -gt 0 ]<br />
+then<br />
+mailx -s &ldquo;DEADLOCK ALERT for PPRD10&rdquo; $DBALIST<br />
+fi</p>
+
+<p>四． 结论<br />
+0,20,40 7-17 * * 1-5 /dba/scripts/ckinstance.sh &gt; /dev/null 2&gt;&amp;1<br />
+0,20,40 7-17 * * 1-5 /dba/scripts/cklsnr.sh &gt; /dev/null 2&gt;&amp;1<br />
+0,20,40 7-17 * * 1-5 /dba/scripts/ckalertlog.sh &gt; /dev/null 2&gt;&amp;1<br />
+30 * * * 0-6 /dba/scripts/clean_arch.sh &gt; /dev/null 2&gt;&amp;1<br />
+* 5 * * 1,3 /dba/scripts/analyze_table.sh &gt; /dev/null 2&gt;&amp;1<br />
+* 5 * * 0-6 /dba/scripts/ck_tbsp.sh &gt; /dev/null 2&gt;&amp;1<br />
+* 5 * * 0-6 /dba/scripts/invalid_object_alert.sh &gt; /dev/null 2&gt;&amp;1<br />
+0,20,40 7-17 * * 1-5 /dba/scripts/deadlock_alert.sh &gt; /dev/null 2&gt;&amp;1<br />
+通过以上的脚本，可大大减轻你的工作。你可以使用这些是来做更重要的工作，例如性能调整。</p>
+
+<p>转载于:<a href="https://blog.51cto.com/xiaocao13140/1929891">https://blog.51cto.com/xiaocao13140/1929891</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

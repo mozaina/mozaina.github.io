@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>初学乍练redis两行shell脚本实现slowlog持久化转储去重保留历史条目时间戳格式化 | 开发者问答集锦</title>
+    <meta property="og:title" content="初学乍练redis两行shell脚本实现slowlog持久化转储去重保留历史条目时间戳格式化 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="初学乍练redis两行shell脚本实现slowlog持久化转储去重保留历史条目时间戳格式化">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%88%9D%E5%AD%A6%E4%B9%8D%E7%BB%83redis%E4%B8%A4%E8%A1%8Cshell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0slowlog%E6%8C%81%E4%B9%85%E5%8C%96%E8%BD%AC%E5%82%A8%E5%8E%BB%E9%87%8D%E4%BF%9D%E7%95%99%E5%8E%86%E5%8F%B2%E6%9D%A1%E7%9B%AE%E6%97%B6%E9%97%B4%E6%88%B3%E6%A0%BC%E5%BC%8F%E5%8C%96/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">初学乍练redis两行shell脚本实现slowlog持久化转储去重保留历史条目时间戳格式化</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><strong>目录</strong></p>
+
+<p>一、问题提出</p>
+
+<p>二、关于redis slowlog</p>
+
+<p>三、设计思路</p>
+
+<p>四、shell实现</p>
+
+<p>1. 追加slowlog条目并格式化输出文件</p>
+
+<p>2. 去除重复条目并生成结果文件</p>
+
+<p>3. 最终脚本文件</p>
+
+<p>4. 定期调度执行</p>
+
+<hr />
+
+<h1 id="一-问题提出">一、问题提出</h1>
+
+<p>在排查redis性能问题时，从slowlog中找执行缓慢的命令进行优化是一种常规手段。redis
+slowlog被设计成内存中一个先进先出的队列结构，一旦容量被填满，新的条目就会挤出旧条目。特别是在慢日志较多的情况下，有些问题命令很快就会被刷新出slowlog，从而很难跟踪到。</p>
+
+<p>为了解决历史慢日志跟踪问题，需要将redis
+slowlog定期转储到其它存储介质，如磁盘文件或MySQL数据库等。本文介绍使用shell脚本将slowlog转储到普通文本文件的设计实现。这个方案的特点是简单直接，无需其它语言或环境支持，只要在Linux上编写几行简单的shell脚本即可。</p>
+
+<h2 id="二-关于redis-slowlog">二、关于redis slowlog</h2>
+
+<p>redis的slowlog是redis用于记录记录慢查询执行时间的日志系统。由于slowlog只保存在内存中，因此slowlog的效率很高，完全不用担心会影响到redis的性能。slowlog是redis从2.2.12版本引入的一条命令。</p>
+
+<p>slowlog有两个配置参数：</p>
+
+<ul>
+<li>slowlog-log-slower-than：表示slowlog的划定界限，只有query执行时间大于slowlog-log-slower-than的才会被定义成慢查询，才会被slowlog进行记录。slowlog-log-slower-than设置的单位是微妙，默认是10000微妙，也就是10ms。</li>
+<li>slowlog-max-len：表示慢查询最大的条数，默认值为128。当slowlog超过设定的最大值后，会将最早的slowlog删除。</li>
+</ul>
+
+<p>可以在redis配置文件中设置slowlog参数，也可以使用config set命令动态进行设置。 slowlog命令用于查看慢日志信息：</p>
+
+<pre><code># 查看slowlog总条数
+127.0.0.1:20003&gt; slowlog len
+(integer) 128
+127.0.0.1:20003&gt; 
+
+# 查看slowlog
+127.0.0.1:20003&gt; slowlog get
+ 1) 1) (integer) 89161
+    2) (integer) 1541121851
+    3) (integer) 20773
+    4) 1) &quot;DEL&quot;
+       2) &quot;vvmusiclive_kroom_receive_k_gift_detail_list_908843175&quot;
+ 2) 1) (integer) 89160
+    2) (integer) 1541121711
+    3) (integer) 137653
+    4) 1) &quot;COMMAND&quot;
+ 
+ ...
+ 
+ 9) 1) (integer) 89153
+    2) (integer) 1541121481
+    3) (integer) 75091
+    4) 1) &quot;COMMAND&quot;
+10) 1) (integer) 89152
+    2) (integer) 1541121371
+    3) (integer) 51331
+    4) 1) &quot;COMMAND&quot;
+
+
+# 获取指定的条数可以使用SLOWLOG GET N命令
+slowlog get 100
+</code></pre>
+
+<p>慢日志输出信息中最左列表示条目编号。每条慢日志由4项组成：1)是系统中的唯一ID号；2)是执行query的UNIX时间戳；3)是以微秒表示的query执行时间；4)是执行的命令。</p>
+
+<h1 id="三-设计思路">三、设计思路</h1>
+
+<p>slowlog的输出格式是固定的，因此可以定期执行slowlog
+get命令，将输出用追加方式重定向到磁盘文件。这样就解决了转储的问题，看似毫无难度。但问题并没有这么简单，我们还有以下几个问题需要解决：</p>
+
+<ol>
+<li>将UNIX时间戳转换成普通日期时间表示。</li>
+<li>多次get到的条目很可能存在重复，需要进行去重处理。</li>
+<li>考虑轮询时间间隔，假如定义为10秒get一次，需要秒级别的周期性调度。</li>
+</ol>
+
+<h1 id="四-shell实现">四、shell实现</h1>
+
+<h2 id="1-追加slowlog条目并格式化输出文件">1. 追加slowlog条目并格式化输出文件</h2>
+
+<pre><code>redis-cli -p 20001 --no-raw slowlog get 128 |
+gawk '{ if($0~/1\) \(integer\)/) {$1=&quot;&quot;;sub(&quot;^ *&quot;,&quot;&quot;);} else if($0~/2\) \(integer\)/) {gsub($3,strftime(&quot;%Y-%m-%d %H:%M:%S&quot;,$3));sub(&quot;^ *&quot;,&quot;&quot;);} else if($0~/3\) \(integer\)/) {sub(&quot;^ *&quot;,&quot;&quot;);} else if ($0~/4\) +1\)/) {gsub(/4\)/,&quot;  &quot;,$0);} {print $0}}' &gt;&gt; tmpfile.txt
+</code></pre>
+
+<p>说明：</p>
+
+<ul>
+<li>redis-cli命令行加&ndash;no-raw选项，目的是将get的原样输出到管道，便于gawk处理。</li>
+<li>将含有“1) (integer)”的行的第一列置空，并去掉前置空格。目的是去掉条目编号列。</li>
+<li>将含有“1) (integer)”的行的第三列替换为指定的日期时间格式，并去掉前置空格。目的是转换时间戳显示。</li>
+<li>将含有“3) (integer)”的行去掉前置空格。目的是左对齐显示。</li>
+<li>将含有“4) +1)”的行中的“4)”替换为两个空格。“ +”表示4)和1)之间有多个空格。由于slowlog中的命令参数不定，可能是个位数，也可能是十位数，因此这里用“ +”统一处理。</li>
+<li>将经过前面处理后行以追加方式重定向到一个临时文件中。</li>
+
+<li><p>输出文件的内容如下所示：</p>
+
+<p>1) (integer) 89218
+2) (integer) 2018-11-02 10:10:00
+3) (integer) 10519
+        1) &ldquo;SADD&rdquo;
+        2) &ldquo;vvmusiclive_kroom_receive_k_gift_user_list&rdquo;
+        3) &ldquo;925826217&rdquo;
+        4) &ldquo;929306725&rdquo;
+        5) &ldquo;934086121&rdquo;
+        6) &ldquo;916089563&rdquo;
+        7) &ldquo;914163795&rdquo;
+        8) &ldquo;912578737&rdquo;
+        9) &ldquo;920874412&rdquo;
+       10) &ldquo;907827537&rdquo;
+       11) &ldquo;931068540&rdquo;
+       12) &ldquo;938706194&rdquo;
+       13) &ldquo;927533508&rdquo;
+       14) &ldquo;921846404&rdquo;
+       15) &ldquo;912687098&rdquo;
+       16) &ldquo;917264259&rdquo;
+       17) &ldquo;930628034&rdquo;
+       18) &ldquo;922576934&rdquo;
+       19) &ldquo;920568873&rdquo;
+       20) &ldquo;935731276&rdquo;
+       21) &ldquo;923170841&rdquo;
+       22) &ldquo;923189677&rdquo;
+       23) &ldquo;918620435&rdquo;
+       24) &ldquo;913823655&rdquo;
+       25) &ldquo;914592705&rdquo;
+       26) &ldquo;927324056&rdquo;
+       27) &ldquo;917882023&rdquo;
+       28) &ldquo;911605787&rdquo;
+       29) &ldquo;916684087&rdquo;
+       30) &ldquo;938970157&rdquo;
+       31) &ldquo;928144602&rdquo;
+       32) &ldquo;&hellip; (28095 more arguments)&rdquo;
+1) (integer) 89217
+2) (integer) 2018-11-02 10:10:00
+3) (integer) 14067
+       1) &ldquo;DEL&rdquo;
+       2) &ldquo;vvmusiclive_kroom_receive_k_gift_user_list&rdquo;
+1) (integer) 89215
+2) (integer) 2018-11-02 10:09:13
+3) (integer) 14687
+       1) &ldquo;HSET&rdquo;
+       2) &ldquo;kroom_gift_msg_hash&rdquo;
+       3) &ldquo;103.244.233.181_16287_331568_6000236_925076681_916572144_1541124553684&rdquo;
+       4) &ldquo;{\&ldquo;roomServerIp\&rdquo;:\&ldquo;114.112.77.220\&ldquo;,\&ldquo;r_id\&rdquo;:916572144,\&ldquo;receiveTicket\&rdquo;:2,\&ldquo;dalIp\&rdquo;:\&ldquo;103.244.233.181\&ldquo;,\&ldquo;liveId\&rdquo;:331568,\&ldquo;diamondPrice\&rdquo;:2,\&ldquo;&hellip; (169 more bytes)&rdquo;
+1) (integer) 89214
+2) (integer) 2018-11-02 10:07:28
+3) (integer) 31447
+       1) &ldquo;DEL&rdquo;
+       2) &ldquo;f_room_no_recommand_family_schedule_key1541123507699&rdquo;
+1) (integer) 89213
+2) (integer) 2018-11-02 10:07:21
+3) (integer) 111291
+       1) &ldquo;COMMAND&rdquo;
+&hellip;</p></li>
+</ul>
+
+<p>每次执行该命令都会将当前的slowlog格式化后追加到指定文件中。</p>
+
+<h2 id="2-去除重复条目并生成结果文件">2. 去除重复条目并生成结果文件</h2>
+
+<p>前一步处理只是追加慢日志记录并格式化存储到文件中。如前所述，多次get到的条目需要做去重处理。每个慢日志条目由多行组成，其中前三行固定格式，但命令的行数是不定的。shell在处理文本文件时，一般都是按某些条件逐行去重，面对这种多行整体去重的场景，很自然想到行转列，将每个条目的多行转换成一行，然后在整行去重就容易了。去重后，再将每个条目的单行转成原始的多行格式化显示。完成这些工作的命令如下：</p>
+
+<pre><code>gawk '/^1\)/{print s;s=&quot;&quot;};{ s=(s&quot; &quot;$0)};END{print s } ' tmpfile.txt  | sort | uniq |
+sed 's/        /\n        /g'  | gawk '/^ 1\) \(integer\)/{rc =rc+1;rowdata=rc&quot;) \t&quot; $1&quot; &quot;$2&quot; &quot;$3&quot;\n\t&quot;$4&quot; &quot;$5&quot; &quot;$6&quot; &quot;$7&quot;\n\t&quot;$8&quot; &quot;$9&quot; &quot;$10;print rowdata};/^  /{print &quot;\t&quot;$0}' &gt; resultfile
+</code></pre>
+
+<p>说明：</p>
+
+<ul>
+<li>在每个包含“1) (integer)”的行初始化变量s，然后将后续行拼接到s中。每个慢日志条目处理后，转成单行输出。此步骤处理后输出的首行为空行，其后是每个慢日志条目一行。</li>
+<li>将前面处理后的输出整行排序去重。</li>
+
+<li><p>将命令部分的每个分隔符（空白符）前加一个换行符，实现列转行，输出如下所示：</p>
+
+<p> 1) (integer) 89209 2) (integer) 2018-11-02 10:03:33 3) (integer) 48990
+         1) &ldquo;ZADD&rdquo;
+         2) &ldquo;f_room_no_recommand_family_schedule_key1541124213383&rdquo;
+         3) &ldquo;0.0&rdquo;
+         4) &ldquo;1240&rdquo;
+         5) &ldquo;0.0&rdquo;
+         6) &ldquo;1396&rdquo;
+         7) &ldquo;450.0&rdquo;
+         8) &ldquo;1179&rdquo;
+         9) &ldquo;0.0&rdquo;
+        10) &ldquo;1465&rdquo;
+        11) &ldquo;0.0&rdquo;
+        12) &ldquo;1305&rdquo;
+        13) &ldquo;960.0&rdquo;
+        14) &ldquo;1138&rdquo;
+        15) &ldquo;0.0&rdquo;
+        16) &ldquo;1452&rdquo;
+        17) &ldquo;0.0&rdquo;
+        18) &ldquo;35274&rdquo;
+        19) &ldquo;0.0&rdquo;
+        20) &ldquo;1127&rdquo;
+        21) &ldquo;0.0&rdquo;
+        22) &ldquo;46632&rdquo;
+        23) &ldquo;0.0&rdquo;
+        24) &ldquo;1217&rdquo;
+        25) &ldquo;0.0&rdquo;
+        26) &ldquo;1297&rdquo;
+        27) &ldquo;0.0&rdquo;
+        28) &ldquo;1325&rdquo;
+        29) &ldquo;0.0&rdquo;
+        30) &ldquo;1185&rdquo;
+        31) &ldquo;0.0&rdquo;
+        32) &ldquo;&hellip; (1347 more arguments)&rdquo;
+ 1) (integer) 89210 2) (integer) 2018-11-02 10:03:40 3) (integer) 10485
+        1) &ldquo;DEL&rdquo;
+        2) &ldquo;vvmusiclive_kroom_receive_k_user_gift_detail_list_927348780_3466&rdquo;
+ 1) (integer) 89211 2) (integer) 2018-11-02 10:05:31 3) (integer) 50708
+        1) &ldquo;COMMAND&rdquo;
+&hellip;</p></li>
+
+<li><p>将以“1) (integer)”开头的行的十个字段按格式添加换行符输出，并打印计数器变量：</p>
+
+<h1 id="处理前">处理前</h1>
+
+<p> 1) (integer) 89209 2) (integer) 2018-11-02 10:03:33 3) (integer) 48990
+ 1) (integer) 89210 2) (integer) 2018-11-02 10:03:40 3) (integer) 10485
+ 1) (integer) 89211 2) (integer) 2018-11-02 10:05:31 3) (integer) 50708
+&hellip;
+ # 处理后
+1)     1) (integer) 89209
+       2) (integer) 2018-11-02 10:03:33
+       3) (integer) 48990
+2)     1) (integer) 89210
+       2) (integer) 2018-11-02 10:03:40
+       3) (integer) 10485
+3)     1) (integer) 89211
+       2) (integer) 2018-11-02 10:05:31
+       3) (integer) 50708
+&hellip;</p></li>
+
+<li><p>用“^ ”去掉原来以“1) (integer)”开头的单行，输出其它行。</p></li>
+
+<li><p>将最终结果存入结果文件。</p></li>
+</ul>
+
+<h2 id="3-最终脚本文件">3. 最终脚本文件</h2>
+
+<p>将处理步骤封装成shell函数，便于多实例调用。每天每个redis实例生成一个慢日志文件，以日期和端口命名文件。最终的redis_slowlog.sh内容如下：</p>
+
+<pre><code>#!/bin/bash
+
+cd ~/redis_slowlog
+
+function format_slowlog {
+    filename=`date &quot;+%Y%m%d&quot;`_$1.log
+    tmpfilename=tmp_slowlog_$1.txt
+
+    /home/redis/redis-3.2.3/src/redis-cli -p $1 --no-raw slowlog get 128 |
+    gawk '{ if($0~/1\) \(integer\)/) {$1=&quot;&quot;;sub(&quot;^ *&quot;,&quot;&quot;);} else if($0~/2\) \(integer\)/) {gsub($3,strftime(&quot;%Y-%m-%d %H:%M:%S&quot;,$3));sub(&quot;^ *&quot;,&quot;&quot;);} else if($0~/3\) \(integer\)/) {sub(&quot;^ *&quot;,&quot;&quot;);} else if ($0~/4\) +1\)/) {gsub(/4\)/,&quot;  &quot;,$0);} {print $0}}' &gt;&gt; $tmpfilename
+
+    gawk '/^1\)/{print s;s=&quot;&quot;};{ s=(s&quot; &quot;$0)};END{print s } ' $tmpfilename  | sort | uniq |
+    sed 's/        /\n        /g'  | gawk '/^ 1\) \(integer\)/{rc =rc+1;rowdata=rc&quot;) \t&quot; $1&quot; &quot;$2&quot; &quot;$3&quot;\n\t&quot;$4&quot; &quot;$5&quot; &quot;$6&quot; &quot;$7&quot;\n\t&quot;$8&quot; &quot;$9&quot; &quot;$10;print rowdata};/^  /{print &quot;\t&quot;$0}' &gt; $filename
+}
+
+format_slowlog 20001
+format_slowlog 20002
+format_slowlog 20003
+format_slowlog 20004
+format_slowlog 20005
+format_slowlog 20006
+format_slowlog 20007
+format_slowlog 20008
+</code></pre>
+
+<h2 id="4-定期调度执行">4. 定期调度执行</h2>
+
+<p>redis
+slowlog的内容变化较快，因此10秒收集一次。考虑到生成的文件较多，并且太久以前的文件作用不大，只保留三天慢日志文件。调度使用crontab实现：</p>
+
+<pre><code>* * * * * /root/redis_slowlog.sh
+* * * * * sleep 10; /root/redis_slowlog.sh
+* * * * * sleep 20; /root/redis_slowlog.sh
+* * * * * sleep 30; /root/redis_slowlog.sh
+* * * * * sleep 40; /root/redis_slowlog.sh
+* * * * * sleep 50; /root/redis_slowlog.sh
+0 0 * * * rm -f /root/redis_slowlog/tmp_slowlog*.txt
+0 0 * * * find /root/redis_slowlog/* -type f -mtime +3 -exec rm {} \;
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

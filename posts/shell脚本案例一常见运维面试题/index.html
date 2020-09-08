@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell脚本案例一常见运维面试题 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell脚本案例一常见运维面试题 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell脚本案例一常见运维面试题">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E6%A1%88%E4%BE%8B%E4%B8%80%E5%B8%B8%E8%A7%81%E8%BF%90%E7%BB%B4%E9%9D%A2%E8%AF%95%E9%A2%98/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell脚本案例一常见运维面试题</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>shell是运维人员应该具备的基本技能一，熟练掌握及运用shell，对提升运维作业效率与质量有很大帮助。在这里，将会结合工作中各种场景，利用shell脚本解决问题，完成目标。</p>
+
+<hr />
+
+<ol>
+<li><p>监控MySQL主从同步是否异常，如果异常，则发送短信或者邮件给管理员。<br />
+a. 开发一个守护进程脚本每30秒实现检测一次。<br />
+b. 如果同步出现如下错误号（1158,1159,1008,1007,1062），则跳过错误。<br />
+c. 请使用数组技术实现上述脚本（获取主从判断及错误号部分）。</p>
+
+<pre><code>#!/bin/bash
+</code></pre>
+
+<p>mysqlbin=/usr/bin/mysql
+mysqlhost=127.0.0.1
+mysqluser=root
+mysqlpwd=root
+skiperrors=(1158 1159 1008 1007 1062)
+admin=&lsquo;email@qq.com&rsquo;</p>
+
+<p>check() {
+LASTNO=$($mysqlbin -h$mysqluser -u$mysqluser -p$mysqlpwd -e &ldquo;show slave status\G&rdquo;|grep Last_Errno|awk -F: &lsquo;{print $2}&rsquo;)
+}</p>
+
+<p>skip() {
+for errorno in ${skiperrors[@]};do
+ if [ $errorno == $LASTNO ];then
+  notify $errorno
+  break
+ fi
+done<br />
+}</p>
+
+<p>notify() {
+text=&ldquo;mysql slave monitor error: $1&rdquo;
+echo $text|mail -s &lsquo;mysql error&rsquo;
+}</p>
+
+<p>main() {
+while :;do
+ check &amp;&amp; skip || notify &ldquo;mysql connected failed!&rdquo;
+ sleep 30
+done
+}</p>
+
+<p>main</p></li>
+
+<li><p>使用for循环在目录下通过随机小写10个字母加固定字符串file批量创建10个。</p>
+
+<pre><code>#!/bin/bash
+</code></pre>
+
+<p>gen_num() {
+local n
+min=$1
+max=$(($2-$min+1))
+n=$(($RANDOM+1000000000))
+echo $(($n%$max+$min))
+}</p>
+
+<p>gen_randletters() {
+local l
+local n</p>
+
+<p>#raw=(a b c d e f g h i g k l m n o p q r s t u v w x y z)</p>
+
+<p>raw=({a..z})
+l=$1
+for ((i=1;i&lt;=$l;i++));do
+ n=$(gen_num 0 26)
+ letters+=${raw[$n]}
+done
+echo $letters
+}</p>
+
+<p>gen_randnames() {
+suffix=_file
+local l
+local n
+n=$1
+l=$2
+for ((i=1;i&lt;=$n;i++));do
+  touch $(gen_randletters $l)$suffix
+done
+}</p>
+
+<p>gen_randnames $1 $2</p></li>
+
+<li><p>用for循环将以上文件名中的file批量改为files。</p>
+
+<pre><code>#!/bin/bash
+</code></pre>
+
+<h1 id="方法一">方法一</h1>
+
+<p>example<em>1() {
+for file in <code>ls *_file</code>;do
+ newfile=$(echo $file|sed &ldquo;s/(.*</em>)file/\1FILES/&ldquo;)
+ mv $file $newfile
+done
+}
+example_1</p>
+
+<h1 id="方法二">方法二</h1>
+
+<p>example_2() {
+for file in <code>ls *_file</code>;do
+ rename file FILES *_file
+done
+}</p>
+
+<p>example_2</p></li>
+
+<li><p>写一个脚本，实现判断10.0.0.0/24网络里，当前在线用户的IP有哪些（方法有很多）。</p>
+
+<pre><code>#!/bin/bash
+</code></pre>
+
+<p>subnet=10.0.0.0/24</p>
+
+<h1 id="方法一-1">方法一</h1>
+
+<p>netaddr=<code>echo $subnet|cut -d. -f1-3</code>
+for i in {1..254};do
+{
+ping -c 1 -t 1 $netaddr.$i &gt; /dev/null
+if [ $? == 0 ];then
+ echo $netaddr.$i
+fi
+} &amp;
+done
+wait</p>
+
+<h1 id="方法二-1">方法二</h1>
+
+<p>nmap -sP $subnet</p></li>
+
+<li><p>写一个脚本解决DOS攻击生产案例。根据web日志或者或者网络连接数，监控当某个IP并发连接数或者短时内PV达到100，即调用防火墙命令封掉对应的IP，监控频率每隔3分钟。</p>
+
+<pre><code>#!/bin/bash
+</code></pre>
+
+<p>ips_file=/tmp/pv_ge_100
+n=1</p>
+
+<p>netstat -an| <br />
+awk &lsquo;/tcp|udp/{print $4}&rsquo;| <br />
+awk -F: &lsquo;{print $1}&rsquo;| <br />
+awk &lsquo;{s[$1]++} END {for (i in s) if (s[i]&gt;&lsquo;&ldquo;$n&rdquo;&rsquo;) print i}&rsquo; | <br />
+grep -Ev &lsquo;127.0.0.1|0.0.0.0&rsquo; <br />
+&gt; $ips_file</p>
+
+<p>cat $ips_file | while read LINE;do
+iptables -A INPUT -s $LINE -j drop
+done</p></li>
+
+<li><p>请用至少两种方法实现：bash for循环打印下面这句话中字母数不大于6的单词。<br />
+I am oldboy teacher welcome to oldboy training class.</p>
+
+<pre><code>#!/bin/bash
+</code></pre>
+
+<p>len=6
+words=&lsquo;I am oldboy teacher welcome to oldboy training class.&rsquo;</p>
+
+<h1 id="方法一-2">方法一</h1>
+
+<p>for word in ${words[@]};do
+l=$(echo $word|wc -c)
+if [ $l -gt $len ];then echo $word;fi
+done</p>
+
+<h1 id="方法二-2">方法二</h1>
+
+<p>for word in ${words[@]};do
+l=$(echo $word|awk &lsquo;{print length($0)}&rsquo;)
+if [ $l -gt $len ];then echo $word;fi
+done</p></li>
+
+<li><p>开发shell脚本分别实现以脚本传参以及read读入的方式比较2个整数大小。以屏幕输出的方式提醒用户比较结果。需要对变量是否为数字、并且传参个数做判断。</p>
+
+<pre><code>#!/bin/bash
+</code></pre>
+
+<h1 id="read读参">read读参</h1>
+
+<p>IFS=&lsquo;,&rsquo;</p>
+
+<p>compare() {
+n1=$1
+n2=$2
+if [ $n1 -ge $n2 ];then
+[ $n1 -eq $n2 ] &amp;&amp; echo &ldquo;$n1 = $n2&rdquo; || echo &ldquo;$n1 &gt; $n2&rdquo;
+else
+echo &ldquo;$n1 &lt; $n2&rdquo;
+fi
+}</p>
+
+<p>isnum() {
+num=$1
+for n in ${num[@]};do
+ if [[ ! $n =~ <sup class="footnote-ref" id="fnref:0-9"><a href="#fn:0-9">1</a></sup>+$ ]];then
+  echo &lsquo;WARNING: 必须输入整数！&rsquo;
+  return 1
+ fi
+done
+}</p>
+
+<p>while :;do
+read -a num -p &ldquo;请输入2个整数(逗号分隔): &ldquo;</p>
+
+<p>if [ ${#num[@]} -ne 2 ];then
+ echo &lsquo;WARNING: 必须输入2个整数！&rsquo;
+ continue
+fi</p>
+
+<p>isnum $num &amp;&amp; compare ${num[@]}</p>
+
+<p>done</p>
+
+<p>#!/bin/bash</p>
+
+<h1 id="脚本传参">脚本传参</h1>
+
+<p>compare() {
+n1=$1
+n2=$2
+if [ $n1 -ge $n2 ];then
+[ $n1 -eq $n2 ] &amp;&amp; echo &ldquo;$n1 = $n2&rdquo; || echo &ldquo;$n1 &gt; $n2&rdquo;
+else
+echo &ldquo;$n1 &lt; $n2&rdquo;
+fi
+}</p>
+
+<p>isnum() {
+num=$1
+for n in ${num[@]};do
+ if [[ ! $n =~ <sup class="footnote-ref" id="fnref:0-9"><a href="#fn:0-9">2</a></sup>+$ ]];then
+  echo &lsquo;WARNING: 必须输入整数！&rsquo;
+  exit 2
+ fi
+done</p>
+
+<p>}</p>
+
+<p>if [ $# -ne 2 ];then
+echo &lsquo;WARNING: 必须输入2个整数！&rsquo;
+exit 1
+fi</p>
+
+<p>isnum &ldquo;$*&rdquo; &amp;&amp; compare $@</p></li>
+
+<li><p>打印选择菜单，一键安装Web服务：</p></li>
+</ol>
+
+<p>[root@scripts]# sh menu.sh<br />
+1.[install lamp]<br />
+2.[install lnmp]<br />
+3.[exit]</p>
+
+<p>pls input the num you want:</p>
+
+<p>要求：</p>
+
+<p>a. 当用户输入1时，输出“startinstalling lamp.”然后执行/server/scripts/lamp.sh，脚本内容输出”lamp is
+installed”后退出脚本；<br />
+b. 当用户输入2时，输出“startinstalling lnmp.” 然后执行/server/scripts/lnmp.sh输出”lnmp is
+installed”后退出脚本;<br />
+c. 当输入3时，退出当前菜单及脚本；<br />
+d. 当输入任何其它字符，给出提示“Input error”后退出脚本。<br />
+e. 要对执行的脚本进行相关条件判断，例如：脚本是否存在，是否可执行等。</p>
+
+<pre><code>    #!/bin/bash
+
+lamp_script=/server/scripts/lamp.sh
+lnmp_script=/server/scripts/lnmp.sh
+
+check_script() {
+if [ ! -f $1 ];then
+ echo 'script file is not found.'
+ exit 1
+fi
+if [ ! -x $1 ];then
+ echo 'script file is not executable.'
+ exit 2
+fi
+}
+
+lamp() {
+check_script $lamp_script
+echo 'startinstalling lamp'
+$lamp_script
+echo 'lamp is installed'
+}
+
+lnmp() {
+check_script $lnmp_script
+echo 'startinstalling lnmp'
+$lnmp_script
+echo 'lnmp is installed'
+}
+
+IFS=','
+PS3='pls input the num you want:'
+options=(&quot;[install lamp]&quot;,&quot;[install lnmp]&quot;,&quot;[exit]&quot;)
+
+select opt in ${options[@]}
+do
+case $opt in
+*lamp*)
+   lamp
+   ;;
+*lnmp*)
+   lanmp
+   ;;
+*exit*)
+   exit 0
+   ;;
+*)
+   echo 'Input error';exit 3
+   ;;
+esac
+done
+</code></pre>
+
+<ol>
+<li>已知下面的字符串是通过RANDOM随机数变量md5sum|cut -c 1-8截取后的结果，请破解这些字符串对应的md5sum前的RANDOM对应数字？</li>
+</ol>
+
+<p>21029299<br />
+00205d1c<br />
+a3da1677<br />
+1f6d12dd<br />
+890684b</p>
+
+<pre><code>    #!/bin/bash
+
+
+md5prefix=&quot;21029299|00205d1c|a3da1677|1f6d12dd|890684b&quot;
+
+output=/tmp/md5sum
+
+for ((i=0;i&lt;=32767;i++));do
+res=$(echo $i|md5sum|awk '{print $1}'|cut -c1-8)
+echo $i $res &gt;&gt;$output
+done
+
+grep -E $md5prefix $output
+</code></pre>
+
+<ol>
+<li>抓阄题目：某企业提供外出项目实践机会来了（本月中旬），但是，名额有限，队员限3人（班长带队）。</li>
+</ol>
+
+<p>因此需要挑选学生，因此需要一个抓阄的程序，要求：</p>
+
+<p>a. 执行脚本后，想去的同学输入英文名字全拼，产生随机数01-99之间的数字，数字越大就去参加项目实践，前面已经抓到的数字，下次不能在出现相同数字。<br />
+b. 第一个输入名字后，屏幕输出信息，并将名字和数字记录到文件里，程序不能退出继续等待别的学生输入。</p>
+
+<pre><code>    #!/bin/bash
+
+output=/tmp/result
+
+rand_num() {
+ min=$1
+ max=$2
+ echo $(($RANDOM%$max+$min))
+}
+
+touch $output
+while :;do
+ read -p '输出名字全拼: ' name
+ while :;do
+  r=$(rand_num 1 99)
+  count=$(grep -w -c $r $output)
+  if [ $count -eq 0 ];then
+   echo $name:$r|tee -a $output
+   break
+  fi
+ done
+done
+</code></pre>
+<div class="footnotes">
+
+<hr />
+
+<ol>
+<li id="fn:0-9">0-9 <a class="footnote-return" href="#fnref:0-9"><sup>[return]</sup></a></li>
+<li id="fn:0-9">0-9 <a class="footnote-return" href="#fnref:0-9"><sup>[return]</sup></a></li>
+</ol>
+</div>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

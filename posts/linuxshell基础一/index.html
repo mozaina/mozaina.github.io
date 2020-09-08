@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linuxshell基础一 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linuxshell基础一 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linuxshell基础一">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E5%9F%BA%E7%A1%80%E4%B8%80/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linuxshell基础一</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>一. 特殊文件: /dev/null和/dev/tty</p>
+
+<pre><code>Linux系统提供了两个对Shell编程非常有用的特殊文件，/dev/null和/dev/tty。其中/dev/null将会丢掉所有写入它的数据，换句换说，当程序将数据写入到此文件时，会认为它已经成功完成写入数据的操作，但实际上什么事都没有做。如果你需要的是命令的退出状态，而非它的输出，此功能会非常有用，见如下Shell代码：
+/&gt; vi test_dev_null.sh
+
+#!/bin/bash
+if grep hello TestFile &gt; /dev/null
+then
+    echo &quot;Found&quot;
+else
+    echo &quot;NOT Found&quot;
+fi
+在vi中保存并退出后执行以下命令：
+/&gt; chmod +x test_dev_null.sh  #使该文件成为可执行文件
+/&gt; cat &gt; TestFile
+hello my friend
+CTRL + D                             #退出命令行文件编辑状态
+/&gt; ./test_dev_null.sh
+Found                                 #这里并没有输出grep命令的执行结果。
+将以上Shell脚本做如下修改：
+/&gt; vi test_dev_null.sh
+
+#!/bin/bash
+if grep hello TestFile
+then
+    echo &quot;Found&quot;
+else
+    echo &quot;NOT Found&quot;
+fi
+在vi中保存退出后，再次执行该脚本：
+/&gt; ./test_dev_null.sh
+hello my friend                      #grep命令的执行结果被输出了。
+Found
+
+下面我们再来看/dev/tty的用途。当程序打开此文件是，Linux会自动将它重定向到一个终端窗口，因此该文件对于读取人工输入时特别有用。见如下Shell代码：
+/&gt; vi test_dev_tty.sh
+
+#!/bin/bash
+printf &quot;Enter new password: &quot;    #提示输入
+stty -echo                               #关闭自动打印输入字符的功能
+read password &lt; /dev/tty         #读取密码
+printf &quot;\nEnter again: &quot;             #换行后提示再输入一次
+read password2 &lt; /dev/tty       #再读取一次以确认
+printf &quot;\n&quot;                               #换行
+stty echo                                #记着打开自动打印输入字符的功能
+echo &quot;Password = &quot; $password #输出读入变量
+echo &quot;Password2 = &quot; $password2
+echo &quot;All Done&quot;
+
+在vi中保存并退出后执行以下命令：
+/&gt; chmod +x test_dev_tty.sh #使该文件成为可执行文件
+/&gt; ./test_dev_tty
+Enter new password:             #这里密码的输入被读入到脚本中的password变量
+Enter again:                          #这里密码的输入被读入到脚本中的password2变量
+Password = hello
+Password2 = hello
+All Done
+</code></pre>
+
+<p>二. 简单的命令跟踪:</p>
+
+<pre><code>Linux Shell提供了两种方式来跟踪Shell脚本中的命令，以帮助我们准确的定位程序中存在的问题。下面的代码为第一种方式，该方式会将Shell脚本中所有被执行的命令打印到终端，并在命令前加&quot;+&quot;：加号的后面还跟着一个空格。
+/&gt; cat &gt; trace_all_command.sh
+who | wc -l                          #这两条Shell命令将输出当前Linux服务器登录的用户数量
+CTRL + D                            #退出命令行文件编辑状态
+/&gt; chmod +x trace_all_command.sh
+/&gt; sh -x ./trace_all_command.sh #Shell执行器的-x选项将打开脚本的执行跟踪功能。
++ wc -l                               #被跟踪的两条Shell命令
++ who
+2                                       #实际输出结果。
+Linux Shell提供的另一种方式可以只打印部分被执行的Shell命令，该方法在调试较为复杂的脚本时，显得尤为有用。
+/&gt; cat &gt; trace_patial_command.sh
+#! /bin/bash
+set -x                                #从该命令之后打开跟踪功能
+echo 1st echo                     #将被打印输出的Shell命令
+set +x                               #该Shell命令也将被打印输出，然而在该命令被执行之后，所有的命令将不再打印输出
+echo 2nd echo                    #该Shell命令将不再被打印输出。
+CTRL + D                           #退出命令行文件编辑状态
+/&gt; chmod +x trace_patial_command.sh
+/&gt; ./trace_patial_command.sh
++ echo 1st echo
+1st echo
++ set +x
+2nd echo
+</code></pre>
+
+<p>四. 使用cut命令选定字段:</p>
+
+<pre><code>cut命令是用来剪下文本文件里的数据，文本文件可以是字段类型或是字符类型。下面给出应用实例：
+/&gt; cat /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+adm:x:3:4:adm:/var/adm:/sbin/nologin
+... ...
+/&gt; cut -d : -f 1,5 /etc/passwd     #-d后面的冒号表示字段之间的分隔符，-f表示取分割后的哪些字段
+root:root                                 #这里取出的是第一个和第五个字段。
+bin:bin
+daemon:daemon
+adm:adm
+... ...
+/&gt; cut -d: -f 3- /etc/passwd       #从第三个字段开始显示，直到最后一个字段。
+0:0:root:/root:/bin/bash
+1:1:bin:/bin:/sbin/nologin
+2:2:daemon:/sbin:/sbin/nologin
+3:4:adm:/var/adm:/sbin/nologin
+4:7:lp:/var/spool/lpd:/sbin/nologin
+... ...    
+这里需要进一步说明的是，使用cut命令还可以剪切以字符数量为标量的部分字符，该功能通过-c选项实现，其不能与-d选项共存。
+/&gt; cut -c 1-4 /etc/passwd          #取每行的前1-4个字符。
+/&gt; cut -c-4 /etc/passwd            #取每行的前4个字符。 
+root
+bin:
+daem
+adm:
+... ...
+/&gt; cut -c4- /etc/passwd            #取每行的第4个到最后字符。
+t:x:0:0:root:/root:/bin/bash
+:x:1:1:bin:/bin:/sbin/nologin
+mon:x:2:2:daemon:/sbin:/sbin/nologin
+:x:3:4:adm:/var/adm:/sbin/nologin
+... ...
+/&gt; cut -c1,4 /etc/passwd           #取每行的第一个和第四个字符。
+rt
+b:
+dm
+a:
+... ...
+/&gt; cut -c1-4,5 /etc/passwd        #取每行的1-4和第5个字符。
+root:
+bin:x
+daemo
+adm:x
+</code></pre>
+
+<p>五. 计算行数、字数以及字符数:</p>
+
+<pre><code>Linux提供了一个简单的工具wc用于完成该功能，见如下用例：
+/&gt; echo This is a test of the emergency broadcast system | wc
+1    9    49                              #1行，9个单词，49个字符
+/&gt; echo Testing one two three | wc -c
+22                                         #22个字符
+/&gt; echo Testing one two three | wc -l
+1                                           #1行
+/&gt; echo Testing one two three | wc -w
+4                                           #4个单词
+/&gt; wc /etc/passwd /etc/group    #计算两个文件里的数据。
+39   71  1933  /etc/passwd
+62   62  906    /etc/group
+101 133 2839  总用量
+</code></pre>
+
+<p>六. 提取开头或结尾数行:</p>
+
+<pre><code>有时，你会需要从文本文件里把几行字，多半是靠近开头或结尾的几行提取出来。如查看工作日志等操作。Linux Shell提供head和tail两个命令来完成此项工作。见如下用例：
+/&gt; head -n 5 /etc/passwd           #显示输入文件的前五行。
+root:x:0:0:root:/root:/bin/bash
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+adm:x:3:4:adm:/var/adm:/sbin/nologin
+lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+
+/&gt; tail -n 5 /etc/passwd             #显示输入文件的最后五行。
+sshd:x:74:74:Privilege-separated SSH:/var/empty/sshd:/sbin/nologin
+mysql:x:27:27:MySQL Server:/var/lib/mysql:/bin/bash
+pulse:x:496:494:PulseAudio System Daemon:/var/run/pulse:/sbin/nologin
+gdm:x:42:42::/var/lib/gdm:/sbin/nologin
+stephen:x:500:500:stephen:/home/stephen:/bin/bash
+如果使用者想查看不间断增长的日志(如服务程序输出的)，可以使用tail的-f选项，这样可以让tail命令不会自动退出，必须通过CTRL+C命令强制退出，因此该选项不适合用于Shell脚本中，见如下用例：
+/&gt; tail -f -n 5 my_server_log
+... ...
+^C                                         #CTRL+C退出到命令行提示符状态。
+</code></pre>
+
+<p>转载于:<a href="https://www.cnblogs.com/cppb/p/6215983.html">https://www.cnblogs.com/cppb/p/6215983.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,1042 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linuxshell三剑客之sed流式编辑器详解 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linuxshell三剑客之sed流式编辑器详解 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linuxshell三剑客之sed流式编辑器详解">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E4%B8%89%E5%89%91%E5%AE%A2%E4%B9%8Bsed%E6%B5%81%E5%BC%8F%E7%BC%96%E8%BE%91%E5%99%A8%E8%AF%A6%E8%A7%A3/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linuxshell三剑客之sed流式编辑器详解</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><strong>目录</strong></p>
+
+<h1 id="sed-流式编辑器">sed 流式编辑器</h1>
+
+<p>①sed基本原理</p>
+
+<p>②sed程序语法格式</p>
+
+<p>OPTION选项</p>
+
+<p>SCRIPT命令集合</p>
+
+<p>sed寻址</p>
+
+<p>sed正则表达式</p>
+
+<p>sed命令</p>
+
+<p>③sed高级</p>
+
+<p>标签命令</p>
+
+<p>滑动窗口</p>
+
+<p>sed中变量的使用和替换问题</p>
+
+<p>④sed实战</p>
+
+<hr />
+
+<p>#</p>
+
+<h1 id="①-sed-基本原理"><strong>①</strong> <strong>sed</strong> <strong>基本原理</strong></h1>
+
+<blockquote>
+<blockquote>
+<blockquote>
+<p>sed（stream editor）是一个 <strong>流式编辑器</strong> ，是一个程序，，用于对输入流执行文本转换操作</p>
+
+<p>sed只能通过一次输入流，每次的输入流 <strong>只能被处理一次</strong></p>
+
+<p>将读入到模式空间的行号通过sed的 <strong>行号计数器</strong> 记录在 <strong>内存</strong> 中</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>sed</strong> <strong>数据缓冲空间</strong><br />
+sed对输入流进行操作，需要将其加载到缓冲空间后才能操作<br />
+sed有两个缓冲空间： <strong>模式空间</strong> （pattern_space），一直处于活动的空间</p>
+
+<p><strong>保持空间</strong> （ hold_space ），是一个辅助性的空间</p>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>对模式空间中行的处理逻辑：</strong></p>
+
+<p>（1）读取输入流的第一行到模式空间中（此时行号计数器记录的行号为1）（移除读取到的行的尾随换行符）</p>
+
+<p>（2）当行被预设定的模式匹配上时，则使用sed程序内部的命令进行处理，<br />
+<strong>不管内容是否匹配，都会默认自动输出模式空间中处理过后的内容</strong> （尾部默认加上换行符）</p>
+
+<p><strong>（</strong> <strong>3</strong> <strong>）清空模式空间中的内容</strong></p>
+
+<p>（4）然后从输入流读取下一行到模式空间(行号计数器更新为下一行)，并循环上面的操作，直到输入流中所有行都被处理完成</p>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>通过一个</strong> <strong>shell</strong> <strong>伪代码理解</strong> <strong>sed</strong> <strong>程序对输入流的处理逻辑：</strong></p>
+
+<p>for ((line=1;line&lt;=1last_line_num;++line)) #外循环即sed循环</p>
+
+<p>do</p>
+
+<p>read $line to pattern_space；</p>
+
+<p>while pattern_space is not null #内循环即SCRIPT循环</p>
+
+<p>do</p>
+
+<p>excute cmd1 in SCRIPT；</p>
+
+<p>excute cmd2 in SCRIPT；</p>
+
+<p>excute cmd3 in SCRIPT；</p>
+
+<p>……</p>
+
+<p>auto_print； #自动输出</p>
+
+<p>remove_pattern_space； #清空模式pattern_space</p>
+
+<p>done</p>
+
+<p>done</p>
+
+<hr />
+
+<h1 id="②-sed-程序语法格式"><strong>②</strong> <strong>sed</strong> <strong>程序语法格式</strong></h1>
+
+<h3 id="sed-opsions-script-input-stream"><strong>sed OPSIONS</strong> <strong>SCRIPT</strong> <strong>INPUT_STREAM</strong></h3>
+
+<p><strong>说明：</strong></p>
+
+<p><strong>OPSIONS</strong> <strong>即选项</strong></p>
+
+<p><strong>SCRIPT</strong> <strong>即命令的集合，由寻址和命令组成</strong></p>
+
+<p><strong>INPUT_STREAM</strong> <strong>即输入流</strong></p>
+
+<h2 id="option-选项"><strong>OPTION</strong> <strong>选项</strong></h2>
+
+<p><strong>常用选项</strong></p>
+
+<p>|</p>
+
+<p><strong>描述</strong></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p><strong>-V</strong></p>
+
+<p>|</p>
+
+<p><strong>输出</strong> <strong>sed</strong> <strong>的版本</strong></p>
+
+<p><strong>-n</strong></p>
+
+<p>|</p>
+
+<p><strong>禁止</strong> <strong>auto_print</strong> <strong>，输出的内容为空</strong></p>
+
+<p><strong>-e</strong></p>
+
+<p>|</p>
+
+<p><strong>指定多个表达式</strong> <strong>例：</strong> <strong>sed -e SCRIPT1 -e SCRIPT2 INPUT_STREAM</strong></p>
+
+<p><strong>-f</strong></p>
+
+<p>|</p>
+
+<p><strong>-f script_file</strong> <strong>指定</strong> <strong>SCRIPT</strong> <strong>文件（命令集合）</strong></p>
+
+<p><strong>-i</strong></p>
+
+<p>|</p>
+
+<p><strong>对输入流中的内容进行修改，将修改后的内容写入原文件</strong><br />
+ <strong>-i&rsquo;_bak&rsquo;</strong> <strong>：</strong> <strong>-i</strong> <strong>有后缀，将原文件备份为</strong> <strong>file_bak</strong> <strong>（可以用</strong> *****
+<strong>表示原文件的文件名）</strong></p>
+
+<p><strong>-r</strong></p>
+
+<p>|</p>
+
+<p><strong>使用扩展的正则表达式（类似</strong> <strong>egrep</strong> <strong>）</strong></p>
+
+<p><strong>-s</strong></p>
+
+<p>|</p>
+
+<p><strong>对于多个文件，每个文件当成独立的输入流，分别处理<br />
+（没有</strong> <strong>-s</strong> <strong>，会将多个文件追加当做一个合并的输入流）</strong></p>
+
+<h2 id="script-命令集合-由寻址和命令组成"><strong>SCRIPT</strong> <strong>命令集合——由寻址和命令组成</strong></h2>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>SCRIPT</strong> <strong>写法规则</strong> <strong>addr1{cmd1</strong> <strong>;</strong> <strong>cmd2}</strong> <strong>;</strong>
+<strong>addr2{cmd3</strong> <strong>;</strong> <strong>cmd4}</strong></p>
+
+<p>addr表示寻址，cmd表示命令 （命令之间和表达式之间用 &ldquo;;&ldquo;隔开）</p>
+
+<h3 id="sed寻址-line-addressing"><strong>sed寻址</strong> <strong>line addressing</strong></h3>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>为何要寻址</strong></p>
+
+<p>寻址是对模式空间中的内容进行匹配，根据匹配规则决定是否执行对应的命令</p>
+
+<p>若匹配，则执行相应命令</p>
+
+<p>若不匹配，默认情况下直接将模式空间中的内容输出，然后清空模式空间并进入下一个sed循环</p>
+
+<blockquote>
+<blockquote>
+<blockquote>
+<p>寻址即匹配，匹配可能是单行，也可以是一个范围，也可以是用正则表达式去匹配</p>
+
+<p>寻址格式：add1[ <strong>,</strong> add2]：表示从add1至add2这个范围</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+<p><strong>sed</strong> <strong>常用匹配方式如下：</strong></p>
+
+<p><strong>匹配方式</strong></p>
+
+<p>|</p>
+
+<p><strong>描述</strong></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p><strong>‘</strong> <strong>N</strong> <strong>’</strong></p>
+
+<p>|</p>
+
+<p>指定一个行号</p>
+
+<p><strong>‘</strong> <strong>N</strong> <strong>，</strong> <strong>M</strong> <strong>’</strong></p>
+
+<p>|</p>
+
+<p>指定一个 <strong>范围</strong> ，从第N行到第M行</p>
+
+<p><strong>‘</strong> <strong>FIRST~STEP</strong> <strong>’</strong></p>
+
+<p>|</p>
+
+<p>从FIRST开始，每隔STEP后的行会被定位（2~3，定位到2、5、8、11行）</p>
+
+<p><strong>‘</strong> <strong>$</strong> <strong>’</strong></p>
+
+<p>|</p>
+
+<p>匹配最后一个文件的最后一行（使用-s或-i时，匹配每个文件的最后一行） <strong>$</strong> <strong>不能用作数学计算</strong></p>
+
+<p><strong>‘</strong> <strong>/</strong> <strong>REGEXP</strong> <strong>/</strong> <strong>’</strong> <strong>或</strong> <strong>‘</strong> *<em>*</em> <strong>%REGEXP%&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>将选择能被正则表达式REGEXP匹配到的所有的行<br />
+当正则表达式REGEXP中有符号‘/ ’，必须使用反斜杠对其转义<br />
+使用 <strong>‘</strong> %REGEXP%&lsquo;不用对 &lsquo;/ &lsquo;进行转义<br />
+ <strong>空正则表达式</strong> <strong>&rsquo;//&rsquo;</strong> <strong>，表示引用最后一个正则表达式匹配的结果（</strong> <strong>s</strong> <strong>命令</strong> <strong>&rsquo;s///g&rsquo;</strong> <strong>也是）</strong></p>
+
+<p>修饰符“i”，“I”、“M”不能用作空正则表达式</p>
+
+<p><strong>‘</strong> <strong>/</strong> <strong>REGEXP</strong> <strong>/</strong> <strong>I</strong> <strong>’</strong> <strong>或</strong> <strong>‘</strong> *<em>*</em> <strong>%REGEXP%I</strong> <strong>’</strong></p>
+
+<p>|</p>
+
+<p>I表示匹配的时候忽略大小写 不能用i，因为i是个命令表示插入</p>
+
+<p><strong>‘</strong> <strong>/</strong> <strong>REGEXP</strong> <strong>/</strong> <strong>M</strong> <strong>’或‘</strong> *<em>*</em> <strong>%REGEXP%M</strong> <strong>’</strong></p>
+
+<p>|</p>
+
+<p><strong>多行匹配</strong> （ <strong>以</strong> <strong>\n</strong> <strong>为分隔符</strong> ）<br />
+N命令可以实现模式空间有多行<br />
+例：echo -e “a\nb\c\d”|sed -n ‘N；s/<sup class="footnote-ref" id="fnref:a-z"><a href="#fn:a-z">1</a></sup>$/X/Mp’<br />
+&gt;&gt;&gt;首先读取第一行到模式空间，行号计数器为1</p>
+
+<blockquote>
+<blockquote>
+<blockquote>
+<p>执行N命令进入多行模式，在当前行后面添加“\n”，并读取第二行内容到模式空间<br />
+行号计数器更新为2，此时模式空间内容为“a\nb”</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+<p>用<sup class="footnote-ref" id="fnref:a-z"><a href="#fn:a-z">2</a></sup>$对模式空间的内容“a\nb”进行匹配（ <strong>以</strong> <strong>\n</strong> <strong>为分隔符</strong> ）</p>
+
+<p>a符合匹配要求被替换为X（无g修饰符，只匹配一次，所以b不被替换）</p>
+
+<p>输出模式空间中的内容</p>
+
+<blockquote>
+<blockquote>
+<blockquote>
+<p>清空模式空间，读取第三行的内容，行号计数器更新为3，循环上面步骤</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+<p><strong>‘</strong> <strong>ADDR1</strong> <strong>，</strong> <strong>+N</strong> <strong>’</strong></p>
+
+<p>|</p>
+
+<p>匹配到ADDR1和其后的N行</p>
+
+<p><strong>‘</strong> <strong>ADDR1</strong> <strong>，</strong> <strong>~N</strong> <strong>’</strong></p>
+
+<p>|</p>
+
+<p>匹配到ADDR1和其后的行，直到出现N的倍数行 （ADDR1=4，N=3，定位到4、5、6行）</p>
+
+<p><strong>‘</strong> <strong>0</strong> <strong>，</strong> <strong>/</strong> <strong>REGEXP</strong> <strong>/</strong> <strong>’</strong></p>
+
+<p>|</p>
+
+<p>使用0作为起始地址，sed程序会尝试对第一行匹配REGEXP；</p>
+
+<p>若第一行匹配到，则搜索范围立即结束；</p>
+
+<p>若以行号1作为起始地址，则会从第二行开始匹配，直到匹配成功<br />
+（第1行至匹配到的行之间所有的行都会输出）</p>
+
+<h3 id="寻址之sed-正则表达式-用于模式匹配"><strong>寻址之sed</strong> <strong>正则表达式</strong> <strong>——用于模式匹配</strong></h3>
+
+<p><strong>建议：</strong> 少用GNU特有的表达式</p>
+
+<p><strong>/</strong> <strong>正则表达式</strong> <strong>/</strong></p>
+
+<p>|</p>
+
+<p><strong>描述</strong></p>
+
+<p>|</p>
+
+<p><strong>举例</strong></p>
+
+<p>&mdash;|&mdash;|&mdash;</p>
+
+<p><strong>&lsquo;CHAR&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>单个普通字符与自身匹配</p>
+
+<p>|</p>
+
+<p>‘abc’</p>
+
+<p><strong>&rsquo;.&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>匹配任意单个字符（除换行符）</p>
+
+<p>|</p>
+
+<p>如果在点号字符的位置没有字符，那么模式不成立（可以是空格）</p>
+
+<p><strong>&lsquo;*&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>紧跟在它 <strong>前面</strong> 的单元应匹配零次或多次</p>
+
+<p>|</p>
+
+<p>a*b 表示b前面可以没有a或者多个a，可以是b或者aaaab</p>
+
+<p><strong>&lsquo;\+&rsquo; GNU extension</strong></p>
+
+<p>|</p>
+
+<p>紧跟在它前面的单元应匹配一次或多次</p>
+
+<p>|</p>
+
+<p>a\+b 表示b前面至少有一个a，可以是ab或者aaab</p>
+
+<p><strong>&lsquo;\?&rsquo; GNU extension</strong></p>
+
+<p>|</p>
+
+<p>紧跟在它前面的单元应匹配零次或一次</p>
+
+<p>|</p>
+
+<p>/^a\?b$/ 表示输出b或者ab</p>
+
+<p><strong>&rsquo;.*&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>匹配任何字符串，包括空字符串</p>
+
+<p>|</p>
+
+<p>输出所有行</p>
+
+<p><strong>&rsquo;.\+&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>匹配任何字符串，但包含至少一个字符的字符串</p>
+
+<p>|</p>
+
+<p><strong>只输出非空白行</strong></p>
+
+<p><strong>&lsquo;\{N\}&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>紧跟在它前面的单元应精准匹配N次</p>
+
+<p>|</p>
+
+<p><strong>&lsquo;\{N，M\}&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>紧跟在它前面的单元应匹配至少N次，最后M次</p>
+
+<p>|</p>
+
+<p><strong>&lsquo;\{N，\}&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>紧跟在它前面的单元应匹配至少N次</p>
+
+<p>|</p>
+
+<p><strong>&lsquo;\(REGEXP\)&rsquo;</strong></p>
+
+<p>|</p>
+
+<p><strong>将正则表达式的一部分括起来组成一个单元，<br />
+可以对整个单元使用数量限定符</strong> <strong>&lsquo;\DIGIT&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>ifconfig | sed -n
+&rsquo;s/\([0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}\)/\1（ip）/gp&rsquo;
+将输出的ip后面追加（ip）</p>
+
+<p><strong>&lsquo;\DIGIT&rsquo;</strong></p>
+
+<p>|</p>
+
+<p><strong>引用</strong> <strong>\(REGEXP\)</strong></p>
+
+<p>|</p>
+
+<p>\1表示引用被匹配到的第一个分组</p>
+
+<p><strong>&rsquo;^&rsquo;</strong> <strong>脱字符</strong></p>
+
+<p>|</p>
+
+<p>匹配行的开始</p>
+
+<p>|</p>
+
+<p>sed &lsquo;/^$/d&rsquo; test.txt ：过滤空白行</p>
+
+<p><strong>&rsquo;$&rsquo;</strong> <strong>美元符</strong></p>
+
+<p>|</p>
+
+<p>匹配到行的结尾</p>
+
+<p>|</p>
+
+<p><strong>&lsquo;[LIST]&rsquo;</strong></p>
+
+<p>|</p>
+
+<p><strong>匹配字符组</strong></p>
+
+<p>|</p>
+
+<p>[0-9]表示0~9任意数字都可以匹配 ; [ae]表示匹配a或者e<br />
+sed -n &lsquo;/maint[ae]n[ae]nce/p&rsquo; test.txt,即使maintenance输错也可匹配</p>
+
+<p><strong>&lsquo;[^LIST]&rsquo;</strong></p>
+
+<p>|</p>
+
+<p><strong>排除字符组</strong></p>
+
+<p>|</p>
+
+<p>[^0-9]表示除了数字0~9都可以匹配</p>
+
+<p><strong>&lsquo;REGEXP1|EXGREP2&rsquo;</strong></p>
+
+<p><strong>GNU extension</strong></p>
+
+<p>|</p>
+
+<p>连接两个子表达式，表示或的关系，<br />
+并使用第一个成功匹配的表达式</p>
+
+<p>|</p>
+
+<p><strong>&lsquo;REGEXP1EXGREP2&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>连接两个正则表达式，表示与的关系</p>
+
+<p>|</p>
+
+<p><strong>&lsquo;\n&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>匹配换行符</p>
+
+<p>|</p>
+
+<p><strong>&lsquo;\CHAR&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>对特殊字符进行转义后匹配</p>
+
+<p>|</p>
+
+<p><strong>&lsquo;[-]&rsquo;</strong></p>
+
+<p>|</p>
+
+<p>字符或数字的范围</p>
+
+<p>|</p>
+
+<p>[a-zA-Z0-9]</p>
+
+<h2 id="sed命令"><strong>sed命令</strong></h2>
+
+<p><strong>根据作用空间进行划分分为：</strong></p>
+
+<blockquote>
+<blockquote>
+<blockquote>
+<p>作用于模式空间pattern_space的命令（p、d、q/Q、=、y、n、w、r、s、a、i、c、N、D、P）</p>
+
+<p>作用于保持空间hold_space的命令（h、H、g、G、x）</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>输入一系列命令需要使用使用大花括号</strong> <strong>{}</strong> <strong>括起来</strong></p>
+
+<h3 id="sed-命令如下"><strong>sed</strong> <strong>命令如下</strong></h3>
+
+<p><strong>命令</strong></p>
+
+<p>|</p>
+
+<p><strong>描述</strong></p>
+
+<p>&mdash;|&mdash;</p>
+
+<p><strong>p</strong></p>
+
+<p>|</p>
+
+<p><strong>强制输出命令</strong> ，即使使用-n选项，也能输出内容</p>
+
+<p><strong>d</strong></p>
+
+<p>|</p>
+
+<p>作用是 <strong>删除</strong> ，用于删除整个模式空间中的内容，即使d命令后面有命令也不会执行<br />
+直接 <strong>退出</strong> <strong>SCRIPT</strong> <strong>循环</strong> ，进入下一个sed循环<br />
+sed ‘/^#/{1！d} test.txt’：删除除了第一行的所有以#开头的行</p>
+
+<p><strong>q</strong> <strong>/</strong> <strong>Q</strong></p>
+
+<p>|</p>
+
+<p><strong>退出当前</strong> <strong>sed</strong> <strong>程序</strong> ，不再执行后面的命令和输入流<br />
+q命令被执行后，会输出模式空间内容再退出sed循环<br />
+Q命令被执行后，会立即退出，不会输出模式空间内容</p>
+
+<p><strong>=</strong></p>
+
+<p>|</p>
+
+<p><strong>输出匹配到的行的行号</strong> （=命令输出的行号是内存空间，不受-n选项影响）<br />
+&gt;&gt;&gt;当“=”和“q”，“Q”命令结合时，会有异常</p>
+
+<p><strong>y</strong></p>
+
+<p>|</p>
+
+<p>根据映射进行 <strong>替换</strong> ，根据位置关系进行替换 <strong>（被替换字符串，和替换字符串长度必须相等）</strong> <strong>&lsquo;</strong> <strong>y</strong> <strong>/</strong> <strong>abc</strong>
+<strong>/</strong> <strong>def</strong> <strong>/&rsquo;</strong></p>
+
+<p><strong>n</strong></p>
+
+<p>|</p>
+
+<p>作用是输出当前模式空间并清空模式空间， <strong>手动读取下一行</strong> ，行号计数器自动更新到要读取的那一行<br />
+sed -n ‘p，n’test.txt ：输出奇数行</p>
+
+<p>sed -n ‘n，p’test.txt ：输出偶数行</p>
+
+<p><strong>w filename</strong></p>
+
+<p>|</p>
+
+<p><strong>将输入流写到指定文件中</strong></p>
+
+<p><strong>r filename</strong></p>
+
+<p>|</p>
+
+<p><strong>将一个文件插入到数据流中</strong></p>
+
+<p><strong>s</strong></p>
+
+<p>|</p>
+
+<p><strong>替换匹配的内容</strong><br />
+ <strong>语法格式：</strong> <strong>s/REGEXP/REPLACEMENT/FLAGS</strong><br />
+ <strong>&gt; &gt;&gt;</strong> <strong>REGEXP:</strong> <strong>使用</strong> <strong>REGEXP</strong> <strong>去匹配行，将匹配到的那部分内容替换成</strong> <strong>REPLACEMENT</strong><br />
+ <strong>&gt; &gt;&gt;</strong> <strong>REPLACEMENT</strong> <strong>：用于替换的字符</strong></p>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>FLAGS</strong> <strong>：修饰符</strong><br />
+ <strong>g</strong> <strong>：即</strong> <strong>gloabl</strong> <strong>，全局替换，</strong><br />
+<strong>可以将</strong> <strong>g</strong> <strong>修饰符替换成</strong> <strong>N</strong> <strong>，</strong> <strong>N</strong> <strong>表示替换第几个匹配到的字符</strong><br />
+ <strong>p</strong> <strong>：强制输出被修改的行，在</strong> <strong>auto_print</strong> <strong>之前会多打印一次</strong><br />
+ <strong>w filename</strong> <strong>：将替换的结果写到指定文件中</strong><br />
+ <strong>e</strong> <strong>：若</strong> <strong>REPLACEMENT</strong> <strong>的行首是可执行命令，替换成命令执行结果，</strong> <strong>s</strong> <strong>命令才会执行成功</strong><br />
+ <strong>i/I</strong> <strong>：忽略</strong> <strong>REGEXP</strong> <strong>的大小写</strong></p>
+
+<p><strong>需求</strong> ：将ifconfig &amp;&amp; ls || pwd 替换成 ifconfig &amp;&amp; pwd || ls</p>
+
+<p>sed ‘s#&amp;&amp;\(.<em>\) ||\(.</em>\)#&amp;&amp;\2 ||\1#g’<br />
+在REPLACEMENT中对&amp;进行了转义，因为&amp;符号在REPLACEMRNT中，表示的是引用REGEXP匹配的所有内容</p>
+
+<p><strong>a</strong> <strong>、</strong> <strong>i</strong> <strong>、</strong> <strong>c</strong></p>
+
+<p>|</p>
+
+<p>格式：【a|i|c】 TEXT 当有输出流时，这三个命令就会半路”劫杀“（命令和TEXT之间有无空格，有无转义符都一样）</p>
+
+<p><strong>a</strong> <strong>命令</strong> 表示 <strong>追加</strong> 到输出流内容中再输出，追加在输出流的尾部<br />
+ <strong>i</strong> <strong>命令</strong> 表示 <strong>插入</strong> 到输出流内容中再输出，插入在输出流的首部<br />
+ <strong>c</strong> <strong>命令</strong> 表示 <strong>替换</strong> 掉输出流的内容再输出，替换掉整个输出流 （地址若是一个区间，此命令会用一行替换掉输入流中的多行）<br />
+<strong>（</strong> <strong>c</strong> <strong>命令替换结束会立即退出</strong> <strong>当前</strong> <strong>SCRIPT</strong> <strong>循环</strong> <strong>，</strong> <strong>SCRIPT</strong>
+<strong>循环后面的命令不会被执行）</strong><br />
+这三个命令的TEXT是存放在 <strong>内存</strong> 中，不会加入模式空间，不受“-n”选项或某些命令影响</p>
+
+<p><strong>N</strong> <strong>、</strong> <strong>D</strong> <strong>、</strong> <strong>P</strong></p>
+
+<p>|</p>
+
+<p><strong>N</strong> <strong>命令</strong> ：读取下一行内容追加到当前 <strong>模式空间</strong> 的尾部，追加时 原有内容与新内容用换行符 <strong>“</strong> <strong>\n</strong> <strong>”</strong> 隔开<br />
+<strong>此时行号计数器记录的行号会更新为下一行的行号</strong><br />
+有多行内容时，模式空间格式：line1 <strong>\n</strong> line2 <strong>\n</strong> line3<br />
+ <strong>D</strong> <strong>命令</strong> ：删除 <strong>模式空间</strong> 中第一个换行符“\n”之前的内容，然后进入到下一轮SCRIPT循环</p>
+
+<p>实现将模式空间中的内容一行行删除（只有在多行模式才可以生效）<br />
+ <strong>P</strong> <strong>命令</strong> ：输出 <strong>模式空间</strong> 中第一个换行符“\n”之前的内容，即输出模式空间第一行内容</p>
+
+<p><strong>h</strong> <strong>、</strong> <strong>H</strong></p>
+
+<p><strong>g</strong> <strong>、</strong> <strong>G</strong> <strong>、</strong> <strong>x</strong></p>
+
+<p>|</p>
+
+<p><strong>h</strong> <strong>命令</strong> ：将模式空间中的内容覆盖到保持空间，注意模式空间中的内容仍然保留<br />
+ <strong>H</strong> <strong>命令</strong> ：在保持空间尾部加上换行符“\n”，并将模式空间的内容追加到保持空间的尾部，注意模式空间中的内容仍然保留<br />
+ <strong>g</strong> <strong>命令</strong> ：将保持空间中的内容覆盖到模式空间<br />
+ <strong>G</strong> <strong>命令</strong> ：在模式空间尾部加上换行符“\n”，并将模式空间的内容追加到模式空间的尾部<br />
+ <strong>x</strong> <strong>命令</strong> ：交换模式空间和保持空间的内容</p>
+
+<hr />
+
+<h1 id="③-sed-高级"><strong>③</strong> <strong>sed</strong> <strong>高级</strong></h1>
+
+<h2 id="标签命令"><strong>标签命令</strong></h2>
+
+<p>作用：用于控制SCRIPT循环中执行流的循环和分支语句，可以根据标签跳转到某一行命令继续执行</p>
+
+<p><strong>&gt; &gt;&gt;:</strong> <strong>LABEL</strong></p>
+
+<p>通过这个格式去定义一个标签，不可放在地址表达式后面</p>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>b LABEL</strong></p>
+
+<p>无条件跳转到标签LABEL上 ，只有bLABEL会导致死循环<br />
+/REGEXP/bx，如果匹配到表达式，就会跳转到LABEL标签处</p>
+
+<p>如果LABEL省略，则跳转到SCRIPT的尾部，跳到进行auto_print前面</p>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>t LABEL</strong><br />
+如果对最近读入s命令能够执行成功，则跳转到LABEL标签处</p>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>T LABEL</strong></p>
+
+<p>如果对最近读入s命令没有执行成功，则跳转到LABEL标签处</p>
+
+<h2 id="滑动窗口"><strong>滑动窗口</strong></h2>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>输出文件最后五行（单用模式空间，效率慢，适合小文件）</strong><br />
+cat 1.txt | sed -n &lsquo;N;N;N;:r;N;$!s/[^\n]*\n//;tr;p&rsquo;
+（若p改为P，即输出文件倒数第5行，P命令用于输出模式空间第一个\n之前的内容）</p>
+
+<p>/[^\n]*\n/ ：表达式匹配到第一行的内容，然后删除它</p>
+
+<p>第一次执行s命令：1\n2\n3\n4\n5</p>
+
+<p>第二次执行s命令：2\n3\n4\n5\n6</p>
+
+<p>第三次执行s命令：3\n4\n5\n6\n7</p>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>输出文件最后五行（用模式空间和保持空间，适合大文件）</strong></p>
+
+<p>cat 1.txt | sed -n &lsquo;H;5,${g;s/[^\n]*\n//;h};$p&rsquo;</p>
+
+<p>执行流程：</p>
+
+<p>第一次执行sed循环： 保持空间内容为：\n1</p>
+
+<p>第二次执行sed循环： 保持空间内容为：\n1\n2</p>
+
+<p>第三次执行sed循环： 保持空间内容为：\n1\n2\n3</p>
+
+<p>第四次执行sed循环： 保持空间内容为：\n1\n2\n3\n4</p>
+
+<p>第五次执行sed循环： 保持空间内容为：1\n2\n3\n4\n5</p>
+
+<p>第六次执行sed循环： 保持空间内容为：2\n3\n4\n5\n6<br />
+…….</p>
+
+<h2 id="sed-中变量的使用和替换问题"><strong>sed</strong> <strong>中变量的使用和替换问题</strong></h2>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>shell</strong> <strong>中单引号、双引号、无引号时的作用：决定命令行中哪些单词会被</strong> <strong>shell</strong> <strong>解析</strong></p>
+
+<p><strong>&gt; &gt;&gt;</strong> <strong>规范：</strong> <strong>sed &ldquo;shell_content&rdquo;&lsquo;sed_content&rsquo; INPUT_STREAM</strong><br />
+<strong>（</strong> <strong>1</strong> <strong>）单引号：</strong> <strong>当变量需要被</strong> <strong>sed</strong> <strong>解析，而不被</strong> <strong>shell</strong> <strong>解析，使用单引号</strong></p>
+
+<p>单引号内所有字符都是普通字符（包括$）</p>
+
+<p>单引号内不能包括单引号字符，即使转义也不行，因为此时转义字符也是一个普通字符<br />
+单引号内包括变量不会被解析，不会命令替换和算术运算，不会进行路径拓展<br />
+<strong>使用</strong> <strong>sed</strong> <strong>，</strong> <strong>$</strong> <strong>，</strong> <strong>!</strong> <strong>，</strong> <strong>{}</strong> <strong>对于这些符号需要用单引号</strong><br />
+<strong>（</strong> <strong>2</strong> <strong>）双引号：</strong> <strong>对于需要被</strong> <strong>shell</strong> <strong>解析的字符，可以使用双引号</strong></p>
+
+<p>双引号内的所有字符都为普通字符（&rsquo;\&lsquo;，&rsquo;$&lsquo;，&rsquo;`&lsquo;除外）<br />
+对于需要 <strong>被</strong> <strong>shell</strong> <strong>解析</strong> 的字符，可以使用双引号，也可以不加任何引号<br />
+<strong>（</strong> <strong>3</strong> <strong>）无引号：</strong></p>
+
+<p>等同于双引号，但会进行大括号和波浪号扩展</p>
+
+<hr />
+
+<h1 id="④-sed-实战"><strong>④</strong> <strong>sed</strong> <strong>实战</strong></h1>
+
+<p><strong>（</strong> <strong>1</strong> <strong>）</strong> <strong>shell</strong> <strong>变量与</strong> <strong>sed</strong> <strong>变量的引号使用</strong></p>
+
+<p>sed -n &ldquo;<code>expr $(wc -l &lt;1.txt) - 4</code>&rdquo;&lsquo;,$p&rsquo; 1.txt<br />
+&gt;&gt;&gt; <code>expr $(wc -l &lt;1.txt) - 4</code>需要被shell解析，不能加单引号<br />
+&gt;&gt;&gt; $p的&rdquo;$&ldquo;要被sed解析成最后一行，必须使用单引号，避免被shell解析</p>
+
+<p><strong>（</strong> <strong>2</strong> <strong>）将连续空行压缩为一行</strong></p>
+
+<p>sed &lsquo;/./,/^$/!d&rsquo; 1.txt</p>
+
+<p><strong>（</strong> <strong>3</strong> <strong>）删除开头空行</strong></p>
+
+<p>sed &lsquo;/./,$!d&rsquo; 1.txt</p>
+
+<p><strong>（</strong> <strong>4</strong> <strong>）删除结尾空行</strong><br />
+sed &lsquo;:start;/^\n*$/{$d;N;b start}&rsquo; 1.txt</p>
+
+<blockquote>
+<blockquote>
+<blockquote>
+<p>/^\n*$/ ：匹配到的是空行</p>
+</blockquote>
+</blockquote>
+</blockquote>
+
+<p><strong>（</strong> <strong>5</strong> <strong>）删除每行开头的空格和</strong> <strong>tab</strong> <strong>前导空白</strong></p>
+
+<p>sed &rsquo;s/<sup class="footnote-ref" id="fnref:t"><a href="#fn:t">3</a></sup>*//&rsquo; 1.txt</p>
+
+<p><strong>（</strong> <strong>6</strong> <strong>）过滤所有</strong> <strong>HTML</strong> <strong>标签</strong></p>
+
+<p>sed &rsquo;s/]<em>&gt;//g;/^$/d;s/<sup class="footnote-ref" id="fnref:-"><a href="#fn:-">4</a></sup></em>//&rsquo; 1.txt</p>
+<div class="footnotes">
+
+<hr />
+
+<ol>
+<li id="fn:a-z">a-z <a class="footnote-return" href="#fnref:a-z"><sup>[return]</sup></a></li>
+<li id="fn:a-z">a-z <a class="footnote-return" href="#fnref:a-z"><sup>[return]</sup></a></li>
+<li id="fn:t">\t  <a class="footnote-return" href="#fnref:t"><sup>[return]</sup></a></li>
+<li id="fn:-">  <a class="footnote-return" href="#fnref:-"><sup>[return]</sup></a></li>
+</ol>
+</div>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

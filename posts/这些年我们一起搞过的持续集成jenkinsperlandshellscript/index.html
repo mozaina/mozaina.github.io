@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>这些年我们一起搞过的持续集成JenkinsPerlandShellscript | 开发者问答集锦</title>
+    <meta property="og:title" content="这些年我们一起搞过的持续集成JenkinsPerlandShellscript - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="这些年我们一起搞过的持续集成JenkinsPerlandShellscript">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E8%BF%99%E4%BA%9B%E5%B9%B4%E6%88%91%E4%BB%AC%E4%B8%80%E8%B5%B7%E6%90%9E%E8%BF%87%E7%9A%84%E6%8C%81%E7%BB%AD%E9%9B%86%E6%88%90jenkinsperlandshellscript/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">这些年我们一起搞过的持续集成JenkinsPerlandShellscript</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="这些年我们一起搞过的持续集成-jenkins-perl-and-shell-script">这些年我们一起搞过的持续集成~Jenkins+Perl and Shell script</h2>
+
+<p>##本文同时发表在<a href="http://www.cnblogs.com/wade-xu/p/4378224.html">http://www.cnblogs.com/wade-xu/p/4378224.html</a> ##转载注明出处</p>
+
+<p>部门用持续集成已经很久了，但其实使用起来还是很麻烦的，每当要给一个新项目set up持续集成的环境，虽然是Copy一些现有的jobs,
+但是许多参数，变量需要去改，然后还有调试，少说3,4天搞一下，非常不方便。</p>
+
+<p>最近比较空，就把现有的持续集成系统升级改造下，job用一套模板，全部参数化，只要修改配置文件，就可以为新项目配置好环境。</p>
+
+<p>本文的重点是一些经验，想法的分享，并不是一篇手把手教你搭建持续集成环境的教程，而且阅读本文需要一定的Jenkins, perl, shell脚本的基础知识，
+所用到的知识有：Jenkins+Maven+Git+Sonar+Perl+Shell script</p>
+
+<p>下图很好的说明了我们现有的Job流， 以往是每个项目都有一套这样的job流，现在我改成这个Template_service
+job流，供所有的项目使用，项目名也是作为参数传递进来的，每个job都是用Jenkins Execute shell这个组件来实现功能的，像check
+out code，Email Notification, Publish Junit test results, code coverage report
+等Jenkins自带组件都没有使用。</p>
+
+<p>运行环境： apache-maven-3.0.5, jdk1.7.0_15, git 1.8.2.1, SonarQube 4.0, perl v5.8.8</p>
+
+<p><a href="https://img.it610.com/image/info8/a8cdee0834fb457898f7f417c84eadaf.jpg"><img src="https://img.it610.com/image/info8/a8cdee0834fb457898f7f417c84eadaf.jpg" alt="这些年我们一起搞过的持续集成~Jenkins+Perl and Shell
+script_第1张图片" /></a></p>
+
+<p>##转载注明出处：<a href="http://www.cnblogs.com/wade-xu/p/4378224.html">http://www.cnblogs.com/wade-xu/p/4378224.html</a></p>
+
+<p>接下来简单的说明一下各个Job的功能，以及贴出详细的脚本供大家参考。</p>
+
+<p>除了上图里面的job, 还有一个Config job, export一些环境变量</p>
+
+<p>0)Template_Service_Config (one time run)</p>
+
+<p>用来Export 环境变量的，比如Project list, project git 地址，</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>export PROJECT_LIST=PROJECTA,PROJECTB<br />
+export
+PROJECTA_GIT_PROJECT_URL=ssh://git@stash.xxx.com:7999/Project/ProjectA.git<br />
+export PROJECTA_BRANCH=development<br />
+export PROJECTA_SERVICE_NAME=China_Template_Service<br />
+export PROJECTA_EMAIL_LIST=wadexu@xxx.com,xxx@xxx.com<br />
+export PROJECTA_EMAIL_CC_LIST=wadexu@xxx.com</p>
+
+<p>&hellip;&hellip;</p>
+
+<p>export PROJECTB_GIT_PROJECT_URL=ssh://git@stash.xxx.com:7999/abc/ProjectB.git<br />
+export PROJECTB_BRANCH=perf<br />
+export PROJECTB_SERVICE_NAME=China_ProjectB_DEV<br />
+export PROJECTB_EMAIL_LIST=wadexu@xxx.com,xxx@xxx.com<br />
+export PROJECTB_EMAIL_CC_LIST=wadexu@xxx.com</p>
+
+<p>&hellip;&hellip;</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>Build 这个job 的时候需要Parameters</p>
+
+<p><a href="https://img.it610.com/image/info8/2542354d7ef544e3b93e55c4f51d36ee.jpg"><img src="https://img.it610.com/image/info8/2542354d7ef544e3b93e55c4f51d36ee.jpg" alt="这些年我们一起搞过的持续集成~Jenkins+Perl and Shell
+script_第2张图片" /></a></p>
+
+<p>代码如下：主要作用就是将输入的Parameters写入到一个文件，以便后续所有job 一上来source一下</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>TEST=${WORKSPACE}/test
+CONFIG_FILE=Project_Config.txt
+
+rm -rf ${TEST}
+git clone ssh://git@stash.xxx.com:7999/project/test.git
+cd ${TEST}
+
+cd Config
+if [ ! -f &quot;${CONFIG_FILE}&quot; ]; then  
+touch &quot;${CONFIG_FILE}&quot;
+fi
+
+##########Rewrite the config file base on the project list########### CURRENT_TIME=`date +&quot;%m/%d/%Y/%T&quot;` echo -e &quot;export CONFIG_TIME=${CURRENT_TIME}\n export PROJECT_LIST=${PROJECT_LIST}\n export SHARED_FOLDER=~/jenkins/common\n&quot; &gt; ${CONFIG_FILE}  ###########List the project1 parameters########### echo -e &quot;${PROJECTA_PARAMETERS}&quot; &gt;&gt; ${CONFIG_FILE} ###########List the project2 parameters########### echo -e &quot;${PROJECTB_PARAMETERS}&quot; &gt;&gt; ${CONFIG_FILE}  git add ${CONFIG_FILE} git commit -m &quot;config file&quot; git push origin master cp ${CONFIG_FILE} ~/jenkins/common/Config cd .. cp Scripts/* ~/jenkins/common/Scripts chmod 755 ~/jenkins/common/Scripts/*
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>还有就是将一些perl写的脚本从git clone下来放到某一个公共目录下，以便后续job使用， 有如下脚本，比如发送email, Unit test
+analyzer</p>
+
+<p>部分脚本像gridService, packageService是操作公司一个网格云计算平台，安装rpm包，重启service用的，不方便贴出来。</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>[wadexu@vm10226 common]$ cd Scripts/
+[wadexu@vm10226 Scripts]$ ll
+total 404
+-rwxr-xr-x 1 wadexu wadexu  37853 Mar 27 09:12 gridService
+-rwxr-xr-x 1 wadexu wadexu   4991 Mar 27 09:12 packageService
+-rwxr-xr-x 1 wadexu wadexu   1628 Mar 27 09:12 queryDB.pl
+-rwxr-xr-x 1 wadexu wadexu 317183 Mar 27 09:12 Reporter.jar
+-rwxr-xr-x 1 wadexu wadexu   2190 Mar 27 09:12 report.pl
+-rwxr-xr-x 1 wadexu wadexu   3415 Mar 27 09:12 sendEmail.pl
+-rwxr-xr-x 1 wadexu wadexu   1210 Mar 27 09:12 ServiceInfoProvider.pl
+-rwxr-xr-x 1 wadexu wadexu   3418 Mar 27 09:12 UnitTestAnalyzer.pl
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>1)Template_Service_Initial</p>
+
+<p>遍历Project list 列出的项目， 使用curl 调用下一个job (Commit_Auto_Build) 的Rest API， Build job
+with parameter接口</p>
+
+<p>每个项目的Job流都是通过Project name + Initial job的Build number 来贯穿的,
+这点很重要，多项目一起运行时各项目之间不会错乱，比如写Log文件，分析Log文件生成report</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>rm -rf ${WORKSPACE}/*
+
+####### Import config file #######
+cd ~/jenkins/common/Config
+. Project_Config.txt
+cd ~/jenkins/common/Temp
+
+####### Get the Project list and traverse the list ######    
+          id=1
+          list_size=`echo $PROJECT_LIST | awk -F &quot;,&quot; '{print NF;}'`
+          let list_size=list_size+1
+          while [ $id -lt $list_size ]
+            do 
+                projectName=`echo &quot;${PROJECT_LIST}&quot;|awk -v id=$id -F &quot;,&quot; '{print $id}'`      
+                if [ &quot;$projectName &quot; != ' ' ];  then            
+                curl -X POST --user &quot;jadmin:71103407&quot; -s _http://vm10686.global.xxx.net_ :8080/view/Template/job/Template_Service_Commit_Auto_Build/build --data json='{&quot;parameter&quot;: [{&quot;name&quot;:&quot;PROJECT_NAME&quot;,&quot;value&quot;:&quot;'$projectName'&quot;},{&quot;name&quot;:&quot;PIPELINE_NUM&quot;,&quot;value&quot;:&quot;'$BUILD_NUMBER'&quot;}]}'                        
+                    id=`expr $id + 1`
+                 else
+                    break
+                fi
+            done     
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>2)Template_Service_Commit_Auto_Build</p>
+
+<p>这个Job的作用是用来比较代码版本有没有更新，如果有更新（或者是第一次run这个job）就会调用后续的&ndash; Build job</p>
+
+<p>还有就是列出这次Build和上次Build之间改动过代码的作者。</p>
+
+<p>如果将Initial job 设置成每几分钟run一下，其实这个job就起到了 每当有人提交代码，则自动Build的作用了。</p>
+
+<p><a href="https://img.it610.com/image/info8/9434bd7c91f64abaa507e5099f00fa0a.jpg"><img src="https://img.it610.com/image/info8/9434bd7c91f64abaa507e5099f00fa0a.jpg" alt="这些年我们一起搞过的持续集成~Jenkins+Perl and Shell
+script_第3张图片" /></a></p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>### Import config file ###
+cd ~/jenkins/common/Config
+. Project_Config.txt
+
+### Initial parameters ###
+GIT_PROJECT_URL=${PROJECT_NAME}&quot;_GIT_PROJECT_URL&quot; 
+GIT_PROJECT_URL=$(eval echo \${$GIT_PROJECT_URL})
+
+BRANCH=${PROJECT_NAME}&quot;_BRANCH&quot;
+BRANCH=$(eval echo \${$BRANCH})
+
+LOG_NAME=${PROJECT_NAME}&quot;_BUILD_&quot;${PIPELINE_NUM}&quot;.log&quot;
+BUILD_LOG_FOLDER=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}
+BUILD_LOG=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}/$LOG_NAME
+
+mkdir $BUILD_LOG_FOLDER
+
+GIT_PROJECT_NAME=${PROJECT_NAME}&quot;_GIT_PROJECT_NAME&quot;
+GIT_PROJECT_NAME=$(eval echo \${$GIT_PROJECT_NAME})
+
+#### setup ####
+export CURRENT_RESOURCE_DIR=${WORKSPACE}/${GIT_PROJECT_NAME}
+export CURRENT_MD5_FILE=${WORKSPACE}/${PROJECT_NAME}&quot;_Code_Current&quot;
+export BASE_MD5_FILE=${WORKSPACE}/${PROJECT_NAME}&quot;_Code_Base&quot;
+export CURRENT_AUTHOR_LIST=${WORKSPACE}/${PROJECT_NAME}&quot;_Author_Current&quot;
+export BASE_AUTHOR_LIST=${WORKSPACE}/${PROJECT_NAME}&quot;_Author_Base&quot;
+
+#### cd resource,get log commit MD5 ####
+cd ${WORKSPACE}
+rm -rf ${CURRENT_RESOURCE_DIR}
+git clone ${GIT_PROJECT_URL}
+cd ${CURRENT_RESOURCE_DIR}
+git checkout -b ci origin/${BRANCH}
+
+if [ ! -f &quot;${BASE_AUTHOR_LIST}&quot; ]; then  
+  touch &quot;${BASE_AUTHOR_LIST}&quot;
+fi
+
+if [ ! -f &quot;${BASE_MD5_FILE}&quot; ]; then  
+  touch &quot;${BASE_MD5_FILE}&quot;
+
+  ########call build job######  
+  curl -d --user &quot;jadmin:71103407&quot; -s http://vm10686.global.xxx.net:8080/view/Template/job/Template_Service_Build/build --data json='{&quot;parameter&quot;:[{&quot;name&quot;:&quot;PROJECT_NAME&quot;,&quot;value&quot;:&quot;'${PROJECT_NAME}'&quot;},{&quot;name&quot;:&quot;PIPELINE_NUM&quot;,&quot;value&quot;:&quot;'${PIPELINE_NUM}'&quot;}]}'
+
+  git log --pretty=format:&quot;Author: %an&quot; &gt; ${BASE_AUTHOR_LIST}
+  sort -u  ${BASE_AUTHOR_LIST}  &gt;  ${BUILD_LOG}
+
+  git log --max-count=1 --pretty=format:&quot;%H&quot; &gt; ${BASE_MD5_FILE}
+  exit 0
+else
+  git log --max-count=1 --pretty=format:&quot;%H&quot; &gt; ${CURRENT_MD5_FILE}
+  git log --pretty=format:&quot;Author: %an&quot; &gt; ${CURRENT_AUTHOR_LIST}
+fi
+
+#### compare the md5 file, and run the job.####
+## -a means &amp;&amp; ##
+    if cmp -s ${CURRENT_MD5_FILE} ${BASE_MD5_FILE}
+       then
+          echo &quot;same,no changes!&quot;
+     else
+      mv ${CURRENT_MD5_FILE} ${BASE_MD5_FILE}
+      diff -b $CURRENT_AUTHOR_LIST $BASE_AUTHOR_LIST | grep &quot;&lt;&quot; | sed 's/^&lt; //g' &gt; Update_Author.txt
+      mv ${CURRENT_AUTHOR_LIST} ${BASE_AUTHOR_LIST}
+      sort -u Update_Author.txt &gt; ${BUILD_LOG}
+
+########call build job###### 
+      curl -d --user &quot;jadmin:71103407&quot; -s http://vm10686.global.xxx.net:8080/view/Template/job/Template_service_Build/build --data json='{&quot;parameter&quot;: [{&quot;name&quot;:&quot;PROJECT_NAME&quot;,&quot;value&quot;:&quot;'${PROJECT_NAME}'&quot;},{&quot;name&quot;:&quot;PIPELINE_NUM&quot;,&quot;value&quot;:&quot;'${PIPELINE_NUM}'&quot;}]}'
+    fi
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>这里用到了&ndash;pretty=format 这个参数， %H就是打印出哈希字串， %an是打印出Author， &ndash;max-count=1 取最近的一条log
+记录</p>
+
+<p>##转载注明出处：<a href="http://www.cnblogs.com/wade-xu/p/4378224.html">http://www.cnblogs.com/wade-xu/p/4378224.html</a></p>
+
+<p>3) Template_Service_Build</p>
+
+<p>这个job是最核心的job， 执行rpm build, 将rpm包丢到公司内部网格云计算平台的Repository下， 分析单元测试结果， 运行Sonar,
+从Sonar的首页上拿到这个项目的一些信息，比如Sonar上 blocker, critical, major 等issues, 还有code
+coverage，全部打印到log里， 以便后续的脚本生成report, 另外就是Sonar issue, code coverage
+不达标，则发送相应的email 给相应的project email list</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>rm -rf ${WORKSPACE}/*
+
+###### Import config file ######
+cd ~/jenkins/common/Config
+. Project_Config.txt
+
+###### Initial parameters ######
+GIT_PROJECT_NAME=${PROJECT_NAME}&quot;_GIT_PROJECT_NAME&quot;
+GIT_PROJECT_NAME=$(eval echo \${$GIT_PROJECT_NAME})
+
+LOG_NAME=${PROJECT_NAME}&quot;_BUILD_&quot;${PIPELINE_NUM}&quot;.log&quot;
+BUILD_LOG=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}/$LOG_NAME
+
+BRANCH=${PROJECT_NAME}&quot;_BRANCH&quot;
+BRANCH=$(eval echo \${$BRANCH})
+
+GIT_PROJECT_URL=${PROJECT_NAME}&quot;_GIT_PROJECT_URL&quot; 
+GIT_PROJECT_URL=$(eval echo \${$GIT_PROJECT_URL})
+
+REPOSITORY=${PROJECT_NAME}&quot;_REPOSITORY&quot; 
+REPOSITORY=$(eval echo \${$REPOSITORY})
+
+INSTANCES=${PROJECT_NAME}&quot;_INSTANCES&quot;
+INSTANCES=$(eval echo \${$INSTANCES})
+
+COVERAGE_URL=${PROJECT_NAME}&quot;_COVERAGE_URL&quot;
+COVERAGE_URL=$(eval echo \${$COVERAGE_URL})
+
+SONAR_MIN_COVERAGE=${PROJECT_NAME}&quot;_SONAR_MIN_COVERAGE&quot;
+SONAR_MIN_COVERAGE=$(eval echo \${$SONAR_MIN_COVERAGE})
+
+MAX_MAJOR_ISSUE_NUM=${PROJECT_NAME}&quot;_MAX_MAJOR_ISSUE_NUM&quot;
+MAX_MAJOR_ISSUE_NUM=$(eval echo \${$MAX_MAJOR_ISSUE_NUM})
+
+MAX_CRITICAL_ISSUE_NUM=${PROJECT_NAME}&quot;_MAX_CRITICAL_ISSUE_NUM&quot;
+MAX_CRITICAL_ISSUE_NUM=$(eval echo \${$MAX_CRITICAL_ISSUE_NUM})
+
+SERVICE_NAME=${PROJECT_NAME}&quot;_SERVICE_NAME&quot;
+SERVICE_NAME=$(eval echo \${$SERVICE_NAME})
+
+EMAIL_LIST=${PROJECT_NAME}&quot;_EMAIL_LIST&quot;
+EMAIL_LIST=$(eval echo \${$EMAIL_LIST})
+
+author_list=`cat $BUILD_LOG | grep &quot;Author&quot;` || true
+
+######### SET ENVIRONMENT VARIABLE ##############
+export BASE_DIR=${WORKSPACE}/${GIT_PROJECT_NAME}
+export SCRIPTS_HOME=${SHARED_FOLDER}/Scripts
+cd ${SCRIPTS_HOME}
+chmod 755 *
+export PATH=$PATH:`pwd`
+
+####### Build Job ######
+cd ${WORKSPACE}
+
+START_TIME=`date +&quot;%m/%d/%Y %T&quot;`
+echo &quot;overview-&gt;startTime: ${START_TIME}&quot; &gt;&gt; ${BUILD_LOG}
+echo &quot;overview-&gt;logURL: ${BUILD_URL}&quot; &gt;&gt; ${BUILD_LOG}
+echo &quot;overview-&gt;serviceType: ${PROJECT_NAME} Service&quot; &gt;&gt; ${BUILD_LOG}
+
+git clone ${GIT_PROJECT_URL}
+
+BUILD_FILE=rpmbuild.sh
+cd ${BASE_DIR}
+git checkout origin/${BRANCH}
+
+let BUILD_NUMBER=100+${BUILD_NUMBER}
+sed -i -r &quot;s/^RELEASE.+/RELEASE=${BUILD_NUMBER}_Dev/g&quot; ${BUILD_FILE}
+sh ${BUILD_FILE}
+
+cd ${WORKSPACE}
+rm -rf *.rpm
+mv `find . -type f -name &quot;*.rpm&quot; | egrep -v '(\.src\.)' | egrep -v 'BUILD'` .
+RPM=`ls *.rpm`
+
+packageService --addPackages --repository ${REPOSITORY} --packages &quot;${RPM}&quot;
+
+############# Unit test analyze  ###############
+UnitTestAnalyzer.pl --path &quot;${BASE_DIR}/.rpm/BUILD&quot; --sufix xml &gt;&gt; ${BUILD_LOG}
+
+################Run Sonar################
+cd ${BASE_DIR}
+mvn clean install -f ${BASE_DIR}/pom.xml -DPASSWORD=$ENV{PASSWORD} -DUSERNAME=$ENV{USERNAME} -e -B sonar:sonar
+
+################Get project in Sonar ################
+sonarProjectName=`sed -ne '/name/{s/.*\(.*\).*/\1/p;q;}' pom.xml`
+lowerProjectName=`echo $sonarProjectName | awk '{print tolower($0)}'`
+
+sonarId=`queryDB.pl --query=&quot;select * from resource_index where kee = '$lowerProjectName' order by resource_id;&quot;`
+echo $sonarId
+sonar_path=http://vm10686.global.xxx.net:9000/dashboard/index/${sonarId}
+echo &quot;SonarPath: ${sonar_path}&quot; &gt;&gt; ${BUILD_LOG}
+
+################Function for get Sonar home page info################
+##Key for what you want to find
+##column to print
+
+function get_html_value() {
+html=$1
+key=$2
+column=$3
+echo `cat $html | sed -n '/'$key'/p' | awk -v column=$column -F &quot;[&gt;&quot; '{print $column}'`
+}
+
+##############Sonar issues analyze ###############
+curl ${sonar_path} &gt; html.txt
+blocker_num=`get_html_value html.txt m_blocker_violations 3`
+critical_num=`get_html_value html.txt m_critical_violations 3`
+major_num=`get_html_value html.txt m_major_violations 3`
+minor_num=`get_html_value html.txt m_minor_violations 3`
+info_num=`get_html_value html.txt m_info_violations 3`
+
+echo &quot;SonarIssues-&gt;Blocker: ${blocker_num}&quot; &gt;&gt; ${BUILD_LOG}
+echo &quot;SonarIssues-&gt;Critical: ${critical_num}&quot; &gt;&gt; ${BUILD_LOG}
+echo &quot;SonarIssues-&gt;Major: ${major_num}&quot; &gt;&gt; ${BUILD_LOG}
+echo &quot;SonarIssues-&gt;Minor: ${minor_num}&quot; &gt;&gt; ${BUILD_LOG}
+echo &quot;SonarIssues-&gt;Info: ${info_num}&quot; &gt;&gt; ${BUILD_LOG}
+
+##############Sonar Code Coverage analyze ###############
+code_coverage=`get_html_value html.txt m_coverage 7`
+code_coverage_integer=`echo $code_coverage | sed -n 's/%//p'`
+
+line_coverage=`get_html_value html.txt m_line_coverage 5`
+branch_coverage=`get_html_value html.txt m_branch_coverage 5`
+
+echo &quot;CoverageInfo-&gt;UnitTestsCoverage: ${code_coverage}&quot; &gt;&gt; ${BUILD_LOG}
+echo &quot;CoverageInfo-&gt;LineCoverage: ${line_coverage}&quot; &gt;&gt; ${BUILD_LOG}
+echo &quot;CoverageInfo-&gt;BranchCoverage: ${branch_coverage}&quot; &gt;&gt; ${BUILD_LOG}
+echo &quot;CoverageInfo-&gt;CoverageThreshold: ${SONAR_MIN_COVERAGE}%&quot;  &gt;&gt; ${BUILD_LOG}
+
+################Send Email Code Coverage &lt; Threshold ################
+if (( $(echo &quot;$code_coverage_integer &lt; $SONAR_MIN_COVERAGE&quot; | bc -l) ))
+then
+mail_subject=${PROJECT_NAME}&quot;_Service_Build Job - Build # &quot;${BUILD_NUMBER}&quot; Failure&quot;'!'
+
+mail_body=&quot;Hi, ${PROJECT_NAME}&quot;&quot; project member&quot;$'\n'$'\n'&quot;Alerts : Unit Tests Coverage: ${code_coverage} &lt; CoverageThreshold: ${SONAR_MIN_COVERAGE}%, the latest build package cannot be allowed to install to service - ${SERVICE_NAME} [$INSTANCES]&quot;'!'$'\n'$'\n'&quot;For details please refer to SonarQube - ${sonar_path}&quot;$'\n'$'\n'&quot;The latest code author list as below:&quot;$'\n'&quot;${author_list}&quot;
+
+sendEmail.pl --subject &quot;${mail_subject}&quot; --emaillist &quot;${EMAIL_LIST}&quot; --mailbody &quot;$mail_body&quot; --msg_type &quot;text&quot;
+exit 0
+fi
+
+################Send Email when Sonar has major above issue################
+if [ ${blocker_num} -gt 0 ] || [ ${critical_num} -gt ${MAX_CRITICAL_ISSUE_NUM} ] || [ ${major_num} -gt ${MAX_MAJOR_ISSUE_NUM} ]
+then
+mail_subject=${PROJECT_NAME}&quot;_Service_Build Job - Build # &quot;${BUILD_NUMBER}&quot; Failure&quot;'!'
+
+mail_body=&quot;Hi, ${PROJECT_NAME}&quot;&quot; project member&quot;$'\n'$'\n'&quot;Alerts : Sonar major above issues != 0, the latest build package cannot be allowed to install to service - ${SERVICE_NAME} [$INSTANCES]&quot;'!'$'\n'$'\n'&quot;Blocker issues: ${blocker_num}&quot;$'\n'&quot;Critical issues: ${critical_num}&quot;$'\n'&quot;Major issues: ${major_num}&quot;$'\n'&quot;Minor issues: ${minor_num}&quot;$'\n'&quot;Info issues: ${info_num}&quot;$'\n'$'\n'&quot;For details please refer to SonarQube - ${sonar_path}&quot;$'\n'$'\n'&quot;The latest code author list as below:&quot;$'\n'&quot;${author_list}&quot;
+
+sendEmail.pl --subject &quot;${mail_subject}&quot; --emaillist &quot;${EMAIL_LIST}&quot; --mailbody &quot;$mail_body&quot; --msg_type &quot;text&quot;
+exit 0
+fi
+
+####### Call Deploy Job ######
+curl -d --user &quot;jadmin:71103407&quot; -s http://vm10686.global.xxx.net:8080/view/Template/job/Template_Service_Deploy/build --data json='{&quot;parameter&quot;: [{&quot;name&quot;:&quot;PROJECT_NAME&quot;,&quot;value&quot;:&quot;'${PROJECT_NAME}'&quot;},{&quot;name&quot;:&quot;PIPELINE_NUM&quot;,&quot;value&quot;:&quot;'${PIPELINE_NUM}'&quot;}]}'
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>mvn clean install -f ${BASE_DIR}/pom.xml -DPASSWORD=$ENV{PASSWORD} -DUSERNAME=$ENV{USERNAME} -e -B sonar:sonar
+</code></pre>
+
+<p>运行Sonar 的一些数据库配置信息，是放在maven/conf/settings.xml文件里的。</p>
+
+<p>另外一点：每个项目在Sonar里的名称是 项目pom文件的标签里的值，根据这个值去数据库里搜出id, 有了这个id就可以直接访问到Sonar上的这个项目
+比如<a href="http://vm10686.global.xxx.net:9000/dashboard/index/1234">http://vm10686.global.xxx.net:9000/dashboard/index/1234</a></p>
+
+<p>4)Template_Service_Deploy</p>
+
+<p>Build完之后 就是要Deploy了， 将rpm包装到相应Service的instance上，然后重启service</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>rm -rf ${WORKSPACE}/*
+
+###### Import config file ######
+cd ~/jenkins/common/Config
+. Project_Config.txt
+
+###### Initial parameters ######
+SERVICE_NAME=${PROJECT_NAME}&quot;_SERVICE_NAME&quot;
+SERVICE_NAME=$(eval echo \${$SERVICE_NAME})
+
+INSTANCES=${PROJECT_NAME}&quot;_INSTANCES&quot;
+INSTANCES=$(eval echo \${$INSTANCES})
+
+PATTERN=${PROJECT_NAME}&quot;_RPM_GREP_PATTERN&quot;
+PATTERN=$(eval echo \${$PATTERN})
+
+LOG_NAME=${PROJECT_NAME}&quot;_BUILD_&quot;${PIPELINE_NUM}&quot;.log&quot;
+BUILD_LOG=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}/$LOG_NAME
+
+##########SET ENVIRONMENT VARIABLE##############
+SCRIPTS_HOME=~/jenkins/common/Scripts
+cd ${SCRIPTS_HOME}
+chmod 755 *
+export PATH=$PATH:`pwd`
+
+InstallTime=`date +&quot;%m/%d/%Y %T&quot;`
+echo &quot;Installation-&gt;InstallTime: ${InstallTime}&quot; &gt;&gt; ${BUILD_LOG}
+
+############ Deploy ###############
+gridService --add-service --service ${SERVICE_NAME}  --instance ${INSTANCES}
+sleep 60
+gridService --start-service --service ${SERVICE_NAME}
+
+Endpoint=&quot;${INSTANCES}:8080&quot;
+echo &quot;Installation-&gt;Endpoint: ${Endpoint}&quot; &gt;&gt; ${BUILD_LOG}
+
+echo &quot;Installation-&gt;LogURL: ${BUILD_URL}&quot; &gt;&gt; ${BUILD_LOG}
+
+UpdateTime=`date +&quot;%m/%d/%Y %T&quot;`
+echo &quot;ServiceInfo-&gt;UpdateTime: ${UpdateTime}&quot; &gt;&gt; ${BUILD_LOG}
+
+ServiceInfoProvider.pl --service ${SERVICE_NAME} --pattern ${PATTERN} &gt;&gt; ${BUILD_LOG}
+
+###### Call Polling Job ######
+curl -d --user &quot;jadmin:71103407&quot; -s _http://vm10686.global.xxx.net_ :8080/view/Template/job/Template_Service_Polling/build --data json='{&quot;parameter&quot;: [{&quot;name&quot;:&quot;PROJECT_NAME&quot;,&quot;value&quot;:&quot;'$PROJECT_NAME'&quot;},{&quot;name&quot;:&quot;PIPELINE_NUM&quot;,&quot;value&quot;:&quot;'$PIPELINE_NUM'&quot;}]}'
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>5)Template_Service_Polling</p>
+
+<p>接下来通过这个Polling job 轮询service有没有启动好， 每1分钟 判断一下，timeout时间10分钟，
+脚本其实很简单，就是调一个接口，查看状态是否status=200</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>rm -rf ${WORKSPACE}/*
+
+######## Import config file #########
+cd ~/jenkins/common/Config
+. Project_Config.txt
+
+####### SET ENV #############
+export SCRIPTS_HOME=${SHARED_FOLDER}/Scripts
+cd ${SCRIPTS_HOME}
+chmod 755 *
+export PATH=$PATH:`pwd`
+
+###### Initial parameters #############
+SERVICE_NAME=${PROJECT_NAME}&quot;_SERVICE_NAME&quot;
+SERVICE_NAME=$(eval echo \${$SERVICE_NAME})
+
+LOG_NAME=${PROJECT_NAME}&quot;_BUILD_&quot;${PIPELINE_NUM}&quot;.log&quot;
+BUILD_LOG=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}/$LOG_NAME
+
+echo &quot;pollingjob-&gt;logURL: ${BUILD_URL}&quot; &gt;&gt; ${BUILD_LOG}
+
+###### Polling service whether start #############
+sleep 30
+gridService --ping --timeout 600 --interval 60 --service ${SERVICE_NAME}
+
+
+###### Call API Testing Job ######
+curl -d --user &quot;jadmin:71103407&quot; -s _http://vm10686.global.xxx.net_ :8080/view/Template/job/Template_Service_APITesting/build --data json='{&quot;parameter&quot;: [{&quot;name&quot;:&quot;PROJECT_NAME&quot;,&quot;value&quot;:&quot;'${PROJECT_NAME}'&quot;},{&quot;name&quot;:&quot;PIPELINE_NUM&quot;,&quot;value&quot;:&quot;'${PIPELINE_NUM}'&quot;}]}'
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>6)Template_Service_APITesting</p>
+
+<p>Polling之后 就是调用借口测试的内部测试系统，如果export 的变量有 TestPlan 就会执行，否则直接调用最后一个job&ndash;Report</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>rm -rf ${WORKSPACE}/*
+
+###### Import config file ######
+cd ~/jenkins/common/Config
+. Project_Config.txt
+
+###### Initial parameters ######
+LOG_NAME=${PROJECT_NAME}&quot;_BUILD_&quot;${PIPELINE_NUM}&quot;.log&quot;
+BUILD_LOG=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}/$LOG_NAME
+
+TESTPLAN_ID=${PROJECT_NAME}&quot;_TESTPLAN_ID&quot;
+TESTPLAN_ID=$(eval echo \${$TESTPLAN_ID})
+
+SERVICE_NAME=${PROJECT_NAME}&quot;_SERVICE_NAME&quot;
+SERVICE_NAME=$(eval echo \${$SERVICE_NAME})
+
+EMAIL_LIST=${PROJECT_NAME}&quot;_EMAIL_LIST&quot;
+EMAIL_LIST=$(eval echo \${$EMAIL_LIST})
+
+EMAIL_CC_LIST=${PROJECT_NAME}&quot;_EMAIL_CC_LIST&quot;
+EMAIL_CC_LIST=$(eval echo \${$EMAIL_CC_LIST})
+
+###########Set Env #############
+export SCRIPTS_HOME=${SHARED_FOLDER}/Scripts/
+cd ${SCRIPTS_HOME}
+chmod 755 *
+export PATH=$PATH:`pwd`
+
+################Function################
+##Key for what you want to find
+##num occurrence of value if it multiple time
+
+function jsonValue() {
+KEY=$1
+num=$2
+awk -F&quot;[,:}]&quot; '{for(i=1;i&lt;=NF;i++){if($i~/'$KEY'\042/){print $(i+1)}}}' | tr -d '&quot;' | sed -n ${num}p
+}
+
+############### Main ######################
+
+if [[ $TESTPLAN_ID == &quot;&quot; ]]; then
+echo &quot;TestPlan ID is blank&quot;
+###### Call Report Job ######
+curl -d --user &quot;jadmin:71103407&quot; -s _http://vm10686.global.xxx.net_ :8080/view/Template/job/Template_Service_Report/build --data json='{&quot;parameter&quot;: [{&quot;name&quot;:&quot;PROJECT_NAME&quot;,&quot;value&quot;:&quot;'$PROJECT_NAME'&quot;},{&quot;name&quot;:&quot;PIPELINE_NUM&quot;,&quot;value&quot;:&quot;'$PIPELINE_NUM'&quot;}]}'
+
+else
+processID=$(curl -X GET _http://vm10765.global.xxx.net_ :8080/tms/project/testPlan/run.spring?ids=$TESTPLAN_ID)
+
+    if [[ $processID != TestPlan-* ]]; then
+
+       mail_subject=${PROJECT_NAME}&quot;_Service_TMS_APITesting Job - Build # &quot;${BUILD_NUMBER}&quot; Failure&quot;'!'
+       mail_body=&quot;TMS Server is not available now, please contact adminstrator.&quot;
+       echo $mail_body
+       sendEmail.pl --subject &quot;${mail_subject}&quot; --emaillist &quot;${EMAIL_LIST}&quot; --emailcclist &quot;${EMAIL_CC_LIST}&quot; --mailbody &quot;$mail_body&quot; --msg_type &quot;text&quot;
+    else
+
+       while [ 1 ]
+         do
+           response=$(curl -X GET _http://vm10765.global.xxx.net_ :8080/tms/project/getProcessResult.spring?processID=$processID)
+
+           totalCounts=`echo $response | jsonValue totalCounts`
+           notStartCounts=`echo $response | jsonValue notStartCounts`
+           processingCounts=`echo $response | jsonValue processingCounts`
+           faildCounts=`echo $response | jsonValue faildCounts`
+           comparedCounts=`echo $response | jsonValue comparedCounts`
+           comparedFaildCounts=`echo $response | jsonValue comparedFaildCounts`
+           unComparedCounts=`echo $response | jsonValue unComparedCounts`
+
+           if [ $notStartCounts == 0 ] &amp;&amp; [ $processingCounts == 0 ]; then 
+              echo &quot;End of run.&quot;
+              break
+
+           else 
+              echo &quot;API Testing is still running, please wait...&quot;
+              sleep 5
+           fi
+       done
+
+    ############# Print Log ###################
+    echo &quot;APITestingInfo-&gt;TotalCounts: $totalCounts&quot; &gt;&gt; ${BUILD_LOG}
+    echo &quot;APITestingInfo-&gt;ErrorCounts: $faildCounts&quot; &gt;&gt; ${BUILD_LOG}
+    echo &quot;APITestingInfo-&gt;ComparedPassedCounts: $comparedCounts&quot; &gt;&gt; ${BUILD_LOG}
+    echo &quot;APITestingInfo-&gt;ComparedFailedCounts: $comparedFaildCounts&quot; &gt;&gt; ${BUILD_LOG}
+    echo &quot;APITestingInfo-&gt;UnComparedCounts: $unComparedCounts&quot; &gt;&gt; ${BUILD_LOG}
+
+    ###### Call Report Job ######
+    curl -d --user &quot;jadmin:71103407&quot; -s _http://vm10686.global.xxx.net_ :8080/view/Template/job/Template_Service_Report/build --data json='{&quot;parameter&quot;: [{&quot;name&quot;:&quot;PROJECT_NAME&quot;,&quot;value&quot;:&quot;'$PROJECT_NAME'&quot;},{&quot;name&quot;:&quot;PIPELINE_NUM&quot;,&quot;value&quot;:&quot;'$PIPELINE_NUM'&quot;}]}'
+
+    fi
+fi
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>##转载注明出处：<a href="http://www.cnblogs.com/wade-xu/p/4378224.html">http://www.cnblogs.com/wade-xu/p/4378224.html</a></p>
+
+<p>7)Template_Service_Report</p>
+
+<p>这里主要是生成Report并且发送Email，用Java写的一个jar放到linux上执行的，用html直接贴在邮件里发送email的，简单的其实可以用Perl写个excel,统计下测试情况，做个报表。</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>rm -rf ${WORKSPACE}/*
+
+###### Import config file ######
+cd ~/jenkins/common/Config
+. Project_Config.txt
+
+###### Initial parameters ######
+LOG_NAME=${PROJECT_NAME}&quot;_BUILD_&quot;${PIPELINE_NUM}&quot;.log&quot;
+BUILD_LOG_FOLDER=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}
+BUILD_LOG=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}/$LOG_NAME
+
+SERVICE_NAME=${PROJECT_NAME}&quot;_SERVICE_NAME&quot;
+SERVICE_NAME=$(eval echo \${$SERVICE_NAME})
+
+INSTANCES=${PROJECT_NAME}&quot;_INSTANCES&quot;
+INSTANCES=$(eval echo \${$INSTANCES})
+
+EMAIL_LIST=${PROJECT_NAME}&quot;_EMAIL_LIST&quot;
+EMAIL_LIST=$(eval echo \${$EMAIL_LIST})
+
+EMAIL_CC_LIST=${PROJECT_NAME}&quot;_EMAIL_CC_LIST&quot;
+EMAIL_CC_LIST=$(eval echo \${$EMAIL_CC_LIST})
+
+TESTPLAN_ID=${PROJECT_NAME}&quot;_TESTPLAN_ID&quot;
+TESTPLAN_ID=$(eval echo \${$TESTPLAN_ID})
+
+export SCRIPTS_HOME=${SHARED_FOLDER}/Scripts/
+cd ${SCRIPTS_HOME}
+chmod 755 *
+export PATH=$PATH:`pwd`
+export XML_REPORT=${WORKSPACE}/interface.xml
+
+report.pl  --log-path=&quot;$BUILD_LOG_FOLDER&quot; --output ${XML_REPORT}
+
+REPORT_PATH=${WORKSPACE}/Report.html
+echo ${REPORT_PATH}
+
+java -Dxmlpath=&quot;${XML_REPORT}&quot; -Dreport=&quot;${REPORT_PATH}&quot; -jar Reporter.jar
+report_context=`cat $REPORT_PATH`
+
+errorCounts=`cat $BUILD_LOG | grep &quot;APITestingInfo-&gt;ErrorCounts&quot; | awk -F &quot;: &quot; '{print $2}'`
+comparedFailedCounts=`cat $BUILD_LOG | grep &quot;APITestingInfo-&gt;ComparedFailedCounts&quot; | awk -F &quot;: &quot; '{print $2}'`
+sonarPath=`cat $BUILD_LOG | grep &quot;SonarPath&quot; | awk -F &quot;: &quot; '{print $2}'`
+
+############## Send Email ##################
+if [ ${errorCounts} -gt 0 ] || [ ${comparedFailedCounts} -gt 0 ]
+then
+mail_subject=${PROJECT_NAME}&quot;_Service_Report Job - Build # &quot;${BUILD_NUMBER}&quot; Failure&quot;'!'
+
+mail_body=&quot;Hi, ${PROJECT_NAME} project member   
+
+The latest build package has been installed to service - ${SERVICE_NAME} [$INSTANCES], but the API testing has some test case failed.  
+
+Errored Test Case: ${errorCounts}  
+Failed Test Case: ${comparedFailedCounts}  
+
+For details please refer to Test Management System - _http://vm10765.global.xxx.net_ :8080/tms/login.spring  
+
+SonarQube - $sonarPath  
+
+Report as below:  
+
+&quot;&quot;$report_context&quot;
+
+sendEmail.pl --subject &quot;${mail_subject}&quot; --emaillist &quot;${EMAIL_LIST}&quot; --emailcclist &quot;${EMAIL_CC_LIST}&quot; --mailbody &quot;$mail_body&quot; --attached ${REPORT_PATH}
+
+else
+
+if [[ $TESTPLAN_ID == &quot;&quot; ]]; then
+mail_subject=${PROJECT_NAME}&quot;_Service_Report Job - Build # &quot;${BUILD_NUMBER}&quot; Success&quot;'!'&quot; [No TestPlan for API testing]&quot;
+mail_body=&quot;Hi, ${PROJECT_NAME} project member   
+
+The latest build package has been installed to service - ${SERVICE_NAME} [$INSTANCES].  
+
+SonarQube - $sonarPath  
+
+Report as below:  
+
+&quot;&quot;$report_context&quot;
+
+else
+mail_subject=${PROJECT_NAME}&quot;_Service_Report Job - Build # &quot;${BUILD_NUMBER}&quot; Success&quot;'!'
+mail_body=&quot;Hi, ${PROJECT_NAME} project member   
+
+The latest build package has been installed to service - ${SERVICE_NAME} [$INSTANCES] and API testing has passed.  
+
+For detailed test results, please refer to Test Management System - _http://vm10765.global.xxx.net_ :8080/tms/login.spring  
+
+SonarQube - $sonarPath  
+
+Report as below:  
+
+&quot;&quot;$report_context&quot;
+fi
+
+sendEmail.pl --subject &quot;${mail_subject}&quot; --emaillist &quot;${EMAIL_LIST}&quot; --emailcclist &quot;${EMAIL_CC_LIST}&quot; --mailbody &quot;$mail_body&quot; --attached ${REPORT_PATH}
+
+fi
+
+########### Tear Down ###########
+rm -rf ${BUILD_LOG_FOLDER}
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>我设置的是每天运行一次所有的project的持续集成， 收到的Email如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/bc8c1becf0884883a41361b688ee4c3e.jpg"><img src="https://img.it610.com/image/info8/bc8c1becf0884883a41361b688ee4c3e.jpg" alt="这些年我们一起搞过的持续集成~Jenkins+Perl and Shell
+script_第4张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/8f0349eaaccc414f907cb5bd13c98719.jpg"><img src="https://img.it610.com/image/info8/8f0349eaaccc414f907cb5bd13c98719.jpg" alt="这些年我们一起搞过的持续集成~Jenkins+Perl and Shell
+script_第5张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/e1cf22b8bfdf4810ad387672ac439bbc.jpg"><img src="https://img.it610.com/image/info8/e1cf22b8bfdf4810ad387672ac439bbc.jpg" alt="这些年我们一起搞过的持续集成~Jenkins+Perl and Shell
+script_第6张图片" /></a></p>
+
+<p>Report中的很多信息都是来源于Sonar</p>
+
+<p>##转载注明出处：<a href="http://www.cnblogs.com/wade-xu/p/4378224.html">http://www.cnblogs.com/wade-xu/p/4378224.html</a></p>
+
+<p>到这里就结束了吗，还没有， 如果Build job,单元测试不通过或者其他原因导致Build Failure, 那怎么办？</p>
+
+<p>再加一个Post Build job, 来监控Build job， 如果挂了，发email通知项目人员。</p>
+
+<p>下图为Build job 加一个Action, 当Job Failed时触发Template_Service_Post_Build job</p>
+
+<p><a href="https://img.it610.com/image/info8/829fd82bdf78439c88d8812784188b9d.jpg"><img src="https://img.it610.com/image/info8/829fd82bdf78439c88d8812784188b9d.jpg" alt="这些年我们一起搞过的持续集成~Jenkins+Perl and Shell
+script_第7张图片" /></a></p>
+
+<p>Template_Service_Post_Build 脚本如下：</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>rm -rf ${WORKSPACE}/*
+
+######## Import config file #########
+cd ~/jenkins/common/Config
+. Project_Config.txt
+
+####### SET ENV #############
+export SCRIPTS_HOME=${SHARED_FOLDER}/Scripts
+cd ${SCRIPTS_HOME}
+chmod 755 *
+export PATH=$PATH:`pwd`
+
+###### Initial parameters #############
+LOG_NAME=${PROJECT_NAME}&quot;_BUILD_&quot;${PIPELINE_NUM}&quot;.log&quot;
+BUILD_LOG=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}/$LOG_NAME
+
+EMAIL_LIST=${PROJECT_NAME}&quot;_EMAIL_LIST&quot;
+EMAIL_LIST=$(eval echo \${$EMAIL_LIST})
+
+EMAIL_CC_LIST=${PROJECT_NAME}&quot;_EMAIL_CC_LIST&quot;
+EMAIL_CC_LIST=$(eval echo \${$EMAIL_CC_LIST})
+
+author_list=`cat $BUILD_LOG | grep &quot;Author&quot;` || true
+
+###### Monitor Service Build Job ########
+build_job_url=`cat $BUILD_LOG | sed -n '/overview-&gt;logURL/p' | awk -F &quot;: &quot; '{print $2}'`
+build_job_build_number=`echo $build_job_url | awk -F &quot;/&quot; '{print $(NF-1)}'`
+build_job_log_url=$build_job_url&quot;logText/progressiveText?start=0&quot;
+build_job_console_output=$build_job_url&quot;console&quot;
+
+mail_subject=${PROJECT_NAME}&quot;_Service_Build Job - Build # &quot;${build_job_build_number}&quot; Failure&quot;'!'
+
+mail_body=&quot;Hi, ${PROJECT_NAME}&quot;&quot; project member&quot;$'\n'$'\n'&quot;Build Failure&quot;'!'$'\n'$'\n'&quot;For details please refer to Console Output - ${build_job_console_output}&quot;$'\n'$'\n'&quot;The latest code author list as below:&quot;$'\n'&quot;${author_list}&quot;
+
+sendEmail.pl --subject &quot;${mail_subject}&quot; --emaillist &quot;${EMAIL_LIST}&quot; --emailcclist &quot;${EMAIL_CC_LIST}&quot; --mailbody &quot;$mail_body&quot; --msg_type &quot;text&quot;
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>同理还需要加一个Template_Service_Post_Polling job来监控Template_Service_Polling job，
+如果轮询Service的结果是重启失败，则邮件通知项目组人员。</p>
+
+<p>脚本如下：</p>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<pre><code>rm -rf ${WORKSPACE}/*
+
+######## Import config file #########
+cd ~/jenkins/common/Config
+. Project_Config.txt
+
+####### SET ENV #############
+export SCRIPTS_HOME=${SHARED_FOLDER}/Scripts
+cd ${SCRIPTS_HOME}
+chmod 755 *
+export PATH=$PATH:`pwd`
+
+###### Initial parameters #############
+LOG_NAME=${PROJECT_NAME}&quot;_BUILD_&quot;${PIPELINE_NUM}&quot;.log&quot;
+BUILD_LOG=${SHARED_FOLDER}/Log/${PROJECT_NAME}&quot;_&quot;${PIPELINE_NUM}/$LOG_NAME
+
+EMAIL_LIST=${PROJECT_NAME}&quot;_EMAIL_LIST&quot;
+EMAIL_LIST=$(eval echo \${$EMAIL_LIST})
+
+EMAIL_CC_LIST=${PROJECT_NAME}&quot;_EMAIL_CC_LIST&quot;
+EMAIL_CC_LIST=$(eval echo \${$EMAIL_CC_LIST})
+
+author_list=`cat $BUILD_LOG | grep &quot;Author&quot;`
+
+###### Monitor Service Polling Job ########
+polling_job_url=`cat $BUILD_LOG | sed -n '/pollingjob-&gt;logURL/p' | awk -F &quot;: &quot; '{print $2}'`
+polling_job_build_number=`echo $polling_job_url | awk -F &quot;/&quot; '{print $(NF-1)}'`
+polling_job_log_url=$polling_job_url&quot;logText/progressiveText?start=0&quot;
+polling_job_console_output=$polling_job_url&quot;console&quot;
+
+mail_subject=${PROJECT_NAME}&quot;_Service_Polling Job - Build # &quot;${polling_job_build_number}&quot; Failure&quot;'!'
+
+mail_body=&quot;Hi, ${PROJECT_NAME}&quot;&quot; project member&quot;$'\n'$'\n'&quot;Service Restart Failure&quot;'!'$'\n'$'\n'&quot;For details please refer to Console Output - ${polling_job_console_output}&quot;$'\n'$'\n'&quot;The latest code author list as below:&quot;$'\n'&quot;${author_list}&quot;
+
+sendEmail.pl --subject &quot;${mail_subject}&quot; --emaillist &quot;${EMAIL_LIST}&quot; --emailcclist &quot;${EMAIL_CC_LIST}&quot; --mailbody &quot;$mail_body&quot; --msg_type &quot;text&quot;
+</code></pre>
+
+<p><img src="https://img.it610.com/image/info8/bd54bc823ad4473c8df81da2dd0e2402.gif" alt="复制代码" /></p>
+
+<p>##转载注明出处：<a href="http://www.cnblogs.com/wade-xu/p/4378224.html">http://www.cnblogs.com/wade-xu/p/4378224.html</a></p>
+
+<p>现在我们来看一下更新后的CI 流程图</p>
+
+<p><a href="https://img.it610.com/image/info8/c0deb812b5a64c6ea16896c8c3a7b853.jpg"><img src="https://img.it610.com/image/info8/c0deb812b5a64c6ea16896c8c3a7b853.jpg" alt="这些年我们一起搞过的持续集成~Jenkins+Perl and Shell
+script_第8张图片" /></a></p>
+
+<p>那么，这个flow的前提是 所有的项目都是按这个流程来的，万一有些特别的项目呢? 比如一个项目，它在Build之前 需要Pre-
+Build一个CommonUtils包， 那怎么办呢，简单一点就是为了这个项目定制一下。</p>
+
+<p>为了更具通用性，扩展性，方便的插入一些special job, 我们可以在每个job之间加入 Exit Point, 以适应一些特别的项目想在任意点Plug
+in一些特别的job，</p>
+
+<p>除了要在Config job 加上一些规则， 比如 export
+ProjectX_EXIT_POINT=Template_Service_Commit_Auto_Build|Special ProjectX-
+PreBuild job</p>
+
+<p>还要在每个job里加一些判断语句，比如当前run的job name
+等于ProjectX_EXIT_POINT以竖线分割的第一个值，则表明要在这个job退出， 第二个值表明要去调的special job name，当然
+special job 里做完了自己的事之后还是要回调原来flow的下一个job</p>
+
+<p>流程图更新如下所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/9d63efbd6b594e86972d50ec635500dd.jpg"><img src="https://img.it610.com/image/info8/9d63efbd6b594e86972d50ec635500dd.jpg" alt="这些年我们一起搞过的持续集成~Jenkins+Perl and Shell
+script_第9张图片" /></a></p>
+
+<p><strong>感谢阅读，希望本文的内容对您的学习有所帮助。</strong></p>
+
+<p>##转载注明出处：<a href="http://www.cnblogs.com/wade-xu/p/4378224.html">http://www.cnblogs.com/wade-xu/p/4378224.html</a></p>
+
+<p>Teaching is learning.</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell浅谈之十一别名列表及数组 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell浅谈之十一别名列表及数组 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell浅谈之十一别名列表及数组">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E6%B5%85%E8%B0%88%E4%B9%8B%E5%8D%81%E4%B8%80%E5%88%AB%E5%90%8D%E5%88%97%E8%A1%A8%E5%8F%8A%E6%95%B0%E7%BB%84/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell浅谈之十一别名列表及数组</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="一-简介">一、简介</h1>
+
+<p>Shell中别名可以对命令进行重新命名，方便用户记忆长命名和定制自己熟悉的工作环境；列表是一组命名以逻辑与、逻辑或的关系串在一起，实现脚本程序的逻辑控制；数组是一重点，涉及数组的赋值、操作和字符串的处理，以及利用数组实现堆栈和二维数组等数据结构的存储。</p>
+
+<h1 id="二-详解">二、详解</h1>
+
+<h2 id="1-别名">1、别名</h2>
+
+<p>对linux命令重新命名，主要考虑到很多linux命令带有冗长的选项和参数，频繁使用这些长命令极易造成用户使用上的不便。别名的命令关键字是alias，基本格式为alias
+name=&lsquo;original-command&rsquo;（等号两边不能有空格）。如alias
+ipconfig=ifconfig。若要删除已经设置的别名，使用内建命令unalias，unalias -a表示删除所有已设置的别名，unalias
+alias-name表示仅删除alias-name别名。</p>
+
+<pre><code>#!/bin/bash
+
+shopt -s expand_aliases   #打开expand_aliases选项
+alias detail=&quot;ls -l&quot;
+detail /root/in*          #别名支持通配符*
+echo
+directory=/root/
+prefix=in*
+alias vardetail=&quot;ls -l $directory$prefix&quot;   #双引号和单引号在处理空格时是等价的，
+                                            #但设置vardetail引用了变量，此处只能使用双引号
+vardetail
+
+echo &quot;Deleting all aliases:&quot;
+unalias -a                #删除所有的别名
+detail
+vardetail
+</code></pre>
+
+<p>若要在脚本中使用别名功能，必须在脚本使用shopt -s expand_aliases命令打开
+expand_aliases（表示别名可以被扩展）选项，未打开，alias命令建立的别名不会执行。</p>
+
+<p>要注意的是：在诸如if/then结构、循环和函数等混合型结构中不能使用alias命令设置别名，但可以执行在混合型结构之外所设置的别名。</p>
+
+<h2 id="2-列表">2、列表</h2>
+
+<p>（1）shell中列表是由一串命令用与运算（&amp;&amp;）和或运算（||）连接而成，分别称为与列表和或列表。与列表的格式为：命令1 &amp;&amp;命令2&amp;&amp; 命令3
+&amp;&amp;&hellip; &amp;&amp;命令n，从左到右依次执行命名，直到某命令返回FALSE时（退出状态为非0）与列表执行终止。或列表的格式为：命令1 || 命令2 || 命令3
+||&hellip; ||命令n，从左到右依次执行命名，但是当某命令返回TRUE时（退出状态为0）或列表执行终止。</p>
+
+<p>（2）与列表控制输入参数个数和返回状态码</p>
+
+<pre><code>#!/bin/bash
+
+MAXARGS=3
+ERROR=68
+test $# -ne $MAXARGS  &amp;&amp; echo &quot;Usage: `basename $0` $MAXARGS arguments&quot; &amp;&amp; exit $ERROR
+echo &quot;Less than $MAXARGS arguments are passed to this script.&quot;
+exit 0
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/3a341f8823ef418099fc54f51f19ca98.jpg"><img src="https://img.it610.com/image/info8/3a341f8823ef418099fc54f51f19ca98.jpg" alt="shell浅谈之十一别名、列表及数组_第1张图片" /></a></p>
+
+<p>（3）或列表控制输入参数个数和返回状态码</p>
+
+<pre><code>#!/bin/bash
+
+MAXARGS=3
+ERROR=68
+test $# -eq $MAXARGS  || (echo &quot;Usage: `basename $0` $MAXARGS arguments&quot; &amp;&amp; false) || exit $ERROR
+echo &quot;Correct arguments are passed to this script.&quot;
+exit 0
+</code></pre>
+
+<p>可以对比或列表和与列表的语句，由于echo命令总是返回TRUE，要将echo和false进行与运算从而返回FALSE值。其中test命令实际上是或列表的嵌套，在使用与或列表嵌套时需要利用圆括号区分逻辑运算的优先级。</p>
+
+<h2 id="3-数组">3、数组</h2>
+
+<p>（1）赋值和取值</p>
+
+<p>数组（Array）是一个由若干同类型变量组成的集合，数组均由连续的存储单元组成，最低地址对应于数组的第一个元素，最高地址对应于最后一个元素。Shell只支持一维数组，array[x]表示array数组的第x+1个元素，支持的最大数值标号是599
+147 937 791。shell取得数组值（引用数组元素）格式是：${array[x]}。</p>
+
+<pre><code>#!/bin/bash
+
+city[0]=Nanjing      #对第1、2个数组元素赋值
+city[1]=Beijing
+city[9]=Melbourne    #对第10个数组元素赋值
+city[15]=NewYork     #对第16个数组元素赋值
+
+echo &quot;city[0]=${city[0]}&quot;
+echo &quot;city[1]=${city[1]}&quot;
+echo &quot;city[9]=${city[9]}&quot;
+echo &quot;city[15]=${city[15]}&quot;
+echo &quot;city[2]=${city[2]}&quot;    #未初始化数组的值为空
+echo &quot;city[10]=${city[10]}&quot;
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/917b6720c1d147a997550efe4cf1c444.png"><img src="https://img.it610.com/image/info8/917b6720c1d147a997550efe4cf1c444.png" alt="shell浅谈之十一别名、列表及数组_第2张图片" /></a></p>
+
+<p>Shell中允许数组空缺元素，即可以不连续地给数组赋值。还可以用圆括号将一组值赋给数组。</p>
+
+<pre><code>#!/bin/bash
+
+city=(Nanjing Beijing Melbourne NewYork)    #圆括号内以空格为分隔符，依次赋给数组元素
+
+echo &quot;city[0]=${city[0]}&quot;
+echo &quot;city[1]=${city[1]}&quot;
+echo &quot;city[2]=${city[2]}&quot;
+echo &quot;city[3]=${city[3]}&quot;
+echo &quot;city[4]=${city[4]}&quot;       #未被初始化输出空
+echo &quot;city[5]=${city[5]}&quot;
+
+
+#!/bin/bash
+
+city=(Nanjing [10]=Atlanta Massachusetts Marseilles)  #指定所赋元素的标号，并以此标号为起点继续赋值
+
+echo &quot;city[0]=${city[0]}&quot;       #city[0]=Nanjing
+echo &quot;city[1]=${city[1]}&quot;       #city[1]=
+echo &quot;city[10]=${city[10]}&quot;     #city[10]=Atlanta
+echo &quot;city[11]=${city[11]}&quot;     #city[11]=Massachusetts
+echo &quot;city[12]=${city[12]}&quot;     #city[12]=Marseilles
+echo &quot;city[13]=${city[13]}&quot;     #city[13]=
+</code></pre>
+
+<p>既然圆括号内允许对数组指定元素进行赋值，那么完全可以按照任意顺序指定任意元素对数组赋值。例如：</p>
+
+<pre><code>city=([2]=Nanjing [10]=Atlanta [1]=Massachusetts [5]=Marseilles)
+</code></pre>
+
+<p>（2）位置参数中$@和$*都表示传递到脚本的所有参数，在数组中@和*的应用是打印数组的所有元素。</p>
+
+<pre><code>#!/bin/bash
+
+city=(Nanjing Beijing Melbourne NewYork)
+
+for i in ${city[@]}  #等价于  for i in ${city[*]}
+do                   #打印数组的所有元素
+echo $i
+done
+
+
+#!/bin/bash
+
+city[1]=&quot;Hong Kong&quot;       #用引号包含空格的字符串
+city[100]=Massachusetts
+city[101]=&quot;New York&quot;
+city[10000]=Atlanta
+
+for i in &quot;${city[@]}&quot;
+do
+echo $i
+done
+</code></pre>
+
+<p>由于city数组元素包含了空格，因此需要使用引号将${city[@]}引起来，for循环和@只打印被赋值的元素而不打印未赋值的元素。</p>
+
+<p>注意：&rdquo;${city[@]}&ldquo;将数组的所有元素分行打印，而&rdquo;${city[<em>]}&ldquo;只能将数组的所有元素打印在一行内且中间以IFS分隔。不用引号时${city[@]}和${city[</em>]}是等价的，使用引号时，@和*只是打印数组的方式存在差异。<br />
+（3）数组的用法</p>
+
+<p>数组的字符串操作与字符串操作的符号和意义完全一致，数组字符串操作特殊之处在于所有的操作都是针对所有的数组元素逐个进行的。</p>
+
+<pre><code>#数组的字符串操作
+#!/bin/bash
+
+city=(Nanjing Atlanta Massachusetts MaseillesMas)
+
+echo &quot;Extracting Substring&quot;  #抽取字串
+echo ${city[*]:0}            #抽取整个数组  Nanjing Atlanta Massachusetts Marseilles
+echo ${city[*]:1}            #抽取从第1个元素到结束的数组  Atlanta Massachusetts Marseilles
+echo ${city[*]:3}            #抽取从第3个元素到结束的数组  Marseilles
+echo ${city[*]:0:2}          #抽取从第0个元素开始的两个元素  Nanjing Atlanta
+echo
+echo &quot;Removing Substring&quot;    #删除字串
+echo ${city[*]#M*a}          #删除匹配M*a的最短字串  Nanjing Atlanta ssachusetts rseilles
+echo ${city[*]##M*a}         #删除匹配M*a的最长字串  Nanjing Atlanta chusetts rseilles
+echo
+echo &quot;Replcing Substring&quot;    #替换子串功能
+echo ${city[*]/M*s/Year}     #替换第1次与M*a匹配的子串  Nanjing Atlanta Year Year
+echo ${city[*]//Mas/Year}    #替换所有与Mas匹配的子串   Nanjing Atlanta Yearsachusetts YeareillesYear
+                             #替换的正则为最长匹配
+</code></pre>
+
+<p>数组也可以存放read命令所读入的用户输入参数，declare -a city（并不是必须的）将city申明为数组，用read -a
+city命令将输入存储到city数组之中，输入以空格分开。可以使用unset city[0]命令清空一个元素，和unset
+city清空整个数组。使用${#city[@]}获取数组的长度。</p>
+
+<p>shell数组的一种重要操作：数组连接。</p>
+
+<pre><code>#!/bin/bash
+
+city=(Beijing Nanjing Shanghai)
+person=(Cai [5]=Wu Tang)             #数组不连续地赋值
+
+declare -a combine                   #声明combine数组
+combine=(${city[@]} ${person[@]})    #combine是数组city和person的连接，连接操作将不连续的元素按序存放到combine数组中
+
+element_count=${#combine[@]}         #while循环输出combine数组
+index=0
+while [ &quot;$index&quot; -lt &quot;$element_count&quot; ]
+do
+   echo &quot;Element[$index]=${combine[$index]}&quot;  #数组标号与值的对应关系
+   let &quot;index=$index+1&quot;
+done
+###################
+echo
+unset combine                                 #清空combine数组
+combine[0]=${city[@]}                         #将city数组赋给combine[0]的一个元素
+combine[1]=${person[@]}                       #将person数组赋给combine[1]的一个元素
+element_count=${#combine[@]}
+index=0
+while [ &quot;$index&quot; -lt &quot;$element_count&quot; ]
+do
+   echo &quot;Element[$index]=${combine[$index]}&quot;
+   let &quot;index=$index+1&quot;
+done
+###################
+echo
+declare -a subcombine=${combine[1]}          #声明数组时赋值
+element_count=${#subcombine[@]}
+index=0
+while [ &quot;$index&quot; -lt &quot;$element_count&quot; ]
+do
+   echo &quot;Element[$index]=${subcombine[$index]}&quot;
+   let &quot;index=$index+1&quot;
+done
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/9e54b215db194d1482588a9882ddff31.png"><img src="https://img.it610.com/image/info8/9e54b215db194d1482588a9882ddff31.png" alt="shell浅谈之十一别名、列表及数组_第3张图片" /></a></p>
+
+<p>（4）数组实现简单的数据结构</p>
+
+<p>数据结构是指相互之间存在一种或多种特定关系的数据元素的集合，它直接影响到程序的运行速度和存储效率。Shell不直接支持如堆栈、队列、链表等数据结构，但可以很容易实现线性数据结构。对于树形、图等复杂的数据结构，shell理论上可以实现，但难度角度。</p>
+
+<p>利用数组实现堆栈操作。push函数将字符串压入堆栈，pop函数能弹出栈顶元素，status函数打印当前堆栈的状态信息。其中shift命令完成两个功能：第一，所有位置参数左移1位，即$2移动到$1的位置，$3移动到$2的位置，依次类推（$0不变）；第二，$#变量值减1。</p>
+
+<pre><code>#!/bin/bash
+
+MAXTOP=50               #堆栈能存放元素的最大值
+
+TOP=$MAXTOP             #栈顶指针，初始值是$MAXTOP
+
+TEMP=
+declare -a STACK        #全局数组STACK
+
+push()                  #push进栈操作，可同时将多个元素压入堆栈
+{
+        if [ -z &quot;$1&quot; ]      #无参数，返回
+        then
+             return
+        fi
+
+        #for ((i=1; i&lt;=$#; i++))
+        until [ $# -eq 0 ]   #until循环将push函数的所有参数都压入堆栈
+        do
+                let TOP=TOP-1    #栈顶指针减1
+
+                STACK[$TOP]=$1
+                shift            #脚本参数除$0外左移1位，$#参数总个数减1
+        done
+
+        return
+}
+
+pop()                     #pop出栈操作，执行pop函数使栈顶元素出栈
+{
+        TEMP=
+
+        if [ &quot;$TOP&quot; -eq &quot;$MAXTOP&quot; ]   #若堆栈为空，返回
+        then
+         return
+        fi
+
+        TEMP=${STACK[$TOP]}           #栈顶元素出栈
+        unset STACK[$TOP]         
+        let TOP=TOP+1                 #栈顶指针加1
+        return
+}
+
+status()                          #显示当前堆栈内的元素，以及TOP指针和TEMP变量
+{
+        echo &quot;==========STACK==========&quot;
+        for i in ${STACK[@]}                                
+        do
+        echo $i
+        done
+        echo &quot;Stack Pointer=$TOP&quot;
+        echo &quot;Just popped \&quot;&quot;$TEMP&quot;\&quot; off the stack&quot;
+        echo &quot;==========================&quot;
+}
+
+push one              #1个元素入栈
+status                #显示状态
+push two three four   #3个元素入栈
+status
+
+pop                   #出栈
+pop
+status
+push five six
+status
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/31b2e7767db54b5d9b02e3f4652d5180.png"><img src="https://img.it610.com/image/info8/31b2e7767db54b5d9b02e3f4652d5180.png" alt="shell浅谈之十一别名、列表及数组_第4张图片" /></a></p>
+
+<p>利用一维数组模拟实现二维数组，二维数组仍存储在一维数组中，只是通过行号和列号计算出数组的索引而已。可以采用该方法使shell脚本语言用于定义二维数组和矩阵。</p>
+
+<pre><code>#创建一个二维数组，并以逐行打印及旋转45度打印的两种方式将它打印出来
+#!/bin/bash
+
+#定义行数、列数，及数组名
+ROW=5
+COL=5
+declare -a MATRIX      #申明MATRIX数组
+
+load_alpha ()
+{
+        local rc=0
+        local index
+
+        #for循环将A-Y这25个字符存储到MATRIX数组
+        for i in A B C D E F G H I J K L M N O P Q R S T U V W X Y
+        do
+                local row=`expr $rc / $COL`
+                local column=`expr $rc % $ROW`
+                let &quot;index = $row * $ROW + $column&quot;
+                MATRIX[$index]=$i
+                let &quot;rc += 1&quot;
+        done  
+}
+
+print_alpha ()
+{
+        local row=0
+        local index
+
+        #逐行打印MATRIX数组
+        while [ &quot;$row&quot; -lt &quot;$ROW&quot; ] 
+        do                           
+                local column=0
+                echo -n &quot;       &quot; 
+                while [ &quot;$column&quot; -lt &quot;$COL&quot; ]
+                do
+                        let &quot;index = $row * $ROW + $column&quot;
+                        echo -n &quot;${MATRIX[index]} &quot; 
+                        let &quot;column += 1&quot;
+                done
+                let &quot;row += 1&quot;
+                echo
+        done
+      echo
+}
+
+filter ()     # 过滤掉负的数组下标. 
+{
+        echo -n &quot;  &quot;  # 产生倾斜. 
+                      # 解释一下, 这是怎么做到的. 
+
+        if [[ &quot;$1&quot; -ge 0 &amp;&amp;  &quot;$1&quot; -lt &quot;$ROW&quot; &amp;&amp; &quot;$2&quot; -ge 0 &amp;&amp; &quot;$2&quot; -lt &quot;$COL&quot; ]]
+        then
+            let &quot;index = $1 * $ROW + $2&quot;
+            # 现在, 按照旋转方向进行打印. 
+            echo -n &quot; ${MATRIX[index]}&quot;
+            # alpha[$row][$column]
+        fi    
+}
+
+rotate ()  # 将数组旋转45度 --
+{          #+ 从左下角进行&quot;平衡&quot;. 
+        local row
+        local column
+
+        for (( row = ROW; row &gt; -ROW; row-- ))
+          do  
+          for (( column = 0; column &lt; COL; column++ ))
+          do
+                  if [ &quot;$row&quot; -ge 0 ]
+                  then
+                    let &quot;t1 = $column - $row&quot;
+                    let &quot;t2 = $column&quot;
+                  else
+                    let &quot;t1 = $column&quot;
+                    let &quot;t2 = $column + $row&quot;
+                  fi  
+                  filter $t1 $t2   # 将负的数组下标过滤出来
+         done
+
+        echo; echo
+        done 
+}
+
+ #下面利用上述函数创建二维数组，逐行和旋转45°打印数组
+ load_alpha     # 加载数组
+ print_alpha    # 打印数组
+ rotate         # 逆时针旋转45°打印
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/b109542d4a254e4aa2c43d7196a6e32b.jpg"><img src="https://img.it610.com/image/info8/b109542d4a254e4aa2c43d7196a6e32b.jpg" alt="shell浅谈之十一别名、列表及数组_第5张图片" /></a></p>
+
+<h1 id="三-总结">三、总结</h1>
+
+<p>（1）别名、列表及数组这三个知识点是相对独立的，可分开理解。</p>
+
+<p>（2）数组是重点，会使用数组字符串的操作，以及利用数组实现堆栈和二维数组等数据结构。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

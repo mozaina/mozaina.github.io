@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>编写可靠Linuxshell脚本的八个建议 | 开发者问答集锦</title>
+    <meta property="og:title" content="编写可靠Linuxshell脚本的八个建议 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="编写可靠Linuxshell脚本的八个建议">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%BC%96%E5%86%99%E5%8F%AF%E9%9D%A0linuxshell%E8%84%9A%E6%9C%AC%E7%9A%84%E5%85%AB%E4%B8%AA%E5%BB%BA%E8%AE%AE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">编写可靠Linuxshell脚本的八个建议</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>这八个建议，来源于键者几年来编写 shell
+脚本的一些经验和教训。事实上开始写的时候还不止这几条，后来思索再三，去掉几条无关痛痒的，最后剩下八条。毫不夸张地说，每条都是精挑细选的，虽然有几点算是老生常谈了。</p>
+
+<h2 id="1-指定bash"><strong>1. 指定bash</strong></h2>
+
+<p>shell 脚本的第一行，#!之后应该是什么？</p>
+
+<p>如果拿这个问题去问别人，不同的人的回答可能各不相同。我见过/usr/bin/env
+bash，也见过/bin/bash，还有/usr/bin/bash，还有/bin/sh，还有/usr/bin/env
+sh。这算是编程界的“’茴’字四种写法”了。</p>
+
+<p>在多数情况下，以上五种写法都是等价的。但是，写过程序的人都知道：“少数情况”里往往隐藏着意想不到的坑。</p>
+
+<p>如果系统的默认 shell 不是 bash 怎么办？比如某 Linux 发行版的某个版本，默认的 sh 就不是 bash。</p>
+
+<p>如果系统的 bash 不是在 /usr/bin/bash 怎么办？</p>
+
+<p>我推荐使用 /usr/bin/env bash 和
+/bin/bash。前者通过env添加一个中间层，让env在$PATH中搜索bash；后者则是官方背书的，约定俗成的 bash
+位置，/usr/bin/bash不过是指向它的一个符号链接。</p>
+
+<h2 id="2-set-e-和-set-x"><strong>2. set -e 和 set -x</strong></h2>
+
+<p>OK，经过一番讨论，现在第一行定下来了。接下来该开始写第二行了吧？</p>
+
+<p>且慢！在你开始构思并写下具体的代码逻辑之前，先插入一行set -e和一行set -x。</p>
+
+<p>set -x会在执行每一行 shell 脚本时，把执行的内容输出来。它可以让你看到当前执行的情况，里面涉及的变量也会被替换成实际的值。</p>
+
+<p>set -e会在执行出错时结束程序，就像其他语言中的“抛出异常”一样。（准确说，不是所有出错的时候都会结束程序，见下面的注）</p>
+
+<p>注：set -e结束程序的条件比较复杂，在man bash里面，足足用了一段话描述各种情景。大多数执行都会在出错时退出，除非 shell 命令位于以下情况：</p>
+
+<p>一个 pipeline 的非结尾部分，比如 error | ok</p>
+
+<p>一个组合语句的非结尾部分，比如 ok &amp;&amp; error || other</p>
+
+<p>一连串语句的非结尾部分，比如 error; ok</p>
+
+<p>位于判断语句内，包括 test、if、 while 等等。</p>
+
+<p>这两个组合在一起用，可以在 debug
+的时候替你节省许多时间。出于防御性编程的考虑，有必要在写第一行具体的代码之前就插入它们。扪心自问，写代码的时候能够一次写对的次数有多少？关注公众号：程序员大咖
+免费领取视频教程。大多数代码，在提交之前，通常都经历过反复调试修改的过程。与其在焦头烂额之际才引入这两个配置，不如一开始就给 debug
+留下余地。在代码终于可以提交之后，再考虑是否保留它们也不迟。</p>
+
+<h2 id="3-带上shellcheck"><strong>3. 带上shellcheck</strong></h2>
+
+<p>好了，现在我已经有了三行（样板）代码，具体的业务逻辑一行都没写呢。是不是该开始写了？</p>
+
+<p>且慢！工欲善其事，必先利其器。这次，我就介绍一个 shell 脚本编写神器：shellcheck</p>
+
+<p>说来惭愧，虽然写了几年 shell 脚本，有些语法我还是记不清楚。这时候就要依仗 shellcheck 指点一下了。</p>
+
+<p>shellcheck 除了可以提醒语法问题以外，还能检查出 shell 脚本编写常见的 bad code。本来我的N条建议里面，还有几条是关于这些 bad
+code 的，不过考虑到 shellcheck 完全可以发掘出这些问题，于是忍痛把它们都剔除在外了。毫无疑问，使用 shellcheck 给我的 shell
+编写技能带来了巨大的飞跃。</p>
+
+<p>所谓“站在巨人的肩膀上”，虽然我们这些新兵蛋子，技能不如老兵们强，但是我们可以在装备上赶上对方啊！动动手安装一下，就能结识一个循循善诱的“老师”，何乐而不为？</p>
+
+<p>顺便一提，shellcheck 居然是用 haskell 写的。谁说 haskell 只能用来装逼？</p>
+
+<h2 id="4-变量展开"><strong>4. 变量展开</strong></h2>
+
+<p>在 shell 脚本中，偶尔可以看到这样的做法：echo $xxx |
+awk/sed/grep/cut&hellip;。看起来大张形势的样子，其实不过是想修改一个变量的值。</p>
+
+<p>杀鸡何必用牛刀？bash 内建的变量展开机制已经足以满足你各种需求！还是老方法， read the f**k manaul! man bash
+然后搜索Parameter Expansion，下面就是你想要的技巧。键者也写过一篇相关的文章，希望能助上一臂之力：玩转 Bash变量。</p>
+
+<h2 id="5-注意local"><strong>5. 注意local</strong></h2>
+
+<p>随着代码越写越多，你开始把重复的逻辑提炼成函数。有可能你会掉到 bash 的一个坑里。在 bash，如果不加 local
+限定词，变量默认都是全局的。变量默认全局——这跟 js 和 lua 相似；但相较而言，很少有 bash
+教程一开始就告知你这个事实。在顶级作用域里，是否是全局变量并不重要。但是在函数里面，声明一个全局变量可能会污染到其他作用域（尤其在你根本没有注意到这一点的情况下）。所以，对于在函数内声明的变量，请务必记得加上
+local 限定词。</p>
+
+<h2 id="6-trap-信号"><strong>6. trap 信号</strong></h2>
+
+<p>如果你写过稍微复杂点的在后台运行的程序，应该知道 posix 标准里面“信号”是什么一回事。如果不知道，直接看下一段。像其他语言一样，shell
+也支持处理信号。trap sighandler INT可以在接收到 SIGINT 时调用 sighandler 函数。捕获其他信号的方式以此类推。</p>
+
+<p>不过 trap 的主要应用场景可不是捕获哪个信号。trap
+命令支持“捕获”许多不同的流程——准确来说，允许用户给特定的流程注入函数调用。其中最为常用的是trap func EXIT和trap func ERR。</p>
+
+<p>trap func
+EXIT允许在脚本结束时调用函数。由于无论正常退出抑或异常退出，所注册的函数都能得以调用，在需要调用一个清理函数的场景下，我都是用它注册清理函数，而不是简单地在脚本结尾调用清理函数。</p>
+
+<p>trap func
+ERR允许在运行出错时调用函数。一个常用的技法是，使用全局变量ERROR存储错误信息，然后在注册的函数中根据存储的值完成对应的错误报告。把原本四分五裂的错误处理逻辑集中到一处，有时候会起奇效。不过要记住，程序异常退出时，既会调用EXIT注册的函数，也会调用ERR注册的函数。</p>
+
+<h2 id="7-三思后行"><strong>7. 三思后行</strong></h2>
+
+<p>以上几条都是具体的建议，剩下两条比较务虚。</p>
+
+<p>这条建议的名字叫“三思而行”。其实无论写什么代码，哪怕只是一个辅助脚本，都要三思而行，切忌粗心大意。不，写脚本的时候更要记住这点。毕竟许多时候，一个复杂的脚本发端于几行小小的命令。一开始写这个脚本的人，也许以为它只是一次性任务。代码里难免对一些外部条件有些假定，在当时也许是正常的，但是随着外部环境的变化，这些就成了隐藏的暗礁。雪上加霜的是，几乎没有人会给脚本做测试。除非你去运行它，否则不知道它是否还能正常使用。</p>
+
+<p>要想减缓脚本代码的腐烂速度，需要在编写的时候辨清哪些是会变的依赖、哪些是脚本正常运行所不可或缺的。要有适当的抽象，编写可变更的代码；同时要有防御性编程的意识，给自己的代码一道护城河。</p>
+
+<h2 id="8-扬长避短"><strong>8. 扬长避短</strong></h2>
+
+<p>有些时候，使用 shell 写脚本就意味着难以移植、难以统一地进行错误处理、难以利索地处理数据。</p>
+
+<p>虽然使用外部的命令可以方便快捷地实现各种复杂的功能，但作为硬币的反面，不得不依靠grep、sed、awk等各种工具把它们粘合在一起。</p>
+
+<p>如果有兼容多平台的需求，还得小心规避诸如BSD和GNU coreutils，bash版本差异之类奇奇怪怪的陷阱。</p>
+
+<p>由于缺乏完善的数据结构以及一致的API，shell 脚本在处理复杂的逻辑上力不从心。</p>
+
+<p>解决特定的问题要用合适的工具。知道什么时候用 shell，什么时候切换到另外一门更通用的脚本语言（比如ruby/python/perl），这也是编写可靠
+shell 脚本的诀窍。如果你的任务可以组合常见的命令来完成，而且只涉及简单的数据，那么 shell
+脚本就是适合的锤子。如果你的任务包含较为复杂的逻辑，而且数据结构复杂，那么你需要用 ruby/python 之类的语言编写脚本</p>
+
+<p><strong>关注微信公众号和今日头条，精彩文章持续更新中。。。。。</strong></p>
+
+<p><a href="https://img.it610.com/image/info8/00aa4aebe7294bab9cc4b80639fd1c9a.jpg"><img src="https://img.it610.com/image/info8/00aa4aebe7294bab9cc4b80639fd1c9a.jpg" alt="编写可靠Linux
+shell脚本的八个建议_第1张图片" /></a></p>
+
+<p><a href="https://img.it610.com/image/info8/9ab765f413994e0eae1379b2fe0470b9.jpg"><img src="https://img.it610.com/image/info8/9ab765f413994e0eae1379b2fe0470b9.jpg" alt="编写可靠Linux
+shell脚本的八个建议_第2张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

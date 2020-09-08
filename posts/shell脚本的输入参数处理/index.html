@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本的输入参数处理 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本的输入参数处理 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本的输入参数处理">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E7%9A%84%E8%BE%93%E5%85%A5%E5%8F%82%E6%95%B0%E5%A4%84%E7%90%86/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本的输入参数处理</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>2019独角兽企业重金招聘Python工程师标准&gt;&gt;&gt;
+<img src="https://img.it610.com/image/info8/35bf71b4b7ad4a72bcb9c6561b5679b1.jpg" alt="hot3.png" /></p>
+
+<p>参数处理-Shell传入参数的处理</p>
+
+<h3 id="1-参数说明">1、参数说明</h3>
+
+<pre><code>1. $# 传递到脚本的参数个数
+2. $* 以一个单字符串显示所有向脚本传递的参数。与位置变量不同，此选项参数可超过9个
+3.脚本运行的当前进程ID号 
+4. $! 后台运行的最后一个进程的进程ID号 
+5. $@ 与$#相同，但是使用时加引号，并在引号中返回每个参数 
+6. $- 显示shell使用的当前选项，与set命令功能相同 
+7. $? 显示最后命令的退出状态。0表示没有错误，其他任何值表明有错误。
+</code></pre>
+
+<h3 id="2-变量含义">2、变量含义</h3>
+
+<pre><code>$0 脚本名字
+$1 位置参数 #1  
+$2 - $9 位置参数 #2 - #9  
+${10} 位置参数 #10  
+${#*} 传递到脚本中的命令行参数的个数  
+${#@} 传递到脚本中的命令行参数的个数  $? 返回值
+</code></pre>
+
+<p>脚本的进程ID(PID)</p>
+
+<pre><code>$- 传递到脚本中的标志(使用set) 
+$_ 之前命令的最后一个参数 
+$! 运行在后台的最后一个作业的进程ID(PID)
+</code></pre>
+
+<p>使用shell处理的时候对参数的处理是个基本模块，所以今天找到一篇简单易懂的文章来进行参考，作为以后shell参数处理的模板，推荐使用getOpts形式进行参数的处理。</p>
+
+<h3 id="3-使用实例">3、使用实例</h3>
+
+<p>写程序的时候经常要处理命令行参数，本文描述在Bash下的命令行处理方式。</p>
+
+<p>选项与参数：</p>
+
+<p>如下一个命令行：</p>
+
+<pre><code>./test.sh -f config.conf -v --prefix=/home
+</code></pre>
+
+<p>我们称-f为选项，它需要一个参数，即config.conf, -v 也是一个选项，但它不需要参数。</p>
+
+<p>--prefix我们称之为一个长选项，即选项本身多于一个字符，它也需要一个参数，用等号连接，当然等号不是必须的，/home可以直接写在&ndash;
+prefix后面，即&ndash;prefix/home,更多的限制后面具体会讲到。<br />
+在bash中，可以用以下三种方式来处理命令行参数，每种方式都有自己的应用场景。</p>
+
+<ul>
+<li>手工处理方式<br /></li>
+<li>getopts<br /></li>
+<li>getopt</li>
+</ul>
+
+<p>下面我们依次讨论这三种处理方式。</p>
+
+<h4 id="3-1-手工处理参数">3.1. 手工处理参数</h4>
+
+<p>在手工处理方式中，首先要知道几个变量，还是以上面的命令行为例：</p>
+
+<pre><code>*    $0 ： ./test.sh,即命令本身，相当于C/C++中的argv[0]
+    *    $1 ： -f,第一个参数.
+    *    $2 ： config.conf
+    *    $3, $4 ... ：类推。
+    *    $# 参数的个数，不包括命令本身，上例中$#为4.
+    *    $@ ：参数本身的列表，也不包括命令本身，如上例为 -f config.conf -v --prefix=/home
+    *    $* ：和$@相同，但&quot;$*&quot; 和 &quot;$@&quot;(加引号)并不同，&quot;$*&quot;将所有的参数解释成一个字符串，而&quot;$@&quot;是一个参数数组。
+</code></pre>
+
+<p>如下例所示：</p>
+
+<pre><code>#!/bin/bash
+for arg in &quot;$*&quot;
+ do
+     echo $arg
+ done
+
+for arg in &quot;$@&quot;
+ do
+     echo $arg
+ done
+</code></pre>
+
+<p>执行./test.sh -f config.conf -n 10 会打印：</p>
+
+<pre><code>-f config.conf -n 10    #这是&quot;$*&quot;的输出
+-f   #以下为$@的输出
+config.conf
+-n
+10
+</code></pre>
+
+<p>所以，手工处理的方式即对这些变量的处理。因为手工处理高度依赖于你在命令行上所传参数的位置，所以一般都只用来处理较简单的参数。如:</p>
+
+<pre><code>./test.sh 10
+</code></pre>
+
+<p>而很少使用./test -n 10这种带选项的方式。 典型用法为：</p>
+
+<pre><code>#!/bin/bash
+if [ x$1 != x ]
+then
+    #...有参数
+else
+then
+    #...没有参数
+fi
+</code></pre>
+
+<p>为什么要使用 x$1 != x 这种方式来比较呢？想像一下这种方式比较：<br />
+if [ -n $1 ] #$1不为空</p>
+
+<p>但如果用户不传参数的时候，$1为空，这时 就会变成 [ -n ] ,所以需要加一个辅助字符串来进行比较。</p>
+
+<p>手工处理方式能满足大多数的简单需求，配合shift使用也能构造出强大的功能，但在要处理复杂选项的时候建议用下面的两种方法。</p>
+
+<h4 id="3-2-获取参数-getopts-getopt">3.2. 获取参数－getopts/getopt</h4>
+
+<p>处理命令行参数是一个相似而又复杂的事情，为此，C提供了getopt/getopt_long等函数，<br />
+C++的boost提供了Options库，在shell中，处理此事的是getopts和getopt.</p>
+
+<p>getopts和getopt功能相似但又不完全相同，其中getopt是独立的可执行文件，而getopts是由Bash内置的。</p>
+
+<p>先来看看参数传递的典型用法:</p>
+
+<ul>
+<li>./test.sh -a -b -c ： 短选项，各选项不需参数<br /></li>
+<li>./test.sh -abc ： 短选项，和上一种方法的效果一样，只是将所有的选项写在一起。<br /></li>
+<li>./test.sh -a args -b -c ：短选项，其中-a需要参数，而-b -c不需参数。<br /></li>
+<li>./test.sh &ndash;a-long=args &ndash;b-long ：长选项</li>
+</ul>
+
+<p>我们先来看getopts,它不支持长选项。</p>
+
+<p>使用getopts非常简单：</p>
+
+<pre><code>#test.sh#!/bin/bash
+while getopts &quot;a:bc&quot; arg #选项后面的冒号表示该选项需要参数
+do
+        case $arg in
+             a)
+                echo &quot;a's arg:$OPTARG&quot; #参数存在$OPTARG中
+                ;;
+             b)
+                echo &quot;b&quot;
+                ;;
+             c)
+                echo &quot;c&quot;
+                ;;
+             ?) #当有不认识的选项的时候arg为?
+            echo &quot;unkonw argument&quot;
+        exit 1
+        ;;
+        esac
+done
+</code></pre>
+
+<p>现在就可以使用：<br />
+./test.sh -a arg -b -c<br />
+或<br />
+./test.sh -a arg -bc<br />
+来加载了。<br />
+应该说绝大多数脚本使用该函数就可以了，如果需要支持长选项以及可选参数，那么就需要使用getopt.<br />
+下面是getopt自带的一个例子：</p>
+
+<pre><code>#!/bin/bash
+# A small example program for using the new getopt(1) program.
+# This program will only work with bash(1)
+# An similar program using the tcsh(1) script language can be found
+# as parse.tcsh
+# Example input and output (from the bash prompt):
+# ./parse.bash -a par1 'another arg' --c-long 'wow!*/?' -cmore -b &quot; very long &quot;
+# Option a
+# Option c, no argument
+# Option c, argument `more'
+# Option b, argument ` very long '
+# Remaining arguments:
+# --&gt; `par1'
+# --&gt; `another arg'
+# --&gt; `wow!*/?'
+# Note that we use `&quot;$@&quot;' to let each command-line parameter expand to a
+# separate word. The quotes around `$@' are essential!
+# We need TEMP as the `eval set --' would nuke the return value of getopt.
+#-o表示短选项，两个冒号表示该选项有一个可选参数，可选参数必须紧贴选项
+#如-carg 而不能是-c arg
+#--long表示长选项
+#&quot;$@&quot;在上面解释过
+# -n:出错时的信息
+# -- ：举一个例子比较好理解：
+#我们要创建一个名字为 &quot;-f&quot;的目录你会怎么办？
+# mkdir -f #不成功，因为-f会被mkdir当作选项来解析，这时就可以使用
+# mkdir -- -f 这样-f就不会被作为选项。
+TEMP=`getopt -o ab:c:: --long a-long,b-long:,c-long:: /
+     -n 'example.bash' -- &quot;$@&quot;`
+if [ $? != 0 ] ; then echo &quot;Terminating...&quot; &gt;&amp;2 ; exit 1 ; fi
+# Note the quotes around `$TEMP': they are essential!
+#set 会重新排列参数的顺序，也就是改变$1,$2...$n的值，这些值在getopt中重新排列过了
+eval set -- &quot;$TEMP&quot;
+#经过getopt的处理，下面处理具体选项。
+while true ; do
+        case &quot;$1&quot; in
+                -a|--a-long) echo &quot;Option a&quot; ; shift ;;
+                -b|--b-long) echo &quot;Option b, argument /`$2'&quot; ; shift 2 ;;
+                -c|--c-long)
+                        # c has an optional argument. As we are in quoted mode,
+                        # an empty parameter will be generated if its optional
+                        # argument is not found.
+                        case &quot;$2&quot; in
+                                &quot;&quot;) echo &quot;Option c, no argument&quot;; shift 2 ;;
+                                *) echo &quot;Option c, argument /`$2'&quot; ; shift 2 ;;
+                        esac ;;
+                --) shift ; break ;;
+                *) echo &quot;Internal error!&quot; ; exit 1 ;;
+        esac
+done
+echo &quot;Remaining arguments:&quot;
+for arg do
+   echo '--&gt; '&quot;/`$arg'&quot; ;
+done
+</code></pre>
+
+<p>比如我们使用:</p>
+
+<pre><code>./test -a -b arg arg1 -c
+</code></pre>
+
+<p>你可以看到,命令行中多了个arg1参数，在经过getopt和set之后，命令行会变为：</p>
+
+<pre><code>-a -b arg -c -- arg1
+</code></pre>
+
+<p>$1指向-a,$2指向-b,$3指向arg,$4指向-c,$5指向&ndash;,而多出的arg1则被放到了最后。</p>
+
+<h4 id="3-3-使用总结">3.3.使用总结</h4>
+
+<p>一般小脚本手工处理也许就够了，getopts能处理绝大多数的情况，getopt较复杂，功能也更强大。</p>
+
+<hr />
+
+<p>shift其实很简单的，就是左移参数列表，shift一次就将最左边的参数$1移出去了，然后<br />
+原来的$2现在就变成了$1。</p>
+
+<p>shift后面还可以带上一个数字，指明要移出多少个参数（默认只移出一个），比如说<br />
+shift 3 就是移出3个参数，之后原来的$4就变成了现在的$1。</p>
+
+<p>eval就是先将后面的参数执行一遍，将必要的置换都做了，再来执行命令。举个例子：<br />
+MYFILE=&ldquo;cat myfile&rdquo;<br />
+echo $MYFILE # output: cat myfile<br />
+eval $MYFILE # output: contents of myfile</p>
+
+<p>再举个详细点儿的例子：</p>
+
+<pre><code>#!/bin/bash 
+# evalit 
+echo &quot; Total number of arguments passed: $#&quot; 
+echo &quot; The process ID:&quot;echo&quot;Lastargument:&quot;$(evalecho/
+#)
+</code></pre>
+
+<p>运行脚本：</p>
+
+<pre><code>$ ./evalit alpha bravo charlie 
+output as follows: 
+Total number of arguments passed: 3 
+The process ID: 780 
+Last argument:   charlie
+</code></pre>
+
+<p>读取文件：</p>
+
+<pre><code>for i in `cat abc.txt`
+do
+echo $i
+done
+</code></pre>
+
+<p>转载于:<a href="https://my.oschina.net/u/2306127/blog/483449">https://my.oschina.net/u/2306127/blog/483449</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

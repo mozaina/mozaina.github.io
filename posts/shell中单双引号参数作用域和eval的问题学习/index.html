@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell中单双引号参数作用域和eval的问题学习 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell中单双引号参数作用域和eval的问题学习 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell中单双引号参数作用域和eval的问题学习">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E4%B8%AD%E5%8D%95%E5%8F%8C%E5%BC%95%E5%8F%B7%E5%8F%82%E6%95%B0%E4%BD%9C%E7%94%A8%E5%9F%9F%E5%92%8Ceval%E7%9A%84%E9%97%AE%E9%A2%98%E5%AD%A6%E4%B9%A0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell中单双引号参数作用域和eval的问题学习</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>自定义一个net函数，目的是从ifconfig的输出结果中截取网卡的ip ，netmask和broadcast信息</p>
+
+<pre><code>##ip netmask broadcast
+function net()
+{
+        name=$1
+        num=\$$2
+        /sbin/ifconfig -a | awk '{if ( $1 == &quot;inet&quot; &amp;&amp; $5 == &quot;broadcast&quot;) print &quot;\t&quot;$name $num}'
+}
+echo eth:
+net ip 2
+</code></pre>
+
+<p>上面函数先调用一次以输出ip信息为例：（结果如图）</p>
+
+<p><a href="https://img.it610.com/image/info8/4213bb06aa854ef492d67e92cc18c9c6.jpg"><img src="https://img.it610.com/image/info8/4213bb06aa854ef492d67e92cc18c9c6.jpg" alt="Shell中单、双引号，参数作用域和eval的问题学习_第1张图片" /></a>l</p>
+
+<p>可以看到输出的结果完全不是想要的 <strong>ip 192.168.100.10</strong></p>
+
+<p>这是为什么呢？？</p>
+
+<p>下面说一下我的错误处理过程（错误错误错误）</p>
+
+<p>我是把函数改了一下</p>
+
+<pre><code>/sbin/ifconfig -a | awk '{if ( $1 == &quot;inet&quot; &amp;&amp; $5 == &quot;broadcast&quot;) print &quot;\t&quot;$name $num}'
+</code></pre>
+
+<p>改称：</p>
+
+<pre><code>echo &quot;/sbin/ifconfig -a | awk '{if ( $1 == &quot;inet&quot; &amp;&amp; $5 == &quot;broadcast&quot;) print &quot;\t&quot;$name $num}'&quot;
+</code></pre>
+
+<p>输出结果是：</p>
+
+<p><img src="https://img.it610.com/image/info8/7ce90c6c844a488890d6aff7f937d8d1.jpg" alt="" /></p>
+
+<p>分析一下：发现awk语句中的$1被替换成函数调用时传进来的第一个参数了。就自以为这个问题错误发生在awk不能区分自身截取出的$1字段和函数参数的$1段。</p>
+
+<p>后来华哥帮忙看时告诉我这样的输出结果只是因为awk语句并没有执行而只是被 echo语句做了简单的 <strong>弱引用</strong> 替换成变量值。</p>
+
+<p>下面来介绍一下shell中的强引用和弱引用,还是以实例分析：</p>
+
+<pre><code>a=test
+echo '$a'
+echo &quot;$a&quot;
+echo '&quot;$a&quot;'
+echo &quot;'$a'&quot;
+</code></pre>
+
+<p>运行结果：</p>
+
+<p><a href="https://img.it610.com/image/info8/66dae00c478e4060ab8208cc6e69f3b4.jpg"><img src="https://img.it610.com/image/info8/66dae00c478e4060ab8208cc6e69f3b4.jpg" alt="" /></a></p>
+
+<p>解释:</p>
+
+<p>单引号： 强引用 (引号里面的内容全部当成字符串处理，如 echo &lsquo;$a&rsquo;) 双引号：弱引用（有变量时，变量会被替换 ,如 echo &ldquo;$a&rdquo;）</p>
+
+<dl>
+<dt>单引号和双引号都有时会以外面的为主（即外边的引号类型决定其里面内容是强引用还是弱引用，如 echo &lsquo; &ldquo;$a&rdquo; &lsquo;:强引用 和 echo &ldquo; &lsquo;$a&rsquo; &ldquo;</dt>
+<dd>弱引用）</dd>
+</dl>
+
+<p>了解到上面的强引用和弱引用区别之后，回过头来考虑一下原来的问题，错误分析方法如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/fe6df1d95a2e43fcb51c6fe021775939.jpg"><img src="https://img.it610.com/image/info8/fe6df1d95a2e43fcb51c6fe021775939.jpg" alt="" /></a></p>
+
+<p>看到上面的情况，可以看出：awk的单引号也是 “强引用”，所以导致$name 和 $num 都不能传进入他们的值，所以都是空，awk就以两个$0 输出结果</p>
+
+<p>那么，“强引用”不可以，能不能把awk的单引号变成双引号呢？？？？？ 试一下：</p>
+
+<p><img src="https://img.it610.com/image/info8/cf8165ebd5a947a090afe5f30d090029.jpg" alt="" /></p>
+
+<p>显示语法错误说明不行，</p>
+
+<p>可能有些朋友会问能不能用eval 语句（关于eval语句的使用讲解，详见下文）</p>
+
+<p>测试一下：(如图)</p>
+
+<p><a href="https://img.it610.com/image/info8/81445cffca884983823132aed5569bf4.jpg"><img src="https://img.it610.com/image/info8/81445cffca884983823132aed5569bf4.jpg" alt="" /></a></p>
+
+<p>可见eval的功能不能在awk里面使用</p>
+
+<p>也就是说明这个函数的逻辑行不通，因为没有办法将函数的参数赋给awk。</p>
+
+<p>下面我们再以一个函数例子来学习一下shell函数的返回值问题</p>
+
+<pre><code>function cpuinfo()
+{
+        $1=`cat /proc/stat | grep 'cpu ' | awk '{print &quot;$2&quot; &quot;$3&quot; &quot;$4&quot; &quot;$5&quot; &quot;$6&quot; &quot;$7&quot; &quot;$8}'`
+        $2=`echo $1 | awk '{print $5}'`
+        $3=`echo $1 | awk '{print $1+$2+$3+$4+$5+$6+$7}'`
+}
+cpuinfo Log1 idle1 cpu1
+echo $Log1 $idle1 $cpu1
+</code></pre>
+
+<p>说一下我函数的意图，我是想将函数的第一条语句赋给传进的第一个参数，以此类推.</p>
+
+<p>运行以后发现错误</p>
+
+<p><a href="https://img.it610.com/image/info8/bd5fd10feca0406f91cbdaeb22e0ab68.jpg"><img src="https://img.it610.com/image/info8/bd5fd10feca0406f91cbdaeb22e0ab68.jpg" alt="Shell中单、双引号，参数作用域和eval的问题学习_第2张图片" /></a></p>
+
+<p>明显这种变量赋值方法是错误的。那么该如何才能实现自己的目的呢。</p>
+
+<p>结合shell学习的知识。首先通过一个最简单的例子介绍一下eval用法，再做错误更正测试：</p>
+
+<p><a href="https://img.it610.com/image/info8/da1fa807104745ce8d322945b77ec0bd.jpg"><img src="https://img.it610.com/image/info8/da1fa807104745ce8d322945b77ec0bd.jpg" alt="Shell中单、双引号，参数作用域和eval的问题学习_第3张图片" /></a></p>
+
+<p>可以看出：eval可读取一连串的参数，然后再依参数本身的特性来执行。</p>
+
+<p>关于 eval $v1=$vaaa;echo aaa:$aaa 和 eval &ldquo;$v1=$vaaa&rdquo;;echo aaa:$aaa 的错误输出如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/95f3fb9865d34c378d451e0b1bb568b7.jpg"><img src="https://img.it610.com/image/info8/95f3fb9865d34c378d451e0b1bb568b7.jpg" alt="" /></a></p>
+
+<p>为什么会报这样的错误。从上面的eval作用思考：命令变成了 aaa=This is aaa这样当然会报错。双引号的弱引用也是这样。</p>
+
+<p>只有单引号的强引用变成aaa=$vaaa</p>
+
+<p>想仔细学习eval可参考：<a href="http://www.cnblogs.com/huzhiwei/archive/2012/03/14/2395956.html">http://www.cnblogs.com/huzhiwei/archive/2012/03/14/2395956.html</a></p>
+
+<p>回到正题</p>
+
+<p>我接下来做了如下测试：</p>
+
+<p><img src="https://img.it610.com/image/info8/b6dcd3945d2744d4ab2b7cdb6f2454e0.jpg" alt="" /></p>
+
+<p>就以为只要将例子中的变量a通过eval换成函数变量传入的$1就可以了呢。就修改了函数的内容，并测试了一下。</p>
+
+<p><a href="https://img.it610.com/image/info8/052a573c04c74692a0e4b8973d6b135c.jpg"><img src="https://img.it610.com/image/info8/052a573c04c74692a0e4b8973d6b135c.jpg" alt="Shell中单、双引号，参数作用域和eval的问题学习_第4张图片" /></a></p>
+
+<p>发现还是错误。&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;</p>
+
+<p>最后还是决定使用另一种方法解决函数多次使用赋值的问题。如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/4267d871f3fb4b05990eff7393495ed7.jpg"><img src="https://img.it610.com/image/info8/4267d871f3fb4b05990eff7393495ed7.jpg" alt="Shell中单、双引号，参数作用域和eval的问题学习_第5张图片" /></a></p>
+
+<p>这里牵扯到了函数的变量值作用域知识点。它和c语言不同。这一点也可以通过上面的例子看出。</p>
+
+<p>详细学习可以看出参照文章：<a href="http://blog.csdn.net/ithomer/article/details/7954577">http://blog.csdn.net/ithomer/article/details/7954577</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

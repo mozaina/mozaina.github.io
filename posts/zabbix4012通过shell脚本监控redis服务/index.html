@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Zabbix4012通过shell脚本监控redis服务 | 开发者问答集锦</title>
+    <meta property="og:title" content="Zabbix4012通过shell脚本监控redis服务 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Zabbix4012通过shell脚本监控redis服务">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/zabbix4012%E9%80%9A%E8%BF%87shell%E8%84%9A%E6%9C%AC%E7%9B%91%E6%8E%A7redis%E6%9C%8D%E5%8A%A1/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Zabbix4012通过shell脚本监控redis服务</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>由于公司需要监控redis的状态，并放在zabbix图形展示，所以就需要用到redis自带的redis-
+cli客户端，通过info命令查询redis的运行情况，以下是shell脚本，下一篇文章会介绍如何简单监控windows上的redis。</p>
+
+<h2 id="一-info命令的使用">一、info命令的使用</h2>
+
+<p>如何搭建zabbix和安装redis这里就不介绍了。<br />
+1、首先要用到redis-cli命令，通过find查找本机命令所在目录，比如我的是在/usr/local/bin/redis-cli 通过命令redis-
+cli -h 127.0.0.1 -p 6379 -a ‘password’ info可以查看本机redis的详细信息，包括连接数、网络流量等。<br />
+2、所以我们可以在安装有redis的服务器上编写shell脚本，用来查询该服务器redis的状态，然后通过该服务器上zabbix客户端来读取脚本结果，返回给zabbix服务端数值，来展现在我们面前。</p>
+
+<h2 id="二-创建redis监控脚本">二、创建redis监控脚本</h2>
+
+<p>1.首先来到zabbix_agentd.d目录，比如我的是在/etc/zabbix/zabbix_agentd.d，然后该目录下默认会有一个userparameter_mysql.conf配置文件，该配置文件用来定义要执行的脚本和键值对应关系。<br />
+2.我们先创建一个redis监控脚本，用来筛选出我们需要的监控项目所对应的值。<br />
+3. vim redisStatus.sh
+这里由于我每台机器都部署了两个redis，用来跟其他机器的redis做主从，所以我需要监听两个端口6379和6380.</p>
+
+<pre><code>#!/bin/bash
+REDISCLI=&quot;/usr/local/bin/redis-cli&quot;
+HOST=&quot;127.0.0.1&quot;
+PASS=&quot;password&quot;
+#这里我没有定义端口号的变量，有需要也可以定义的，会更方便
+#以下筛选出每个字断所对应的值
+if [[ $# == 1 ]];then
+    case $1 in
+        version)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info server 2&gt;/dev/null | grep -w &quot;redis_version&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        total_commands_processed6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info 2&gt;/dev/null | grep -w &quot;total_commands_processed&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        instantaneous_ops_per_sec6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info 2&gt;/dev/null | grep -w &quot;instantaneous_ops_per_sec&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        instantaneous_input_kbps6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info 2&gt;/dev/null | grep -w &quot;instantaneous_input_kbps&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        instantaneous_output_kbps6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info 2&gt;/dev/null | grep -w &quot;instantaneous_output_kbps&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        uptime6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info server 2&gt;/dev/null | grep -w &quot;uptime_in_seconds&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        connected_clients6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info clients 2&gt;/dev/null | grep -w &quot;connected_clients&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        blocked_clients6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info clients 2&gt;/dev/null | grep -w &quot;blocked_clients&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info memory 2&gt;/dev/null | grep -w &quot;used_memory&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory_rss6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info memory 2&gt;/dev/null | grep -w &quot;used_memory_rss&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory_peak6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info memory 2&gt;/dev/null | grep -w &quot;used_memory_peak&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory_lua6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info memory 2&gt;/dev/null | grep -w &quot;used_memory_lua&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        maxmemory6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info memory 2&gt;/dev/null | grep -w &quot;maxmemory&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_sys6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info cpu 2&gt;/dev/null | grep -w &quot;used_cpu_sys&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_user6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info cpu 2&gt;/dev/null | grep -w &quot;used_cpu_user&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_sys_children6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info cpu 2&gt;/dev/null | grep -w &quot;used_cpu_sys_children&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_user_children6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info cpu 2&gt;/dev/null | grep -w &quot;used_cpu_user_children&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        rdb_last_bgsave_status6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info Persistence 2&gt;/dev/null | grep -w &quot;rdb_last_bgsave_status&quot; | awk -F':' '{print $2}' | grep -c ok`
+            echo $result
+        ;;
+        aof_last_bgrewrite_status6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info Persistence 2&gt;/dev/null | grep -w &quot;aof_last_bgrewrite_status&quot; | awk -F':' '{print $2}' | grep -c ok`
+            echo $result
+        ;;
+        aof_last_write_status6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info Persistence 2&gt;/dev/null | grep -w &quot;aof_last_write_status&quot; | awk -F':' '{print $2}' | grep -c ok`
+            echo $result
+        ;;
+        total_commands_processed6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info 2&gt;/dev/null | grep -w &quot;total_commands_processed&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        instantaneous_ops_per_sec6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info 2&gt;/dev/null | grep -w &quot;instantaneous_ops_per_sec&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        instantaneous_input_kbps6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info 2&gt;/dev/null | grep -w &quot;instantaneous_input_kbps&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        instantaneous_output_kbps6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info 2&gt;/dev/null | grep -w &quot;instantaneous_output_kbps&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        uptime6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info server 2&gt;/dev/null | grep -w &quot;uptime_in_seconds&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        connected_clients6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info clients 2&gt;/dev/null | grep -w &quot;connected_clients&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        blocked_clients6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info clients 2&gt;/dev/null | grep -w &quot;blocked_clients&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info memory 2&gt;/dev/null | grep -w &quot;used_memory&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory_rss6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info memory 2&gt;/dev/null | grep -w &quot;used_memory_rss&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory_peak6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info memory 2&gt;/dev/null | grep -w &quot;used_memory_peak&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_memory_lua6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info memory 2&gt;/dev/null | grep -w &quot;used_memory_lua&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        maxmemory6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info memory 2&gt;/dev/null | grep -w &quot;maxmemory&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_sys6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info cpu 2&gt;/dev/null | grep -w &quot;used_cpu_sys&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_user6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info cpu 2&gt;/dev/null | grep -w &quot;used_cpu_user&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_sys_children6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info cpu 2&gt;/dev/null | grep -w &quot;used_cpu_sys_children&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        used_cpu_user_children6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info cpu 2&gt;/dev/null | grep -w &quot;used_cpu_user_children&quot; | awk -F':' '{print $2}'`
+            echo $result
+        ;;
+        rdb_last_bgsave_status6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info Persistence 2&gt;/dev/null | grep -w &quot;rdb_last_bgsave_status&quot; | awk -F':' '{print $2}' | grep -c ok`
+            echo $result
+        ;;
+        aof_last_bgrewrite_status6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info Persistence 2&gt;/dev/null | grep -w &quot;aof_last_bgrewrite_status&quot; | awk -F':' '{print $2}' | grep -c ok`
+            echo $result
+        ;;
+        aof_last_write_status6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info Persistence 2&gt;/dev/null | grep -w &quot;aof_last_write_status&quot; | awk -F':' '{print $2}' | grep -c ok`
+            echo $result
+        ;;
+        *)
+            echo -e &quot;\033[33mUsage: $0 {connected_clients|blocked_clients|used_memory|used_memory_rss|used_memory_peak|used_memory_lua|used_cpu_sys|used_cpu_user|used_cpu_sys_children|used_cpu_user_children|rdb_last_bgsave_status|aof_last_bgrewrite_status|aof_last_write_status}\033[0m&quot;
+        ;;
+    esac
+elif [[ $# == 2 ]];then
+    case $2 in
+        keys6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info 2&gt;/dev/null | grep -w &quot;$1&quot; | grep -w &quot;keys&quot; | awk -F'=|,' '{print $2}'`
+            echo $result
+        ;;
+        keys6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info 2&gt;/dev/null | grep -w &quot;$1&quot; | grep -w &quot;keys&quot; | awk -F'=|,' '{print $2}'`
+            echo $result
+        ;;
+    esac
+elif [[ $# == 2 ]];then
+    case $2 in
+        keys6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info 2&gt;/dev/null | grep -w &quot;$1&quot; | grep -w &quot;keys&quot; | awk -F'=|,' '{print $2}'`
+            echo $result
+        ;;
+        expires6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info 2&gt;/dev/null | grep -w &quot;$1&quot; | grep -w &quot;keys&quot; | awk -F'=|,' '{print $4}'`
+            echo $result
+        ;;
+        avg_ttl6379)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6379 info 2&gt;/dev/null | grep -w &quot;$1&quot; | grep -w &quot;avg_ttl&quot; | awk -F'=|,' '{print $6}'`
+            echo $result
+        ;;
+        keys6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info 2&gt;/dev/null | grep -w &quot;$1&quot; | grep -w &quot;keys&quot; | awk -F'=|,' '{print $2}'`
+            echo $result
+        ;;
+        expires6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info 2&gt;/dev/null | grep -w &quot;$1&quot; | grep -w &quot;keys&quot; | awk -F'=|,' '{print $4}'`
+            echo $result
+        ;;
+        avg_ttl6380)
+            result=`$REDISCLI -h $HOST -a $PASS -p 6380 info 2&gt;/dev/null | grep -w &quot;$1&quot; | grep -w &quot;avg_ttl&quot; | awk -F'=|,' '{print $6}'`
+            echo $result
+        ;;
+        *)
+            echo -e &quot;\033[33mUsage: $0 {db0 keys|db0 expires|db0 avg_ttl}\033[0m&quot; 
+        ;;
+    esac
+fi
+</code></pre>
+
+<p>4.赋予脚本可执行权限<br />
+chmod +x /etc/zabbix/zabbix_agentd.d/redisStatus.sh<br />
+5.脚本测试一下是否正确<br />
+/etc/zabbix/zabbix_agentd.d/redisStatus.sh version</p>
+
+<h2 id="三-修改配置文件">三、修改配置文件</h2>
+
+<p>1.编写redis监控配置文件</p>
+
+<pre><code>  vim  /etc/zabbix/zabbix_agentd.d/userparameter_mysql.conf
+</code></pre>
+
+<p>写入：</p>
+
+<pre><code>UserParameter=Redis.Status,status=`/usr/local/bin/redis-cli -h 127.0.0.1 -a 'uV2pVUxZaO' -p 6379 ping 2&gt;/dev/null |grep -c PONG` &amp;&amp;echo $status
+UserParameter=Redis.Info[*],/etc/zabbix/zabbix_agentd.d/redisStatus6379.sh $1 $2
+</code></pre>
+
+<p>这里的两项，一个是监测redis的状态，用来zabbix触发报警；一个是用来匹配脚本的值。<br />
+2.重启zabbix-agent<br />
+systemctl restart zabbix-agent</p>
+
+<h2 id="四-创建并导入监控模板">四、创建并导入监控模板</h2>
+
+<p>1、创建监控模板文件<br />
+redis-template.xml文件下载地址如下，在我的github上。<br />
+git@github.com:sxswcq/zabbix.template.of.redis.monitoring.git<br />
+2.下载之后，导入监控模板<br />
+<a href="https://img.it610.com/image/info8/c8f9f285b600487c9763e091130f7eb0.jpg"><img src="https://img.it610.com/image/info8/c8f9f285b600487c9763e091130f7eb0.jpg" alt="Zabbix4.0.12通过shell脚本监控redis服务_第1张图片" /></a></p>
+
+<p>3.给主机添加监控项，选中刚才的模板就好。</p>
+
+<p>以下写一些个人搭建中碰到的问题：<br />
+1.这个监控模板是网上通用的，一些基础项目的模板，不包含网络流量等，所以有需要大家自行添加，或者直接自己编写监控项目，根据自己写的脚本。如下是我自己写的监控项，其实只需要修改名称和对应的键值就行，名称自定义，键值就是脚本中case后面定义的：<br />
+<a href="https://img.it610.com/image/info8/706fbdf08db24215b134b264e32ad83a.jpg"><img src="https://img.it610.com/image/info8/706fbdf08db24215b134b264e32ad83a.jpg" alt="Zabbix4.0.12通过shell脚本监控redis服务_第2张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

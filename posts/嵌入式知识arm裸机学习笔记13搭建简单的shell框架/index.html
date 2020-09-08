@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>嵌入式知识ARM裸机学习笔记13搭建简单的shell框架 | 开发者问答集锦</title>
+    <meta property="og:title" content="嵌入式知识ARM裸机学习笔记13搭建简单的shell框架 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="嵌入式知识ARM裸机学习笔记13搭建简单的shell框架">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%B5%8C%E5%85%A5%E5%BC%8F%E7%9F%A5%E8%AF%86arm%E8%A3%B8%E6%9C%BA%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B013%E6%90%AD%E5%BB%BA%E7%AE%80%E5%8D%95%E7%9A%84shell%E6%A1%86%E6%9E%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">嵌入式知识ARM裸机学习笔记13搭建简单的shell框架</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="嵌入式知识-arm裸机-学习笔记-13-搭建简单的shell框架">嵌入式知识-ARM裸机-学习笔记（13）：搭建简单的shell框架</h2>
+
+<h2 id="一-shell原理">一、shell原理</h2>
+
+<h4 id="1-什么是shell">1. 什么是shell？</h4>
+
+<p>shell中文是壳的意思，在计算机中经常提到shell是 <strong>用户操作接口</strong>
+的意思。因为计算机程序本身很复杂，里面的实现和外面的调用必须分开。接口本身就是 <strong>对内部复杂的实现的一种封装</strong>
+，外部只需要通过接口就可以很容易的实现效果，但是却不用理会内部实现的复杂性和原理。</p>
+
+<p>操作系统运行起来后都会给用户提供一个操作界面，这个 <strong>操作界面就叫shell</strong>
+。用户可以通过shell来调用操作系统内部的复杂实现。shell编程就是在shell层次上进行编程。譬如linux中的脚本编程、windows中的批处理。</p>
+
+<h4 id="2-两种shell-gui和cmdline">2. 两种shell：GUI和cmdline</h4>
+
+<p><strong>GUI（图形用户界面）</strong> ，特点是操作简单、易学易用，适合使用电脑来工作的人。<br />
+<a href="https://img.it610.com/image/info8/14bdf3696a144d0ea5466a1e3e20b068.jpg"><img src="https://img.it610.com/image/info8/14bdf3696a144d0ea5466a1e3e20b068.jpg" alt="嵌入式知识-ARM裸机-
+学习笔记（13）：搭建简单的shell框架_第1张图片" /></a><br />
+<strong>cmdline(命令行界面)</strong> ，譬如linux的终端和windows的cmd，特点是不易用易学，优点是可以进行方便的shell编程，适合做开发的人。<br />
+<a href="https://img.it610.com/image/info8/c306fc5d58c44c0bace0f79bfec5490d.jpg"><img src="https://img.it610.com/image/info8/c306fc5d58c44c0bace0f79bfec5490d.jpg" alt="嵌入式知识-ARM裸机-
+学习笔记（13）：搭建简单的shell框架_第2张图片" /></a></p>
+
+<h4 id="3-shell运行原理">3. shell运行原理</h4>
+
+<p><strong>我们主要分析命令行shell的运行原理。</strong>
+命令行shell其实就是一个死循环。这个死循环包含3个模块，这3个模块是串联的，分别是命令接收、命令解析、命令执行。<br />
+命令行有一个标准命令集，用户在操作的时候必须知道自己想要的操作用通过哪个命令来实现，不能随便输入命令。如果用户输入了一个不是标准命令的命令（不能识别的命令），提示用户这不是一个合法命令，然后重新回到命令行让用户输入下一个命令。<br />
+用户输入命令的界面是一个命令行，命令行的意思就是用户 <strong>输入的命令是以行为单位的</strong>
+，更好理解的说用户输入的命令在用户按下回车键之后就算是结束了，shell可以开始接收了。</p>
+
+<h2 id="二-搭建简单的shell框架">二、搭建简单的shell框架</h2>
+
+<h4 id="1-命令列表的搭建">1. 命令列表的搭建</h4>
+
+<p>首先要先宏定义存储命令列表的数组，标准命令，以及与数组相关的参数。<br />
+<a href="https://img.it610.com/image/info8/2d2c76dd48fb45b3bd8ca4a7dd7d31fa.jpg"><img src="https://img.it610.com/image/info8/2d2c76dd48fb45b3bd8ca4a7dd7d31fa.jpg" alt="嵌入式知识-ARM裸机-
+学习笔记（13）：搭建简单的shell框架_第3张图片" /></a></p>
+
+<h4 id="2-命令的接收">2. 命令的接收</h4>
+
+<p>sheel框架是一个循环的状态，一直在检测是否有命令的输入，一旦有输入，将会按照一定格式去接收命令，并将命令暂存到buf中，这里的buf数组中存的是你输入的所有字符，之后会通过buf数组对你输入的信息进行解析。<br />
+通过 <strong>getchar（）</strong>
+函数来实现串口的接收，即获取用户从键盘输入的信息。利用一个while循环一直进行判断，直到遇到回车符标志结束，这也符合命令行的规则，
+<strong>以回车符表示一行命令的结束。</strong><br />
+在获取用户输入的同时，利用 <strong>putchar（）</strong> 函数进行显示，即实现打印一个字符就在输出处显示出打印的该字符，这又称为 <strong>回显</strong> 。<br />
+通过一个*p指针，来对数组中的位置进行索引，从而将输入的内容存储在buf数组中。<br />
+<a href="https://img.it610.com/image/info8/abe8a9eb32f0402da6c8de3453b8686e.jpg"><img src="https://img.it610.com/image/info8/abe8a9eb32f0402da6c8de3453b8686e.jpg" alt="嵌入式知识-ARM裸机-
+学习笔记（13）：搭建简单的shell框架_第4张图片" /></a></p>
+
+<h4 id="3-命令的解析">3. 命令的解析</h4>
+
+<p>在进行命令解析时，用到了两个数组，一个是 <strong>g_cmdset</strong> ：该数组中存储了标准的命令集，另一个是 <strong>cmd</strong>
+：该数组中是通过buf数组解析出来的用户输入的命令。命令的解析其实就是 <strong>对比用户输入的命令和事先定义好的命令集</strong>
+，如果相同则执行对应的命令操作，如果不相同则返回错误并提示相应信息。<br />
+在解析命令时，由于buf数组中是用户输入的一长串内容，其中可能包含了多个子命令，所以在最开始首先要对用户输入的信息 <strong>进行命令的分割</strong>
+，从中提取出多个子命令并放入到cmd数组中的对应位置。<br />
+两个数组的第一维度都是用来存放第几个子命令，第二维度用来存放该命令的内容，两个维度相配合即可实现 <strong>多个命令内容的存储</strong> 。</p>
+
+<p><a href="https://img.it610.com/image/info8/fe99dbae2872426ca686faa6f6ad1b82.jpg"><img src="https://img.it610.com/image/info8/fe99dbae2872426ca686faa6f6ad1b82.jpg" alt="嵌入式知识-ARM裸机-
+学习笔记（13）：搭建简单的shell框架_第5张图片" /></a></p>
+
+<h4 id="4-命令的执行">4. 命令的执行</h4>
+
+<p>在执行命令时，通过 <strong>cmd[0]</strong> 的内容可以知道是g_cmdset数组中的哪个命令，然后通过 <strong>cmd_index</strong>
+这个索引去判断对应的那个命令执行函数。之后跳转到相应的命令执行函数，再解析接下来的子命令，通过 <strong>cmd[1]</strong>
+能够解析出第二个子命令，并结合第一个子命令执行相应的操作，这里对应的操作应当是最开始设定好的。<br />
+<a href="https://img.it610.com/image/info8/9be3d0f40ac3482db3f3a5fb2125f796.jpg"><img src="https://img.it610.com/image/info8/9be3d0f40ac3482db3f3a5fb2125f796.jpg" alt="嵌入式知识-ARM裸机-
+学习笔记（13）：搭建简单的shell框架_第6张图片" /></a></p>
+
+<h4 id="5-shell初始化和循环">5. shell初始化和循环</h4>
+
+<p>shell框架首先要初始化shell，其中包括定义cmdset数组内的命令集，初始化串口，初始化硬件（这里指的是编写好对应命令下的执行操作），初始化看门狗等。<br />
+紧接着是shell大循环，再循环中反复检测用户输入的信息，并且执行命令接收、命令解析和命令执行这三步骤，最终实现能够通过命令去执行对应的硬件操作，从而符合shell这种API式的框架。<br />
+<a href="https://img.it610.com/image/info8/d78a83ebc7bb42f388e8628a3b75c02f.jpg"><img src="https://img.it610.com/image/info8/d78a83ebc7bb42f388e8628a3b75c02f.jpg" alt="嵌入式知识-ARM裸机-
+学习笔记（13）：搭建简单的shell框架_第7张图片" /></a></p>
+
+<h2 id="三-分析shell命令控制硬件的过程">三、分析shell命令控制硬件的过程</h2>
+
+<h4 id="1-输入命令">1. 输入命令</h4>
+
+<p>当你不输入命令时，shell的大循环则一直等待你输入命令，此时键入led off即可关闭LED灯，以led为例来介绍shell框架执行流程。<br />
+<a href="https://img.it610.com/image/info8/f3fc57a13f45408783c009be3f0e99fd.jpg"><img src="https://img.it610.com/image/info8/f3fc57a13f45408783c009be3f0e99fd.jpg" alt="嵌入式知识-ARM裸机-
+学习笔记（13）：搭建简单的shell框架_第8张图片" /></a><br />
+整个输入命令可以分为2步，第一步通过串口将用户输入的字符串“led off
+\n”接收进来并暂存在buf数组中，并设计回显的功能通过串口输入打印出来。第二步是将buf数组中的命令进行多个子命令的分割，并将分割后的多个子命令存在cmd数组中，并从中解析出来对应的cmd_index号为0，用于后续的命令执行。</p>
+
+<h4 id="2-执行命令">2. 执行命令</h4>
+
+<p>执行命令则通过输入的命令去做对应的操作，此时命令为lef off，则应去执行对应的关闭led的操作。<br />
+<a href="https://img.it610.com/image/info8/49fa1d62627f46ebac2fe73e67281ee3.jpg"><img src="https://img.it610.com/image/info8/49fa1d62627f46ebac2fe73e67281ee3.jpg" alt="嵌入式知识-ARM裸机-
+学习笔记（13）：搭建简单的shell框架_第9张图片" /></a><br />
+通过命令解析时得到的cmd_index=0，可以对应到do_cmd_led()函数，进而实现第二条子命令的判断，由于cmd[1]中存入的命令为’off’，所以将2者搭配起来使用，进而实现了led的关闭。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>小项目linux下简单shell | 开发者问答集锦</title>
+    <meta property="og:title" content="小项目linux下简单shell - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="小项目linux下简单shell">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%B0%8F%E9%A1%B9%E7%9B%AElinux%E4%B8%8B%E7%AE%80%E5%8D%95shell/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">小项目linux下简单shell</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>目的：<br />
+分享大家学习入门linux-c、熟悉shell命令执行，解析的过程</p>
+
+<p>实现过程：<br />
+在linux的bashshell中执行我的应用程序，进入自己制作的shell界面（while循环），定制自己的shell提示符，通过fgets获得输入，并将所传入的参数写入一个指针数组中（整理参数），判断是不是空操作或exit（退出），如果不是再判断是不是重定向输入输出，或管道。最后通过fork创建子进程，调用execvp执行命令。最终程序能实现所有单linux命令，重定向输入输出，及管道（最多两层管道）。</p>
+
+<p>内容（分为三个文件）：<br />
+main.c<br />
+function.c<br />
+head.c</p>
+
+<p>文档下载</p>
+
+<hr />
+
+<p>main.c</p>
+
+<pre><code>#include &quot;head.h&quot;
+#include &quot;function.c&quot;
+int main(){
+    int ret,i,j,k=0;
+    pid_t pid;
+    char buf[ MAXLINE ];
+    while(1){
+    again:
+        print();
+        bzero(buf,MAXLINE);
+        fgets(buf,MAXLINE,stdin);//从stdin中输入MAXLINE到buf里面最后一个字符是\n(enter换行符)
+        if(buf[strlen(buf)-1]=='\n'){//将最后一个字符\n改为\0
+            buf[strlen(buf)-1]='\0';
+        }
+
+//      printf(&quot;%s\n&quot;,buf);
+        canshuzhengli(canshu,buf);//将所传入的参数用一个指针数组（*canshu[]）来指向buf中的每个参数
+        if(*(canshu+0)==NULL){//没有输入，直接按下了enter
+            goto again;
+        }
+        if(strcmp(*(canshu+0),&quot;exit&quot;)==0){//判断是不是输入了exit命令，是我们就直接退出
+            exit(1);
+        }
+
+/*****************重定向输入，输出***************************************************/
+        if(*(canshu+1)!=NULL){
+            if((*(*(canshu+1)+0)==60)||(*(*(canshu+1)+0)==62)){//60==&lt;    62==&gt; 
+                chongdingxiang(canshu);
+                goto again;
+
+            }   
+        }
+/******************管道命令*********************************************************/
+        for(i=0;*(canshu+i) != NULL;i++){
+            if(*(*(canshu+i)+0)=='|'){
+                guandao(canshu,i);
+                k=1000;
+                break;
+            }
+            printf(&quot;%d++++++++++\n&quot;,__LINE__);
+        }
+        if(k==1000){
+            printf(&quot;%d++++++++++\n&quot;,__LINE__);
+            goto again;
+        }
+
+
+/**************输出指针数组*canshu[]中的每一个参数***********************************/
+        for(i=0;*(canshu+i) != NULL;i++){
+            printf(&quot;%s\n&quot;,*(canshu+i));
+        }
+/*************创建子进程，用来执行和序********************************************/
+        if((pid=fork())&lt;0){
+            perror(&quot;fork is failure!\n&quot;);
+            exit(1);
+        }else if(pid == 0){
+            if(execvp(*(canshu+0),canshu)&lt;0){
+                perror(NULL);
+                exit(111);
+            }
+        }
+        if((pid=waitpid(pid,NULL,0))&lt;0){
+            perror(&quot;fork is failure!\n&quot;);
+            exit(1);
+        }
+    }
+    return 0;
+}
+</code></pre>
+
+<p>function.c</p>
+
+<pre><code>/*********************************************************************
+********参数整理，将所有的参数都放在一个指针数组。ls -la /root******** 
+********在指针数组的存放：&quot;ls\0&quot;  &quot;-la\0&quot; &quot;/root\0&quot; &quot;NULL&quot;    ********
+**********************************************************************/
+int canshuzhengli(char **ptr,char *buf){
+
+        while(*buf != '\0'){
+            *ptr=buf;
+            while(*buf != 32){//124==&gt;管道字符;32==&gt;空格
+                if(*buf=='\0'){
+                    *++ptr=NULL;
+                    return 0;
+                }
+                buf++;
+            }
+            *buf='\0';
+            buf++;
+            ptr++;
+            while(*buf == 32){
+                buf++;
+            }
+        }
+        *ptr = NULL;
+        return 0;
+}
+/**************打印提示符********************************************/
+void print(){
+    int ret;
+    char *user;
+    char *dir;
+    char name[HOST_LEN];
+    bzero(name,sizeof(name));
+    if((ret = gethostname(name,sizeof(name)))&lt;0){//获取主机名
+        perror(&quot;gethostname is failure!\n&quot;);
+        exit(1);
+    }
+    user=getlogin();                 //获取登陆者名字
+    dir=(char *)get_current_dir_name();      //获取当前路径
+    printf(&quot;%s@%s##%s##%%&quot;,user,name,dir);       //最终打印 
+}
+
+/*****************输入输出重定向***********************************/
+void chongdingxiang(char **canshu){
+        pid_t pidd,pid;
+        int fd;
+        if(*(*(canshu+1)+0) == 62){//输出重定向：目前只支持这种形式：ls &gt; bb
+            pidd=fork();
+            if(pidd&lt;0){
+                perror(&quot;chongdingxiang fork is failure!&quot;);
+                exit(1);
+            }else if(pidd==0){
+                if((fd=open(*(canshu+2),O_RDWR|O_CREAT|O_TRUNC,770))&lt;0){
+                    perror(&quot;&gt;open is failure!&quot;);
+                    exit(111);  
+                }
+                if(dup2(fd,STDOUT_FILENO)&lt;0){
+                    perror(&quot;&gt;dup2 is failure!&quot;);
+                    exit(111);
+                }
+                if(execlp(*(canshu+0),*(canshu+0),NULL)&lt;0){
+                    perror(NULL);
+                    exit(111);
+                }
+            }
+            if(pidd&gt;0){
+                if(waitpid(pidd,NULL,0)&lt;0){
+                    perror(&quot;chongdingxiang waitpid is failure!&quot;);
+                    exit(1);
+                }
+            }
+        }else{//wc &lt; 1.c 输入重定向
+            pid=fork();
+            if(pid&lt;0){
+                perror(&quot;chongdingxiang fork is failure!&quot;);
+                exit(1);
+            }else if(pid==0){
+
+                if((fd=open(*(canshu+2),O_RDWR))&lt;0){
+                    perror(&quot;open is failure!&quot;);
+                    exit(111);
+                }
+                if(dup2(fd,STDIN_FILENO)&lt;0){
+                    perror(&quot;);
+                    exit(111);
+                }
+//              printf(&quot;line:%d,canshu1:%s\n&quot;,__LINE__,*(canshu+0));
+                if(execlp(*(canshu+0),*(canshu+0),NULL)&lt;0){
+                    perror(&quot;+++++++&quot;);
+                    exit(111);
+                }       
+//              printf(&quot;line:%d,canshu1:%s\n&quot;,__LINE__,*(canshu+0));
+            }
+            if(pid&gt;0){
+                if(waitpid(pid,NULL,0)&lt;0){
+                    perror(&quot;chongdingxiang &lt; waitpid is failure!&quot;);
+                    exit(1);
+                }
+            }
+
+        }   
+}
+
+/***************************管道处理*************************************************/
+int  guandao(char **canshu,int i){
+    printf(&quot;++++++++++%d\n&quot;,__LINE__);
+    *(canshu+i)=NULL;
+    pid_t pid;
+    int ret,n;
+    int fd[2];
+    ret = pipe(fd);
+    if(ret&lt;0){
+        perror(&quot;pipe is failure!&quot;);
+        return 1;
+    }
+    pid = fork();
+    if(pid &lt; 0){
+        perror(&quot;fork is failure!&quot;);
+        return 1;
+    }
+    if(pid == 0){
+    printf(&quot;++++++++++%d\n&quot;,__LINE__);
+        close(fd[0]);
+        if(dup2(fd[1],STDOUT_FILENO)&lt;0){
+            perror(&quot;| is dup2&quot;);
+            return 1;
+        }
+        if(execvp(*(canshu+0),canshu)&lt;0){
+            perror(&quot;| is exe failure!&quot;);
+            return 1;
+        }
+    }
+    if(pid&gt;0){
+    printf(&quot;++++++++++%d\n&quot;,__LINE__);
+        if(waitpid(pid,NULL,0)&lt;0){
+            perror(&quot;| father waitpid is failure!&quot;);
+            return 1;
+        }
+        close(fd[1]);
+        if(dup2(fd[0],STDIN_FILENO)&lt;0){
+            perror(&quot;| father dup2 is failure!&quot;);
+            return 1;
+        }
+        if(execvp(*(canshu+i+1),(canshu+i+1))&lt;0){
+            perror(&quot;| father exe is failure!&quot;);
+            return 1;
+        }
+    }
+    printf(&quot;++++++++++%d\n&quot;,__LINE__);
+    return 0;
+
+
+}
+</code></pre>
+
+<p>head.h</p>
+
+<pre><code>#include
+#include
+#include               
+#include
+#include
+#include
+#include
+#define MAXLINE 100
+#define HOST_LEN 40
+#define CANSHU_LEN 10
+void print();
+int guandao(char **canshu,int i);
+int canshuzhengli(char **ptr,char *buf);
+static char *canshu[ CANSHU_LEN ];
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

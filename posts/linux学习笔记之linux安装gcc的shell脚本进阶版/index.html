@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux学习笔记之linux安装gcc的shell脚本进阶版 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux学习笔记之linux安装gcc的shell脚本进阶版 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux学习笔记之linux安装gcc的shell脚本进阶版">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E4%B9%8Blinux%E5%AE%89%E8%A3%85gcc%E7%9A%84shell%E8%84%9A%E6%9C%AC%E8%BF%9B%E9%98%B6%E7%89%88/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux学习笔记之linux安装gcc的shell脚本进阶版</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>GCC是GUN Compiler
+Collection的简称，除了编译程序之外，它还含其他相关工具，它能把易于人类使用的高级语言编写的源代码构建成计算机能够直接执行的二进制代码。</p>
+
+<p>GCC是Linux平台下最常用的编译程序，它是Linux平台编译器的事实标准。同时，在Linux平台下的嵌入式开发领域，GCC也是用得最普遍的一种编译器。GCC之所以被广泛采用，是因为它能支持各种不同的目标体系结构。例如，它既支持基于宿主的开发（简单讲就是要为某平台编译程序，就在该平台上编译），也支持交叉编译（即在A平台上编译的程序是供平台B使用的）。目前，GCC支持的体系结构有四十余种，常见的有X86系列、Arm、PowerPC等。同时，GCC还能运行在不同的操作系统上，如Linux、Solaris、Windows等。</p>
+
+<p>除以上外，GCC除了支持C语言，还支持多种其他语言，例如C++、Ada、Java、Objective-C、FORTRAN、Pascal、go等。</p>
+
+<p>基本上很多应用在编译安装时需要使用到gcc，一般使用的版本不是很高所以通过快捷安装命令即可：</p>
+
+<pre><code>yum install -y gcc-c++
+</code></pre>
+
+<p>但有的应用编译时需要更高版本的gcc，这个时候基本上只能通过编译安装，而gcc编译安装非常麻烦，需要几个指定版本的依赖组件才能编译安装成功，为方便安装特意编写了一个安装shell脚本，通过脚本来无人安装，当然安装编译过程还是有点长的，脚本暂只支持以CentOS系统（系统版本5~7有测试过）来安装（其它系统需要调整下快速安装组件命令
+yum 和对应的安装包名）</p>
+
+<pre><code>#!/bin/bash
+#  官网 https://gcc.gnu.org/
+#
+# 下载地址 （镜像）
+# https://gcc.gnu.org/mirrors.html
+#
+# 依赖说明
+# https://gcc.gnu.org/install/prerequisites.html
+#
+#  命令参数
+#  $1 指定安装版本，如果不传则获取最新版本号，为 new 时安装最新版本
+#
+
+#GCC version number
+GCC_VERSION=$1
+# GCC安装基目录
+INSTALL_BASE=&quot;/usr/local/gcc/&quot;
+# 必需的库基目录
+INSTALL_PACKAGE_BASE=&quot;/usr/local/&quot;
+# gcc 编译配置
+GCC_CONFIGURE_WITH=''
+# 镜像地址
+MIRRORS_URL=&quot;http://mirror.linux-ia64.org/gnu/gcc&quot;
+
+if [ -z $1 ] || [[ $1 == &quot;new&quot; ]]; then
+    echo &quot;gcc version is empty!&quot;
+    echo &quot;获取最新稳定版本号 ...&quot;;
+    GCC_VERSION=`curl $MIRRORS_URL/releases/ 2&gt;&amp;1| grep -P 'gcc-\d+\.\d+\.\d+' -o|tail -n 1|grep -P '\d+\.\d+\.\d+' -o`
+    if [ -z &quot;$GCC_VERSION&quot; ];then
+        echo &quot;获取版失败！&quot;;
+        exit
+    fi
+    if [ -z $1 ]; then
+        echo $GCC_VERSION
+        exit
+    fi
+fi
+if [ -e &quot;$INSTALL_BASE$GCC_VERSION/bin/gcc&quot; ];then
+    echo &quot;gcc-$GCC_VERSION already install!&quot;
+    exit
+fi
+
+OLD_PATH=`pwd`
+if [[ &quot;$0&quot; =~ '/' ]]; then
+    cd &quot;`echo &quot;$0&quot; | grep -P '(/?[^/]+/)+' -o`&quot;
+    CURRENT_PATH=`pwd`
+    cd $OLD_PATH
+else
+    CURRENT_PATH=$OLD_PATH
+fi
+
+if [ ! -d &quot;gcc&quot; ];then
+    mkdir gcc
+fi
+cd gcc
+if [ ! -e &quot;gcc-$GCC_VERSION.tar.gz&quot; ]; then
+    #download php
+    echo &quot;download gcc-$GCC_VERSION.tar.gz&quot;;
+    wget $MIRRORS_URL/releases/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.gz 2&gt;&amp;1
+fi
+if [ ! -d &quot;gcc-$GCC_VERSION&quot; ]; then
+    #decompression
+    echo &quot;decompression gcc-$GCC_VERSION.tar.gz&quot;;
+    tar -zxf gcc-$GCC_VERSION.tar.gz
+fi
+if [ ! -d &quot;gcc-$GCC_VERSION&quot; ]; then
+    echo &quot;gcc-$GCC_VERSION dir is not exists&quot;
+    exit
+fi
+
+echo &quot;install dependence&quot;
+
+yum install -y gcc-c++ bzip2 ntpdate m4
+# 时间不同步容易造成配置死循环
+ntpdate -u ntp.api.bz
+
+# while 循环使用的是管道，会开启子进程，无法修改外部的变量
+
+PACKAGE_LISTS=`cat gcc-$GCC_VERSION/contrib/download_prerequisites| grep -P '\-\d+\.\d+(\.\d+)?\.tar'`
+for LINE in `echo -e $PACKAGE_LISTS`
+do
+    PACKAGE_VERSION_FILE=`echo $LINE|grep -P '\w+\-\d+\.\d+(\.\d+)?\.tar\.(bz2|gz)' -o`
+    PACKAGE=`echo $PACKAGE_VERSION_FILE|grep -P '^\w+' -o`
+    PACKAGE_VERSION_DIR=`echo $PACKAGE_VERSION_FILE|grep -P '\w+\-\d+\.\d+(\.\d+)?' -o`
+    PACKAGE_VERSION=`echo $PACKAGE_VERSION_DIR|grep -P '\d+\.\d+(\.\d+)?' -o`
+    PACKAGE_CONFIGURE_WITH=$GCC_CONFIGURE_WITH
+    GCC_CONFIGURE_WITH=&quot;$PACKAGE_CONFIGURE_WITH --with-$PACKAGE=$INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION&quot;
+    echo &quot;install $PACKAGE_VERSION_DIR&quot;
+    if [ -d &quot;$INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION&quot; ]; then
+        echo &quot;$PACKAGE_VERSION_DIR already install&quot;;
+        continue;
+    fi
+    if [ ! -e &quot;$PACKAGE_VERSION_FILE&quot; ]; then
+        #download package
+        echo &quot;download $PACKAGE_VERSION_FILE&quot;;
+        wget $MIRRORS_URL/infrastructure/$PACKAGE_VERSION_FILE 2&gt;&amp;1
+    fi
+    if [ ! -d &quot;$PACKAGE_VERSION_DIR&quot; ]; then
+        #decompression
+        echo &quot;decompression $PACKAGE_VERSION_FILE&quot;;
+        if [ -n &quot;`echo $PACKAGE_VERSION_FILE|grep -P '\.gz$'`&quot; ];then
+            tar -zxf $PACKAGE_VERSION_FILE
+        else
+            tar -xf $PACKAGE_VERSION_FILE
+        fi
+    fi
+    if [ ! -d &quot;$PACKAGE_VERSION_DIR&quot; ]; then
+        echo &quot;$PACKAGE_VERSION_DIR dir is not exists&quot;
+        exit
+    fi
+    cd $PACKAGE_VERSION_DIR
+    if [[ &quot;$PACKAGE&quot; == &quot;isl&quot; ]];then
+        PACKAGE_CONFIGURE_WITH=' --with-gmp-prefix='`echo $PACKAGE_CONFIGURE_WITH|grep -P &quot;[^=]+gmp/\d+\.\d+\.\d+&quot; -o`
+    fi
+    echo &quot;./configure --prefix=$INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION$PACKAGE_CONFIGURE_WITH&quot;
+    ./configure --prefix=$INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION$PACKAGE_CONFIGURE_WITH 2&gt;&amp;1
+    make 2&gt;&amp;1
+    make install 2&gt;&amp;1
+    if [ ! -d &quot;$INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION&quot; ] || [ -z &quot;`ls $INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION`&quot; ];then
+        echo &quot;$PACKAGE-$PACKAGE_VERSION install fail!&quot;
+        exit
+    fi
+    if [[ &quot;$PACKAGE&quot; == &quot;isl&quot; ]];then
+        echo &quot;mv lib/*.py file&quot;
+        # 清除py文件，这些文件会影响共享的动态链接库ldconfig命令执行失败
+        for PY_FILE in `find $INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION/lib/ -name &quot;*.py&quot;`
+        do
+            if [ -n &quot;$PY_FILE&quot; ] &amp;&amp; [ -e &quot;$PY_FILE&quot; ];then
+                echo &quot;mv $PY_FILE $INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION&quot;
+                mv $PY_FILE $INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION
+            fi
+        done
+    fi
+    # 共享的动态链接库，加载配置
+    if [ -d &quot;$INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION/lib&quot; ] &amp;&amp; [ -z &quot;`cat /etc/ld.so.conf|grep &quot;$INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION&quot;`&quot; ];then
+        echo &quot;$INSTALL_PACKAGE_BASE$PACKAGE/$PACKAGE_VERSION/lib&quot; &gt;&gt; /etc/ld.so.conf
+        ldconfig
+    fi
+    cd ../
+done
+
+cd gcc-$GCC_VERSION
+echo &quot;install gcc&quot;
+make clean 2&gt;&amp;1
+# 64位系统需要禁用multilib
+if [ -n &quot;`uname -a|grep -P 'el\d+\.x\d+_\d+' -o|grep x86_64 -o`&quot; ]; then
+    GCC_CONFIGURE_WITH=$GCC_CONFIGURE_WITH' --disable-multilib'
+fi
+
+# 新版需要下载配置文件
+if [ ! -e &quot;./configure&quot; ] &amp;&amp; [ -e &quot;./contrib/download_prerequisites&quot; ];then
+    ./contrib/download_prerequisites
+     mkdir gcc-make-tmp
+     cd gcc-make-tmp
+    echo &quot;../configure --prefix=$INSTALL_BASE$GCC_VERSION$GCC_CONFIGURE_WITH&quot;
+    ../configure --prefix=$INSTALL_BASE$GCC_VERSION$GCC_CONFIGURE_WITH 2&gt;&amp;1
+else
+    echo &quot;./configure --prefix=$INSTALL_BASE$GCC_VERSION$GCC_CONFIGURE_WITH&quot;
+    ./configure --prefix=$INSTALL_BASE$GCC_VERSION$GCC_CONFIGURE_WITH 2&gt;&amp;1
+fi
+
+HTREAD_NUM=`lscpu |grep Thread|grep -P '\d+$' -o`
+make -j $HTREAD_NUM 2&gt;&amp;1
+make install 2&gt;&amp;1
+
+# check install status
+if [ ! -d &quot;$INSTALL_BASE$GCC_VERSION&quot; ] || [ -z &quot;`ls $INSTALL_BASE$GCC_VERSION`&quot; ]; then
+    echo &quot;[error] install gcc-$GCC_VERSION fail!&quot;;
+else
+    echo &quot;$INSTALL_BASE$GCC_VERSION/lib64&quot; &gt;&gt; /etc/ld.so.conf
+    echo &quot;mv lib64/*.py file&quot;
+    # 清除py文件，这些文件会影响共享的动态链接库ldconfig命令执行失败
+    for PY_FILE in `find $INSTALL_BASE$GCC_VERSION/lib64/ -name &quot;*.py&quot;`
+    do
+        if [ -n &quot;$PY_FILE&quot; ] &amp;&amp; [ -e &quot;$PY_FILE&quot; ];then
+            echo &quot;mv $PY_FILE $INSTALL_BASE$GCC_VERSION&quot;
+            mv $PY_FILE $INSTALL_BASE$GCC_VERSION
+        fi
+    done
+    ldconfig
+    echo 'export PATH=$PATH:'&quot;$INSTALL_BASE$GCC_VERSION/bin&quot; &gt;&gt; /etc/profile
+    source /etc/profile
+    yum remove -y gcc-c++
+    echo &quot;install gcc-$GCC_VERSION success!&quot;;
+fi
+</code></pre>
+
+<p>在root账号下，创建一个.sh后缀的shell脚本文件，比如：gcc-install.sh 并把上面脚本写入保存。</p>
+
+<p>执行安装命令</p>
+
+<pre><code>#直接安装最新版
+bash gcc-install.sh new
+#安装指定版本GCC
+bash gcc-install.sh 9.2.0
+</code></pre>
+
+<p>如果系统的依赖过少导致安装不成功，则需要增加对应的依赖包（这里只以测试系统为例依赖包可能安装不是很充足），安装目录可以在安装脚本中去配置修改，安装成功后会提示安装成功。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

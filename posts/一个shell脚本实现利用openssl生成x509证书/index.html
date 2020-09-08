@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>一个shell脚本实现利用OpenSSL生成X509证书 | 开发者问答集锦</title>
+    <meta property="og:title" content="一个shell脚本实现利用OpenSSL生成X509证书 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="一个shell脚本实现利用OpenSSL生成X509证书">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%B8%80%E4%B8%AAshell%E8%84%9A%E6%9C%AC%E5%AE%9E%E7%8E%B0%E5%88%A9%E7%94%A8openssl%E7%94%9F%E6%88%90x509%E8%AF%81%E4%B9%A6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">一个shell脚本实现利用OpenSSL生成X509证书</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <pre><code>#!/bin/bash
+#
+# Copyright (C) 2015 Nicolas TANDE
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#
+
+function usage() { cat &lt;&lt; EOUSAGE
+Usage : $0 CN [altnames]
+      : example : $0 mail.example.net
+      : example : $0 www.example.net alt.example.net secure.example.net
+      :
+      : for *.example.net you can either put '*.example.net' or 'wildcard.example.net'
+EOUSAGE
+}
+
+#################
+# Configuration #
+#################
+
+# Path to openssl binary
+openssl=$(which openssl)
+
+# Crypto ciphers rsa 4096 + sha 512
+openssl_crypto=&quot;rsa:4096 -sha512&quot;
+
+# Certificate Authority that will sign our certificates
+ca=
+
+# Details to be added to every certificates
+organization=&quot;&quot;
+organizationunitname=&quot;&quot;
+locality=&quot;&quot;
+province=&quot;&quot;
+country=&quot;&quot;
+
+# you may also define those variables in your home directory
+userconfig=&quot;$HOME/.certifishrc&quot;
+[ -r &quot;$userconfig&quot; ] &amp;&amp; source &quot;$userconfig&quot;
+
+#################
+# Sanity checks #
+#################
+function error()
+{
+  echo &quot;-- $1 --&quot; &gt;&amp;2
+  exit 1
+}
+
+[ &quot;$country&quot; = &quot;&quot; -o &quot;$province&quot; = &quot;&quot; -o &quot;$locality&quot; = &quot;&quot; -o &quot;$organization&quot; = &quot;&quot; -o &quot;$organizationunitname&quot; = &quot;&quot; ] &amp;&amp;
+  error &quot;Please set configuration at the begin of the script&quot;
+[ ! -r &quot;$ca&quot; ] &amp;&amp; error &quot;CA is not readable (path=$ca), please check configuration at the begin of the script&quot;
+[ ! -x &quot;$openssl&quot; ] &amp;&amp; error &quot;Could not find openssl binary (path=$openssl), please check configuration at the begin of the script&quot;
+
+##############################
+# Do no edit below this line #
+##############################
+set -e
+function notice()
+{
+  echo &quot;-- $1 --&quot;
+}
+
+function confirmation()
+{
+  notice &quot;Is it correct ? [y/N]&quot;
+  read confirmation
+
+  if [ &quot;$confirmation&quot; != &quot;y&quot; ]; then return 1; fi
+}
+
+# Reading parameters
+
+n=$#
+if [ $n -lt 1 ]; then 
+  usage
+  error &quot;Invalid parameters&quot;
+fi
+
+# you can either input '*' or 'wildcard'
+real_cn=$(echo &quot;$1&quot; | sed 's/wildcard/\*/g')
+cn=$(echo &quot;$1&quot;|sed 's/\*/wildcard/g')
+shift
+altname=$@
+
+# Only display parameters
+
+notice &quot;You called this script with the following parameters&quot;
+echo CommonName: $real_cn
+havealtname=0
+if [ ${#altname[@]} -ne 0 ]; then
+  for i in ${altname[@]} ; do
+    havealtname=1
+    echo &quot;AltName: $i&quot;;
+  done
+fi
+
+confirmation
+
+mkdir &quot;$cn&quot;
+cp &quot;$ca&quot; &quot;$cn&quot;
+cd &quot;$cn&quot;
+
+
+# Display OpenSSL parameters
+
+(
+  echo &quot;[req]&quot;
+  echo &quot;distinguished_name = req_distinguished_name&quot;
+  echo &quot;req_extensions = req_ext&quot;
+  echo &quot;prompt = no&quot;
+  echo &quot;&quot;
+  echo &quot;[req_distinguished_name]&quot;
+  echo &quot;CN = $real_cn&quot;
+  echo &quot;O = $organization&quot;
+  echo &quot;OU = $organizationunitname&quot;
+  echo &quot;L = $locality&quot;
+  echo &quot;ST = $province&quot;
+  echo &quot;C = $country&quot;
+  echo &quot;&quot;
+  echo &quot;[req_ext]&quot;
+dns=1
+if [ $havealtname -ne 0 ]; then
+  echo &quot;subjectAltName = @alt_names&quot;
+  echo &quot;&quot;
+  echo &quot;[alt_names]&quot;
+  for i in ${altname[@]} ; do
+    echo &quot;DNS.$dns  = $i&quot;;
+    dns=$((dns + 1))
+  done
+fi
+) &gt; &quot;$cn.cnf&quot;
+
+notice &quot;We are going to generate keys with following parameters&quot;
+notice &quot;The Crypto will be $openssl_crypto and the config will be&quot;
+
+cat &quot;$cn.cnf&quot;
+confirmation
+
+# Generate key + csr
+
+$openssl req -new -newkey $openssl_crypto -nodes -keyout &quot;$cn.key&quot; -out &quot;$cn.csr&quot; -config &quot;$cn.cnf&quot;
+chmod 600 &quot;$cn.key&quot;
+
+notice &quot;This is the CSR, copy paste it in your CA website&quot;
+cat &quot;$cn.csr&quot;
+
+# read user certificate
+
+ok=0
+until [ &quot;$ok&quot; = 1 ] ; do
+  notice &quot;Copy paste here the certificate from your CA website, Control-D to finish&quot;
+  while read line; do
+    cert+=( &quot;$line&quot; )
+  done
+
+  notice &quot;You entered&quot;
+  for line in &quot;${cert[@]}&quot;; do
+    echo &quot;$line&quot;
+  done
+
+  confirmation &amp;&amp; ok=1
+
+done
+for line in &quot;${cert[@]}&quot;; do
+  echo &quot;$line&quot; &gt;&gt; &quot;${cn}&quot;.crt
+done
+
+# generate chained certificate
+
+cat &quot;${cn}.crt&quot; $(basename &quot;${ca}&quot;) &gt; &quot;${cn}.chained.crt&quot;
+
+# generate DNSSEC/TLSA record
+
+notice &quot;TLSA&quot;
+notice &quot;If you with to use DNSSEC/TLSA, add this in DNS zone (replace host with real hostname):&quot;
+
+fpr=$( $openssl x509 -noout -fingerprint -sha512 &lt; &quot;${cn}.crt&quot; |sed -e &quot;s/.*=//g&quot; | sed -e &quot;s/\://g&quot; )
+
+echo &quot;_port._tcp.host IN TLSA ( 3 0 2 $fpr )&quot; &gt; &quot;${cn}.tlsa.txt&quot;
+echo &quot;_port._tcp.host IN TLSA ( 3 0 2 $fpr )&quot;
+</code></pre>
+
+<p>来自：<a href="https://github.com/nittch/certifish">https://github.com/nittch/certifish</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

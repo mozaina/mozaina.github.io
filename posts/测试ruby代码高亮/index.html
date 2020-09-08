@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>测试ruby代码高亮 | 开发者问答集锦</title>
+    <meta property="og:title" content="测试ruby代码高亮 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="测试ruby代码高亮">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%B5%8B%E8%AF%95ruby%E4%BB%A3%E7%A0%81%E9%AB%98%E4%BA%AE/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">测试ruby代码高亮</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <pre><code># encoding: utf-8
+require 'digest/sha2'
+
+class User &lt; ActiveRecord::Base
+  validates :email, format: {with: /^([^@\s]+)@((?:[-a-z0-9]+\.)+[a-z]{2,})$/i, message: '请填写有效电子邮箱'}, :on =&gt; :create
+  validates :password, format: {with: /^[a-zA-Z0-9~@#%&amp;_\.\-\^\$\*\!\+\=]{6,16}$/,message: '必须由6-16个字母、数字或特殊字符组成'}, :on =&gt; :create
+  validates :password, :confirmation =&gt; true , :on =&gt; :create
+  validates :name ,format: {with: /^[\u4e00-\u9fa5]{2,4}$/,message: '中文姓名必须由2到4个汉字组成'}
+  validates :city ,format: {with: /^[\u4e00-\u9fa5]{2,10}$/,message: '地名必须由2到10个汉字组成'}
+  validates :agree, inclusion: { in: %w(1), message: &quot;%{value} is invalid.&quot; }
+  validates :status, inclusion: { in: %w(0 1 2), message: &quot;%{value} is invalid.&quot; }
+  validates :gender, inclusion: { in: %w(0 1), message: &quot;%{value} is invalid.&quot; }
+
+  attr_accessor :password_confirmation
+  attr_reader   :password
+
+  validate  :password_must_be_present
+  validate  :email_unique, :on=&gt; :create
+
+  before_create :make_activation_code, :set_pinyin
+
+  has_many :posts
+  has_many :comments
+  has_many :groups
+
+
+  has_many :requestee_relationships,:class_name=&gt;&quot;Relationship&quot;,:foreign_key=&gt;&quot;requester_id&quot;
+  has_many :requestees,:through=&gt;:requestee_relationships,:source=&gt;:requestee
+
+  has_many :requester_relationships,:class_name=&gt;&quot;Relationship&quot;,:foreign_key=&gt;&quot;requestee_id&quot;
+  has_many :requesters,:through=&gt;:requester_relationships,:source=&gt;:requester
+
+  STATUS = {&quot;0&quot; =&gt; &quot;未工作&quot;,&quot;1&quot;=&gt;&quot;在上学&quot; ,&quot;2&quot;=&gt;&quot;在工作&quot;}
+  UserPath=&quot;#{Rails.root.to_s}/public/uploads/users&quot;
+  #UserPath=&quot;#{Rails.root.to_s}/public/上传/用户&quot;
+
+
+  # 'password' is a virtual attribute
+  def password=(password)
+    @password = password
+
+    if password.present?
+      generate_salt
+      self.encrypted_password = self.class.encrypt_password(password, salt)
+    end
+  end
+
+  def active?
+    activation_code.nil?
+  end
+
+  # Activates the user in the database.
+  def activate!
+    activate
+    save(:validate =&gt; false)
+  end
+
+  def activate
+    @activated = true
+    self.activated_at = Time.now
+    self.activation_code = nil
+  end
+
+  # Returns true if the user has just been activated.
+  def recently_activated?
+    @activated
+  end
+=begin
+select user_id,count(user_id) as same  from friendships where friend_id in (select friend_id from friendships  where user_id=1 ) and user_id in (6,7,8,9,10,16,17,18,19,20) and friend_id&lt;&gt;1 group by user_id order by same desc
+=end
+  #有共同好友的,从好友的好友中找，不包含已经发送请求或是好友关系的 
+  def suggested_friends
+    rs1=Relationship.where(&quot;requester_id='#{self.id}' and (status='pending' or status='accepted')&quot;)
+    ids1= rs1.map{|r| r.requestee_id}
+    rs2=Relationship.where(&quot;requestee_id='#{self.id}' and (status='pending' or status='accepted')&quot;)
+    ids2 = rs2.map{|r| r.requester_id}
+    rs3 = User.all(:conditions=&gt;[&quot;activation_code is NULL and id not in (?)&quot;,ids1+ids2+[self.id]]) 
+    ids3 =rs3.map{|r| r.id}
+    _ids3=ids3.join(&quot;,&quot;)
+    rs=ActiveRecord::Base.connection.execute(&quot;select user_id,friend_id  from friendships where friend_id in (select friend_id from friendships  where user_id='#{self.id}' ) and user_id in (#{_ids3}) and friend_id&lt;&gt;'#{self.id}'&quot;)
+        hash={}
+        rs.each_with_index do |r,i|
+           hash[r[0]]=[] if hash[r[0]].nil?
+           hash[r[0]] &lt;&lt; r[1]
+        end
+        users = rs3.select{|r| hash.keys.include? r.id}
+        users.sort_by! {|u| -hash[u.id].count}
+        return  users,hash
+  end
+
+  def search(keyword)
+    rs1=Relationship.where(&quot;requester_id='#{self.id}' and (status='pending' or status='accepted')&quot;)
+    ids1= rs1.map{|r| r.requestee_id}
+    rs2=Relationship.where(&quot;requestee_id='#{self.id}' and (status='pending' or status='accepted')&quot;)
+    ids2 = rs2.map{|r| r.requester_id}
+    User.all(:conditions=&gt;[&quot;activation_code is NULL and id not in (?)&quot;,ids1+ids2+[self.id]])
+  end
+
+  def is_friend_of?(user_id)
+    arr1 = Relationship.where(&quot;requester_id='#{self.id}' and requestee_id='#{user_id}'&quot;)
+    arr2 = Relationship.where(&quot;requestee_id='#{self.id}' and requester_id='#{user_id}'&quot;)
+    return true if !arr1.empty? and arr1[0].status==&quot;accepted&quot; 
+    return true if !arr2.empty? and arr2[0].status==&quot;accepted&quot; 
+    return false 
+  end
+
+  def friends(group)
+    if group.nil? or group=~/^\-\d+$/ or group=~/^\d+$/
+          _group = group.to_i
+          if group.nil? or _group ==-3
+                 a = self.requesters.where(&quot;relationships.status='accepted'&quot;)
+                 b = self.requestees.where(&quot;relationships.status='accepted'&quot;)
+                 return a+b
+          elsif _group&gt;-3
+            fs= Friendship.where(&quot;user_id='#{self.id}' and group_id='#{group}'&quot;)
+            ids = fs.map{|f| f.friend_id }
+            return User.all(:conditions=&gt;[&quot;id  in (?)&quot;,ids]) 
+          end
+         elsif ('a'..'z').include?(group.downcase)
+           fs= Friendship.where(&quot;user_id='#{self.id}'&quot;)
+           ids = fs.map{|f| f.friend_id }
+           return User.all(:conditions=&gt;[&quot;id in (?) and pinyin like ?&quot;,ids,&quot;#{group.downcase}%&quot;]) 
+         else
+           []
+    end
+  end
+
+  def self.same_friend(user_id,id)
+    rs=ActiveRecord::Base.connection.execute(&quot;select user_id,friend_id  from friendships where friend_id in (select friend_id from friendships  where user_id='#{user_id}' ) and user_id='#{id}' and friend_id&lt;&gt;'#{user_id}'&quot;)
+    rs.count
+  end
+
+=begin
+select distinct relationships.requestee_id,friendships.group_id from relationships left join friendships on friendships.relationship_id=relationships.id  where relationships.requester_id=1 and relationships.status='accepted';
+
+select distinct relationships.requester_id,friendships.group_id from relationships left join friendships on friendships.relationship_id=relationships.id  where relationships.requestee_id=1 and relationships.status='accepted';
+=end
+
+  class &lt;&lt; self
+    def birth(year,month,day)
+      #20.days.ago.to_date.to_s
+      return year + &quot;-&quot; +month+ &quot;-&quot; +day
+    end    
+
+    def authenticate(email, password)
+                if user = find_by_email(email)
+                  if user.encrypted_password == encrypt_password(password, user.salt)
+                    if user.active?
+                      return [true,user]
+                    else
+                      return [false,user]
+                    end
+                  end
+                end
+                [false,nil]
+    end
+
+         def encrypt_password(password, salt)
+              Digest::SHA2.hexdigest(password + &quot;wibble&quot; + salt)
+         end
+
+         def secure_digest(*args)
+      Digest::SHA2.hexdigest(args.flatten.join('--'))
+    end
+
+         def make_token
+             secure_digest(Time.now, (1..10).map{ rand.to_s })
+         end
+
+         def valid_image?(file)
+           format = file.original_filename.split(&quot;.&quot;)[-1] =~ /jpg|jpeg|png|gif|bmp/
+           size = file.size &lt;= 2*1024*1024 #小于2M
+           format&amp;&amp;size
+         end
+  end
+
+  def User.another_user?(current_user,another)
+    current_user &amp;&amp; current_user.id != another.to_i
+  end
+
+  def self.upload_logo(hash)
+    path= &quot;/#{hash[:id]}/logo&quot;
+    FileUtils.mkdir_p &quot;#{UserPath}#{path}&quot;
+    original_type = hash[:uploaded_logo].original_filename.split(&quot;.&quot;)[-1]
+    basename = File.basename(hash[:uploaded_logo].original_filename,&quot;.*&quot;)
+
+    _now = Time.now.strftime(&quot;%Y%m%d%H%M%S&quot;)
+    _path = &quot;/#{UserPath.split(&quot;/&quot;)[-2..-1].join(&quot;/&quot;)}&quot;
+    logo_name = basename.force_encoding(&quot;UTF-8&quot;)
+    save_logo_path = &quot;#{UserPath}#{path}/#{logo_name}_#{_now}.#{original_type}&quot; 
+    logo_path=&quot;#{_path}#{path}/#{logo_name}_#{_now}.#{original_type}&quot;
+
+    small_logo_name = &quot;#{basename}_small&quot;
+    save_small_logo_path=&quot;#{UserPath}#{path}/#{small_logo_name}#{_now}.#{original_type}&quot; 
+    small_logo_path=&quot;#{_path}#{path}/#{small_logo_name}#{_now}.#{original_type}&quot; 
+
+    medium_logo_name = &quot;#{basename}_medium&quot;
+    save_medium_logo_path=&quot;#{UserPath}#{path}/#{medium_logo_name}#{_now}.#{original_type}&quot;
+    medium_logo_path=&quot;#{_path}#{path}/#{medium_logo_name}#{_now}.#{original_type}&quot;
+
+    large_logo_name = &quot;#{basename}_large&quot;
+    save_large_logo_path = &quot;#{UserPath}#{path}/#{large_logo_name}#{_now}.#{original_type}&quot;
+    large_logo_path = &quot;#{_path}#{path}/#{large_logo_name}#{_now}.#{original_type}&quot;
+
+    File.open(save_logo_path,&quot;wb&quot;) do |file|
+      file.write hash[:uploaded_logo].read
+    end 
+    img = Magick::Image.from_blob(hash[:uploaded_logo].read)[0]
+    img.write(save_logo_path)
+
+         thumbnail = img.resize_to_fill(50, 50)
+         thumbnail.write(save_small_logo_path)
+
+         thumbnail = img.resize_to_fill(120, 120)
+         thumbnail.write(save_medium_logo_path)
+
+         thumbnail = img.resize_to_fill(180, 180)
+         thumbnail.write(save_large_logo_path)
+         [logo_name,logo_path,small_logo_path,medium_logo_path,large_logo_path]
+  end
+
+  private
+
+  def password_must_be_present
+    errors.add(:password, &quot;Missing password&quot;) unless encrypted_password.present?
+  end
+
+  def email_unique
+         if User.find_by_email(self.email)
+           errors.add(:email,&quot;该邮箱已经注册，请您换一个邮箱&quot;)
+         end
+  end
+
+  def birth_valid?(year, month,day)
+    begin
+      @date = Date.new(year.to_i, month.to_i, day.to_i)
+      return @date&gt;=Date.new(1900,1,1)&amp;&amp;@date&lt;=Time.now.to_date
+    rescue ArgumentError
+      return false
+    end
+  end
+
+  def check_birth
+    unless birth_valid?
+      errors.add(:birth,&quot;日期格式错误或不在范围内&quot;)
+    end
+  end
+
+  def generate_salt
+    self.salt = self.object_id.to_s + rand.to_s
+  end
+
+  def make_activation_code
+    self.activation_code = self.class.make_token
+  end
+
+  def set_pinyin
+    self.pinyin = PinYin.of_string(self.name, :ascii).join.gsub!(/\d/,&quot;&quot;)
+  end
+end
+
+
+=begin
+self.errors.add_to_base(self.class.instance_variable_get(:@message)) 
+self.errors.add(:captcha, self.class.instance_variable_get(:@message))
+flash.now[:error]            
+@reply.errors.full_messages.join(',')
+
+DUPLICATE_RECORD_ERRORS = [
+  /^Mysql::Error:\s+Duplicate\s+entry\b/,
+  /^PG::Error:\s+ERROR:\s+duplicate\s+key\b/,
+  /\bConstraintException\b/
+]
+
+def self.duplicate_record_error?(error)
+  error.class.name == 'ActiveRecord::RecordNotUnique' or
+  DUPLICATE_RECORD_ERRORS.any? { |re| re =~ error.message }
+end
+=end
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

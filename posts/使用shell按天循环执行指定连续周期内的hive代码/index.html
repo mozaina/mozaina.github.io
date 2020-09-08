@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用shell按天循环执行指定连续周期内的hive代码 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用shell按天循环执行指定连续周期内的hive代码 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用shell按天循环执行指定连续周期内的hive代码">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8shell%E6%8C%89%E5%A4%A9%E5%BE%AA%E7%8E%AF%E6%89%A7%E8%A1%8C%E6%8C%87%E5%AE%9A%E8%BF%9E%E7%BB%AD%E5%91%A8%E6%9C%9F%E5%86%85%E7%9A%84hive%E4%BB%A3%E7%A0%81/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用shell按天循环执行指定连续周期内的hive代码</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>废话不多少，直接上代码：</p>
+
+<pre><code>#!/bin/sh
+#*****************************************************************************************
+#*** 程序功能:  按天循环导入分区数据
+#*** 输入参数:  -s  :需要导入的开始日期
+#***           -e    :需要导入的结束日期
+#***           -f   :SQL脚本绝对路径名称
+#*** 编 写 人:  fuyun
+#*** 编写日期:  2019-12-08
+#*** 修 改 人:  
+#*****************************************************************************************
+
+#若指令传回值不等于0，则立即退出shell
+#set -e
+umask 002
+
+
+while getopts s:e:f: OPT; do #选项后面的冒号表示该选项需要参数
+  case ${OPT} in
+    s) START_DAY=${OPTARG}
+       ;;
+    e) END_DAY=${OPTARG}
+       ;;
+    f) SOL_FILE=${OPTARG}
+       ;;
+    \?)
+       printf &quot;[Usage] `date '+%F %T'` `basename $0` -s  -e  -f \n&quot; &gt;&amp;2
+       exit 1
+  esac
+done
+
+# check parameter
+if [ -z &quot;${START_DAY}&quot; -o -z &quot;${END_DAY}&quot; -o -z &quot;${SOL_FILE}&quot; ]; then
+    printf &quot;[ERROR] `date '+%F %T'` following parameters is empty:\nSTART_DAY=${START_DAY}\nEND_DAY=${END_DAY}\n&quot;
+    printf &quot;SOL_FILE=${SOL_FILE}\n&quot;
+    exit 1
+fi
+
+LOG_FILE=$(echo &quot;${SOL_FILE}&quot; | awk -F&quot;/&quot; '{print $NF}' | awk -F&quot;.&quot; '{print $1}')
+LOG_PATH=/home/fuyun/logs/${LOG_FILE}
+
+printf &quot;[INFO] `date '+%F %T'` execute start day is ${START_DAY}\n&quot;
+printf &quot;[INFO] `date '+%F %T'` execute end day is ${END_DAY}\n&quot;
+printf &quot;[INFO] `date '+%F %T'` execute SQL file is ${SOL_FILE}\n&quot;
+printf &quot;[INFO] `date '+%F %T'` looping execute.......\n&quot;
+
+executeHive() {
+  while :
+  do
+
+    local START_DAY=$(date -d &quot;$START_DAY 1day&quot;  +%Y%m%d)
+    local STAT_DAY=`date -d &quot;${START_DAY} -1 day&quot; +%Y%m%d`
+    local SEVEN_DAY_BEFOR=`date -d &quot;${STAT_DAY} -7 day&quot; +%Y%m%d`
+
+    local LOG_PATH=/home/fuyun/logs/${LOG_FILE}_${STAT_DAY}.log
+    local SEVEN_DAY_BEFOR_LOG_PATH=/home/fuyun/logs/${LOG_FILE}_${SEVEN_DAY_BEFOR}.log
+
+    printf &quot;[INFO] `date '+%F %T'` log file name is ${LOG_PATH}\n&quot;
+    printf &quot;[INFO] `date '+%F %T'` current execute partition is ${STAT_DAY}\n&quot;
+    local startTime=`date '+%F %T'`
+    local startSeconds=$(date --date=&quot;${startTime}&quot; +%s)
+    printf &quot;[INFO] `date '+%F %T'` hivesql execute start time is ${startTime}\n&quot;
+
+    # execute sql
+    # 注意：hiveSQL中的日期变量必须和hiveconf后的变量一致，比如这里就是DT
+    hive --hiveconf DT=${STAT_DAY} -f ${SOL_FILE}&gt;&gt;${LOG_PATH}.tmp 2&gt;&gt; ${LOG_PATH}
+    # 如果有配置这个命令可用beeline2通过beeline2执行SQL
+    # beeline2 --hiveconf DT=${STAT_DAY} -f ${SOL_FILE}&gt;&gt;${LOG_PATH}.tmp 2&gt;&gt; ${LOG_PATH}
+
+    exitCode=$?
+    if [ $exitCode -ne 0 ];then
+      printf &quot;[ERROR] `date '+%F %T'` hivesql execute ${SOL_FILE} is failed!!!\n&quot;
+      exit $exitCode
+    else
+      local endTime=`date '+%F %T'`
+      local endSeconds=$(date --date=&quot;${endTime}&quot; +%s)
+      printf &quot;[INFO] `date '+%F %T'` hivesql execute end time is ${endTime}\n&quot;
+      printf &quot;[INFO] `date '+%F %T'` hivesql execute time is $(($((endSeconds-startSeconds))/60)) minutes\n&quot;
+      printf &quot;[INFO] `date '+%F %T'` hivesql ${STAT_DAY} data execute success！！！\n&quot;
+      printf &quot;[INFO] `date '+%F %T'` delete temp log ${LOG_PATH}.tmp\n&quot;
+      rm ${LOG_PATH}.tmp
+      find ${SEVEN_DAY_BEFOR_LOG_PATH} 2&gt;/home/fuyun/logs/err_${SEVEN_DAY_BEFOR}.log.tmp
+      if [ $? -ne 0 ];then
+        printf &quot;[WARN] `date '+%F %T'` ${SEVEN_DAY_BEFOR_LOG_PATH}: No such file or directory\n&quot;
+        rm /home/fuyun/logs/err_${SEVEN_DAY_BEFOR}.log.tmp
+      else
+        printf &quot;[INFO] `date '+%F %T'` delete log ${SEVEN_DAY_BEFOR_LOG_PATH}\n&quot;
+        rm ${SEVEN_DAY_BEFOR_LOG_PATH}
+      fi
+    fi
+
+    if [ ${STAT_DAY} -eq ${END_DAY} ]; then
+      break;
+    fi
+
+  done
+}
+
+if [ ${START_DAY} -gt ${END_DAY} ]; then
+  printf &quot;[ERROR] `date '+%F %T'` -s:${START_DAY} greater than -e:${END_DAY}\n&quot;
+else
+  executeHive
+  printf &quot;[INFO] `date '+%F %T'` hivesql ${START_DAY} to ${END_DAY} data execute success！！！\n&quot;
+fi
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

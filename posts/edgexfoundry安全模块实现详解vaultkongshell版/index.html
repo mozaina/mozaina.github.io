@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>edgexfoundry安全模块实现详解vaultkongshell版 | 开发者问答集锦</title>
+    <meta property="og:title" content="edgexfoundry安全模块实现详解vaultkongshell版 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="edgexfoundry安全模块实现详解vaultkongshell版">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/edgexfoundry%E5%AE%89%E5%85%A8%E6%A8%A1%E5%9D%97%E5%AE%9E%E7%8E%B0%E8%AF%A6%E8%A7%A3vaultkongshell%E7%89%88/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">edgexfoundry安全模块实现详解vaultkongshell版</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>一、安全功能流程概述<br />
+安全功能主要涉及到如下几个模块：vault, vault-worker , security-api-gateway, kong</p>
+
+<p>下面是各模块功能介绍：</p>
+
+<ul>
+<li>vault：生成root CA 证书与私钥、edgex-vault证书与私钥（支持https用）</li>
+<li>vault-worker：(若不存在)生成kong证书与私钥，并保存到vault中去；向consul发起心跳检测，看vault是否存活</li>
+<li>security-api-gateway：根据token，从vault服务器中获取证书，并上传到kong服务器；管理kong用户、生成JWT字串</li>
+<li>kong：实现edgexfoundry各微服务的安全访问(获取了JWT，通JWT字串访问后端微服务)</li>
+</ul>
+
+<p>1、vault启动时，生成root CA 证书与私钥，并生成edgex-vault证书与私钥</p>
+
+<p>2、worker启动时，每定时（3分钟）执行如下动作</p>
+
+<p>1.1、探测试vault是否活着，并注册到consul</p>
+
+<p>1.2、上面vault活着的话，则执行vault-kong.sh脚本，它主要动作如下：</p>
+
+<p>1. 2.1 看是vault服务器上是否存在edgex-kong证书（如果本地edgex-kong证书没有，则先生成edgex-
+kong证书），没有的话就上传到vault</p>
+
+<p>3、security-api-gateway ：初始化kong（从vault获取证书密钥，并上传到kong）</p>
+
+<p>二、功能代码详细解读</p>
+
+<p>2.1 镜像edgexfoundry/docker-edgex-vault制作过程</p>
+
+<p>2.1.1 Dockerfile.vault文件</p>
+
+<p>#vault官方基础镜像</p>
+
+<p>FROM vault:0.10.2</p>
+
+<p>LABEL license=&lsquo;SPDX-License-Identifier: Apache-2.0&rsquo; \<br />
+copyright=&lsquo;Copyright &copy; 2018: ForgeRock&rsquo;</p>
+
+<p>USER root<br />
+WORKDIR /vault/config<br />
+#使用tls 方式，将vault注册到consul</p>
+
+<p>COPY local-tls.json ./local.json<br />
+RUN chmod 777 /vault/config/local.json</p>
+
+<h1 id="vault-pki-tls-setup-config-and-x-509-materials">Vault PKI/TLS setup/config and X.509 materials</h1>
+
+<p>WORKDIR /vault<br />
+COPY pki-setup.sh .<br />
+COPY pki-setup-config-vault.env .</p>
+
+<h1 id="install-pre-requisites-for-pki-setup-bash-openssl-pki-tls-setup-and">install pre-requisites for pki setup: bash/openssl, pki/tls setup and</h1>
+
+<p>housekeeping<br />
+RUN apk &ndash;no-cache update &amp;&amp; \<br />
+apk &ndash;no-cache add bash openssl &amp;&amp; \  #安装bash openssl工具，用于生成证书<br />
+chown -R vault:vault /vault &amp;&amp; \<br />
+chmod 777 /vault/config/local.json &amp;&amp; \<br />
+chmod 744 pki-setup* &amp;&amp; \<br />
+./pki-setup.sh pki-setup-config-vault.env &amp;&amp; \ #生成根证书密钥，及vault证书密钥，后面会详述<br />
+chown -R vault:vault /vault/pki &amp;&amp; \<br />
+chmod 750 /vault/pki &amp;&amp; \<br />
+chmod 640 /vault/pki/<em>/</em> &amp;&amp; \<br />
+apk del &ndash;purge bash openssl &amp;&amp; \ #安全起见，删除bash openssl工具、删除脚本，也可以减小镜像的空间大小<br />
+rm -f /vault/pki-setup.sh /vault/pki-setup-config-vault.env &amp;&amp; \<br />
+rm -f /var/cache/apk/*</p>
+
+<h1 id="set-the-default-path-for-docker-exec-sessions">Set the default path for Docker exec sessions</h1>
+
+<p>WORKDIR /</p>
+
+<p>我们结合docker-compose.yml文件，看vault服务一段，如下</p>
+
+<p>vault:<br />
+image: edgexfoundry/docker-edgex-vault:security<br />
+container_name: edgex-vault<br />
+hostname: edgex-vault<br />
+networks:<br />
+- edgex-network<br />
+ports:<br />
+- &ldquo;8200:8200&rdquo;<br />
+cap_add:<br />
+- &ldquo;IPC_LOCK&rdquo;<br />
+command: &ldquo;server&rdquo; #vault容器启动后，执行server命令，拉起vault服务<br />
+environment:<br />
+- &lsquo;VAULT_ADDR=<a href="https://edgex-vault:8200'">https://edgex-vault:8200'</a> #vault地外服务地址<br />
+- &lsquo;VAULT_CONFIG_DIR=/vault/config&rsquo; # vault启动配置文件，镜像制作是local.json已拷贝到此目录<br />
+- &lsquo;VAULT_UI=true&rsquo; # 开启UI 。在浏览器访问<a href="https://localhost:8200/ui">https://localhost:8200/ui</a> ,可打开管理界面<br />
+volumes:<br />
+- vault-config:/vault/config<br />
+- vault-pki:/vault/pki<br />
+- vault-file:/vault/file<br />
+- vault-logs:/vault/logs<br />
+depends_on:<br />
+- volume<br />
+- consul</p>
+
+<p>2.1.1 local-tls.json文件</p>
+
+<p>#tcp监听配置</p>
+
+<p>listener &ldquo;tcp&rdquo; {<br />
+address = &ldquo;edgex-vault:8200&rdquo; #访问地址<br />
+tls_disable = &ldquo;0&rdquo; #开启tls，即https访问<br />
+cluster_address = &ldquo;edgex-vault:8201&rdquo; #集群地址<br />
+tls_min_version = &ldquo;tls12&rdquo;<br />
+tls_client_ca_file =&ldquo;/vault/pki/EdgeXFoundryTrustCA/EdgeXFoundryTrustCA.pem&rdquo;
+#客户端访问的证书<br />
+tls_cert_file =&ldquo;/vault/pki/EdgeXFoundryTrustCA/edgex-vault.pem&rdquo; #支持https用的证书<br />
+tls_key_file = &ldquo;/vault/pki/EdgeXFoundryTrustCA/edgex-vault.priv.key&rdquo;
+#支持https用的密钥<br />
+}</p>
+
+<p>#注册consul的配置<br />
+backend &ldquo;consul&rdquo; {<br />
+path = &ldquo;vault/&rdquo; #consul的services显示的名字<br />
+address = &ldquo;edgex-core-consul:8500&rdquo; #consul服务地址<br />
+scheme = &ldquo;http&rdquo; #注册使用的协议<br />
+redirect_addr = &ldquo;<a href="https://edgex-vault:8200&quot;">https://edgex-vault:8200&quot;</a> #真实的地址，对应上段的address
+，通过consul访问vault时，转发到此地址<br />
+cluster_addr = &ldquo;<a href="https://edgex-vault:8201&quot;">https://edgex-vault:8201&quot;</a> # 对应上段的cluster_address ，意义同上行<br />
+}</p>
+
+<p>default_lease_ttl = &ldquo;168h&rdquo;<br />
+max_lease_ttl = &ldquo;720h&rdquo;</p>
+
+<p>2.1.2 pki-setup.sh 与 pki-setup-config-vault.env文件</p>
+
+<p>在Dockerfile.vault 文件中，有一行 ./pki-setup.sh pki-setup-config-vault.env &amp;&amp; <br />
+，下面了解一下执行过程。</p>
+
+<p>2.1.2.1 pki-setup.sh文件</p>
+
+<p>#!/bin/bash</p>
+
+<h1 id="pki-setup-sh-用法-即help">pki-setup.sh 用法，即help</h1>
+
+<p>function usage() {<br />
+echo &ldquo;Usage : pki-setup.sh &ldquo;<br />
+echo &ldquo;Example: pki-setup.sh pki-setup-config.env&rdquo;<br />
+echo &ldquo; &rdquo;<br />
+}</p>
+
+<p>function initEnv() {</p>
+
+<h1 id="toc_4">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</h1>
+
+<p>DEBUG=$1 # Debug switch: &ldquo;debug-off&rdquo; or &ldquo;debug-on&rdquo;<br />
+#openssl是否存在<br />
+OPENSSL_BIN=$(which openssl)<br />
+if [[ $? == 1 ]]; then<br />
+echo &ldquo;ERROR: openssl binary not found or not in the path&rdquo;<br />
+exit<br />
+fi<br />
+echo &ldquo;&gt;&gt; openssl binary found: ${OPENSSL_BIN}&rdquo;<br />
+echo &ldquo;&gt;&gt;&rdquo; $(openssl version)<br />
+echo &ldquo;&rdquo;</p>
+
+<h1 id="toc_5">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</h1>
+
+<p>#将pki-setup-config-vault.env 或 pki-setup-config-kong.env里定义的内容装入到shell变量<br />
+source $1 #</p>
+
+<h1 id="toc_6">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</h1>
+
+<p>}</p>
+
+<p>function initCA() {</p>
+
+<h1 id="toc_7">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<h1 id="ca-self-signing-name-keystore-alias-and-file-pem-priv-key">CA (self signing) name, keystore alias and file (.pem .priv.key)</h1>
+
+<p>CA_NAME=${ORG}$1 #值为：EdgeXFoundryTrustCA</p>
+
+<h1 id="ca-root-certificate-subject">CA root certificate subject</h1>
+
+<h1 id="ca-c">CA_C</h1>
+
+<h1 id="ca-st">CA_ST</h1>
+
+<h1 id="ca-l">CA_L</h1>
+
+<h1 id="ca-o">CA_O</h1>
+
+<p>CA_CN=${ORG}&rdquo; &ldquo;$1 #值为：EdgeXFoundry TrustCA<br />
+CA_HOME=${SETUP_PKI}/${CA_NAME} #值为：/vault/pki/EdgeXFoundryTrustCA<br />
+CERT_EXTENSIONS=&ldquo;ssl_server.ext&rdquo; #扩展文件，在签发证书请求（signCertReq）时需要</p>
+
+<p>if [[ ${CREATE_CA} == &ldquo;true&rdquo; ]]; then #setup vault需要，kong时不需要</p>
+
+<h1 id="create-configuration-directory-ca-home">Create configuration directory (CA_HOME)</h1>
+
+<p>echo &ldquo;&gt;&gt; Creating a new Root CA Certificate&rdquo;<br />
+rm -rf ${CA_HOME}<br />
+mkdir -p ${CA_HOME} #创建目录：/vault/pki/EdgeXFoundryTrustCA<br />
+chmod -R 755 ${SETUP_PKI}</p>
+
+<h1 id="generate-an-initial-serial-number-for-signed-generated-certificates">Generate an initial serial number for signed/generated certificates</h1>
+
+<p>echo <code>date +%s</code> &gt; ${CA_HOME}/${CA_NAME}.srl
+#以当前时间，生成初始序号，放入EdgeXFoundryTrustCA.srl文件，在签发证书求（signCertReq）时需要</p>
+
+<h1 id="create-a-certificate-extensions-file">Create a certificate extensions file:</h1>
+
+<h1 id="the-generated-server-certificate-will-be-for-tls-server-usage-only">The generated server certificate will be for TLS server usage only!</h1>
+
+<p>cat &gt; ${CA_HOME}/${CERT_EXTENSIONS} &lt; #向扩展ssl_server.ext文件里写内容<br />
+nsCertType=server  #证书类型为server<br />
+EOF<br />
+else<br />
+echo &ldquo;&gt;&gt; Reusing existing Root CA Certificate&rdquo;</p>
+
+<h1 id="certificate-serial-number-is-incremented-during-ca-signing-process">Certificate serial number is incremented during CA signing process</h1>
+
+<p>fi</p>
+
+<h1 id="toc_19">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>}</p>
+
+<p>#定义FQDN ，当DOMAIN为local时，FQDN 值为 HOST (即：edgex-vault)，否则为 edgex-vault.XXX (XXX
+代表DOMAIN),</p>
+
+<p>#本例FQDN 为edgex-vault 或 edgex-kong ，此值在生成证书求证时要用到，作为CN的值<br />
+function initVaultServer() {</p>
+
+<h1 id="toc_20">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;</h1>
+
+<h1 id="vault-fqdn-files-pem-req-priv-key">Vault FQDN, files (.pem .req .priv.key)</h1>
+
+<p>if [[ ${DOMAIN} == &ldquo;local&rdquo; ]]; then<br />
+FQDN=$1<br />
+else<br />
+FQDN=$1.${DOMAIN}<br />
+fi</p>
+
+<h1 id="vault-tls-certificate-subject">Vault TLS certificate subject</h1>
+
+<h1 id="tls-c">TLS_C</h1>
+
+<h1 id="tls-st">TLS_ST</h1>
+
+<h1 id="tls-l">TLS_L</h1>
+
+<h1 id="tls-o">TLS_O</h1>
+
+<p>TLS_CN=${FQDN}</p>
+
+<h1 id="toc_27">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>}</p>
+
+<p>#创建CA ,生成EdgeXFoundryTrustCA.pem 与 EdgeXFoundryTrustCA.priv.key 文件<br />
+function genRootCA() {</p>
+
+<h1 id="generate-root-ca-private-key-rsa-4096-and-trusted-root-ca-certificate">Generate Root CA private key (RSA/4096) and trusted Root CA certificate</h1>
+
+<p>(1825 days = 5 years)<br />
+${OPENSSL_BIN} req -x509 -sha256 -nodes -days 1825 -newkey rsa:4096 \<br />
+-subj &ldquo;/C=${CA_C}/ST=${CA_ST}/L=${CA_L}/O=${CA_O}/CN=${CA_CN}/emailAddress=${CA_NAME}@${DOMAIN}&rdquo; \<br />
+-keyout ${CA_HOME}/${CA_NAME}.priv.key -out ${CA_HOME}/${CA_NAME}.pem</p>
+
+<h1 id="generate-root-ca-private-key-ecdsa-secp384r1-and-trusted-root-ca">Generate Root CA private key (ECDSA/secp384r1) and trusted Root CA</h1>
+
+<p>certificate<br />
+#${OPENSSL_BIN} req -x509 -sha256 -nodes -days 1825 -newkey ec:secp384r1 </p>
+
+<h1 id="subj">-subj</h1>
+
+<p>&rdquo;/C=${CA_C}/ST=${CA_ST}/L=${CA_L}/O=${CA_O}/CN=${CA_CN}/emailAddress=${CA_NAME}@${DOMAIN}&rdquo;
+</p>
+
+<h1 id="keyout-ca-home-ca-name-priv-key-out-ca-home-ca-name-pem">-keyout ${CA_HOME}/${CA_NAME}.priv.key -out ${CA_HOME}/${CA_NAME}.pem</h1>
+
+<p>if [[ ${DEBUG} == &ldquo;debug-on&rdquo; ]]; then<br />
+echo &ldquo;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++&rdquo;<br />
+echo &ldquo; CA Signing Certificate&rdquo;<br />
+echo &ldquo;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++&rdquo;<br />
+${OPENSSL_BIN} x509 -in ${CA_HOME}/${CA_NAME}.pem -noout -text<br />
+echo &ldquo;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++&rdquo;<br />
+fi<br />
+}</p>
+
+<p>#生成edgex-vault.req 或 edgex-kong.req证书请求文件<br />
+function genVaultCertReq() {</p>
+
+<h1 id="generate-tls-server-private-key-rsa-4096">Generate TLS server private key (RSA/4096)</h1>
+
+<p>${OPENSSL_BIN} genrsa -out ${CA_HOME}/${FQDN}.priv.key 4096</p>
+
+<h1 id="generate-tls-server-private-key-ecdsa-secp384r1">Generate TLS server private key (ECDSA/secp384r1)</h1>
+
+<p>#${OPENSSL_BIN} ecparam -genkey -name secp384r1 -out
+${CA_HOME}/${FQDN}.priv.key</p>
+
+<h1 id="generate-server-certificate-signing-request-for-tls-server-certificate-cn">Generate server certificate signing request for TLS server certificate (CN</h1>
+
+<p>must equal the FQDN)<br />
+${OPENSSL_BIN} req -sha256 -new -key ${CA_HOME}/${FQDN}.priv.key \<br />
+-out ${CA_HOME}/${FQDN}.req \<br />
+-subj &ldquo;/C=${TLS_C}/ST=${TLS_ST}/L=${TLS_L}/O=${TLS_O}/CN=${TLS_CN}/emailAddress=admin@${DOMAIN}&rdquo; #TLS_CN为edgex-vault</p>
+
+<p>if [[ ${DEBUG} == &ldquo;debug-on&rdquo; ]]; then<br />
+echo &ldquo;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++&rdquo;<br />
+echo &ldquo; TLS Server Certificate Request for: ${FQDN}&rdquo;<br />
+echo &ldquo;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++&rdquo;<br />
+${OPENSSL_BIN} req -in ${CA_HOME}/${FQDN}.req -noout -text<br />
+echo &ldquo;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++&rdquo;<br />
+fi<br />
+}</p>
+
+<p>#签发证书，生成edgex-vault.pem edgex-vault.priv.key 或 edgex-kong.pem edgex-
+kong.priv.key<br />
+#输入证书请求文件（edgex-vault.req 或 edgex-kong.req）, CA 的扩展文件 与 CA的序列文件srl<br />
+function signVaultCertReq() {</p>
+
+<h1 id="ca-signs-tls-server-certificate-request-with-its-trusted-root-certificate">CA signs TLS server certificate request with its trusted root certificate,</h1>
+
+<h1 id="and-creates-the-final-tls-server-certificate-1825-days-5-years">and creates the final TLS server certificate (1825 days = 5 years)</h1>
+
+<p>${OPENSSL_BIN} x509 -sha256 -req -in ${CA_HOME}/${FQDN}.req \<br />
+-CA ${CA_HOME}/${CA_NAME}.pem -CAkey ${CA_HOME}/${CA_NAME}.priv.key \<br />
+-CAserial ${CA_HOME}/${CA_NAME}.srl \<br />
+-extfile ${CA_HOME}/${CERT_EXTENSIONS} \<br />
+-days 1825 -outform PEM -out ${CA_HOME}/${FQDN}.pem</p>
+
+<p>if [[ ${DEBUG} == &ldquo;debug-on&rdquo; ]]; then<br />
+echo &ldquo;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++&rdquo;<br />
+echo &ldquo; TLS Server Certificate for: ${FQDN}&rdquo;<br />
+echo &ldquo;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++&rdquo;<br />
+${OPENSSL_BIN} x509 -in ${CA_HOME}/${FQDN}.pem -noout -text<br />
+echo &ldquo;+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++&rdquo;<br />
+fi<br />
+}</p>
+
+<p>#将签发后证书与密钥，存储为PKCS12格式，此格式的好处是需要密码访问<br />
+#即生成 edgex-kong.p12 或 edgex-vault.p12 文件<br />
+function storeToPKCS12() {</p>
+
+<h1 id="create-pkcs12-container-for-tls-server-certificate-and-sk">Create PKCS12 container for TLS server certificate and SK</h1>
+
+<h1 id="sk-secret-key-aka-private-key">SK: Secret Key aka Private key</h1>
+
+<h1 id="pk-public-key">PK: Public Key</h1>
+
+<p>${OPENSSL_BIN} pkcs12 -export -in ${CA_HOME}/${FQDN}.pem \<br />
+-inkey ${CA_HOME}/${FQDN}.priv.key -out ${CA_HOME}/${FQDN}.p12 \<br />
+-name ${FQDN} -password pass{PKCS12_PASSWORD}<br />
+}</p>
+
+<p>function houseKeeping() {<br />
+chmod 644 ${SETUP_PKI}/${CA_NAME}/*<br />
+}</p>
+
+<h1 id="common-functions">&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; Common Functions &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<h1 id="main">#===================================== MAIN</h1>
+
+<h1 id="pki-setup-sh-arguments-check">pki-setup.sh arguments check</h1>
+
+<h1 id="检测pki-setup-sh-后是否有参数-没有的话-若调用usage函数显法用法">检测pki-setup.sh 后是否有参数 ，没有的话，若调用usage函数显法用法</h1>
+
+<p>if [[ $# != 1 ]]; then<br />
+echo &ldquo;SYNTAX ERROR&rdquo;<br />
+usage<br />
+exit<br />
+fi</p>
+
+<h1 id="检测pki-setup-sh-后是的参数文件是否存在-即pki-setup-config-vault-env-或-pki-setup-config">检测pki-setup.sh 后是的参数文件是否存在，即pki-setup-config-vault.env 或 pki-setup-config-</h1>
+
+<p>kong.env<br />
+if [[ ! -f $1 ]]; then<br />
+echo &ldquo;FILE $1 NOT FOUND&rdquo;<br />
+exit<br />
+fi</p>
+
+<h1 id="环境初始化-判断openssl是否安装-将pki-setup-config-vault-env-或-pki-setup-config">环境初始化：判断openssl是否安装、将pki-setup-config-vault.env 或 pki-setup-config-</h1>
+
+<p>kong.env里定义的内容装入到shell变量<br />
+echo &ldquo;&gt;&gt; Create binary paths and folder paths&rdquo;<br />
+initEnv $1</p>
+
+<p>echo &ldquo;&gt;&gt; Prepare Root CA Certificate&rdquo;</p>
+
+<h1 id="初始化ca-1-创建-vault-pki-edgexfoundrytrustca目录-2-准备好-edgexfoundrytrustca-srl-与">初始化CA： 1、创建/vault/pki/EdgeXFoundryTrustCA目录 2、准备好 EdgeXFoundryTrustCA.srl 与</h1>
+
+<p>ssl_server.ext，它们用于签发（子）证书<br />
+initCA TrustCA</p>
+
+<p>echo &ldquo;&gt;&gt; Prepare Vault Server TLS certificate&rdquo;<br />
+#定义FQDN ，当DOMAIN为local时，FQDN 值为 HOST (即：edgex-vault 或 edgex-kong)，否则为 edgex-
+vault.XXX (XXX 代表DOMAIN),</p>
+
+<p>#本例FQDN 的值为edgex-vault 或 edgex-kong ，此值在生成证书求证时要用到，作为CN的值<br />
+initVaultServer ${HOST} #HOST值是：edgex-vault 或 edgex-kong</p>
+
+<p>if [[ ${CREATE_CA} == &ldquo;true&rdquo; ]]; then #edgex-vault 需要创建CA<br />
+echo &ldquo;&gt;&gt; Generate Root CA private key and trusted root certificate&rdquo;<br />
+genRootCA debug-off #创建CA ,生成EdgeXFoundryTrustCA.pem 与
+EdgeXFoundryTrustCA.priv.key 文件<br />
+fi</p>
+
+<p>echo &ldquo;&gt;&gt; Generate TLS server private key&rdquo;<br />
+echo &ldquo;&gt;&gt; Generate server certificate signing request for TLS server
+certificate (CN must equal the FQDN)&rdquo;</p>
+
+<p>#生成edgex-vault.req 或 edgex-kong.req证书请求文件</p>
+
+<p>genVaultCertReq debug-off</p>
+
+<p>echo &ldquo;&gt;&gt; Root CA signs TLS server certificate request with its trusted root
+certificate,&rdquo;<br />
+echo &ldquo;&gt;&gt; and creates the final TLS server certificate&rdquo;</p>
+
+<p>#签发证书，生成edgex-vault.pem edgex-vault.priv.key 或 edgex-kong.pem edgex-
+kong.priv.key<br />
+#输入证书请求文件（edgex-vault.req 或 edgex-kong.req）, CA 的扩展文件 与 CA的序列文件srl<br />
+signVaultCertReq debug-off</p>
+
+<p>echo &ldquo;&gt;&gt; Create PKCS12 containers for TLS server certificate and SK&rdquo;<br />
+#将签发后证书与密钥，存储为PKCS12格式，此格式的好处是需要密码访问<br />
+#即生成 edgex-kong.p12 或 edgex-vault.p12 文件<br />
+storeToPKCS12</p>
+
+<p>#安全起见，限制目录权限/vault/pki/EdgeXFoundryTrustCA<br />
+houseKeeping<br />
+echo &ldquo;&gt;&gt; PKI setup script completed.&rdquo;</p>
+
+<p>exit</p>
+
+<p>#EOF</p>
+
+<p>===========================================</p>
+
+<p>vault镜像从上面文件，可以归纳实现了如下功能：</p>
+
+<ul>
+<li>自建了CA，并用此CA签发了vault证书，另外一个kong证书也类似生成</li>
+<li>local-tls.json定义了vault采用tls 方式访问,注册到consul
+
+<br />
+<br />
+<br /></li>
+</ul>
+
+<p>2.2 镜像edgexfoundry/docker-edgex-vault-worker制作过程</p>
+
+<p>2.2.1 Dockerfile.vault-worker文件<br />
+#使用alpine基础镜像，这是个很小的linux操作系统，只有几M大<br />
+FROM alpine:latest</p>
+
+<p>LABEL license=&lsquo;SPDX-License-Identifier: Apache-2.0&rsquo; \<br />
+copyright=&lsquo;Copyright &copy; 2018: ForgeRock&rsquo;</p>
+
+<p>USER root</p>
+
+<h1 id="vault-init-and-unseal-scripts">Vault init and unseal scripts</h1>
+
+<p>WORKDIR /vault</p>
+
+<h1 id="copy-main-launcher-cmd">Copy main launcher [CMD]</h1>
+
+<p>COPY vault-worker.sh .</p>
+
+<h1 id="copy-init-unseal-process">Copy init-unseal process</h1>
+
+<p>COPY vault-init-unseal.sh .</p>
+
+<h1 id="copy-pki-tls-script-config-for-kong">Copy PKI/TLS script/config for Kong</h1>
+
+<p>COPY pki-setup.sh .<br />
+COPY pki-setup-config-kong.env .</p>
+
+<h1 id="copy-pki-tls-setup-and-vault-import-for-kong">Copy PKI/TLS setup and Vault import for Kong</h1>
+
+<p>COPY vault-kong.sh .</p>
+
+<h1 id="create-a-vault-user-and-group-so-the-ids-get-set-the-same-way">Create a vault user and group so the IDs get set the same way</h1>
+
+<h1 id="set-the-files-ownership-and-rights">Set the files ownership and rights</h1>
+
+<h1 id="install-pre-requisites-for-pki-setup-bash-curl-jq-dig-openssl">Install pre-requisites for pki setup: bash/curl/jq/dig/openssl</h1>
+
+<p>RUN addgroup vault &amp;&amp; \<br />
+adduser -S -G vault vault &amp;&amp; \<br />
+chmod 700 vault-<em>.sh pki-setup</em> &amp;&amp; \<br />
+chown vault:vault vault-<em>.sh pki-setup</em> &amp;&amp; \<br />
+apk &ndash;no-cache update &amp;&amp; \<br />
+apk &ndash;no-cache add bash curl jq bind-tools openssl &amp;&amp; \<br />
+rm -f /var/cache/apk/*</p>
+
+<h1 id="set-the-operation-command">Set the operation command</h1>
+
+<p>ENTRYPOINT [&ldquo;/bin/bash&rdquo;, &ldquo;-c&rdquo;]<br />
+#容器启动后执行vault-worker.sh<br />
+CMD [&ldquo;/vault/vault-worker.sh&rdquo;]</p>
+
+<p>2.2.2 vault-worker.sh文件</p>
+
+<p>#!/bin/bash<br />
+while true<br />
+do</p>
+
+<h1 id="init-unseal-processes">Init/Unseal processes</h1>
+
+<p>/vault/vault-init-unseal.sh</p>
+
+<h1 id="if-vault-init-unseal-was-ok-eventually-prepare-materials-for-kong">If Vault init/unseal was OK&hellip; eventually prepare materials for Kong</h1>
+
+<p>if [[ $? == 0 ]]; then<br />
+/vault/vault-kong.sh # 如果/vault/vault-init-unseal.sh执行成功则执行此步<br />
+fi</p>
+
+<p>sleep ${WATCHDOG_DELAY} #此变量来自docker-compose.yaml文件中的environment定义，定为3分种循环执行一次<br />
+done</p>
+
+<p>exit</p>
+
+<p>#EOF</p>
+
+<p>我们结合docker-compose.yml文件，看 vault-worker服务一段，如下<br />
+vault-worker:<br />
+image: edgexfoundry/docker-edgex-vault-worker:security<br />
+container_name: edgex-vault-worker<br />
+hostname: edgex-vault-worker<br />
+networks:<br />
+- edgex-network<br />
+environment:<br />
+- &lsquo;WATCHDOG_DELAY=3m&rsquo;  #这个在vault-worker.sh有引用<br />
+volumes:<br />
+- vault-pki:/vault/pki<br />
+- vault-file:/vault/file<br />
+depends_on:<br />
+- volume<br />
+- consul<br />
+- vault</p>
+
+<p>2.2.3 vault-init-unseal.sh文件</p>
+
+<p><strong>#功能：实现vault初始化、启封、检查vault是否注册到consul</strong></p>
+
+<p>#!/bin/bash</p>
+
+<h1 id="common-functions-1">&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; Common Functions &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>function houseKeeping() {<br />
+rm -f ${_TMP}<br />
+rm -f ${_PAYLOAD_INIT}<br />
+rm -f ${_PAYLOAD_UNSEAL}<br />
+}</p>
+
+<p>#初始化vault<br />
+function vaulInitialization() {<br />
+echo &ldquo;&gt;&gt; (1) Vault Initialization Process&rdquo;</p>
+
+<h1 id="create-the-vault-init-request-payload-with-only-1-key-and-obviously">Create the Vault init request payload with only 1 key and obviously</h1>
+
+<p>threshold 1<br />
+#创建payload-init.json文件，写入如下内容</p>
+
+<p>cat &gt; ${_PAYLOAD_INIT} &lt;<br />
+{<br />
+&ldquo;secret_shares&rdquo;: 1,<br />
+&ldquo;secret_threshold&rdquo;: 1<br />
+}<br />
+EOF</p>
+
+<h1 id="toc_60">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<h1 id="vault-initialization-api">Vault Initialization API</h1>
+
+<h1 id="toc_62">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>curl -sw &lsquo;HTTP-STATUS: %{http_code}\n&rsquo; ${_TLS} ${_REDIRECT} \<br />
+--request PUT \<br />
+--data @${_PAYLOAD_INIT} \ #<br />
+${_HTTP_SCHEME}://${_VAULT_SVC}{_VAULT_PORT}/v1/sys/init &gt; ${_TMP}<br />
+#上面命令真实值为：curl sw &lsquo;HTTP-STATUS: %{http_code}\n&rsquo; &ndash;cacert
+/vault/pki/EdgeXFoundryTrustCA/EdgeXFoundryTrustCA.pem &ndash;location </p>
+
+<h1 id="request-put">&ndash;request PUT </h1>
+
+<h1 id="data-vault-file-payload-init-json-https-edgex-vault-8200-v1-sys-init">&ndash;data /vault/file/payload-init.json <a href="https://edgex-vault:8200/v1/sys/init">https://edgex-vault:8200/v1/sys/init</a> &gt;</h1>
+
+<p>/vault/file/_tmp.vault</p>
+
+<p>#说明： <strong><a href="https://edgex-vault:8200">https://edgex-vault:8200</a></strong> 在docker-compose.yaml中的vault服务中environment
+定义：VAULT_ADDR</p>
+
+<h1 id="edgexfoundrytrustca-pem-在local-tls-json中tls-client-ca-file定义的要一致"><strong>EdgeXFoundryTrustCA.pem</strong> 在local-tls.json中tls_client_ca_file定义的要一致</h1>
+
+<p>}</p>
+
+<h1 id="toc_66">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<h1 id="check-http-status-code-returned-by-init-request">Check http status code returned by init request</h1>
+
+<p>result=$(tail -1 ${_TMP} | grep &ldquo;HTTP-STATUS:&rdquo; | cut -d&rsquo; &lsquo; -f2)</p>
+
+<p>case ${result} in</p>
+
+<h1 id="if-vault-initialization-ok">If Vault initialization OK</h1>
+
+<h1 id="执行上面的curl后-若初始化成功-会返回类似如下的字串">执行上面的curl后，若初始化成功，会返回类似如下的字串</h1>
+
+<p>#
+{&ldquo;keys&rdquo;:[&ldquo;8e70bcf6ba046b59857cba1ec6495c58b53f6c60e37f871e53b4b391ff43ec59&rdquo;],&ldquo;keys_base64&rdquo;:[&ldquo;jnC89roEa1mFfLoexklcWLU/bGDjf4ceU7Szkf9D7Fk=&rdquo;],&ldquo;root_token&rdquo;:&ldquo;6e2e099f-e5a4-028b-6b84-f11d1fb1ad9d&rdquo;}</p>
+
+<h1 id="http响应状态码为200时-说明成功-将返回内容中的keys的值放入-init-key-root-token的值放入-root-token">http响应状态码为200时，说明成功，将返回内容中的keys的值放入_INIT_KEY ，root_token的值放入 _ROOT_TOKEN</h1>
+
+<p>&ldquo;200&rdquo;)</p>
+
+<h1 id="let-s-grab-the-init-key">let&rsquo;s grab the init key</h1>
+
+<p>_INIT_KEY=$(head -1 ${_TMP} | jq -r &lsquo;.keys | .[0]&lsquo;)</p>
+
+<h1 id="let-s-grab-the-root-token">let&rsquo;s grab the root token</h1>
+
+<p>_ROOT_TOKEN=$(head -1 ${_TMP} | jq -r &lsquo;.root_token&rsquo;)</p>
+
+<h1 id="save-the-key-and-the-root-token-json-strip-http-status">save the key and the root token JSON (strip HTTP-STATUS)</h1>
+
+<p>#resp-init.json存放类似
+{&ldquo;keys&rdquo;:[&ldquo;8e70bcf6ba046b59857cba1ec6495c58b53f6c60e37f871e53b4b391ff43ec59&rdquo;],&ldquo;keys_base64&rdquo;:[&ldquo;jnC89roEa1mFfLoexklcWLU/bGDjf4ceU7Szkf9D7Fk=&rdquo;],&ldquo;root_token&rdquo;:&ldquo;6e2e099f-e5a4-028b-6b84-f11d1fb1ad9d&rdquo;}<br />
+head -1 ${_TMP} | jq &lsquo;.&rsquo; &gt; ${_RESP_INIT}<br />
+chown vault:vault ${_RESP_INIT}<br />
+echo &ldquo;&gt;&gt; Vault successfully initialized&rdquo;<br />
+;;</p>
+
+<h1 id="if-vault-already-initialized">If Vault already initialized</h1>
+
+<h1 id="example">Example:</h1>
+
+<h1 id="errors-vault-is-already-initialized">{&ldquo;errors&rdquo;:[&ldquo;Vault is already initialized&rdquo;]}</h1>
+
+<h1 id="http响应状态码为400时-说明vault-已经初始化过-直接从resp-init-json取出-init-key-与-root-token">http响应状态码为400时，说明Vault 已经初始化过，直接从resp-init.json取出_INIT_KEY 与 _ROOT_TOKEN</h1>
+
+<p>&ldquo;400&rdquo;)</p>
+
+<h1 id="let-s-grab-the-error-message-in-case">let&rsquo;s grab the error message in case&hellip;</h1>
+
+<p>result=$(head -1 ${_TMP} | jq -r &lsquo;.errors | .[0]&lsquo;)<br />
+echo &ldquo;&gt;&gt; ${result}&rdquo;</p>
+
+<h1 id="let-s-go-unseal-but-before-we-need">let&rsquo;s go unseal&hellip; but before we need:</h1>
+
+<h1 id="1-check-previous-init-response-json-still-exists">1) Check previous init response JSON still exists</h1>
+
+<p>if [[ -f ${_RESP_INIT} ]]; then</p>
+
+<h1 id="2-grab-the-init-key-from-previous-init">2) Grab the init key from previous init</h1>
+
+<p>_INIT_KEY=$(cat ${_RESP_INIT} | jq -r &lsquo;.keys | .[0]&lsquo;)</p>
+
+<h1 id="3-grab-the-root-token-from-previous-init">3) Grab the root token from previous init</h1>
+
+<p>_ROOT_TOKEN=$(cat ${_RESP_INIT} | jq -r &lsquo;.root_token&rsquo;)<br />
+else<br />
+echo &ldquo;&gt;&gt; Vault initialization error!&rdquo;<br />
+echo &ldquo;&gt;&gt; Previous init response file not found: ${_RESP_INIT}&rdquo;<br />
+_EXIT=&ldquo;1&rdquo;<br />
+fi<br />
+;;</p>
+
+<h1 id="unattended-error">Unattended error&hellip;</h1>
+
+<p>*)<br />
+echo &ldquo;&gt;&gt; Vault initialization unattended error&rdquo;<br />
+_EXIT=&ldquo;1&rdquo;<br />
+;;<br />
+esac</p>
+
+<h1 id="handle-the-error-exit-use-case-for-vault-init-process">Handle the error exit use case for Vault init process</h1>
+
+<p>if [[ ${_EXIT} == &ldquo;1&rdquo; ]]; then<br />
+echo &ldquo;==&gt; Vault init request response:&rdquo;<br />
+cat ${_TMP}<br />
+echo &ldquo;&gt;&gt;&rdquo;<br />
+fi</p>
+
+<p>return ${_EXIT}<br />
+}</p>
+
+<h1 id="vault初始化后-默认是密封的-需要正确启封才可用">vault初始化后，默认是密封的，需要正确启封才可用</h1>
+
+<p>function vaultUnsealing() {<br />
+echo &ldquo;&gt;&gt; (2) Vault Unseal Process&rdquo;</p>
+
+<h1 id="https-www-vaultproject-io-api-system-seal-status-html"><a href="https://www.vaultproject.io/api/system/seal-status.html">https://www.vaultproject.io/api/system/seal-status.html</a></h1>
+
+<h1 id="create-the-vault-unseal-request-payload-with-the-unseal-key">Create the Vault unseal request payload with the unseal key</h1>
+
+<p>#创建payload-unseal.json文件，写入{ &ldquo;key&rdquo;: &ldquo;${_INIT_KEY}&ldquo;}<br />
+cat &gt; ${_PAYLOAD_UNSEAL} &lt;<br />
+{<br />
+&ldquo;key&rdquo;: &ldquo;${_INIT_KEY}&rdquo; #初始化vault时获理的值_INIT_KEY<br />
+}<br />
+EOF</p>
+
+<h1 id="toc_88">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<h1 id="vault-unsealing-api">Vault Unsealing API</h1>
+
+<h1 id="toc_90">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<p>curl -sw &lsquo;HTTP-STATUS: %{http_code}\n&rsquo; ${_TLS} ${_REDIRECT} \<br />
+--request PUT \<br />
+--data @${_PAYLOAD_UNSEAL} \<br />
+${_HTTP_SCHEME}://${_VAULT_SVC}{_VAULT_PORT}/v1/sys/unseal &gt; ${_TMP}</p>
+
+<p>#上面命令真实值为：curl sw &lsquo;HTTP-STATUS: %{http_code}\n&rsquo; &ndash;cacert
+/vault/pki/EdgeXFoundryTrustCA/EdgeXFoundryTrustCA.pem &ndash;location </p>
+
+<h1 id="request-put-1">&ndash;request PUT </h1>
+
+<h1 id="data-vault-file-payload-unseal-json-https-edgex-vault-8200-v1-sys-init">&ndash;data /vault/file/payload-unseal.json <a href="https://edgex-vault:8200/v1/sys/init">https://edgex-vault:8200/v1/sys/init</a></h1>
+
+<blockquote>
+<p>/vault/file/_tmp.vault</p>
+</blockquote>
+
+<h1 id="toc_93">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<h1 id="check-http-status-code-returned-by-unseal-request">Check http status code returned by unseal request</h1>
+
+<p>result=$(tail -1 ${_TMP} | grep &ldquo;HTTP-STATUS:&rdquo; | cut -d&rsquo; &lsquo; -f2)</p>
+
+<h1 id="if-vault-unsealing-ok">If Vault unsealing OK</h1>
+
+<h1 id="example-1">Example:</h1>
+
+<p>#
+{&ldquo;type&rdquo;:&ldquo;shamir&rdquo;,&ldquo;sealed&rdquo;:false,&ldquo;t&rdquo;:1,&ldquo;n&rdquo;:1,&ldquo;progress&rdquo;:0,&ldquo;nonce&rdquo;:&ldquo;&rdquo;,&ldquo;version&rdquo;:&ldquo;0.10.2&rdquo;,&ldquo;cluster_name&rdquo;:&ldquo;vault-
+cluster-1df0f671&rdquo;,&ldquo;cluster_id&rdquo;:&ldquo;10f1a1eb-ad7a-511f-06af-aab9c370e412&rdquo;}</p>
+
+<h1 id="http-status-200">HTTP-STATUS: 200</h1>
+
+<h1 id="remark-unsealing-vault-when-already-unsealed-generates-same-output-response">Remark: unsealing Vault when already unsealed generates same output response</h1>
+
+<p>with code 200</p>
+
+<h1 id="http响应状态码为200时-说明成功">http响应状态码为200时，说明成功</h1>
+
+<p>if [[ ${result} == &ldquo;200&rdquo; ]]; then</p>
+
+<h1 id="let-s-grab-the-sealed-state-boolean">let&rsquo;s grab the sealed state boolean</h1>
+
+<p>result=$(head -1 ${_TMP} | jq -r &lsquo;.sealed&rsquo;)<br />
+if [[ ${result} == &ldquo;false&rdquo; ]]; then #&ldquo;sealed&rdquo;:false 说明启封状态，可以用了</p>
+
+<h1 id="save-the-unseal-json-response-strip-http-status">save the unseal JSON response (strip HTTP-STATUS)</h1>
+
+<p>#保存到resp-unseal.json，内容类似
+{&ldquo;type&rdquo;:&ldquo;shamir&rdquo;,&ldquo;sealed&rdquo;:false,&ldquo;t&rdquo;:1,&ldquo;n&rdquo;:1,&ldquo;progress&rdquo;:0,&ldquo;nonce&rdquo;:&ldquo;&rdquo;,&ldquo;version&rdquo;:&ldquo;0.10.2&rdquo;,&ldquo;cluster_name&rdquo;:&ldquo;vault-
+cluster-1df0f671&rdquo;,&ldquo;cluster_id&rdquo;:&ldquo;10f1a1eb-ad7a-511f-06af-aab9c370e412&rdquo;}<br />
+head -1 ${_TMP} | jq &lsquo;.&rsquo; &gt; ${_RESP_UNSEAL} #保存到resp-unseal.json<br />
+chown vault:vault ${_RESP_UNSEAL}<br />
+echo &ldquo;&gt;&gt; Vault successfully unsealed&rdquo;<br />
+else<br />
+echo &ldquo;&gt;&gt; Vault unseal ok but incoherent sealed status!&rdquo;<br />
+_EXIT=&ldquo;1&rdquo;<br />
+fi<br />
+else<br />
+echo &ldquo;&gt;&gt; Vault unseal error!&rdquo;<br />
+_EXIT=&ldquo;1&rdquo;<br />
+fi</p>
+
+<h1 id="handle-the-error-exit-use-case-for-vault-unseal-process">Handle the error exit use case for Vault unseal process</h1>
+
+<p>if [[ ${_EXIT} == &ldquo;1&rdquo; ]]; then<br />
+echo &ldquo;==&gt; Vault unseal request response:&rdquo;<br />
+cat ${_TMP}<br />
+echo &ldquo;&gt;&gt;&rdquo;<br />
+fi</p>
+
+<p>return ${_EXIT}<br />
+}</p>
+
+<h1 id="检测vault是否成功注册到consul">检测vault是否成功注册到consul</h1>
+
+<p>function vaultRegistered() {<br />
+sleep 3 # Allow Consul DNS table refresh<br />
+echo &ldquo;&gt;&gt; Check Vault is registered as a service in Consul&rdquo;<br />
+echo &ldquo;&gt;&gt; DNS requests to Consul service on port 8600/tcp&rdquo;<br />
+echo -n &ldquo;vault.service.consul: &ldquo;<br />
+dig +short +tcp -p8600 @edgex-core-consul vault.service.consul #正常时返回“edgex-
+vault.”<br />
+echo -n &ldquo;active.vault.service.consul: &ldquo;<br />
+dig +short +tcp -p8600 @edgex-core-consul active.vault.service.consul
+#正常时返回“edgex-vault.”<br />
+echo &ldquo;&rdquo;</p>
+
+<p>return ${_EXIT} #此段始终返回0，这个可能有问题，没有对上面的输出判断来改变_EXIT的值<br />
+}</p>
+
+<h1 id="common-functions-2">&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; Common Functions &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<h1 id="main-init">#===================================== MAIN INIT</h1>
+
+<h1 id="variables-and-parameters">Variables and parameters</h1>
+
+<p>_VAULT_DIR=&ldquo;/vault&rdquo;<br />
+_VAULT_CONFIG_DIR=&ldquo;${_VAULT_DIR}/config&rdquo;<br />
+_VAULT_PKI_DIR=&ldquo;${_VAULT_DIR}/pki&rdquo;<br />
+_VAULT_FILE_DIR=&ldquo;${_VAULT_DIR}/file&rdquo;</p>
+
+<p>_PAYLOAD_INIT=&ldquo;${_VAULT_FILE_DIR}/payload-init.json&rdquo;<br />
+_PAYLOAD_UNSEAL=&ldquo;${_VAULT_FILE_DIR}/payload-unseal.json&rdquo;<br />
+_RESP_INIT=&ldquo;${_VAULT_FILE_DIR}/resp-init.json&rdquo;<br />
+_RESP_UNSEAL=&ldquo;${_VAULT_FILE_DIR}/resp-unseal.json&rdquo;<br />
+_VAULT_CONFIG=&ldquo;${_VAULT_CONFIG_DIR}/local.json&rdquo;<br />
+_TMP=&ldquo;${_VAULT_FILE_DIR}/_tmp.vault&rdquo;<br />
+_EXIT=&ldquo;0&rdquo;</p>
+
+<p>_CA=&ldquo;EdgeXFoundryTrustCA&rdquo;<br />
+_CA_DIR=&ldquo;${_VAULT_PKI_DIR}/${_CA}&rdquo;<br />
+_CA_PEM=&ldquo;${_CA_DIR}/${_CA}.pem&rdquo;<br />
+_TLS=&rdquo; &ndash;cacert ${_CA_PEM}&rdquo;<br />
+_REDIRECT=&rdquo; &ndash;location&rdquo; # If HTTP temporary redirect (HTTP STATUS 307) follow
+it<br />
+_HTTP_SCHEME=&ldquo;https&rdquo;<br />
+_VAULT_SVC=&ldquo;edgex-vault&rdquo;<br />
+_EDGEX_DOMAIN=&ldquo;&rdquo;<br />
+_VAULT_PORT=&ldquo;8200&rdquo;</p>
+
+<h1 id="main-proc">#===================================== MAIN PROC</h1>
+
+<h1 id="0-cleanup-up-previous-temp-files-and-payloads">0) Cleanup up previous temp files and payloads</h1>
+
+<p>houseKeeping</p>
+
+<h1 id="1-init-vault">1) Init Vault</h1>
+
+<p>#初始化Vault</p>
+
+<p>vaulInitialization</p>
+
+<h1 id="handle-the-error-exit-use-case-for-vault-init-process-1">Handle the error exit use case for Vault init process</h1>
+
+<p>if [[ $? == &ldquo;0&rdquo; ]]; then</p>
+
+<h1 id="2-unseal-vault">2) Unseal Vault</h1>
+
+<p>#Vault 启封</p>
+
+<p>vaultUnsealing</p>
+
+<h1 id="handle-the-error-exit-use-case-for-vault-unseal-process-1">Handle the error exit use case for Vault unseal process</h1>
+
+<p>if [[ $? == &ldquo;0&rdquo; ]]; then</p>
+
+<h1 id="4-check-vault-was-successfully-registered-as-a-consul-service">4) Check Vault was successfully registered as a Consul service</h1>
+
+<p>vaultRegistered<br />
+fi<br />
+fi</p>
+
+<h1 id="5-cleanup-up-temp-files-and-payloads">5) Cleanup up temp files and payloads</h1>
+
+<p>houseKeeping</p>
+
+<p>exit ${_EXIT}<br />
+#EOF</p>
+
+<p>进入vault容器命令</p>
+
+<ol>
+<li>docker exec -it bb28361c0bac /bin/sh</li>
+</ol>
+
+<p><em>复制代码</em></p>
+
+<p><strong>token存储在：/vault/file/resp-init.json</strong></p>
+
+<p>2.2.4 vault-kong.sh文件</p>
+
+<p><strong>#功能： 将 edgex-kong.pem、</strong> <strong>edgex-kong.priv.key 存储到vault中</strong></p>
+
+<p>#!/bin/bash<br />
+function houseKeeping() {<br />
+rm -f ${_TMP}<br />
+rm -f ${_PAYLOAD_KONG}<br />
+}</p>
+
+<h1 id="common-functions-3">&mdash;&mdash;&mdash;&mdash;&mdash;&ndash; Common Functions &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</h1>
+
+<h1 id="main-1">#===================================== MAIN</h1>
+
+<h1 id="variables-and-parameters-1">Variables and parameters</h1>
+
+<p>_VAULT_DIR=&ldquo;/vault&rdquo;<br />
+_VAULT_CONFIG_DIR=&ldquo;${_VAULT_DIR}/config&rdquo;<br />
+_VAULT_PKI_DIR=&ldquo;${_VAULT_DIR}/pki&rdquo;<br />
+_VAULT_FILE_DIR=&ldquo;${_VAULT_DIR}/file&rdquo;</p>
+
+<p>_PAYLOAD_INIT=&ldquo;${_VAULT_FILE_DIR}/payload-init.json&rdquo;<br />
+_PAYLOAD_UNSEAL=&ldquo;${_VAULT_FILE_DIR}/payload-unseal.json&rdquo;<br />
+_PAYLOAD_KONG=&ldquo;${_VAULT_FILE_DIR}/payload-kong.json&rdquo;<br />
+_RESP_INIT=&ldquo;${_VAULT_FILE_DIR}/resp-init.json&rdquo;<br />
+_RESP_UNSEAL=&ldquo;${_VAULT_FILE_DIR}/resp-unseal.json&rdquo;<br />
+_VAULT_CONFIG=&ldquo;${_VAULT_CONFIG_DIR}/local.json&rdquo;<br />
+_TMP=&ldquo;${_VAULT_FILE_DIR}/_tmp.vault&rdquo;<br />
+_EXIT=&ldquo;0&rdquo;</p>
+
+<p>_CA=&ldquo;EdgeXFoundryTrustCA&rdquo;<br />
+_CA_DIR=&ldquo;${_VAULT_PKI_DIR}/${_CA}&rdquo;<br />
+_CA_PEM=&ldquo;${_CA_DIR}/${_CA}.pem&rdquo;<br />
+_TLS=&rdquo; &ndash;cacert ${_CA_PEM}&rdquo;</p>
+
+<p>_KONG_SVC=&ldquo;edgex-kong&rdquo;<br />
+_KONG_PEM=&ldquo;${_CA_DIR}/${_KONG_SVC}.pem&rdquo;<br />
+_KONG_SK=&ldquo;${_CA_DIR}/${_KONG_SVC}.priv.key&rdquo;<br />
+_REDIRECT=&rdquo; &ndash;location&rdquo; # If HTTP temporary redirect (HTTP STATUS 307) follow
+it<br />
+_HTTP_SCHEME=&ldquo;https&rdquo;<br />
+_VAULT_SVC=&ldquo;edgex-vault&rdquo;<br />
+_EDGEX_DOMAIN=&ldquo;&rdquo;<br />
+_VAULT_PORT=&ldquo;8200&rdquo;<br />
+_VAULT_API_PATH_KONG=&ldquo;/v1/secret/edgex/pki/tls/${_KONG_SVC}&rdquo;</p>
+
+<p>houseKeeping # temp files and payloads</p>
+
+<h1 id="generate-kong-pki-tls-materials-if-they-haven-t-been-already">Generate Kong PKI/TLS materials if they haven&rsquo;t been already&hellip;</h1>
+
+<p>#如果edgex-kong.pem 或 edgex-kong.priv.key 文件不存在，则由CA创建签发</p>
+
+<p>if [[ (! -f ${_KONG_PEM}) || (! -f ${_KONG_SK}) ]]; then<br />
+echo &ldquo;&gt;&gt; (3) Create PKI materials for Kong TLS server certificate&rdquo;<br />
+/vault/pki-setup.sh /vault/pki-setup-config-kong.env<br />
+chown vault:vault ${_CA_DIR}/${_KONG_SVC}.*<br />
+else<br />
+echo &ldquo;&gt;&gt; (3) PKI materials for Kong TLS server certificate already created&rdquo;<br />
+#查看证书信息</p>
+
+<p>openssl x509 -noout -subject -in ${_KONG_PEM}<br />
+openssl x509 -noout -issuer -in ${_KONG_PEM}<br />
+fi</p>
+
+<p>echo &ldquo;&rdquo;<br />
+echo &ldquo;&gt;&gt; (4) Fetch the Vault Root Token&rdquo;<br />
+#从resp-init.json文件中获取Vault Root Token<br />
+_ROOT_TOKEN=$(cat ${_RESP_INIT} | jq -r &lsquo;.root_token&rsquo;)</p>
+
+<p>echo &ldquo;&gt;&gt; (5) Test if the Kong Key/Value already exists&rdquo;<br />
+#检测Kong在vault中是否存在<br />
+curl -sw &lsquo;HTTP-STATUS: %{http_code}\n&rsquo; ${_TLS} ${_REDIRECT} \<br />
+--header &ldquo;X-Vault-Token: ${_ROOT_TOKEN}&rdquo; \<br />
+--request GET \<br />
+${_HTTP_SCHEME}://${_VAULT_SVC}{_VAULT_PORT}${_VAULT_API_PATH_KONG} &gt; ${_TMP}</p>
+
+<p>#上面命令真实值为：curl sw &lsquo;HTTP-STATUS: %{http_code}\n&rsquo; &ndash;cacert
+/vault/pki/EdgeXFoundryTrustCA/EdgeXFoundryTrustCA.pem &ndash;location </p>
+
+<h1 id="header-x-vault-token-6e2e099f-e5a4-028b-6b84-f11d1fb1ad9d">&ndash;header &ldquo;X-Vault-Token: 6e2e099f-e5a4-028b-6b84-f11d1fb1ad9d&rdquo; </h1>
+
+<h1 id="request-get">&ndash;request GET </h1>
+
+<h1 id="https-edgex-vault-8200-v1-secret-edgex-pki-tls-edgex-kong"><a href="https://edgex-vault:8200/v1/secret/edgex/pki/tls/edgex-kong">https://edgex-vault:8200/v1/secret/edgex/pki/tls/edgex-kong</a> &gt;</h1>
+
+<p>/vault/file/_tmp.vault</p>
+
+<h1 id="check-http-status-code-returned-by-get-request">Check http status code returned by get request</h1>
+
+<p>result=$(tail -1 ${_TMP} | grep &ldquo;HTTP-STATUS:&rdquo; | cut -d&rsquo; &lsquo; -f2)</p>
+
+<p>case ${result} in</p>
+
+<h1 id="http-status-200-key-found">HTTP-STATUS: 200 -&gt; key found</h1>
+
+<p>&ldquo;200&rdquo;)<br />
+echo &ldquo;==&gt; Key/Value already in Vault, done!&rdquo;<br />
+;;</p>
+
+<h1 id="http-status-404-key-not-found">HTTP-STATUS: 404 -&gt; Key not found</h1>
+
+<p>#如果Kong不存在vault中，则post edgex-kong.pem、edgex-kong.priv.key到vault中去（存储起来）<br />
+&ldquo;404&rdquo;)<br />
+echo &ldquo;&gt;&gt; (6) Create the Kong JSON with TLS certificate and private key (base64
+encoded)&rdquo;<br />
+jq -n &ndash;arg cert &ldquo;$(cat ${_KONG_PEM}|base64)&rdquo; \ #将edgex-kong.pem
+base64编码后赋给变量cert<br />
+--arg sk &ldquo;$(cat ${_KONG_SK}|base64)&rdquo; \ #将edgex-kong.priv.key base64编码后赋给变量sk<br />
+&rsquo;{certcert,keysk}&rsquo; &gt; ${_PAYLOAD_KONG} #生成payload-kong.json</p>
+
+<p>echo &ldquo;&gt;&gt; (7) Load the Kong JSON PKI materials in Vault&rdquo;<br />
+echo &ldquo;$(cat ${_PAYLOAD_KONG})&rdquo;</p>
+
+<p>curl -sw &lsquo;HTTP-STATUS: %{http_code}\n&rsquo; ${_TLS} ${_REDIRECT} \<br />
+--header &ldquo;X-Vault-Token: ${_ROOT_TOKEN}&rdquo; \<br />
+--header &ldquo;Content-Type: application/json&rdquo; \<br />
+--request POST \<br />
+--data @${_PAYLOAD_KONG} \<br />
+${_HTTP_SCHEME}://${_VAULT_SVC}{_VAULT_PORT}${_VAULT_API_PATH_KONG} &gt; ${_TMP}<br />
+#上面命令真实值为：curl sw &lsquo;HTTP-STATUS: %{http_code}\n&rsquo; &ndash;cacert
+/vault/pki/EdgeXFoundryTrustCA/EdgeXFoundryTrustCA.pem &ndash;location </p>
+
+<h1 id="header-x-vault-token-6e2e099f-e5a4-028b-6b84-f11d1fb1ad9d-1">&ndash;header &ldquo;X-Vault-Token: 6e2e099f-e5a4-028b-6b84-f11d1fb1ad9d&rdquo; </h1>
+
+<h1 id="header-content-type-application-json-request-post">&ndash;header &ldquo;Content-Type: application/json&rdquo; \ # &ndash;request POST </h1>
+
+<h1 id="data-vault-file-payload-kong-json">--data /vault/file/payload-kong.json </h1>
+
+<h1 id="https-edgex-vault-8200-v1-secret-edgex-pki-tls-edgex-kong-1"><a href="https://edgex-vault:8200/v1/secret/edgex/pki/tls/edgex-kong">https://edgex-vault:8200/v1/secret/edgex/pki/tls/edgex-kong</a> &gt;</h1>
+
+<p>/vault/file/_tmp.vault</p>
+
+<h1 id="check-http-status-code-returned-by-post-request">Check http status code returned by post request</h1>
+
+<p>result=$(tail -1 ${_TMP} | grep &ldquo;HTTP-STATUS:&rdquo; | cut -d&rsquo; &lsquo; -f2)<br />
+#如果返回http 状代码为204，说明保存到vault成功<br />
+if [[ ${result} == &ldquo;204&rdquo; ]]; then<br />
+echo &ldquo;==&gt; Key/Value successfully written in Vault, done!&rdquo;<br />
+else<br />
+echo &ldquo;==&gt; Error while writing Key/Value in Vault!&rdquo;<br />
+_EXIT=&ldquo;1&rdquo;<br />
+fi<br />
+;;<br />
+*)<br />
+echo &ldquo;==&gt; Unattended Error while reading Key/Value&rdquo;<br />
+_EXIT=&ldquo;1&rdquo;<br />
+;;<br />
+esac</p>
+
+<h1 id="handle-the-error-exit-use-case">Handle the error exit use case</h1>
+
+<p>if [[ ${_EXIT} == &ldquo;1&rdquo; ]]; then<br />
+echo &ldquo;==&gt; Vault request response:&rdquo;<br />
+cat ${_TMP}<br />
+echo &ldquo;&gt;&gt;&rdquo;<br />
+fi</p>
+
+<p>echo &ldquo;&rdquo;</p>
+
+<p>houseKeeping # temp files and payloads</p>
+
+<p>exit ${_EXIT}</p>
+
+<p>#EOF</p>
+
+<p>2.3 edgexfoundry/docker-edgex-proxy-go镜像</p>
+
+<p>首先，将security-api-gateway项目源码拷到ubuntn服务器edgexsecurity 目录下，如下结构：</p>
+
+<ol>
+<li>myEdgex@instance-nbpv5z80:~/gopath/src$ ls</li>
+<li>edgexsecurity github.com</li>
+<li>4. myEdgex@instance-nbpv5z80:~/gopath/src/edgexsecurity$ ls</li>
+<li>build.bat CONTRIBUTING.md Docker Dockerfile.orgin glide.yaml Makefile vendor version.go</li>
+<li>build.sh core Dockerfile glide.lock LICENSE README.md VERSION</li>
+</ol>
+
+<p><em>复制代码</em></p>
+
+<p>然后执行如下命令，安装go依赖，vendor会存放起来以备后用</p>
+
+<ol>
+<li>glide install</li>
+</ol>
+
+<p><em>复制代码</em></p>
+
+<p>2.3.1 Dockerfile.gobuildinside文件</p>
+
+<p>我们采用在镜像内编译的方法，所以解读一下这个文件，此文件我作了修改，内容如下：</p>
+
+<p>#第一阶段，编译为可执行：edgexproxy<br />
+#golang:1.9-alpine作为基础镜像，即带有golang的alpine linux操作系统</p>
+
+<p>FROM golang:1.9-alpine AS builder</p>
+
+<p>#待编译的源码务必要放在/go/src下，否由vendor不起作用<br />
+RUN mkdir -p /go/src/edgexsecurity</p>
+
+<p>WORKDIR /go/src/edgexsecurity</p>
+
+<p>COPY . .</p>
+
+<p>#这样会很慢，会访问网络，屏蔽了如下两行</p>
+
+<p>#RUN apk add make<br />
+#RUN go get github.com/dghubble/sling &amp;&amp; go get github.com/BurntSushi/toml &amp;&amp;
+go get github.com/edgexfoundry/edgex-go/pkg/clients/logging &amp;&amp; go get
+github.com/dgrijalva/jwt-go</p>
+
+<p>#务必要以CGO_ENABLED=0方式编译，否则会报错：standard_init_linux.go:190: exec user process
+caused &ldquo;no such file or directory&rdquo;<br />
+RUN cd core &amp;&amp; CGO_ENABLED=0 go build -o edgexproxy
+#编译好的edgexproxy可执行文件放在core目录下</p>
+
+<p>COPY Docker/res/configuration.toml core/res/</p>
+
+<p>#第二阶段，制作真正的镜像，从第一阶段中拷文件<br />
+FROM scratch</p>
+
+<p>LABEL license=&lsquo;SPDX-License-Identifier: Apache-2.0&rsquo; \<br />
+copyright=&lsquo;Copyright &copy; 2018: Dell, Cavium&rsquo;</p>
+
+<p>#edgexproxy
+必须放在与res同级目录，否则找不到configuration.toml，因为main.go文件中这样定义相对目录configFileLocation :=
+flag.String(&ldquo;configfile&rdquo;, &ldquo; <strong>res/configuration.toml</strong> &ldquo;, &ldquo;configuration
+file&rdquo;)<br />
+#除非你在ENTRYPOINT 中指定configfile<br />
+WORKDIR /edgexsecurity/core<br />
+COPY &ndash;from=builder /go/src/edgexsecurity/core/edgexproxy /edgexsecurity/core/<br />
+COPY &ndash;from=builder /go/src/edgexsecurity/core/res/configuration.toml
+/edgexsecurity/core/res/configuration.toml</p>
+
+<p>ENTRYPOINT [&ldquo;./edgexproxy&rdquo;,&ldquo;&ndash;init=true&rdquo;]</p>
+
+<p><strong>至此，镜像文件已制作完毕！</strong></p>
+
+<p>2.3.2 <strong>security-api-gateway (简称edgexproxy) 是如何工作的及使用？</strong><br />
+请参考：security-api-gateway 模块详解</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

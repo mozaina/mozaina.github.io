@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Atinyshellprogramwithjobcontrol | 开发者问答集锦</title>
+    <meta property="og:title" content="Atinyshellprogramwithjobcontrol - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Atinyshellprogramwithjobcontrol">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/atinyshellprogramwithjobcontrol/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Atinyshellprogramwithjobcontrol</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>那天被布置了个作业，写SHELL<br />
+研究了老半天，下面这个是作业的标准答案</p>
+
+<p>/*<br />
+* tsh - A tiny shell program with job control<br />
+*<br />
+* Clara Raubertas<br />
+* clara1<br />
+*/<br />
+#include<br />
+#include<br />
+#include<br />
+#include<br />
+#include<br />
+#include<br />
+#include<br />
+#include<br />
+#include</p>
+
+<p>/* Misc manifest constants <em>/<br />
+#define MAXLINE 1024 /</em> max line size <em>/<br />
+#define MAXARGS 128 /</em> max args on a command line <em>/<br />
+#define MAXJOBS 16 /</em> max jobs at any point in time <em>/<br />
+#define MAXJID 1&lt;&lt;16 /</em> max job ID */</p>
+
+<p>/* Job states <em>/<br />
+#define UNDEF 0 /</em> undefined <em>/<br />
+#define FG 1 /</em> running in foreground <em>/<br />
+#define BG 2 /</em> running in background <em>/<br />
+#define ST 3 /</em> stopped */</p>
+
+<p>/*<br />
+* Jobs states: FG (foreground), BG (background), ST (stopped)<br />
+* Job state transitions and enabling actions:<br />
+* FG -&gt; ST : ctrl-z<br />
+* ST -&gt; FG : fg command<br />
+* ST -&gt; BG : bg command<br />
+* BG -&gt; FG : fg command<br />
+* At most 1 job can be in the FG state.<br />
+*/</p>
+
+<p>/* Global variables */<br />
+extern char *<em>environ; /</em> defined in libc <em>/<br />
+char prompt[] = &ldquo;tsh&gt; &ldquo;; /</em> command line prompt (DO NOT CHANGE) <em>/<br />
+int verbose = 0; /</em> if true, print additional output <em>/<br />
+int nextjid = 1; /</em> next job ID to allocate <em>/<br />
+char sbuf[MAXLINE]; /</em> for composing sprintf messages */</p>
+
+<p>struct job_t { /* The job struct <em>/<br />
+pid_t pid; /</em> job PID <em>/<br />
+int jid; /</em> job ID [1, 2, &hellip;] <em>/<br />
+int state; /</em> UNDEF, BG, FG, or ST <em>/<br />
+char cmdline[MAXLINE]; /</em> command line <em>/<br />
+};<br />
+struct job_t jobs[MAXJOBS]; /</em> The job list <em>/<br />
+/</em> End global variables */</p>
+
+<p>/* Function prototypes */</p>
+
+<p>/* Here are the functions that you will implement */<br />
+void eval(char *cmdline);<br />
+int builtin_cmd(char **argv);<br />
+void do_bgfg(char **argv);<br />
+void waitfg(pid_t pid);</p>
+
+<p>void sigchld_handler(int sig);<br />
+void sigtstp_handler(int sig);<br />
+void sigint_handler(int sig);</p>
+
+<p>/* Here are helper routines that we&rsquo;ve provided for you */<br />
+int parseline(const char *cmdline, char **argv);<br />
+void sigquit_handler(int sig);</p>
+
+<p>void clearjob(struct job_t *job);<br />
+void initjobs(struct job_t *jobs);<br />
+int maxjid(struct job_t *jobs);<br />
+int addjob(struct job_t *jobs, pid_t pid, int state, char *cmdline);<br />
+int deletejob(struct job_t *jobs, pid_t pid);<br />
+pid_t fgpid(struct job_t *jobs);<br />
+struct job_t *getjobpid(struct job_t *jobs, pid_t pid);<br />
+struct job_t *getjobjid(struct job_t *jobs, int jid);<br />
+int pid2jid(pid_t pid);<br />
+void listjobs(struct job_t *jobs);</p>
+
+<p>void usage(void);<br />
+void unix_error(char *msg);<br />
+void app_error(char *msg);<br />
+typedef void handler_t(int);<br />
+handler_t *Signal(int signum, handler_t *handler);</p>
+
+<p>/*<br />
+* main - The shell&rsquo;s main routine<br />
+*/<br />
+int main(int argc, char *<em>argv)<br />
+{<br />
+char c;<br />
+char cmdline[MAXLINE];<br />
+int emit_prompt = 1; /</em> emit prompt (default) */</p>
+
+<p>/* Redirect stderr to stdout (so that driver will get all output<br />
+* on the pipe connected to stdout) */<br />
+dup2(1, 2);</p>
+
+<p>/* Parse the command line <em>/<br />
+while ((c = getopt(argc, argv, &ldquo;hvp&rdquo;)) != EOF) {<br />
+switch &copy; {<br />
+case &lsquo;h&rsquo;: /</em> print help message <em>/<br />
+usage();<br />
+break;<br />
+case &lsquo;v&rsquo;: /</em> emit additional diagnostic info <em>/<br />
+verbose = 1;<br />
+break;<br />
+case &lsquo;p&rsquo;: /</em> don&rsquo;t print a prompt <em>/<br />
+emit_prompt = 0; /</em> handy for automatic testing */<br />
+break;<br />
+default:<br />
+usage();<br />
+}<br />
+}</p>
+
+<p>/* Install the signal handlers */</p>
+
+<p>/* These are the ones you will need to implement <em>/<br />
+Signal(SIGINT, sigint_handler); /</em> ctrl-c <em>/<br />
+Signal(SIGTSTP, sigtstp_handler); /</em> ctrl-z <em>/<br />
+Signal(SIGCHLD, sigchld_handler); /</em> Terminated or stopped child */</p>
+
+<p>/* This one provides a clean way to kill the shell */<br />
+Signal(SIGQUIT, sigquit_handler);</p>
+
+<p>/* Initialize the job list */<br />
+initjobs(jobs);</p>
+
+<p>/* Execute the shell&rsquo;s read/eval loop */<br />
+while (1) {</p>
+
+<p>/* Read command line <em>/<br />
+if (emit_prompt) {<br />
+printf(&ldquo;%s&rdquo;, prompt);<br />
+fflush(stdout);<br />
+}<br />
+if ((fgets(cmdline, MAXLINE, stdin) == NULL) &amp;&amp; ferror(stdin))<br />
+app_error(&ldquo;fgets error&rdquo;);<br />
+if (feof(stdin)) { /</em> End of file (ctrl-d) */<br />
+fflush(stdout);<br />
+exit(0);<br />
+}</p>
+
+<p>/* Evaluate the command line */<br />
+eval(cmdline);<br />
+fflush(stdout);<br />
+fflush(stdout);<br />
+}</p>
+
+<p>exit(0); /* control never reaches here */<br />
+}</p>
+
+<p>/*<br />
+* eval - Evaluate the command line that the user has just typed in<br />
+*<br />
+* If the user has requested a built-in command (quit, jobs, bg or fg)<br />
+* then execute it immediately. Otherwise, fork a child process and<br />
+* run the job in the context of the child. If the job is running in<br />
+* the foreground, wait for it to terminate and then return. Note:<br />
+* each child process must have a unique process group ID so that our<br />
+* background children don&rsquo;t receive SIGINT (SIGTSTP) from the kernel<br />
+* when we type ctrl-c (ctrl-z) at the keyboard.<br />
+*/<br />
+void eval(char *cmdline)<br />
+{<br />
+char *argv[MAXLINE];<br />
+pid_t pid;<br />
+sigset_t mask;<br />
+int bg = parseline(cmdline, argv);<br />
+// parses the command line and indicates whether the command is to run in the
+background<br />
+if (argv[0] == NULL) {<br />
+return; // ignore blank lines<br />
+}<br />
+if ((sigemptyset(&amp;mask)) &lt; 0) {<br />
+unix_error(&ldquo;sigemptyset error&rdquo;);<br />
+}<br />
+if ((sigaddset(&amp;mask, SIGCHLD)) &lt; 0) {<br />
+unix_error(&ldquo;sigaddset error&rdquo;);<br />
+}<br />
+if (!(builtin_cmd(argv))) { // first check if it is a builtin command<br />
+if ((sigprocmask(SIG_BLOCK, &amp;mask, NULL)) &lt; 0) {<br />
+unix_error(&ldquo;sigprocmask error&rdquo;);<br />
+}<br />
+//fork off and execute the program in the child<br />
+if ((pid = fork()) &lt; 0) {<br />
+unix_error(&ldquo;fork error&rdquo;);<br />
+}<br />
+else if (pid == 0) {<br />
+if (setpgid(0, 0) &lt; 0 ) {<br />
+// make a new process group, check for error<br />
+unix_error(&ldquo;setpgid error&rdquo;);<br />
+}<br />
+if (sigprocmask(SIG_UNBLOCK, &amp;mask, NULL) &lt; 0) {<br />
+unix_error(&ldquo;sigprogmask error&rdquo;);<br />
+}<br />
+// printf(&ldquo;child process group is %d/n&rdquo;, getpgid(0));<br />
+if (execve(argv[0], argv, environ) &lt; 0) {<br />
+//error check execve<br />
+printf(&ldquo;%s: Command not found./n&rdquo;, argv[0]);<br />
+//return;<br />
+exit(0);<br />
+}<br />
+}<br />
+// printf(&ldquo;parent process group is %d/n&rdquo;, getpgid(0));<br />
+if (!bg) {<br />
+// run the process in the foreground<br />
+addjob(jobs, pid, FG, cmdline);<br />
+if (sigprocmask(SIG_UNBLOCK, &amp;mask, NULL) &lt; 0) {<br />
+unix_error(&ldquo;sigprocmask error&rdquo;);<br />
+}<br />
+waitfg(pid); // wait for the foreground child to terminate.<br />
+}<br />
+else {<br />
+// run the process in the background<br />
+int jid;<br />
+addjob(jobs, pid, BG, cmdline);<br />
+if (sigprocmask(SIG_UNBLOCK, &amp;mask, NULL) &lt; 0) {<br />
+unix_error(&ldquo;sigprocmask error&rdquo;);<br />
+}<br />
+jid = pid2jid(pid);<br />
+printf(&rdquo;<a href="%d">%d</a> %s&rdquo;, jid, pid, cmdline);<br />
+}<br />
+}<br />
+return;<br />
+}</p>
+
+<p>/*<br />
+* parseline - Parse the command line and build the argv array.<br />
+*<br />
+* Characters enclosed in single quotes are treated as a single<br />
+* argument. Return true if the user has requested a BG job, false if<br />
+* the user has requested a FG job.<br />
+*/<br />
+int parseline(const char *cmdline, char *<em>argv)<br />
+{<br />
+static char array[MAXLINE]; /</em> holds local copy of command line */<br />
+char <em>buf = array; /</em> ptr that traverses command line */<br />
+char <em>delim; /</em> points to first space delimiter <em>/<br />
+int argc; /</em> number of args <em>/<br />
+int bg; /</em> background job? */</p>
+
+<p>strcpy(buf, cmdline);</p>
+
+<p>buf[strlen(buf)-1] = &lsquo; &lsquo;; /* replace trailing &lsquo;/n&rsquo; with space */<br />
+while (*buf &amp;&amp; (<em>buf == &lsquo; &lsquo;)) /</em> ignore leading spaces */<br />
+buf++;</p>
+
+<p>/* Build the argv list */<br />
+argc = 0;<br />
+if (*buf == &lsquo;/&ldquo;) {<br />
+buf++;<br />
+delim = strchr(buf, &lsquo;/&ldquo;);<br />
+}<br />
+else {<br />
+delim = strchr(buf, &lsquo; &lsquo;);<br />
+}<br />
+while (delim) {<br />
+argv[argc++] = buf;<br />
+*delim = &lsquo;/0&rsquo;;<br />
+buf = delim + 1;<br />
+while (*buf &amp;&amp; (<em>buf == &lsquo; &lsquo;)) /</em> ignore spaces */<br />
+buf++;<br />
+if (*buf == &lsquo;/&ldquo;) {<br />
+buf++;<br />
+delim = strchr(buf, &lsquo;/&ldquo;);<br />
+}<br />
+else {<br />
+delim = strchr(buf, &lsquo; &lsquo;);<br />
+}<br />
+}<br />
+argv[argc] = NULL;</p>
+
+<p>if (argc == 0) /* ignore blank line <em>/<br />
+return 1;<br />
+/</em> should the job run in the background? */<br />
+if ((bg = (*argv[argc-1] == &lsquo;&amp;&lsquo;)) != 0) {<br />
+argv[&ndash;argc] = NULL;<br />
+}<br />
+return bg;<br />
+}</p>
+
+<p>/*<br />
+* builtin_cmd - If the user has typed a built-in command then execute<br />
+* it immediately.<br />
+*/</p>
+
+<p>int builtin_cmd(char **argv)</p>
+
+<p>{<br />
+//printf(&ldquo;builtin_cmd?/n&rdquo;);<br />
+if (!strcmp(&ldquo;quit&rdquo;, argv[0])) {<br />
+exit(0);<br />
+}<br />
+if (!strcmp(&ldquo;jobs&rdquo;, argv[0])) {<br />
+listjobs(jobs);<br />
+return 1;<br />
+}<br />
+if (!strcmp(&ldquo;bg&rdquo;, argv[0]) || !(strcmp(&ldquo;fg&rdquo;, argv[0]))) {<br />
+do_bgfg(argv);<br />
+return 1;<br />
+}<br />
+return 0; /* not a builtin command */<br />
+}</p>
+
+<p>/*<br />
+* do_bgfg - Execute the builtin bg and fg commands<br />
+*/<br />
+void do_bgfg(char *<em>argv)<br />
+{<br />
+if (!(strcmp(&ldquo;bg&rdquo;, argv[0]))) {<br />
+//make the job bg<br />
+if(!(strncpy(argv[1], &ldquo;%&rdquo;, 1))) {<br />
+getjobjid(jobs, atoi(argv[1]));<br />
+}<br />
+else {<br />
+kill(atoi(argv[1]), SIGCONT);<br />
+(</em>(getjobpid(jobs, atoi(argv[1])))).state = BG;<br />
+}<br />
+//find out if it is a pid or jid<br />
+//send the process a sigcont<br />
+//set its state to bg<br />
+}<br />
+if (!(strcmp(&ldquo;fg&rdquo;, argv[0]))) {<br />
+//make the job fg<br />
+//find out if it is a pid or jid<br />
+// send it a sigcont<br />
+//set its state to fg<br />
+//waitfg<br />
+}<br />
+printf(&ldquo;%s/n&rdquo;, argv[0]);<br />
+return;<br />
+}</p>
+
+<p>/*<br />
+* waitfg - Block until process pid is no longer the foreground process<br />
+<em>/<br />
+void waitfg(pid_t pid)<br />
+{<br />
+while<br />
+(getjobpid(jobs, pid) != NULL) {<br />
+if ((</em>(getjobpid(jobs, pid))).state == FG) {<br />
+// printf(&ldquo;%d/n&rdquo;, pid);<br />
+sleep (1);<br />
+}<br />
+}<br />
+return;<br />
+}</p>
+
+<p>/*****************<br />
+* Signal handlers<br />
+*****************/</p>
+
+<p>/*<br />
+* sigchld_handler - The kernel sends a SIGCHLD to the shell whenever<br />
+* a child job terminates (becomes a zombie), or stops because it<br />
+* received a SIGSTOP or SIGTSTP signal. The handler reaps all<br />
+* available zombie children, but doesn&rsquo;t wait for any other<br />
+* currently running children to terminate.<br />
+*/<br />
+void sigchld_handler(int sig)<br />
+{<br />
+int status;<br />
+pid_t pid;<br />
+// pid = fgpid(jobs);<br />
+while ((pid = waitpid(fgpid(jobs), &amp;status, WNOHANG|WUNTRACED)) &gt; 0) {<br />
+// printf(&ldquo;waitpid: %d/n&rdquo;, pid);<br />
+deletejob(jobs, pid);<br />
+}<br />
+if (errno != ECHILD) {<br />
+unix_error(&ldquo;sigchld_handler: waitpid error&rdquo;);<br />
+}<br />
+return;<br />
+}</p>
+
+<p>/* sigint_handler - The kernel sends a SIGINT to the shell whenver the<br />
+* user types ctrl-c at the keyboard. Catch it and send it along<br />
+* to the foreground job.<br />
+*/<br />
+void sigint_handler(int sig)<br />
+{<br />
+int pid;<br />
+int jid;<br />
+pid = fgpid(jobs);<br />
+if (pid != 0) {<br />
+jid = pid2jid(pid);<br />
+kill(-pid, SIGKILL);<br />
+printf(&ldquo;Job <a href="%d">%d</a> terminated by signal %d/n&rdquo;, jid, pid, sig);<br />
+}<br />
+else {<br />
+}<br />
+return;<br />
+}</p>
+
+<p>/*<br />
+* sigtstp_handler - The kernel sends a SIGTSTP to the shell whenever<br />
+* the user types ctrl-z at the keyboard. Catch it and suspend the<br />
+* foreground job by sending it a SIGTSTP.<br />
+*/<br />
+void sigtstp_handler(int sig)<br />
+{<br />
+int pid;<br />
+int jid;<br />
+int gid;<br />
+pid = fgpid(jobs);</p>
+
+<p>if (pid != 0) {<br />
+jid = pid2jid(pid);<br />
+gid = -1 * pid;<br />
+kill(-pid, SIGTSTP);<br />
+(<em>(getjobpid(jobs, pid))).state = ST;<br />
+printf(&ldquo;Stopped <a href="%d">%d</a> %s&rdquo;, jid, pid, (</em>(getjobpid(jobs, pid))).cmdline);<br />
+}<br />
+else {<br />
+}<br />
+return;<br />
+}<br />
+/* test05, test07, test08, test09, test10, test12, test13, test14, test15,
+test16 */<br />
+/*********************<br />
+* End signal handlers<br />
+*********************/</p>
+
+<p>/***********************************************<br />
+* Helper routines that manipulate the job list<br />
+**********************************************/</p>
+
+<p>/* clearjob - Clear the entries in a job struct */<br />
+void clearjob(struct job_t *job) {<br />
+job-&gt;pid = 0;<br />
+job-&gt;jid = 0;<br />
+job-&gt;state = UNDEF;<br />
+job-&gt;cmdline[0] = &lsquo;/0&rsquo;;<br />
+}</p>
+
+<p>/* initjobs - Initialize the job list */<br />
+void initjobs(struct job_t *jobs) {<br />
+int i;</p>
+
+<p>for (i = 0; i &lt; MAXJOBS; i++)<br />
+clearjob(&amp;jobs[i]);<br />
+}</p>
+
+<p>/* maxjid - Returns largest allocated job ID */<br />
+int maxjid(struct job_t *jobs)<br />
+{<br />
+int i, max=0;<br />
+for (i = 0; i &lt; MAXJOBS; i++)<br />
+if (jobs[i].jid &gt; max)<br />
+max = jobs[i].jid;<br />
+return max;<br />
+}</p>
+
+<p>/* addjob - Add a job to the job list */<br />
+int addjob(struct job_t *jobs, pid_t pid, int state, char *cmdline) {<br />
+int i;</p>
+
+<p>if (pid &lt; 1)<br />
+return 0;</p>
+
+<p>for (i = 0; i &lt; MAXJOBS; i++) {<br />
+if (jobs[i].pid == 0) {<br />
+jobs[i].pid = pid;<br />
+jobs[i].state = state;<br />
+jobs[i].jid = nextjid++;<br />
+if (nextjid &gt; MAXJOBS)<br />
+nextjid = 1;<br />
+strcpy(jobs[i].cmdline, cmdline);<br />
+if(verbose){<br />
+printf(&ldquo;Added job [%d] %d %s : %s/n&rdquo;, jobs[i].jid, jobs[i].pid,
+jobs[i].cmdline, cmdline);<br />
+}<br />
+return 1;<br />
+}<br />
+}<br />
+printf(&ldquo;Tried to create too many jobs/n&rdquo;);<br />
+return 0;<br />
+}</p>
+
+<p>/* deletejob - Delete a job whose PID=pid from the job list */<br />
+int deletejob(struct job_t *jobs, pid_t pid)<br />
+{<br />
+int i;</p>
+
+<p>if (pid &lt; 1)<br />
+return 0;</p>
+
+<p>for (i = 0; i &lt; MAXJOBS; i++) {<br />
+if (jobs[i].pid == pid) {<br />
+clearjob(&amp;jobs[i]);<br />
+nextjid = maxjid(jobs)+1;<br />
+return 1;<br />
+}<br />
+}<br />
+return 0;<br />
+}</p>
+
+<p>/* fgpid - Return PID of current foreground job, 0 if no such job */<br />
+pid_t fgpid(struct job_t *jobs) {<br />
+int i;</p>
+
+<p>for (i = 0; i &lt; MAXJOBS; i++)<br />
+if (jobs[i].state == FG)<br />
+return jobs[i].pid;<br />
+return 0;<br />
+}</p>
+
+<p>/* getjobpid - Find a job (by PID) on the job list */<br />
+struct job_t *getjobpid(struct job_t *jobs, pid_t pid) {<br />
+int i;</p>
+
+<p>if (pid &lt; 1)<br />
+return NULL;<br />
+for (i = 0; i &lt; MAXJOBS; i++)<br />
+if (jobs[i].pid == pid)<br />
+return &amp;jobs[i];<br />
+return NULL;<br />
+}</p>
+
+<p>/* getjobjid - Find a job (by JID) on the job list */<br />
+struct job_t *getjobjid(struct job_t *jobs, int jid)<br />
+{<br />
+int i;</p>
+
+<p>if (jid &lt; 1)<br />
+return NULL;<br />
+for (i = 0; i &lt; MAXJOBS; i++)<br />
+if (jobs[i].jid == jid)<br />
+return &amp;jobs[i];<br />
+return NULL;<br />
+}</p>
+
+<p>/* pid2jid - Map process ID to job ID */<br />
+int pid2jid(pid_t pid)<br />
+{<br />
+int i;</p>
+
+<p>if (pid &lt; 1)<br />
+return 0;<br />
+for (i = 0; i &lt; MAXJOBS; i++)<br />
+if (jobs[i].pid == pid) {<br />
+return jobs[i].jid;<br />
+}<br />
+return 0;<br />
+}</p>
+
+<p>/* listjobs - Print the job list */<br />
+void listjobs(struct job_t *jobs)<br />
+{<br />
+int i;</p>
+
+<p>for (i = 0; i &lt; MAXJOBS; i++) {<br />
+if (jobs[i].pid != 0) {<br />
+printf(&rdquo;<a href="%d">%d</a> &ldquo;, jobs[i].jid, jobs[i].pid);<br />
+switch (jobs[i].state) {<br />
+case BG:<br />
+printf(&ldquo;Running &ldquo;);<br />
+break;<br />
+case FG:<br />
+printf(&ldquo;Foreground &ldquo;);<br />
+break;<br />
+case ST:<br />
+printf(&ldquo;Stopped &ldquo;);<br />
+break;<br />
+default:<br />
+printf(&ldquo;listjobs: Internal error: job[%d].state=%d &ldquo;,<br />
+i, jobs[i].state);<br />
+}<br />
+printf(&ldquo;%s&rdquo;, jobs[i].cmdline);<br />
+}<br />
+}<br />
+}<br />
+/******************************<br />
+* end job list helper routines<br />
+******************************/</p>
+
+<p>/***********************<br />
+* Other helper routines<br />
+***********************/</p>
+
+<p>/*<br />
+* usage - print a help message<br />
+*/<br />
+void usage(void)<br />
+{<br />
+printf(&ldquo;Usage: shell [-hvp]/n&rdquo;);<br />
+printf(&rdquo; -h print this message/n&rdquo;);<br />
+printf(&rdquo; -v print additional diagnostic information/n&rdquo;);<br />
+printf(&rdquo; -p do not emit a command prompt/n&rdquo;);<br />
+exit(1);<br />
+}</p>
+
+<p>/*<br />
+* unix_error - unix-style error routine<br />
+*/<br />
+void unix_error(char *msg)<br />
+{<br />
+fprintf(stdout, &ldquo;%s: %s/n&rdquo;, msg, strerror(errno));<br />
+exit(1);<br />
+}</p>
+
+<p>/*<br />
+* app_error - application-style error routine<br />
+*/<br />
+void app_error(char *msg)<br />
+{<br />
+fprintf(stdout, &ldquo;%s/n&rdquo;, msg);<br />
+exit(1);<br />
+}</p>
+
+<p>/*<br />
+* Signal - wrapper for the sigaction function<br />
+*/<br />
+handler_t *Signal(int signum, handler_t *handler)<br />
+{<br />
+struct sigaction action, old_action;</p>
+
+<p>action.sa_handler = handler;<br />
+sigemptyset(&amp;action.sa_mask); /* block sigs of type being handled <em>/<br />
+action.sa_flags = SA_RESTART; /</em> restart syscalls if possible */</p>
+
+<p>if (sigaction(signum, &amp;action, &amp;old_action) &lt; 0)<br />
+unix_error(&ldquo;Signal error&rdquo;);<br />
+return (old_action.sa_handler);<br />
+}</p>
+
+<p>/*<br />
+* sigquit_handler - The driver program can gracefully terminate the<br />
+* child shell by sending it a SIGQUIT signal.<br />
+*/<br />
+void sigquit_handler(int sig)<br />
+{<br />
+printf(&ldquo;Terminating after receipt of SIGQUIT signal/n&rdquo;);<br />
+exit(1);<br />
+}</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

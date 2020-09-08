@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>批量替换类名Shell脚本源码解析 | 开发者问答集锦</title>
+    <meta property="og:title" content="批量替换类名Shell脚本源码解析 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="批量替换类名Shell脚本源码解析">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E6%89%B9%E9%87%8F%E6%9B%BF%E6%8D%A2%E7%B1%BB%E5%90%8Dshell%E8%84%9A%E6%9C%AC%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">批量替换类名Shell脚本源码解析</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>转载自: <a href="http://www.jianshu.com/p/41dff888e330">http://www.jianshu.com/p/41dff888e330</a></p>
+
+<p>Git地址: <a href="https://github.com/kyle-fox/rename-xcode-files">https://github.com/kyle-fox/rename-xcode-files</a></p>
+
+<h1 id="背景">背景</h1>
+
+<p>现在做的项目有个批量修改类名的需求，包括文件名、类名、工程文件中的名字。去github上搜了一下还真找到一个似乎看起来比较满足需求的脚本：
+****<strong>rename-xcode-files</strong> 不过毕竟不能完全满足自己的需求比如类名的前缀匹配比如，ATestXXX=&gt;BTestXXX这种形式。
+先把这个脚本的源码部分贴一下：</p>
+
+<pre><code>#!/bin/bash
+
+1) PROJECT_DIR=.
+2) RENAME_CLASSES=rename_classes.txt
+
+#First, we substitute the text in all of the files.
+5) sed_cmd=`sed -e 's@^@s/[[:&lt;: s=&quot;&quot;&gt;:]]/@; s@$@/g;@' ${RENAME_CLASSES} `
+6) find ${PROJECT_DIR} -type f \
+7) \( -name &quot;*.pbxproj&quot; -or -name &quot;*.h&quot; -or -name &quot;*.m&quot; -or -name &quot;*.xib&quot; -or -name &quot;*.storyboard&quot; \) \
+8) -exec sed -i.bak &quot;${sed_cmd}&quot; {} +
+
+# Now, we rename the .h/.m files
+11) while read line; do
+12)   class_from=`echo $line | sed &quot;s/[[:space:]]\{1,\}.*//&quot;`
+13)   class_to=`echo $line | sed &quot;s/.*[[:space:]]\{1,\}//&quot;`
+14)   find ${PROJECT_DIR} -type f -regex &quot;.*[[:&lt;:&gt;:]][^\/]*\.[hm]&quot; -print | egrep -v '.bak$' | \
+15)     while read file_from; do
+16)       file_to=`echo $file_from | sed &quot;s/\(.*\)[[:&lt;:&gt;:]]\([^\/]*\)/\1${class_to}\2/&quot;` 
+17)       echo mv &quot;${file_from}&quot; &quot;${file_to}&quot;
+18)       mv &quot;${file_from}&quot; &quot;${file_to}&quot;
+19)     done
+20) done &lt; ${RENAME_CLASSES}
+</code></pre>
+
+<p>其中rename_classes.txt文件内容的形式是：</p>
+
+<pre><code>AClass BClass
+TestClass TTestClass
+</code></pre>
+
+<h1 id="源码解析">源码解析</h1>
+
+<p>虽然算上空行和注释总共也只有20行代码，不过乍一看还是很懵的，各种/@：.\等特殊的字符，有些没有思绪。不过这都是因为我对shell脚本的认知其实还属于小白阶段，所以对一些语法和特性并不理解，导致想修改脚本满足自己更多个性化的需求不知道从何入手。查阅了很多资料，文档以及请教了一些对Shell脚本非常有经验的同事，终于读懂了这个脚本，现在就逐行分析一下源码，算是Mark一下自己这几天的收获。</p>
+
+<p><code>第1行，第2行</code><br />
+这两行比较简单，将当前的目录路径和当前目录下的<code>rename_classes.txt</code>文件地址赋值给两个变量</p>
+
+<p><code>第5行</code><br />
+sed命令用于对文件以行为单位进行内容操作，如增删改，查找替换。sed命令的语法如下：</p>
+
+<pre><code>sed [选项] '[动作]' 文件名
+选项：
+-n：一般sed命令会把所有数据都输出到屏幕，如果加入此选择则只会把经过sed命令处理的行输出到屏幕。
+-e：允许对输入数据应用多条sed命令编辑。
+-i：用sed的修改结果直接修改读取数据的文件，而不是由屏幕输出。
+动作：
+a：追加，在当前行后添加一行或多行
+c：行替换，用c后面的字符串替换原数据行
+i：插入，在当前行前插入一行或多行
+d：删除，删除指定的行
+p：打印，输出指定的行
+s：字串替换，用一个字符串替换另外一个字符串。格式为“行范围s/旧字串/新字串/g”，这里/g指的是在整行内完整的匹配，否则默认的只是匹配第一次查找到的旧字符串
+</code></pre>
+
+<p>根据上面的语法解释，sed -e 后面接着的应该是多条命令，以;分割。<br />
+等同于下面三行命令：</p>
+
+<pre><code>s@^@s/[[:&lt;: s=&quot;&quot;&gt;:]]/@;
+s@$@/g;@
+</code></pre>
+
+<p>那么@是什么呢？<br />
+原来，在执行替换操作的时候，如果要替换的内容中包含/，这个时候需要对/进行了转义成<code>\/</code>，不过这样表达式的可读性必然会降低，因此在sed中还可以使用<code>|，@，^，!</code>作为命令的分隔符。</p>
+
+<p><code>[[:space:]]</code>、<code>[[:&lt;:&gt;、</code>[[:&gt;:]]`又是什么意思呢？</p>
+
+<p>**** <strong>POSIX Bracket Expressions</strong>`</p>
+
+<p>从这个文档里可以查到，[:space:]表示空格或者制表符的字符集合，外面那一层[]表示匹配[]中的字符查找，是正则表达式中的规则，
+^和$也是正则表达式中的规则，分别表示行首和行尾。{1,}是表示匹配次数的限制，至少匹配到一次，{m,n}表示匹配到m到n次。[:&lt;:&gt;:]查阅很多资料后依然查询不到，后来在自己的猜测和验证下，这两个字符的含义分别是从xx字符开始和以xx字符结束，其中开始或者结束的标志都是挨着xx字符的不是大写/小写字母、数字和_<br />
+这样上面三行sed指令就可以翻译为：</p>
+
+<pre><code>将行首替换为s/[:&lt;:&gt;:]
+将行尾替换为/g;
+</code></pre>
+
+<p>所以</p>
+
+<pre><code>AClass BClass
+TestClass TTestClass
+</code></pre>
+
+<p>执行完上面的三行命令后就变成了：</p>
+
+<pre><code>s/[:&lt;:&gt;:]/BClass/g;
+s/[:&lt;:&gt;:]/TTestClass/g;
+</code></pre>
+
+<p>执行到这里看出来了：这几行命令实际上最后生成的是一个新的sed命令，作用是将配置文件中的旧类名替换为新类名。个人认为这里的命令行嵌套是此脚本的精髓之处。</p>
+
+<p><code>第6行，第7行，第8行</code><br />
+find命令可以实现对于文件的查找。<br />
+find命令的基本组成：</p>
+
+<pre><code>find pathname -options [-print -exec -ok]
+
+参数
+        pathname: find命令所查找的目录路径。例如用.来表示当前目录，用/来表示系统根目录。
+        -print：     find命令将匹配的文件输出到标准输出。
+        -exec：    find命令对匹配的文件执行该参数所给出的shell命令。相应命令的形式为'command' {} \;，注意{ }和\；之间的空格。
+        -ok：       和-exec的作用相同，只不过以一种更为安全的模式来执行该参数所给出的shell命令，在执行每一个命令之前，都会给出提示，让用户来确定是否执行。
+
+    find命令选项
+
+        -name：按照文件名查找文件。
+        -perm：按照文件权限来查找文件。
+        -prune：使用这一选项可以使find命令不在当前指定的目录中查找，如果同时使用-depth选项，那么-prune将被find命令忽略。
+        -user： 按照文件属主来查找文件。
+        -group：按照文件所属的组来查找文件。
+
+        -mtime -n +n：按照文件的更改时间来查找文件， - n表示文件更改时间距现在n天以内，+n表示文件更改时间距现在n天以前。Find命令还有-atime和-ctime选项，但它们都和-mtime选项。
+
+        -nogroup：查找无有效所属组的文件，即该文件所属的组在/etc/groups中不存在。
+        -nouser：查找无有效属主的文件，即该文件的属主在/etc/passwd中不存在。
+
+        -newer file1 ! file2：查找更改时间比文件file1新但比文件file2旧的文件
+        -type 查找某一类型的文件
+                b - 块设备文件。
+                d - 目录。
+                c - 字符设备文件。
+                p - 管道文件。
+                l - 符号链接文件。
+                f - 普通文件
+</code></pre>
+
+<p>sed -i表示对操作文件的原地修改，sed -i .xxx是可以在原地修改前对操作的文件进行备份，备份后的文件名是原文件名.xxx。<br />
+所以，这几行命令的意思是：找到当前目录下后缀名为pbxproj,h,m,xib的文件，对于每个找到的文件备份为后缀名为.bak的备份文件，然后再执行sed_cm的命令，这样所有上述格式文件中的旧类名就已经被替换成了新类名</p>
+
+<p><code>第11行，第20行</code><br />
+读取文件分为两步：</p>
+
+<pre><code>1.将文件的内容通过重定向(
+</code></pre>
+
+<p><code>第12行，第13行</code><br />
+这里的|是管道命令的操作符，&rdquo;|&ldquo;只能处理经由前面一个指令传出的正确输出信息，对错误信息信息没有直接处理能力。然后，传递给下一个命令，作为标准的输入.<br />
+管理命令的输出说明：</p>
+
+<pre><code>指令1 | 指令2 | 指令3
+</code></pre>
+
+<p>【指令1】正确输出，作为【指令2】的输入，然后【指令2】的输出作为【指令3】的输入 ，【指令3】输出就会直接显示在屏幕上面了。<br />
+通过管道之后【指令1】和【指令2】的正确输出不显示在屏幕上面。<br />
+所以这两行的意思就非常明显了，读取rename_classes.txt文件中的旧类名最为class_from，新类名作为class_to</p>
+
+<p><code>第14行</code><br />
+在当前目录下查找class_from.h或者.m的文件，不包括.bak的备份文件，也不包括class_from的文件夹目录</p>
+
+<p><code>第15行,第19行</code></p>
+
+<pre><code>while语句
+语法：
+while 命令/条件
+do
+语句
+done
+
+机制：如果while后的命令执行成功，或条件真，则执行do和done之间的语句，执行完成后，再次判断while后的命令和条件；如果while后的命令执行失败，或条件为假，循环结束
+</code></pre>
+
+<p><code>第16行</code><br />
+<code>\(\)</code>用于匹配文本中的某个子串。<br />
+在sed中，使用<code>\(\)</code>对匹配的内容进行分组，使用\N的方式进行引用。示例</p>
+
+<pre><code>echo &quot;Three One Two&quot; | sed 's|\(\w\+\) \(\w\+\) \(\w\+\)|\2 \3 \1|'
+One Two Three
+我们输出了Three，One，Two三个单词，在sed的替换规则中，使用空格分隔了三小段正则表达式\(\w\+\)来匹配每一个单词，后面使用\1，，\2，\3分别引用它们的值。
+</code></pre>
+
+<p>所以这里的意思是将XX旧类名YY.h替换成XX新类名YY.h</p>
+
+<p><code>第17行，第18行</code><br />
+打印出来改名前的文件路径和改名后的文件路径，将旧的文件名替换为新的文件名</p>
+
+<h1 id="代码改进">代码改进</h1>
+
+<p>读懂了源码之后，就可以修改满足自己的需求了。 目前这个脚本无法满足需要的主要是两个点：<br />
+1.备份文件其实没必要生成<br />
+2.支持对于旧类名的前缀匹配替换</p>
+
+<p>修改方式：<br />
+1.第8行<code>-exec sed -i.bak &quot;${sed_cmd}&quot; {} +</code>改为<code>-exec sed -i &quot;&quot; &quot;${sed_cmd}&quot; {} +</code>
+，</p>
+
+<pre><code>-i extension
+             Edit files in-place, saving backups with the specified extension.
+             If a zero-length extension is given, no backup will be saved.  It
+             is not recommended to give a zero-length extension when in-place
+             editing files, as you risk corruption or partial content in situ-
+             ations where disk space is exhausted, etc.
+
+要点：
+* 用 -i 命令将替换结果写入文件
+* -i 之后的&quot;&quot;表示不生成备份文件，解决报错问题
+</code></pre>
+
+<p>2.将原来脚本中的<code>[:&gt;:]</code>都去掉就实现了前缀匹配</p>
+
+<p>作者：东野浪子<br />
+链接：<a href="http://www.jianshu.com/p/41dff888e330">http://www.jianshu.com/p/41dff888e330</a><br />
+來源：简书<br />
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

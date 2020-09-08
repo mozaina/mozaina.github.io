@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linux运维常用shell脚本之用户管理实例 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linux运维常用shell脚本之用户管理实例 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linux运维常用shell脚本之用户管理实例">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linux%E8%BF%90%E7%BB%B4%E5%B8%B8%E7%94%A8shell%E8%84%9A%E6%9C%AC%E4%B9%8B%E7%94%A8%E6%88%B7%E7%AE%A1%E7%90%86%E5%AE%9E%E4%BE%8B/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linux运维常用shell脚本之用户管理实例</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<hr />
+
+<h1 id="1-用shell脚本批量建立linux用户">1、用shell脚本批量建立Linux用户</h1>
+
+<p>实现要求：创建用户student1到student50,指定组为student组！而且每个用户需要设定一个不同的密码！</p>
+
+<pre><code>#!/bin/bash
+for i in `seq 1 50`
+do
+    useradd -G student student$i ; 
+    echo student$i | passwd student$i --stdin;
+done
+</code></pre>
+
+<p>【脚本实现如下：说明：Linux下 Passwd有参数 &ndash;stdin This option is used to indicate that
+passwd should read the new password from standard input, which can be a pipe.
+所以linux下自动改变用户密码的办法就是: Echo 密码 |passwd –stdin
+用户名】&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-设置相同的密码&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p>
+
+<pre><code>#!/bin/bash
+password=&quot;123456&quot;
+for USER in user1 user2 user3
+do
+     useradd -m $USER
+     echo -e &quot;${password}\n${password}&quot; | passwd $USER
+done
+</code></pre>
+
+<p>【说明：<br />
+echo -n 不换行输出：<br />
+$echo -n &ldquo;123&rdquo;<br />
+$echo &ldquo;456&rdquo;<br />
+最终输出 123456<br />
+而不是<br />
+123<br />
+456<br />
+echo -e 处理特殊字符：<br />
+\n 换行且光标移至行首 】<br />
+ok,就这么一个简单的脚本，就可以再系统里批量生成账号了。而且密码跟账号的名字一样。<br />
+这就是for do done语句用法。</p>
+
+<h1 id="2-批量创建用户">2、批量创建用户</h1>
+
+<pre><code>#!/bin/bash
+DATE=$(date +%F_%T)
+USER_FILE=user.txt
+echo_color(){
+    if [ $1 == &quot;green&quot; ]; then
+        echo -e &quot;\033[32;40m$2\033[0m&quot;
+    elif [ $1 == &quot;red&quot; ]; then
+        echo -e &quot;\033[31;40m$2\033[0m&quot;
+    fi
+}
+# 如果用户文件存在并且大小大于0就备份
+if [ -s $USER_FILE ]; then
+    mv $USER_FILE ${USER_FILE}-${DATE}.bak
+    echo_color green &quot;$USER_FILE exist, rename ${USER_FILE}-${DATE}.bak&quot;
+fi
+echo -e &quot;User\tPassword&quot; &gt;&gt; $USER_FILE
+echo &quot;----------------&quot; &gt;&gt; $USER_FILE
+for USER in user{1..10}; do
+    if ! id $USER &amp;&gt;/dev/null; then
+        PASS=$(echo $RANDOM |md5sum |cut -c 1-8)
+        useradd $USER
+        echo $PASS |passwd --stdin $USER &amp;&gt;/dev/null
+        echo -e &quot;$USER\t$PASS&quot; &gt;&gt; $USER_FILE
+        echo &quot;$USER User create successful.&quot;
+    else
+        echo_color red &quot;$USER User already exists!&quot;
+    fi
+done
+</code></pre>
+
+<h1 id="3-批量添加组用户">3．批量添加组用户</h1>
+
+<p>添加一个新组为class1，然后添加属于这个组的30个用户，用户名的形式为stdxx，其中xx从01到30<br />
+参考答案：</p>
+
+<pre><code>#!/bin/sh 
+i=1 
+groupadd class1 
+while [ $i -le 30 ] 
+do 
+if [ $i -le 9 ] ;then 
+USERNAME=stu0${i} 
+else
+USERNAME=stu${i} 
+fi 
+useradd $USERNAME 
+mkdir /home/$USERNAME 
+chown -R $USERNAME /home/$USERNAME 
+chgrp -R class1 /home/$USERNAME 
+i=$(($i+1)) 
+done
+</code></pre>
+
+<h1 id="4-批量删除用户">4．批量删除用户</h1>
+
+<p>实现自动删除50个账号的功能。账号名为stud1至stud50。<br />
+参考脚本：</p>
+
+<pre><code>#!/bin/sh 
+i=1 
+while [ $i -le 50 ] 
+do 
+userdel -r stud${i} 
+i=$(($i+1 )) 
+done 
+</code></pre>
+
+<h1 id="5-批量修改用户密码">5.批量修改用户密码</h1>
+
+<p>旧密码SSH主机信息old_info文件：</p>
+
+<h1 id="ip-user-passwd-port">ip user passwd port</h1>
+
+<p>192.168.18.217 root 123456 22<br />
+192.168.18.218 root 123456 22</p>
+
+<p>修改密码脚本：</p>
+
+<pre><code>#!/bin/bash
+OLD_INFO=old_info
+NEW_INFO=new_info
+for IP in $(awk '/^[^#]/{print $1}' $OLD_INFO); do
+    USER=$(awk -v I=$IP 'I==$1{print $2}' $OLD_INFO)
+    PASS=$(awk -v I=$IP 'I==$1{print $3}' $OLD_INFO)
+    PORT=$(awk -v I=$IP 'I==$1{print $4}' $OLD_INFO)
+    NEW_PASS=$(mkpasswd -l 8)
+    echo &quot;$IP   $USER   $NEW_PASS   $PORT&quot; &gt;&gt; $NEW_INFO
+    expect -c &quot;
+    spawn ssh -p$PORT $USER@$IP
+    set timeout 2
+    expect {
+        \&quot;(yes/no)\&quot; {send \&quot;yes\r\&quot;;exp_continue}
+        \&quot;password:\&quot; {send \&quot;$PASS\r\&quot;;exp_continue}
+        \&quot;$USER@*\&quot; {send \&quot;echo \'$NEW_PASS\' |passwd --stdin $USER\r exit\r\&quot;;exp_continue}
+    }&quot;
+done 
+</code></pre>
+
+<p>生成新密码new_info文件：</p>
+
+<p>192.168.18.217 root n8wX3mU% 22<br />
+192.168.18.218 root c87;ZnnL 22</p>
+
+<p>作为一个系统管理员，可能要经常的为机器添加用户，可能是在一台机器上添加很多用户，也有可能是在很多机器上要添加同一个用户。</p>
+
+<p>基本上，批量添加用户有两种方式，一是用useradd + passwd命令配合脚本来添加，二是用newusers+chpasswd来添加。</p>
+
+<p>第一个方法合适用来在不同的机器上添加不同的用户，或者在同一台机器上添加大量的规则命名的用户。第二个方法可用于在同一台机器上添加大量的用户名单，如将A机上的用户全部添加到B机上。</p>
+
+<p><strong>方法一：useradd + passwd命令配合脚本来添加</strong></p>
+
+<p>其中users.list文件内容如下：</p>
+
+<p>johnson<br />
+lily<br />
+kelly</p>
+
+<p>执行结果如下图所示：</p>
+
+<p>由脚本知，用户的初始密码被设为 <strong>用户名+123</strong> ，大家可以按需修改使用。</p>
+
+<p>方法二、使用while语句</p>
+
+<p>#!/bin/bash<br />
+user_info=/root/adduser.txt<br />
+useradd=/usr/sbin/useradd<br />
+passwd=/usr/bin/passwd<br />
+cut=/bin/cut<br />
+while read lines<br />
+do<br />
+username=<code>echo $lines | $cut -f1 -d' '</code><br />
+password=<code>echo $lines | $cut -f2 -d' '</code><br />
+$useradd $username<br />
+if [ $? -ne 0 ];then<br />
+echo &ldquo;$username cunzai,bunengxiugaimima&rdquo;<br />
+else<br />
+echo $password | $passwd<br />
+fi<br />
+done &lt; $user_info<br />
+其中adduser.txt存的文件为</p>
+
+<p>username001 password001<br />
+username002 password002<br />
+username003 password003<br />
+username004 password004</p>
+
+<p><strong>方法三、newusers+chpasswd批量添加用户</strong></p>
+
+<p>1、首先我们创建用户文件和密码文件；</p>
+
+<p>我们要创建包含新用户的文件userfile.txt ；另一个是为新添加的用户设置密码的userpwdfile.txt；</p>
+
+<p><code>[root@localhost ~]# touch userfile.txt  
+[root@localhost ~]# touch userpwdfile.txt</code></p>
+
+<p>然后用文本编辑器打开文件userfile.txt，添加如下内容；</p>
+
+<p><code>win00:x:520:520::/home/win00:/sbin/nologin  
+win01:x:521:521::/home/win01:/sbin/nologin  
+win02:x:522:522::/home/win02:/sbin/nologin  
+win03:x:523:523::/home/win03:/sbin/nologin  
+win04:x:524:524::/home/win04:/sbin/nologin  
+win05:x:525:525::/home/win05:/sbin/nologin  
+win06:x:526:526::/home/win06:/sbin/nologin  
+win07:x:527:527::/home/win07:/sbin/nologin  
+win08:x:528:528::/home/win08:/sbin/nologin  
+win09:x:529:529::/home/win09:/sbin/nologin</code></p>
+
+<p><strong>userfile.txt 文件内容格式和 /etc/passwd 的格式是一样的，必须严格按照/etc/passwd 的格式来书写</strong>
+；上面所添加的用户都不能登录系统，但完全能用于ftp登录，但您得在相应ftp服务器的配置文件中打开让本地用户有读写权限；如果您想让上面的部份用户可以登录系统，可以把SHELL类似改一改，比如改成/bin/bash
+；</p>
+
+<p>我们再来书写新增用户的密码文件userpwdfile.txt内容； <strong>这个文件的内容中的用户名要与
+userfile.txt用户名相同且严格按照“用户名:密码”的格式来写，一个用户一行</strong>
+；也就是说我们先是添加了win00到win09的用户，现在要为这些用户更新密码；比如下面的；</p>
+
+<p><code>win00:123456  
+win01:654321  
+win02:123321  
+win03:qweewq  
+win04:google  
+win05:adadwc  
+win06:wsscee  
+win07:xxec32  
+win08:543wew  
+win09:3ce3wf</code></p>
+
+<p>2、用newusers批量添加用户，此时用户是没有密码的</p>
+
+<p><code>[root@localhost ~]# newusers userfile.txt</code></p>
+
+<p>2、执行命令/usr/sbin/pwunconv，将/etc/shadow产生的shadow密码解码，然后回写到/etc/passwd中，
+并将/etc/shadow的shadow密码栏删掉。这是为了方便下一步的密码转换工作，即先取消shadow password功能，关闭影子文件。</p>
+
+<p><code>[root@localhost ~]</code># <code>pwunconv</code></p>
+
+<p><code>3、 用chpasswd批量修改密码  
+[root@localhost ~]# chpasswd &lt; userpwdfile.txt</code></p>
+
+<p>4、最后不要忘了恢复影子文件，保证安全，您可以通过下面的命令来映射到 /etc/shadow文件名</p>
+
+<p><code>[root@localhost ~]# pwconv</code></p>
+
+<h1 id="6-批量权限控制脚本">6、批量权限控制脚本</h1>
+
+<p>设计一个Shell程序，在/userdata目录下建立50个目录，即user1～user50，并设置每个目录的权限，其中其他用户的权限为：读；文件所有者的权限为：读、写、执行；文件所有者所在组的权限为：读、执行。<br />
+如下：</p>
+
+<pre><code>#!/bin/sh 
+i=1 
+while [ i -le 50 ] 
+do 
+    if [ -d /userdata ];then 
+        mkdir -p -m 754 /userdata/user$i   加上-m 754 就不用写下面那一句了  -p 是递归建立目录 
+        #chmod 754 /userdata/user$i 
+        echo &quot;user$i&quot; 
+        let &quot;i = i + 1&quot; （或i=$(($i+1)) 
+    else 
+        mkdir /userdata 
+        mkdir -p -m /userdata/user$i 
+        #chmod 754 /userdata/user$i 
+        echo &quot;user$i&quot; 
+        let &quot;i = i + 1&quot; （或i=$（（$i＋1）） 
+    fi 
+done
+</code></pre>
+
+<p>#</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

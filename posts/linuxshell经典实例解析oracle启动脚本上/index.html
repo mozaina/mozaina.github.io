@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>LinuxShell经典实例解析Oracle启动脚本上 | 开发者问答集锦</title>
+    <meta property="og:title" content="LinuxShell经典实例解析Oracle启动脚本上 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="LinuxShell经典实例解析Oracle启动脚本上">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E7%BB%8F%E5%85%B8%E5%AE%9E%E4%BE%8B%E8%A7%A3%E6%9E%90oracle%E5%90%AF%E5%8A%A8%E8%84%9A%E6%9C%AC%E4%B8%8A/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">LinuxShell经典实例解析Oracle启动脚本上</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>该篇博客作为对之前Linux
+Shell常用技巧和高级技巧系列博客的总结，将以Oracle数据库服务器启动脚本为例，逐行进行解释和说明，以帮助我们能够更好的学习和理解Shell脚本的惯用技巧和强大之处。<br />
+Oracle的启动脚本从功能上讲主要分为两个部分，第一部分是初始化各种环境变量，以确认当前Oracle服务器的版本，从而进一步确定启动当前服务器的步骤和具体需要使用的各种Oracle工具，第二部分是基于之前判断的结果，读取当前服务器的各种配置信息，之后再通过Oracle提供的Shell命令完成数据库的启动工作。</p>
+
+<p>LOGMSG=&ldquo;logger -puser.alert -s &rdquo;<br />
+<em>#1. 信号捕捉，当脚本捕捉到信号SIGHUP(1)、SIGINT(2)和SIGQUIT(3)时，执行exit命令退出脚本。</em><br />
+trap &lsquo;exit&rsquo; 1 2 3<br />
+_#2. 如果当前Shell环境中指定ORACLE<em>TRACE变量的值为T，则通过执行set -x命令来启动脚本的跟踪功能。</em><br />
+case $ORACLE_TRACE in<br />
+T) set -x ;;<br />
+esac<br />
+SAVE_PATH=/bin:/usr/bin:/etc:${PATH} ; export PATH<br />
+SAVE_LLP=$LD_LIBRARY_PATH<br />
+_#3.
+$1，即当前脚本的第一个参数，通过查看init.d目录下调用该脚本的Shell脚本oracle，可以获悉该参数的值为$ORACLE<em>HOME环境变量的值。</em><br />
+ORACLE_HOME_LISTNER=$1<br />
+<em>#4. 如果该值不存在，则给出错误提示信息，以及该脚本的合法使用方式。</em><br />
+if [ ! $ORACLE_HOME_LISTNER ] ; then<br />
+echo &ldquo;ORACLE_HOME_LISTNER is not SET, unable to auto-start Oracle Net
+Listener&rdquo;<br />
+echo &ldquo;Usage: $0 ORACLE_HOME&rdquo;<br />
+else<br />
+LOG=$ORACLE_HOME_LISTNER/listener.log<br />
+#5. 导出ORACLE_HOME环境变量的值，由于使用了export命令，该变量的值在子Shell中将同样有效。<br />
+export ORACLE_HOME=$ORACLE_HOME_LISTNER<br />
+_#6.
+判断$ORACLE_HOME<em>LISTNER/bin/tnslsnr文件是否有可执行权限，如果为真，则通过该命令启动Oracle监听，需要注意的是，由于在该行命令的末尾有一个
+&amp;符号，这表示该命令将在后台执行。<br />
+#7. 在启动监听时，将标准输出以追加的方式重定向到$LOG变量指向的文件，同时也将标准错误输出也执行到该文件。</em><br />
+if [ -x $ORACLE_HOME_LISTNER/bin/tnslsnr ] ; then<br />
+echo &ldquo;$0: Starting Oracle Net Listener&rdquo; &gt;&gt; $LOG 2&gt;&amp;1<br />
+$ORACLE_HOME_LISTNER/bin/lsnrctl start &gt;&gt; $LOG 2&gt;&amp;1 &amp;<br />
+_#8. 通过提取lsnrctl version的返回信息获取当前Oracle服务器的版本，该命令的返回结果为：</p>
+
+<h1 id="lsnrctl-for-linux-version-11-2-0-1-0-production-on-14-dec-2011-17-23-12">LSNRCTL for Linux: Version 11.2.0.1.0 - Production on 14-DEC-2011 17:23:12</h1>
+
+<h1 id="copyright-c-1991-2009-oracle-all-rights-reserved">Copyright &copy; 1991, 2009, Oracle. All rights reserved.</h1>
+
+<h1 id="connecting-to-description-address-protocol-ipc-key-extproc">Connecting to (DESCRIPTION=(ADDRESS=(PROTOCOL=IPC)(KEY=EXTPROC)))</h1>
+
+<h1 id="tnslsnr-for-linux-version-11-2-0-1-0-production">TNSLSNR for Linux: Version 11.2.0.1.0 - Production</h1>
+
+<h1 id="tns-for-linux-version-11-2-0-1-0-production">TNS for Linux: Version 11.2.0.1.0 - Production</h1>
+
+<h1 id="unix-domain-socket-ipc-nt-protocol-adaptor-for-linux-version-11-2-0-1-0">Unix Domain Socket IPC NT Protocol Adaptor for Linux: Version 11.2.0.1.0 -</h1>
+
+<p>Production</p>
+
+<h1 id="oracle-bequeath-nt-protocol-adapter-for-linux-version-11-2-0-1-0">Oracle Bequeath NT Protocol Adapter for Linux: Version 11.2.0.1.0 -</h1>
+
+<p>Production</p>
+
+<h1 id="tcp-ip-nt-protocol-adapter-for-linux-version-11-2-0-1-0-production">TCP /IP NT Protocol Adapter for Linux: Version 11.2.0.1.0 - Production,,</h1>
+
+<h1 id="the-command-completed-successfully">The command completed successfully</h1>
+
+<p>#9. 在通过grep命令对以上结果进行过滤，只输出包含&rdquo;LSNRCTL for&rdquo;的行，其结果为：</p>
+
+<h1 id="lsnrctl-for-linux-version-11-2-0-1-0-production-on-14-dec-2011-17-25-21">LSNRCTL for Linux: Version 11.2.0.1.0 - Production on 14-DEC-2011 17:25:21</h1>
+
+<p>#10.通过cut命令对以上结果进行拆分，分隔符为-d选项指定的空格字符，-f5表示将输出拆分后的第五个字段，其结果为：</p>
+
+<h1 id="11-2-0-1-0">11.2.0.1.0</h1>
+
+<p>#11.通过cut命令对以上结果进行二次拆分，但是这次的分隔符改为点(.)，本次获取的字段为第一个字段，即11。 _<br />
+VER10LIST=<code>$ORACLE_HOME_LISTNER/bin/lsnrctl version | grep &quot;LSNRCTL for &quot; |
+cut -d' ' -f5 | cut -d'.' -f1</code><br />
+export VER10LIST<br />
+else<br />
+echo &ldquo;Failed to auto-start Oracle Net Listener using
+$ORACLE_HOME_LISTNER/bin/tnslsnr&rdquo;<br />
+fi<br />
+fi</p>
+
+<p>ORATAB=/etc/oratab<br />
+<em>#12.我想此处代码的本意应为判断/etc/oratab文件是否以文件的形式存在，然而下面的写法将会使if判断永远为真，因此应改为if [ ! -f
+$ORATAB ];
+then。-f用于判断其后的变量是否是为普通文件。如果该文件不存在，脚本将直接退出，退出值为1，表示失败。需要说明的是，在Linux中，通用的规则是返回0表示执行成功。</em><br />
+if [ ! $ORATAB ] ; then<br />
+echo &ldquo;$ORATAB not found&rdquo;<br />
+exit 1;<br />
+fi</p>
+
+<p><em>#13. checkversionmismatch是该脚本的自定义函数，用于判断客户端工具sqlplus和Oracle服务器之间的版本是否匹配。</em><br />
+checkversionmismatch() {<br />
+if [ $VER10LIST ] ; then<br />
+_#14. 通过sqlplus -V获取sqlplus的版本，再该通过grep命令过滤，仅输出包含Release的行，其结果为：</p>
+
+<h1 id="sql-plus-release-11-2-0-1-0-production">SQL*Plus: Release 11.2.0.1.0 Production</h1>
+
+<p>#15. 基于以上结果，再通过两次cut命令的拆分，最后输出：11。这里cut的作用已经在上面的注释中给出。_<br />
+VER10INST=<code>sqlplus -V | grep &quot;Release &quot; | cut -d' ' -f3 | cut -d'.' -f1</code><br />
+<em>#16. 如果服务器的版本($VER10LIST)小于sqlplus的版本(VER10INST)，将输出不匹配的提示信息。这里-
+lt用于比较数值型变量，表示A 小于 B。</em><br />
+if [ $VER10LIST -lt $VER10INST ] ; then<br />
+$LOGMSG &ldquo;Listener version $VER10LIST NOT supported with Database version
+$VER10INST&rdquo;<br />
+$LOGMSG &ldquo;Restart Oracle Net Listener using an alternate ORACLE_HOME_LISTNER:&rdquo;<br />
+$LOGMSG &ldquo;lsnrctl start&rdquo;<br />
+fi<br />
+fi<br />
+}</p>
+
+<p>startinst() {<br />
+export ORACLE_SID<br />
+<em>#17. 将oracle的bin目录放置到PATH环境变量中，已便于之后的直接调用。</em><br />
+PATH=$ORACLE_HOME/bin:${SAVE_PATH} ; export PATH<br />
+_#18.
+LD_LIBRARY<em>PATH指出so文件所在的路径，这里将oracle所依赖的lib的路径赋值给该变量，以便oracle执行程序在启动时可以找到他们。</em><br />
+LD_LIBRARY_PATH=${ORACLE_HOME}/lib:${SAVE_LLP} ; export LD_LIBRARY_PATH<br />
+<em>#19. 下面的变量是oracle启动时所需要的服务器实例初始化文件。</em><br />
+PFILE=${ORACLE_HOME}/dbs/init${ORACLE_SID}.ora<br />
+SPFILE=${ORACLE_HOME}/dbs/spfile${ORACLE_SID}.ora<br />
+SPFILE1=${ORACLE_HOME}/dbs/spfile.ora</p>
+
+<p>echo &ldquo;&rdquo;<br />
+echo &ldquo;$0: Starting up database \&ldquo;$ORACLE_SID\&ldquo;&rdquo;<br />
+date<br />
+echo &ldquo;&rdquo;<br />
+checkversionmismatch</p>
+
+<p>_#20. 下面的代码逻辑用于区分当前服务器的版本是否为V6或V7，因为后面的启动逻辑需要为这两个版本做特殊处理。<br />
+#21. 首先判断$ORACLE<em>HOME/bin/sqldba是否以普通文件的形式存在，如果存在，将通过sqldba命令获取版本信息。</em><br />
+VERSION=undef<br />
+if [ -f $ORACLE_HOME/bin/sqldba ] ; then<br />
+SQLDBA=sqldba<br />
+VERSION=<code>$ORACLE_HOME/bin/sqldba command=exit | awk '  
+/SQL\\*DBA: (Release|Version)/ {split($3, V, &quot;.&quot;) ;  
+print V[1]}'</code><br />
+<em>#22. 如果版本为6，则什么也不用做，否则将VERSION变量的值统一为internal。</em><br />
+case $VERSION in<br />
+&ldquo;6&rdquo;) ;;<br />
+*) VERSION=&ldquo;internal&rdquo;<br />
+esac<br />
+else<br />
+_#23.
+再次判断$ORACLE<em>HOME/bin/svrmgrl是否以普通文件的形式存在，如果存在，SQLDBA的命令将为svrmgrl，版本为internal，否则SQLDBA命令将指向sqlplus。需要说明的是，不管是这里的svrmgrl还是上面的sqldba，都是为了向以前版本的兼容，才用SQLDBA来动态的表示他们，事实上，在我们后来的版本中，基本都是使用sqlplus。</em><br />
+if [ -f $ORACLE_HOME/bin/svrmgrl ] ; then<br />
+SQLDBA=svrmgrl<br />
+VERSION=&ldquo;internal&rdquo;<br />
+else<br />
+SQLDBA=&ldquo;sqlplus /nolog&rdquo;<br />
+fi<br />
+fi<br />
+_#24. 变量STATUS为1时表示正常值，其它值均表示oracle的进程已经拉起。<br />
+#25.
+先是判断$ORACLE_HOME/dbs/sgadef${ORACLE_SID}.dbf和$ORACLE_HOME/dbs/sgadef${ORACLE_SID}.ora这两个文件是否已经存在。其中${ORACLE_SID}表示变量，shell在执行时会使用该变量的实际值予以替换，这里之所有用花括号括起${ORACLE_SID}，而不是直接使用$ORACLE_SID，是因为如果这样使用的话，shell脚本会将$ORACLE<em>SID.ora视为一个变量。</em><br />
+STATUS=1<br />
+if [ -f $ORACLE_HOME/dbs/sgadef${ORACLE_SID}.dbf ] ; then<br />
+STATUS=&ldquo;-1&rdquo;<br />
+fi<br />
+if [ -f $ORACLE_HOME/dbs/sgadef${ORACLE_SID}.ora ] ; then<br />
+STATUS=&ldquo;-1&rdquo;<br />
+fi<br />
+<em>#26.
+pmon是oracle的进程监控进程，是oracle服务器的核心进程之一。这里通过ps命令输出当前linux服务器所有进程的列表，再通过grep命令进行过滤，其中-
+w选择表示全词匹配，最后再通过一个grep命令过滤掉上一个grep命令，这里的-v表示取反，即不包含grep的行。</em><br />
+pmon=<code>ps -ef | grep -w &quot;ora_pmon_$ORACLE_SID&quot; | grep -v grep</code><br />
+if [ &ldquo;$pmon&rdquo; != &ldquo;&rdquo; ] ; then<br />
+STATUS=&ldquo;-1&rdquo;<br />
+$LOGMSG &ldquo;Warning: ${INST} \&ldquo;${ORACLE_SID}\&rdquo; already started.&rdquo;<br />
+fi<br />
+<em>#27. 这里是判断数值型变量$STATUS是否为-1，即进程已经启动。</em><br />
+if [ $STATUS -eq -1 ] ; then<br />
+$LOGMSG &ldquo;Warning: ${INST} \&ldquo;${ORACLE_SID}\&rdquo; possibly left running when system
+went down (system crash?).&rdquo;<br />
+$LOGMSG &ldquo;Action: Notify Database Administrator.&rdquo;<br />
+<em>#28. 既然oracle服务器实例已经启动，这里就需要根据oracle的版本，用不同的工具和关闭语法shutdown已经启动的实例。</em><br />
+case $VERSION in<br />
+&ldquo;6&rdquo;) sqldba &ldquo;command=shutdown abort&rdquo; ;;<br />
+&ldquo;internal&rdquo;) $SQLDBA $args &lt;<br />
+connect internal<br />
+shutdown abort<br />
+EOF<br />
+;;<br />
+*) $SQLDBA $args &lt;<br />
+connect / as sysdba<br />
+shutdown abort<br />
+quit<br />
+EOF<br />
+;;<br />
+esac<br />
+<em>#29. $?是shell脚本的内置变量，用于判断上面关闭oracle服务器实例的操作是否成功，0表示成功，其他值均表示失败。</em><br />
+if [ $? -eq 0 ] ; then<br />
+STATUS=1<br />
+else<br />
+$LOGMSG &ldquo;Error: ${INST} \&ldquo;${ORACLE_SID}\&rdquo; NOT started.&rdquo;<br />
+fi<br />
+fi<br />
+if [ $STATUS -eq 1 ] ; then<br />
+<em>#30.
+判断$SPFILE、$SPFILE1或$PFILE是否存在，-e表示其后面的变量表示的文件是否存在，-o表示这几个条件时间的或关系，即C语言中的||。<br />
+#31.
+根本oracle的版本，用不同的oracle工具启动oracle服务器实例，其中不同的工具所使用的语法也不同，这里我们主要需要关注的是sqlplus。<br />
+#32. 在通过oracle工具启动服务器时，这里使用了shell中的HERE
+DOCUMENT，这样可以将一批命令一次性传递给sqlplus这样的oracle命令。</em><br />
+if [ -e $SPFILE -o -e $SPFILE1 -o -e $PFILE ] ; then<br />
+case $VERSION in<br />
+&ldquo;6&rdquo;) sqldba command=startup ;;<br />
+&ldquo;internal&rdquo;) $SQLDBA &lt;<br />
+connect internal<br />
+startup<br />
+EOF<br />
+;;<br />
+*) $SQLDBA &lt;<br />
+connect / as sysdba<br />
+startup<br />
+quit<br />
+EOF<br />
+;;<br />
+esac<br />
+<em>#33. 通过判断以上命令的返回值，来判断是否启动成功。</em><br />
+if [ $? -eq 0 ] ; then<br />
+echo &ldquo;&rdquo;<br />
+echo &ldquo;$0: ${INST} \&ldquo;${ORACLE_SID}\&rdquo; warm started.&rdquo;<br />
+else<br />
+$LOGMSG &ldquo;&rdquo;<br />
+$LOGMSG &ldquo;Error: ${INST} \&ldquo;${ORACLE_SID}\&rdquo; NOT started.&rdquo;<br />
+fi<br />
+else<br />
+$LOGMSG &ldquo;&rdquo;<br />
+$LOGMSG &ldquo;No init file found for ${INST} \&ldquo;${ORACLE_SID}\&ldquo;.&rdquo;<br />
+$LOGMSG &ldquo;Error: ${INST} \&ldquo;${ORACLE_SID}\&rdquo; NOT started.&rdquo;<br />
+fi<br />
+fi<br />
+}</p>
+
+<p><em>#34. 用于启动oracle的AMS实例的函数。</em><br />
+startasminst() {<br />
+export ORACLE_SID<br />
+<em>#34.
+$LINE的值在后面的调用中会给出，该值源自oratab文件的输出，其内容为：MyOrcl:/opt/oracle/product/OraHome:Y<br />
+#35. 这里使用awk命令提取第二个域字段，其中冒号(:)为各个域之间的分隔符，第二个变量($2)为当前实例的oracle主目录。</em><br />
+ORACLE_HOME=<code>echo $LINE | awk -F: '{print $2}' -</code><br />
+export ORACLE_HOME</p>
+
+<p>_#36. 判断$ORACLE<em>HOME/bin/crsctl是否有执行权限。</em><br />
+if [ ! -x $ORACLE_HOME/bin/crsctl ]; then<br />
+$LOGMSG &ldquo;$ORACLE_HOME/bin/crsctl not found when attempting to start&rdquo;<br />
+$LOGMSG &ldquo; ASM instance $ORACLE_SID.&rdquo;<br />
+else<br />
+_#37. 反复执行$ORACLE<em>HOME/bin/crsctl命令，直到其执行成功，或在执行15次失败后退出脚本。</em><br />
+COUNT=0<br />
+$ORACLE_HOME/bin/crsctl check css<br />
+RC=$?<br />
+<em>#38. 判断crsctl命令是否执行成功，如果不等于表示执行失败，则继续执行。</em><br />
+while [ &ldquo;$RC&rdquo; != &ldquo;0&rdquo; ]; do<br />
+<em>#39. 通过expr命令，将COUNT的变量值加一，这里也可以使用let命令，如((COUNT=COUNT+1))。</em><br />
+COUNT=<code>expr $COUNT + 1</code><br />
+if [ $COUNT = 15 ] ; then</p>
+
+<h1 id="15-tries-with-20-sec-interval-5-minutes-timeout">15 tries with 20 sec interval =&gt; 5 minutes timeout</h1>
+
+<p>$LOGMSG &ldquo;Timed out waiting to start ASM instance $ORACLE_SID&rdquo;<br />
+$LOGMSG &ldquo; CSS service is NOT available.&rdquo;<br />
+exit $COUNT<br />
+fi<br />
+$LOGMSG &ldquo;Waiting for Oracle CSS service to be available before starting &rdquo;<br />
+$LOGMSG &ldquo; ASM instance $ORACLE_SID. Wait $COUNT.&rdquo;<br />
+<em>#40. 每次执行之间都休眠20秒。</em><br />
+sleep 20<br />
+$ORACLE_HOME/bin/crsctl check css<br />
+RC=$?<br />
+done<br />
+fi<br />
+<em>#41. asm在启动成功后，调用startinst函数启动该实例。</em><br />
+startinst<br />
+}</p>
+
+<p>在这篇博客中，只是给出了oracle启动脚本中自定义函数的解释，在下一篇博客中将进入该脚本的主体部分，其中主体部分的代码将依赖于本篇博客中给出的函数。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

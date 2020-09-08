@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell中expect解决交互问题 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell中expect解决交互问题 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell中expect解决交互问题">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E4%B8%ADexpect%E8%A7%A3%E5%86%B3%E4%BA%A4%E4%BA%92%E9%97%AE%E9%A2%98/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell中expect解决交互问题</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>【Linux Shell脚本编程】expect解决脚本交互 + Shell的多进程处理<br />
+发布：TangLu2018-7-13 10:53分类： Shell 标签: bash shell</p>
+
+<p>如果在没有使用密钥认证的情况下，想通过SSH来传输文件给多个主机会面临交互的问题，这在脚本中是非常不友好的。要解决这个问题的话可以使用expect这个工具，它的功能就是提前把交互中需要的内容先写好，然后在脚本执行的时候自动输入。通常用这个工具解决秘钥分发的问题，之后有了秘钥就不需要再使用它了。</p>
+
+<p>1、使用yum安装expect</p>
+
+<p>1<br />
+yum -y expect</p>
+
+<p>2、编写一个使用expect解决ssh交互问题的案例</p>
+
+<p>01<br />
+vi expect.sh<br />
+02<br />
+#!/bin/expect<br />
+03<br />
+spawn ssh root@192.168.1.100 #让expect处理该会话，也就是说执行该命令后遇到的交互内容将由expect继续<br />
+04<br />
+#下面是提前输入了可能会遇到的交互的内容以及应答方式<br />
+05<br />
+expect {<br />
+06<br />
+“yes/no” { send “yes\r”; exp_continue } #遇到引号内的关键词就发送yes指令，<br />
+07<br />
+代表回车，后面的exp_continue表示没有遇到的话继续往下执行<br />
+08<br />
+“password” { send “centos\r” };<br />
+09<br />
+}<br />
+10<br />
+interact #让会话保留在对方那边。因为是ssh连接，所以要保持连接就要将会话停住而不能退出</p>
+
+<p>如果不需要保持交互的话可以写成这样的格式：</p>
+
+<p>01<br />
+#!/bin/expect<br />
+02<br />
+spawn ssh root@192.168.1.100<br />
+03<br />
+expect {<br />
+04<br />
+“yes/no” { send “yes\r”; exp_continue }<br />
+05<br />
+“password” { send “centos\r” };<br />
+06<br />
+}<br />
+07<br />
+expect “#” #这里的#其实就是登陆ssh后出现的那个提示符<br />
+08<br />
+send “useradd user1\r”<br />
+09<br />
+send “echo 123456 | password &ndash;stdin user1\r”<br />
+10<br />
+expect eof #结束expect</p>
+
+<p>3、还可以在expect中使用变量，格式如下</p>
+
+<p>01<br />
+#!/bin/expect<br />
+02<br />
+set ip 192.168.1.100<br />
+03<br />
+set user root<br />
+04</p>
+
+<p>05<br />
+spawn ssh  u s e r @ user@ user@ip #让expect处理该会话，引用了变量<br />
+06</p>
+
+<p>07<br />
+expect {<br />
+08<br />
+“yes/no” { send “yes\r”; exp_continue }<br />
+09<br />
+“password” { send “centos\r” };<br />
+10<br />
+}</p>
+
+<p>4、还可以使用位置变量进行传参，括号内是固定格式，不用做变动，0代表第一个参数，以此类推，</p>
+
+<p>01<br />
+#!/bin/expect<br />
+02<br />
+set ip [lindex $argv 0]<br />
+03<br />
+set user [lindex $argv 1]<br />
+04</p>
+
+<p>05<br />
+spawn ssh  u s e r @ user@ user@ip #让expect处理该会话，引用了变量<br />
+06</p>
+
+<p>07<br />
+expect {<br />
+08<br />
+“yes/no” { send “yes\r”; exp_continue }<br />
+09<br />
+“password” { send “centos\r” };<br />
+10<br />
+}</p>
+
+<p>5、最后使用expect执行脚本</p>
+
+<p>1<br />
+expect expect.sh</p>
+
+<p>示例：使用expect批量推送公钥</p>
+
+<p>可以看到该脚本在for循环中用到了{}&amp;这样的组合，这是使用多进程的方式在执行循环，然后使用wait等所有线程都执行完毕后进行最后的finish。使用多进程执行脚本时需要注意的是要结合命名管道（使用mkfifo命令创建命名管道）来控制进程的数量，否则执行大批量操作时会出错</p>
+
+<p>查看源码打印?<br />
+01<br />
+#!/usr/bin/bash<br />
+02</p>
+
+<blockquote>
+<p>ip.txt<br />
+ 03<br />
+ password=yourpassword<br />
+ 04</p>
+</blockquote>
+
+<p>05<br />
+rpm -q expect &amp;&gt;/dev/null<br />
+06<br />
+if [ $? -ne 0 ];then<br />
+07<br />
+yum -y install expect<br />
+08<br />
+fi<br />
+09</p>
+
+<p>10<br />
+if [ ! -f ~/.ssh/id_rsa ];then<br />
+11<br />
+ssh-keygen -P “” -f ~/.ssh/id_rsa<br />
+12<br />
+fi<br />
+13</p>
+
+<p>14<br />
+for i in {1…254}<br />
+15<br />
+do<br />
+16<br />
+{<br />
+17<br />
+ip=192.168.122.$i<br />
+18<br />
+ping -c1 -W1 $ip &amp;&gt;/dev/null<br />
+19<br />
+if [  ? − e q 0 ] ; t h e n 20 e c h o &ldquo; ? -eq 0 ];then 20 echo &ldquo;
+?−eq0];then20echo&rdquo;ip&rdquo; &gt;&gt; ip.txt<br />
+21<br />
+/usr/bin/expect &lt; 22<br />
+set timeout 10<br />
+23<br />
+spawn ssh-copy-id KaTeX parse error: Can&rsquo;t use function &lsquo;\r&rsquo; in math mode at
+position 59: …no&rdquo; { send &ldquo;yes\̲r̲&rdquo;; exp_continue…password\r&rdquo; }<br />
+27<br />
+}<br />
+28<br />
+expect eof<br />
+29<br />
+EOF<br />
+30<br />
+fi<br />
+31<br />
+}&amp;<br />
+32<br />
+done<br />
+33<br />
+wait<br />
+34<br />
+echo “finish…”</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

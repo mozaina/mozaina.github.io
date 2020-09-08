@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>CSAPPShellLab | 开发者问答集锦</title>
+    <meta property="og:title" content="CSAPPShellLab - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="CSAPPShellLab">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/csappshelllab/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">CSAPPShellLab</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="介绍">介绍</h3>
+
+<p>shell Lab的主要目的是为了让我们熟悉进程控制和信号。</p>
+
+<h3 id="实验准备">实验准备</h3>
+
+<p>下载shell Lab实验包：原实验包github链接，本文中撰写的tsh.c全部代码github链接</p>
+
+<p>【实验内容】<br />
+是对tsh.c中没有填写的函数进行填写，使得该shell能处理前后台运行程序、能够处理ctrl+z、ctrl+c等信号。<br />
+需要实现的函数主要有一下五个：</p>
+
+<pre><code>eval: 主要功能是解析cmdline，并且运行. [70 lines]
+builtin cmd: 辨识和解析出bulidin命令: quit, fg, bg, and jobs. [25lines]
+do bgfg: 实现bg和fg命令. [50 lines] 
+waitfg: 实现等待前台程序运行结束. [20 lines]
+sigchld handler: 响应SIGCHLD. 80 lines]
+sigint handler: 响应 SIGINT (ctrl-c) 信号. [15 lines] 
+sigtstp handler: 响应 SIGTSTP (ctrl-z) 幸好. [15 lines]
+</code></pre>
+
+<p>【实验结果的检验】<br />
+通过运行<code>./tshref</code>这个已经实现的shell将它的输出结果与我们自己实现的shell的结果进行比较</p>
+
+<p>【注意】<br />
+有必要阅读《深入理解计算机系统 第二版》第8章异常控制流的所有内容。对于以下内容有比较好的了解</p>
+
+<ul>
+<li><p>实验中重要的函数：</p>
+
+<p>void sigemptyset(sigset_t *mask);
+void Sigaddset(sigset_t *mask,int sign);
+void Sigprocmask(int how,sigset_t *mask,sigset_t *oldmask);
+pid_t Fork(void);
+void Execve(char *filename,char *argv[],char *envp[]);
+void Setpgid(pid_t pid,pid_t gpid);
+void Kill(pid_t pid,int sig);</p></li>
+
+<li><p>实验中最重要的eval()函数的原型可以在P503找到。</p></li>
+
+<li><p>实验中期望运用GDB来调试程序，然而当初次调试时发现里面并不包含符号表等为调试提供方便的内容。可以通过修改<code>makefile</code>来改变这一情况，修改<code>makefile</code>文件中的<code>CFLAGS</code>字段，添加<code>-g</code> 参数（ <strong>为函数编译时添加必要的调试信息</strong> ）。其中本来就存在的<code>-02</code>参数代表程序需要优化的级别，对于优化过的程序我们调试起来可能有些困惑，所以推荐移除，当然不移除问题不大。</p></li>
+</ul>
+
+<blockquote>
+<p>在linux 64位机器上执行<code>.tshref</code>程序会有如下可能输出<br />
+ unix &gt; ./tshref: No such file or directory<br />
+ file ./tshref文件可以看到是32位程序<br />
+ 通过<code>sudo apt-get install ia32-libs</code>解决该问题</p>
+</blockquote>
+
+<hr />
+
+<h3 id="实验">实验</h3>
+
+<p>tsh.c的完整代码在github tsh.c链接</p>
+
+<blockquote>
+<p>下面实现用用到的系统函数首字母为大写如Fock（），是我自己定义的错误分装函数，提高代码的简洁性。</p>
+</blockquote>
+
+<pre><code>/*error-handling wrapper funtion -by yzf*/
+void Sigemptyset(sigset_t *mask);
+void Sigaddset(sigset_t *mask,int sign);
+void Sigprocmask(int how,sigset_t *mask,sigset_t *oldmask);
+pid_t Fork(void);
+void Setpgid(pid_t pid,pid_t gpid);
+void Kill(pid_t pid,int sig);
+</code></pre>
+
+<h4 id="1-eval-函数">1. eval()函数</h4>
+
+<p>该函数的主要功能是对用户输入的参数进行解析并运行计算。如果用户输入内建的命令行（quit，bg，fg，jobs）那么立即执行。<br />
+否则，fork一个新的子进程并且将该任务在子进程的上下文中运行。如果该任务是前台任务那么需要等到它运行结束才返回。</p>
+
+<ol>
+<li>注意每个子进程必须用户自己独一无二的进程组id，通过在fork()之后的子进程中Setpgid(0,0)实现，这样当我们向前台程序发送ctrl+c 或ctrl+z命令时，才不会影响到后台程序。如果没有这一步，则所有的子进程与当前的tsh shell进程为同一个进程组，发送信号时，前后台的子进程均会收到。</li>
+<li>在fork()新进程前后要阻塞SIGCHLD信号，防止出现竞争（race）这种经典的同步错误，如果不阻塞会出现子进程先结束从jobs中删除，然后再执行到主进程addjob的竞争问题。相关解释和方法见CSAPP P519页。</li>
+</ol>
+
+<p>下面是eval（）函数的实现</p>
+
+<pre><code>void eval(char *cmdline)
+{
+    char *argv[MAXLINE];    /*argument list of execve()*/
+    char buf[MAXLINE];      /*hold modified commend line*/
+    int bg;                 /*should the job run in bg or fg?*/
+    pid_t pid;
+    sigset_t mask;          /*mask for signal*/
+
+    stpcpy(buf,cmdline);
+    bg = parseline(buf,argv);
+
+    if(argv[0]==NULL){
+        return;     /*ignore empty line*/
+    }
+
+    if(!builtin_cmd(argv)){                         /*not a build in cmd*/
+        Sigemptyset(&amp;mask);
+        Sigaddset(&amp;mask,SIGCHLD);
+        Sigprocmask(SIG_BLOCK,&amp;mask,NULL);           /*block the SIGCHLD signal*/
+
+        if((pid = Fork())==0)
+        {
+            Sigprocmask(SIG_UNBLOCK,&amp;mask,NULL);     /*unblock the SIGCHLD signal in child*/
+            Setpgid(0,0);                            /*puts the child in a new process group*/
+
+            if(execve(argv[0],argv,environ)&lt;0){
+                printf(&quot;%s: Command not found\n&quot;,argv[0]);
+                exit(0);
+            }
+        }
+
+        addjob(jobs, pid, bg?BG:FG,cmdline);        /*add job into jobs*/
+        Sigprocmask(SIG_UNBLOCK,&amp;mask,NULL);        /*unblock the SIGCHLD signal in parent*/
+
+        bg ? printf(&quot;[%d] (%d) %s&quot;, pid2jid(pid), pid,cmdline):waitfg(pid); /*do in background or foreground*/
+    }
+    return;
+}
+</code></pre>
+
+<h4 id="2-builtin-cmd">2. builtin_cmd</h4>
+
+<p>该函数主要用来判断cmd是否是内建指令，如果是则立即执行，不是则返回。对于单独的<code>&amp;</code>指令直接无视。</p>
+
+<pre><code>int builtin_cmd(char **argv)
+{
+    if(!strcmp(argv[0],&quot;quit&quot;))
+        exit(0);
+    if(!strcmp(argv[0],&quot;&amp;&quot;))
+        return 1;
+    if(!strcmp(argv[0],&quot;bg&quot;)||!strcmp(argv[0],&quot;fg&quot;){
+        do_bgfg(argv);
+        return 1;
+    }
+    if(!strcmp(argv[0],&quot;jobs&quot;)){
+        listjobs(jobs);
+        return 1;
+    }
+
+    return 0;     /* not a builtin command */
+}
+</code></pre>
+
+<h4 id="3-do-bgfg函数">3.do_bgfg函数</h4>
+
+<p>主要执行bg和fg指令功能<br />
+1. 函数中输出的相关提示指令需要trace09.txt 和trace10.txt在./tshref shell中执行来获得<br />
+2. 输入时%num 代表任务id，num代表进程id</p>
+
+<pre><code>void do_bgfg(char **argv)
+{
+    pid_t pid;
+    struct job_t *job;
+    char *id = argv[1];
+
+    if(id==NULL){       /*bg or fg has the argument?*/
+        printf(&quot;%s command requires PID or %%jobid argument\n&quot;,argv[0]);
+        return;
+    }
+
+    if(id[0]=='%'){     /*the argument is a job id*/
+        int jid = atoi(&amp;id[1]);
+        job = getjobjid(jobs,jid);
+        if(job==NULL){
+            printf(&quot;%%%d: No such job\n&quot;,jid);
+            return;
+        }
+    }else if(isdigit(id[0])){               /*the argument is a pid is a digit number?*/
+        pid = atoi(id);
+        job = getjobpid(jobs,pid);
+        if(job==NULL){
+            printf(&quot;(%d): No such process\n&quot;,pid);
+            return ;
+        }
+    }else{
+        printf(&quot;%s: argument must be a PID or %%jobid\n&quot;, argv[0]);
+        return;
+    }
+
+    Kill(-(job-&gt;pid),SIGCONT); /*send the SIGCONT to the pid*/
+
+    if(!strcmp(argv[0],&quot;bg&quot;)){ /*set job state ,do it in bg or fg*/
+        job-&gt;state = BG;
+        printf(&quot;[%d] (%d) %s&quot;, job-&gt;jid, job-&gt;pid,job-&gt;cmdline);
+    }else{
+        job-&gt;state = FG;
+        waitfg(job-&gt;pid);
+    }
+    return;
+}
+</code></pre>
+
+<h4 id="4-waitfg">4.waitfg</h4>
+
+<p>在eval函数中调用，用来等待前台子进程的完成。<br />
+在注释中可以看到最好不要用<code>waitpid(pid,NULL,0);</code>，根据shell
+lab的writeup中的提示，我们可以看到推荐不要同时在SIGCHLD和waitfg函数中使用waitpid（），因为这样会让人迷惑，在同一个程序的两个地方均会回收僵死进程。<br />
+当然这样做也是可行的，在执行waitfg的waitpid()时通过gdb调试，可以看到子进程结束的SIGCHLD信号会被sigchld_handler中waitpid（）处理，处理结束后会返回到waitfg()的waitpid()函数继续判断，程序亦然符合我们预期的执行。<br />
+但是，根据我们还是根据writeup中推荐的方法，当子进程结束时发出SIGCHLD信号后，由sigchld_handler（）处理并回收僵尸进程并从jobs中删除该前台进程。我们在程序中运用sleep函数来等待jobs列表中是否还存在前台进程，如果不存在则返回。</p>
+
+<blockquote>
+<p>One of the tricky parts of the assignment is deciding on the allocation of
+work between the waitfg and sigchld handler functions. We recommend the
+following approach:<br />
+ - In waitfg,use a busy loop around the sleep function.<br />
+ - In sigchldhandler,use exactly one callto waitpid.</p>
+
+<p>While other solutions are possible, such as calling waitpid in both waitfg
+and sigchld handler, these can be very confusing. It is simpler to do all
+reaping in the handler.</p>
+</blockquote>
+
+<pre><code>/*
+ * waitfg - Block until process pid is no longer the foreground process
+ */
+void waitfg(pid_t pid)
+{
+    while(pid == fgpid(jobs)){
+        sleep(0);
+    }
+    return;
+//    waitpid(pid,NULL,0);    /*this is wrong answer ,see the num5 hints*/
+}
+</code></pre>
+
+<h4 id="5-sigchld-handler">5.sigchld_handler</h4>
+
+<p>该函数是SIGCHLD信号的响应函数。<br />
+该函数中运用waitpid（）函数并且用<code>WNOHANG|WUNTRACED</code>参数，该参数的作用是判断当前进程中是否存在已经停止或者终止的进程，如果存在则返回pid，不存在则
+<strong>立即返回</strong><br />
+通过另外一个&amp;status参数，我们可以判断返回的进程是由于什么原因停止或暂停的。</p>
+
+<ul>
+<li><p>WIFEXITED(status):<br />
+如果进程是正常返回即为true，什么是正常返回呢？就是通过调用exit（）或者return返回的</p></li>
+
+<li><p>WIFSIGNALED(status)：<br />
+如果进程因为捕获一个信号而终止的，则返回true</p></li>
+
+<li><p>WTERMSIG(status)：<br />
+当WIFSIGNALED(status)为真时，设置该值，返回导致当前状态的信号编号</p></li>
+
+<li><p>WIFSTOPPED(status)：<br />
+如果返回的进程当前是被停止，则为true</p></li>
+
+<li><p>WSTOPSIG(status)：<br />
+返回引起进程停止的信号</p>
+
+<p>void sigchld_handler(int sig)
+{
+    pid_t pid;
+    int status;
+    while((pid = waitpid(-1,&amp;status,WNOHANG|WUNTRACED))&gt;0){
+        if(WIFEXITED(status)){  /<em>process is exited in normal way</em>/
+            deletejob(jobs,pid);
+        }
+        if(WIFSIGNALED(status)){/<em>process is terminated by a signal</em>/
+            printf(&ldquo;Job <a href="%d">%d</a> terminated by signal %d\n&rdquo;,pid2jid(pid),pid,WTERMSIG(status));
+            deletejob(jobs,pid);
+        }
+        if(WIFSTOPPED(status)){/<em>process is stop because of a signal</em>/
+            printf(&ldquo;Job <a href="%d">%d</a> stopped by signal %d\n&rdquo;,pid2jid(pid),pid,WSTOPSIG(status));
+            struct job_t *job = getjobpid(jobs,pid);
+            if(job !=NULL )job-&gt;state = ST;
+        }
+    }
+    if(errno != ECHILD)
+        unix_error(&ldquo;waitpid error&rdquo;);
+    return;
+}</p></li>
+</ul>
+
+<h4 id="6-sigint-handler">6.sigint_handler</h4>
+
+<p>该函数用来捕获响应ctrl-c操作，并且将该信号发送为所有前台程序</p>
+
+<pre><code>void sigint_handler(int sig)
+{
+    pid_t pid = fgpid(jobs);
+    if(pid != 0){
+        Kill(-pid,SIGINT);
+        /*let the sigchld_handler to delete the job in jobs?*/
+    }
+    return;
+}
+</code></pre>
+
+<h4 id="7-sigtstp-handler">7.sigtstp_handler</h4>
+
+<p>该函数用来捕获响应ctrl-z操作，并且将该信号发送为所有前台程序</p>
+
+<pre><code>void sigtstp_handler(int sig)
+{
+
+    pid_t pid = fgpid(jobs);
+
+    if(pid!=0 ){
+        struct job_t *job = getjobpid(jobs,pid);
+        if(job-&gt;state == ST){  /*already stop the job ,do‘t do it again*/
+            return;
+        }else{
+            Kill(-pid,SIGTSTP);
+        }
+    }
+    return;
+}
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

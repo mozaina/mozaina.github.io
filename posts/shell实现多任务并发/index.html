@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell实现多任务并发 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell实现多任务并发 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell实现多任务并发">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%AE%9E%E7%8E%B0%E5%A4%9A%E4%BB%BB%E5%8A%A1%E5%B9%B6%E5%8F%91/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell实现多任务并发</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="实现思路">实现思路</h3>
+
+<p>实现一个shell进程库，通过类似于<code>init</code>，<code>run</code>，<code>wait</code>几个简单的命令，就可以迅速实现多进程并发，伪码如下：</p>
+
+<pre><code>process_init # 创建进程  
+for city in ${cities[*]}  
+do  
+    cmd=&quot;handler $city&quot;  
+    process_run $cmd   
+done  
+process_wait # 等待进程  
+</code></pre>
+
+<h3 id="原理解析">原理解析</h3>
+
+<p>在实现C++线程库的时候，通常会有一个任务队列，线程从队列中取任务并运行。在实现shell进程库的时候，采用了类似原理，通过一个<code>有名管道</code>充当任务队列。严格来说，并不是一个任务队列，而是一个令牌桶。进程从桶中取得令牌后才可以运行，运行结束后将令牌放回桶中。没有取得令牌的进程不能运行。令牌的数目即允许并发的最大进程数。</p>
+
+<p><a href="https://img.it610.com/image/info8/3f65b4c4c8ab457c8735d3592e74a307.png"><img src="https://img.it610.com/image/info8/3f65b4c4c8ab457c8735d3592e74a307.png" alt="" /></a></p>
+
+<h3 id="管道">管道</h3>
+
+<p>主要思路：通过<code>mkfifo</code>创建一个有名管道，将管道与一个文件描述符绑定，通过往管道中写数据的方式，控制进程数量。</p>
+
+<pre><code>function _create_pipe()  
+{  
+    _PROCESS_PIPE_NAME=$(_get_uid)  
+
+    mkfifo ${_PROCESS_PIPE_NAME}  
+eval exec &quot;${_PROCESS_PIPE_ID}&quot;&quot;&lt;&gt;${_PROCESS_PIPE_NAME}&quot;  
+
+for ((i=0; i &lt; $_PROCESS_NUM; i++))  
+do  
+echo -ne &quot;\n&quot; 1&gt;&amp;${_PROCESS_PIPE_ID}  
+done  
+}  
+</code></pre>
+
+<h4 id="exec">exec</h4>
+
+<pre><code>exec fd &lt;  file  #以读方式打开文件，并关联文件描述符fd  
+exec fd &gt;  file  #以写方式打开文件，并关联文件描述符fd  
+exec fd &lt;&gt; file  #以读写方式打开文件，并关联文件描述符  
+
+
+
+# 测试  
+exec 8&gt;file  
+echo &quot;hello word!&quot; 1&gt;&amp;8  
+</code></pre>
+
+<h4 id="eval">eval</h4>
+
+<p>为了让程序有一定的扩展性，不想写死fd，因而引入了变量。</p>
+
+<pre><code>file_fd=8  
+exec ${file_fd}&gt;file  
+
+
+
+# 测试  
+bash test.sh  
+test.sh: line 7: exec: 8: not found  
+</code></pre>
+
+<p>原因：shell在重定向操作符()左边不进行变量展开。因而引入eval命令，强制shell进行变量展开。<br />
+<code>eval exec &quot;${fd}&gt;file&quot;</code>简单的说，eval将右边参数整体作为一个命令，进行变量的替换，然后将替换后的输出结果给shell去执行。</p>
+
+<h3 id="进程关系">进程关系</h3>
+
+<h4 id="命令执行">命令执行</h4>
+
+<pre><code>function process_run()  
+{  
+    cmd=$1  
+if [ -z &quot;$cmd&quot; ]; then  
+echo &quot;please input command to run&quot;  
+        _delete_pipe      
+exit 1  
+fi  
+
+    _process_get  
+    {  
+$cmd  
+        _process_post  
+    }&amp;  
+}  
+</code></pre>
+
+<p><code>_process_get</code>从管道中取得一个令牌，创建一个进程执行任务，任务执行完毕后，通过<code>_process_post</code>将令牌放回管道。</p>
+
+<h4 id="进程创建">进程创建</h4>
+
+<pre><code>chengsun@153_92:~/test&gt; bash process_util.sh  
+chengsun@153_92:~/test&gt; pstree -a  
+
+|`-sshd  
+|    |-bash  
+|    |   `-bash process_util.sh         #爷爷  
+|    |       |-bash process_util.sh     #爸爸  
+|    |       |   `-a.out                #儿子  
+|    |       |-bash process_util.sh          
+|    |       |   `-a.out                     
+|    |       `-bash process_util.sh  
+|    |           `-a.out  
+</code></pre>
+
+<p>脚本运行后，通过<code>pstree</code>命令，得到如上父子进程关系。稍微做一下解释：当运行脚本<code>bash
+process_util.sh</code>的时候，创建一个shell进程，相当于爷爷被创建起来，而遇到<code>{ command1; command2 }
+&amp;</code>时，shell 又创建一个子shell进程（爸爸进程）处理命令序列；而对于每一个外部命令，shell都会创建一个子进程运行该命令，即儿子进程被创建。</p>
+
+<p>困惑：为什么处理<code>{ command1; command2; } &amp;</code>需要单独创建子进程？<br />
+按照bash manual说法，<code>{ list
+}</code>并不会创建一个新的shell来运行命令序列。但由于加入<code>&amp;</code>，代表将命令族放入后台执行，就必须新开subshell，否则shell会阻塞。</p>
+
+<h4 id="进程组">进程组</h4>
+
+<pre><code>chengsun@153_92:~/test&gt; ps -f -e -o pid,ppid,pgid,comm  
+
+ PID  PPID  PGID  COMMAND  
+24904 21976 24904 bash  
+19885 24904 19885  \_ bash            # 爷爷  
+19893 19885 19885      \_ bash        # 爸爸  
+19894 19893 19885      |   \_ a.out   # 儿子  
+19895 19885 19885      \_ bash  
+19896 19895 19885      |   \_ a.out  
+19897 19885 19885      \_ bash  
+19898 19897 19885          \_ a.out  
+</code></pre>
+
+<p>Shell 将运行process_util的一堆进程置于一个进程组中。其中爷爷进程作为该进程组的组长，pid == pgid。</p>
+
+<h4 id="wait">wait</h4>
+
+<p><code>wait pid:</code>阻塞等待某个进程结束； 如果没有指定参数，<code>wait</code>会等待所有子进程结束。</p>
+
+<h3 id="清理函数">清理函数</h3>
+
+<blockquote>
+<p>允许任务通过<code>CTRL+C</code>方式提前结束，因而需要清理函数</p>
+</blockquote>
+
+<h4 id="信号">信号</h4>
+
+<p>trap<br />
+类似C语言signal函数，为shell脚本注册信号处理函数。<code>trap arg
+signals</code>，其中signals为注册的信号列表，arg为收到信号后执行某个命令。</p>
+
+<pre><code>function Print  
+{  
+echo &quot;Hello World!&quot;  
+}  
+
+trap Print SIGKILL  
+</code></pre>
+
+<p>kill<br />
+<code>kill</code> 命令给进程或进程组发送信号；kill pid 给进程发送默认信号<code>SIGTERM</code>, 通知程序终止执行。</p>
+
+<pre><code>void sig_handler(int signo)  
+{  
+printf(&quot;sigterm signal\n&quot;);  
+}  
+
+int main()  
+{  
+    signal(SIGTERM, sig_handler);  
+    sleep(100);  
+
+return 0;  
+}  
+
+
+
+chengsun@153_92:~/test&gt; ./a.out &amp;  
+[1] 19254  
+chengsun@153_92:~/test&gt; kill 19254  
+sigterm signal  
+</code></pre>
+
+<p><code>kill 0</code>：给当前进程组发送默认信号SIGTERM</p>
+
+<pre><code>chengsun@153_92:~/test&gt; man kill  
+0  All processes in the current process group are signaled.  
+</code></pre>
+
+<h4 id="清理">清理</h4>
+
+<pre><code>function _clean_up  
+{  
+# 清理管道文件  
+    _delete_pipe  
+
+kill 0  
+kill -9 $$  
+}  
+
+trap _clean_up SIGINT SIGHUP SIGTERM SIGKILL  
+</code></pre>
+
+<p><code>kill -9 $$</code> 非常重要</p>
+
+<p><a href="https://img.it610.com/image/info8/cb920e5a217c45c8b0d167bd030fc84f.jpg"><img src="https://img.it610.com/image/info8/cb920e5a217c45c8b0d167bd030fc84f.jpg" alt="Shell
+实现多任务并发_第1张图片" /></a></p>
+
+<p>实际上，最上层是爷爷进程，当发送<code>Ctrl +
+C</code>命令的时候，爷爷进程捕获<code>SIGINT</code>信号，调用<code>_clean_up</code>函数。爷爷进程对整个进程组发送<code>SIGTERM</code>信号，并调用<code>kill
+-9</code>结束自己。爸爸进程接收<code>SIGTERM</code>信号，同时也发送<code>SIGTERN</code>给整个进程组，如果没有<code>kill
+-9</code>，爸爸进程始终无法结束，进入无限递归环节。儿子为CPP二进制程序，内部没有捕获<code>SIGTERM</code>，该信号默认动作是结束进程。</p>
+
+<h3 id="使用范例">使用范例</h3>
+
+<pre><code># file: run.sh  
+#!/bin/sh  
+
+#load process library  
+source ./process_util.sh  
+
+function handler()  
+{  
+    city=$1  
+    ./main ${city}  
+}  
+
+process_init 23  
+for city in $cities  
+do  
+    cmd = &quot;handler $city&quot;  
+    process_run &quot;$cmd&quot;  
+done  
+process_wait
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

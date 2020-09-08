@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>单片机实现串口命令行cmdshell效果 | 开发者问答集锦</title>
+    <meta property="og:title" content="单片机实现串口命令行cmdshell效果 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="单片机实现串口命令行cmdshell效果">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E5%8D%95%E7%89%87%E6%9C%BA%E5%AE%9E%E7%8E%B0%E4%B8%B2%E5%8F%A3%E5%91%BD%E4%BB%A4%E8%A1%8Ccmdshell%E6%95%88%E6%9E%9C/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">单片机实现串口命令行cmdshell效果</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h5 id="参考代码">参考代码：</h5>
+
+<p>[原创] [STM32L496] 使用FreeRTOS任务通知实现命令行解释器<br />
+<a href="http://www.stmcu.org.cn/module/forum/thread-615444-1-1.html">http://www.stmcu.org.cn/module/forum/thread-615444-1-1.html</a></p>
+
+<p>E:\Nu_LB_Nuc140\work\Nu_LB_NUC140_SPI_Flash_FATFS\project\KEIL<br />
+方便自己查看</p>
+
+<pre><code>NUC100 FATFS TEST!
+
+SPI FLASH Open success
+
+rc=0
+
+&gt;?
+
+dd [] - Dump sector
+
+di - Initialize disk
+
+
+bd  - Dump working buffer
+
+be  [] ... - Edit working buffer
+
+br   [] - Read disk into working buffer
+
+bw   [] - Write working buffer into disk
+
+bf  - Fill working buffer
+
+
+fi - Force initialized the logical drive
+
+fs - Show volume status
+
+fl [] - Show a directory
+
+fo   - Open a file
+
+fc - Close the file
+
+fe  - Move fp in normal seek
+
+fd  - Read and dump the file
+
+fr  - Read the file
+
+fw   - Write to the file
+
+fn   - Rename an object
+
+fu  - Unlink an object
+
+fv - Truncate the file at current fp
+
+fk  - Create a directory
+
+fa    - Change object attribute
+
+ft        - Change timestamp of an object
+
+fx   - Copy a file
+
+fg  - Change current directory
+
+fj  - Change current drive
+
+fm    - Create file system
+
+
+&gt;
+
+
+&gt;
+</code></pre>
+
+<h5 id="应用需求">应用需求</h5>
+
+<ol>
+<li><p>串口接收中断用于接收字符流，每收到一个字符就保存在buff里面，<br />
+如果接收到回车换行符，表明已经接收到一条完整命令</p></li>
+
+<li><p>遇到 退格键 怎么办</p></li>
+</ol>
+
+<h4 id="atoi-的实现">atoi()的实现</h4>
+
+<p>atoi()和itoa()函数详解以及C语言实现<br />
+atoi()函数<br />
+atoi()原型: int atoi(const char *str );</p>
+
+<p>函数功能：把字符串转换成整型数。</p>
+
+<p>参数str：要进行转换的字符串</p>
+
+<p>返回值：每个函数返回 int 值，此值由将输入字符作为数字解析而生成。 如果该输入无法转换为该类型的值，则atoi的返回值为 0。</p>
+
+<p>注意：使用该函数时要注意atoi返回的是int类型，注意输入str的范围不要超出int类型的范围。</p>
+
+<p>一小段代码演示一下该函数的使用：</p>
+
+<p>下面来用C语言进行实现该函数：</p>
+
+<pre><code>#include                                                                                                                             
+#include 
+
+int my_atoi(const char *src)
+{
+      int s = 0;
+      bool isMinus = false;
+
+      while(*src == ' ')  //跳过空白符
+      {
+          src++; 
+      }
+
+      if(*src == '+' || *src == '-')
+      {
+          if(*src == '-')
+          {
+              isMinus = true;
+          }
+          src++;
+      }
+      else if(*src &lt; '0' || *src &gt; '9')  //如果第一位既不是符号也不是数字，直接返回异常值
+      {
+          s = 2147483647;
+          return s;
+      }
+
+      while(*src != '\0' &amp;&amp; *src &gt;= '0' &amp;&amp; *src &lt;= '9')
+      {
+          s = s * 10 + *src - '0';
+          src++;
+      }
+      return s * (isMinus ? -1 : 1);
+ }
+
+ int main()
+ {
+      int num;
+
+      char *str = &quot;a123456&quot;;
+      num = my_atoi(str);
+      printf(&quot;atoi num is: %d \r\n&quot;, num);
+
+      return 0;
+ }   
+</code></pre>
+
+<h5 id="参考设计">参考设计</h5>
+
+<pre><code>/*--------------------------------------------------------------------------*/
+/* Monitor                                                                  */
+
+/*----------------------------------------------*/
+/* Get a value of the string                    */
+/*----------------------------------------------*/
+/*  &quot;123 -5   0x3ff 0b1111 0377  w &quot;
+        ^                           1st call returns 123 and next ptr
+           ^                        2nd call returns -5 and next ptr
+                   ^                3rd call returns 1023 and next ptr
+                          ^         4th call returns 15 and next ptr
+                               ^    5th call returns 255 and next ptr
+                                  ^ 6th call fails and returns 0
+*/
+
+int xatoi (         /* 0:Failed, 1:Successful */
+    TCHAR **str,    /* Pointer to pointer to the string */
+    long *res       /* Pointer to a valiable to store the value */
+)
+{
+    unsigned long val;
+    unsigned char r, s = 0;
+    TCHAR c;
+
+
+    *res = 0;
+    while ((c = **str) == ' ') (*str)++;    /* Skip leading spaces */
+
+    if (c == '-') {     /* negative? */
+        s = 1;
+        c = *(++(*str));
+    }
+
+    if (c == '0') {
+        c = *(++(*str));
+        switch (c) {
+        case 'x':       /* hexdecimal */
+            r = 16; c = *(++(*str));
+            break;
+        case 'b':       /* binary */
+            r = 2; c = *(++(*str));
+            break;
+        default:
+            if (c &lt;= ' ') return 1; /* single zero */
+            if (c &lt; '0' || c &gt; '9') return 0;   /* invalid char */
+            r = 8;      /* octal */
+        }
+    } else {
+        if (c &lt; '0' || c &gt; '9') return 0;   /* EOL or invalid char */
+        r = 10;         /* decimal */
+    }
+
+    val = 0;
+    while (c &gt; ' ') {
+        if (c &gt;= 'a') c -= 0x20;
+        c -= '0';
+        if (c &gt;= 17) {
+            c -= 7;
+            if (c &lt;= 9) return 0;   /* invalid char */
+        }
+        if (c &gt;= r) return 0;       /* invalid char for current radix */
+        val = val * r + c;
+        c = *(++(*str));
+    }
+    if (s) val = 0 - val;           /* apply sign if needed */
+
+    *res = val;
+    return 1;
+}
+</code></pre>
+
+<p>地址</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

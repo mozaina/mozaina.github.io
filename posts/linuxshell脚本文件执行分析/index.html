@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>linuxshell脚本文件执行分析 | 开发者问答集锦</title>
+    <meta property="og:title" content="linuxshell脚本文件执行分析 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="linuxshell脚本文件执行分析">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E8%84%9A%E6%9C%AC%E6%96%87%E4%BB%B6%E6%89%A7%E8%A1%8C%E5%88%86%E6%9E%90/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">linuxshell脚本文件执行分析</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>原创，转载注明出处</p>
+
+<p><strong>一．shell脚本父子进程分析</strong></p>
+
+<p><strong>__</strong></p>
+
+<p><strong><em>代码：</em></strong></p>
+
+<pre><code>#!/bin/bash
+echo $$
+ps -ef |grep `echo $$`
+echo &quot;-------------------------------------&quot;
+( pwd;echo $$;ps -ef |grep `echo $$`;)
+echo &quot;-------------------------------------&quot;
+{ pwd;echo $$;ps -ef |grep `echo $$`; }
+</code></pre>
+
+<p><strong><em>运行结果 1：</em></strong></p>
+
+<p><strong>__</strong></p>
+
+<p><strong><em>结果分析 1：</em></strong></p>
+
+<p>1. 最后一行显示当前登录shell进程ID为9561；</p>
+
+<p>2. 第三行显示登录shell派生出一个进程ID为10767的shell执行进程；该进程负责扫描shell脚本进行执行；</p>
+
+<p>3. 10767脚本执行进程负责逐行执行脚本：遇到内置命令直接在当10767进程中执行，遇到可执行程序就fork 新的子进进程来执行。</p>
+
+<p>4. 进程号为 10768和10769的进程都是执行shell 10767进程派生的子进程ps 和grep .</p>
+
+<p>5. 10767脚本执行进程扫描到( com1;com2;) 语句群时，会再派生一个ID为10771子shell负责执行()内的命令和语句：10771
+逐行扫描()中的语句，按照步骤3的规则进行处理：进程号 10773 grep 还有另一个进程 ps
+都是10771又派生出的子进程，ps子进程的父进程是10771 此处没有显示出来。</p>
+
+<p>6. 10767脚本执行进程扫描到{ com1;com2;} 语句时，不会新派生子shell，直接使用当前进程10767进行负责逐行执行脚本。</p>
+
+<p><strong><em>运行结果 2：</em></strong></p>
+
+<p><strong><em>结果分析 2</em></strong></p>
+
+<p>其运行结果和运行1是一样的，bash cpro.sh 和直接运行cpro.sh 的工作机制是一样的，都会派生出一个执行shell，逐行读脚本进行执行；</p>
+
+<p><strong>总结：</strong></p>
+
+<p>Ø 在当前shell中执行内部命令不会派生子shell，因此有些内部命令才能够改变当前的shell执行环境;</p>
+
+<p>Ø 在当前shell中执行外部命令或脚本时会派生子shell，所以这时命令的执行不会影响当前shell环境；</p>
+
+<p>Ø 要想在当前shell中执行脚本，而不派生子shell，可以使用 . 和source 命令 + 脚本名进行执行</p>
+
+<p>Ø ./command.sh = bash ./command.sh 当前shell会派生子shell执行脚本文件，脚本的执行不会影响到当前shell环境</p>
+
+<p>Ø . ./command.sh = source ./command.sh 直接在当前shell中执行脚本，脚本的执行回影响到当前shell环境</p>
+
+<p><strong>二．管道与shell脚本执行关系 command | read var 和 comand | while read var</strong></p>
+
+<p><strong><em>代码：</em></strong></p>
+
+<pre><code>pwd | read var
+echo $var  #1
+
+ls -l |while read var
+do
+echo $var #2
+done
+</code></pre>
+
+<p><strong><em>结果分析：</em></strong></p>
+
+<p><strong>#1 输出时空置</strong></p>
+
+<p><strong>#2输出有值</strong></p>
+
+<p><em>这就是管道的秘笈， bash 在执行pwd | read var时管道两边的都是子shell执行，执行echo $var
+是父shell执行，父shell无法读到子shell变量</em></p>
+
+<p><em>bash 执行ls -l |while read var 左边是子shell 右边是父shell执行，故最后可以读到内容</em></p>
+
+<p><strong><em>shell 脚本执行汇总：</em></strong></p>
+
+<p><strong>__</strong></p>
+
+<p><strong><em>1. 内置命令(builtin)</em></strong><br />
+是shell解释程序内建的，由shell直接执行，不需要派生新的进程；有一些内部命令可以用来改变当前的shell环境，如:<br />
+cd /path<br />
+var=value<br />
+read var<br />
+export var<br />
+&hellip;</p>
+
+<p>** <em>2. 外部命令(&ldquo;externalcommand&rdquo; or &ldquo;disk command&rdquo;)</em>**<br />
+二进制可执行文件，需要由磁盘装入内存执行。会派生新的进程，shell解释程序会调用fork自身的一个拷贝，然后用exec系列函数来执行外部命令，然后外部命令就取代了先前fork的子shell。</p>
+
+<p>** <em>3.shell 脚本(script)</em>**<br />
+shell解释程序会fork+exec执行这个脚本命令，在exec调用中内核会检查脚本的第一行(如:#!/bin/sh)，找到用来执行脚本的解释程序，然后装入这个解释程序，由它解释执行脚本程序。解释程序可能有很多种，各种shell(Bourne
+shell，Korn shell
+cshell，rc及其变体ash，dash，bash，zshell，pdksh，tcsh，es&hellip;)，awk，tcl/tk，expect，perl，python，等等。在此解释程序显然是当前shell的子进程。如果这个解释程序与当前使用的shell是同一种shell，比如都是bash，那么它就是当前shell的子shell，脚本中的命令都是在子shell环境中执行的，不会影响当前shell的环境。</p>
+
+<p><strong>三. 如何查看一个命令时内建命令还是外部命令(程序)</strong></p>
+
+<p>用户输入命令之后，shell一般fork，在子shell中执行命令。内建命令不是这样的。
+执行内建命令相当于调用Shell进程中的一个函数，并不创建新的进程。<br />
+如何查看命令是否为内建命令？</p>
+
+<p><strong>type 命令</strong></p>
+
+<p><strong>type - write a description of command type</strong> **</p>
+
+<p>**</p>
+
+<p>· 不加参数，会显示命令是内建命令还是外部命令。</p>
+
+<pre><code>$type echo
+echoisa shell builtin
+
+·         －t 参数，返回值
+      file    ：表示为外部指令，一般是外部可执行程序，ELF格式 
+      alias   ：表示该指令为命令别名所设定的名称；
+      builtin ：表示该指令为 bash 内建的指令功能；
+$type-t ls
+ alias
+$type-t alias
+builtin
+$type-t chmod
+file
+·        －a 会将命令PATH 路径显示出来。
+</code></pre>
+
+<p>其他相关命令：</p>
+
+<p><strong>which 命令</strong> 只能找到path 下可执行程序，即外部程序，内建命令没有办法识别</p>
+
+<p><strong>file 命令</strong>查看文件类型，file 会尝试读文件头，解析文件类型</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

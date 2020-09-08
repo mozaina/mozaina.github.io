@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Docker批量拉取和推送的LinuxShell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="Docker批量拉取和推送的LinuxShell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Docker批量拉取和推送的LinuxShell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/docker%E6%89%B9%E9%87%8F%E6%8B%89%E5%8F%96%E5%92%8C%E6%8E%A8%E9%80%81%E7%9A%84linuxshell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Docker批量拉取和推送的LinuxShell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="一-简介">一、简介</h3>
+
+<p>今天给小伙伴们分享一个Docker批量拉取和推送到项目地镜像仓库的shell脚本，可以批量进行拉取和推送，比一个一个手动拉取和推送方便不少，话不多说，直接入正题：</p>
+
+<p>【a】创建脚本文件auto-pull-and-push-images.sh</p>
+
+<pre><code>vim auto-pull-and-push-images.sh
+</code></pre>
+
+<p>将下面的脚本内容复制进去：</p>
+
+<pre><code>#!/bin/bash
+#新镜像标签：默认取当前时间作为标签名
+imageNewTag=`date +%Y%m%d-%H%M%S`
+#镜像仓库地址
+registryAddr=&quot;192.168.35.105:5000/lyzhxg/&quot;
+
+#循环读取images.txt,并存入list中
+n=0
+
+for line in $(cat images.txt | grep ^[^#])
+do
+    list[$n]=$line
+    ((n+=1))
+done
+
+echo &quot;需推送的镜像地址如下：&quot;
+for variable in ${list[@]}
+do
+    echo ${variable}
+done
+
+for variable in ${list[@]}
+do
+    #下载镜像
+    echo &quot;准备拉取镜像: $variable&quot;
+    docker pull $variable
+
+    # #获取拉取的镜像ID
+    imageId=`docker images -q $variable`
+    echo &quot;[$variable]拉取完成后的镜像ID: $imageId&quot;
+
+    #获取完整的镜像名
+    imageFormatName=`docker images --format &quot;{{.Repository}}:{{.Tag}}:{{.ID}}&quot; |grep $variable`
+    echo &quot;imageFormatName:$imageFormatName&quot;
+
+    #删掉最后一个/及其左边的字符串
+    #如：192.168.35.126:5000/lyzhxg/bks/ly-sm-yxxt-ui:20200324-153539:0beed7b2fa8c  -&gt;  ly-sm-yxxt-ui:20200324-153539:0beed7b2fa8c
+    repository=${imageFormatName##*/}
+    echo &quot;repository :$repository&quot;
+
+    #删掉第一个:及其右边的字符串
+    #如：ly-sm-yxxt-ui:20200324-153539:0beed7b2fa8c -&gt; ly-sm-yxxt-ui
+    repository=${repository%%:*}
+
+    echo &quot;新镜像地址: $registryAddr$repository:$imageNewTag&quot;
+
+    #重新打镜像标签
+    docker tag $imageId $registryAddr$repository:$imageNewTag
+
+    # #推送镜像
+    docker push $registryAddr$repository:$imageNewTag
+done
+</code></pre>
+
+<p>【b】images.txt：</p>
+
+<pre><code>vim images.txt
+</code></pre>
+
+<p>输入需要拉取和推送的镜像地址：</p>
+
+<pre><code>#基础服务
+192.168.2.78:5000/dev/ly-sm-unauth-svc:4.2
+192.168.2.78:5000/dev/ly-sm-bpm-expansion-ui:4.2
+</code></pre>
+
+<p>注意：每一行写一个镜像地址，因为脚本是循环读取images.txt文件中的每一行来获取镜像地址的 。</p>
+
+<p>准备完这两个文件后，如下图所示：</p>
+
+<p><a href="https://img.it610.com/image/info8/2b476ec063b44b84a139b0739f6b0b58.png"><img src="https://img.it610.com/image/info8/2b476ec063b44b84a139b0739f6b0b58.png" alt="" /></a></p>
+
+<p>【c】测试：</p>
+
+<p>执行脚本：</p>
+
+<pre><code>./auto-pull-and-push-images.sh
+</code></pre>
+
+<p>注意：执行脚本需要有可执行权限，可以使用下面的命令赋予可执行权限：</p>
+
+<pre><code>chmod 777 auto-pull-and-push-images.sh 
+或者
+chmod u+x auto-pull-and-push-images.sh 
+</code></pre>
+
+<p>【d】执行日志：</p>
+
+<pre><code>[root@node1 test01]# ./auto-pull-and-push-images.sh 
+需推送的镜像地址如下：
+﻿#基础服务
+192.168.2.78:5000/dev/ly-sm-unauth-svc:4.2
+192.168.2.78:5000/dev/ly-sm-bpm-expansion-ui:4.2
+准备拉取镜像: ﻿#基础服务
+invalid reference format
+[﻿#基础服务]拉取完成后的镜像ID: 
+imageFormatName:
+repository :
+新镜像地址: 192.168.35.105:5000/lyzhxg/:20200330-145604
+&quot;docker tag&quot; requires exactly 2 argument(s).
+See 'docker tag --help'.
+
+Usage:  docker tag SOURCE_IMAGE[:TAG] TARGET_IMAGE[:TAG]
+
+Create a tag TARGET_IMAGE that refers to SOURCE_IMAGE
+invalid reference format
+准备拉取镜像: 192.168.2.78:5000/dev/ly-sm-unauth-svc:4.2
+4.2: Pulling from dev/ly-sm-unauth-svc
+bdf0201b3a05: Already exists 
+484b5c92c2b2: Already exists 
+d77d79454db4: Already exists 
+5a60d6145c09: Already exists 
+17b0bf5a3271: Already exists 
+e796987ed595: Already exists 
+1877f24e6b98: Already exists 
+e4642025412a: Pull complete 
+Digest: sha256:4a6f5b1f76787a8433eaa28dd3baa11c88b24f9f9804128fe1287b60c931c3a0
+Status: Downloaded newer image for 192.168.2.78:5000/dev/ly-sm-unauth-svc:4.2
+[192.168.2.78:5000/dev/ly-sm-unauth-svc:4.2]拉取完成后的镜像ID: 28bf8a35801a
+imageFormatName:192.168.2.78:5000/dev/ly-sm-unauth-svc:4.2:28bf8a35801a
+repository :ly-sm-unauth-svc:4.2:28bf8a35801a
+新镜像地址: 192.168.35.105:5000/lyzhxg/ly-sm-unauth-svc:20200330-145604
+The push refers to a repository [192.168.35.105:5000/lyzhxg/ly-sm-unauth-svc]
+b02da9392e12: Layer already exists 
+77e5fe1379bd: Layer already exists 
+82d4f7294cc9: Layer already exists 
+caed85d2f965: Layer already exists 
+501ba7f835da: Layer already exists 
+19821cef557a: Layer already exists 
+7a5b1b6f8771: Layer already exists 
+a464c54f93a9: Layer already exists 
+20200330-145604: digest: sha256:4a6f5b1f76787a8433eaa28dd3baa11c88b24f9f9804128fe1287b60c931c3a0 size: 1995
+准备拉取镜像: 192.168.2.78:5000/dev/ly-sm-bpm-expansion-ui:4.2
+4.2: Pulling from dev/ly-sm-bpm-expansion-ui
+d9aaf4d82f24: Already exists 
+d5ee1d58bc2b: Already exists 
+546386b6129d: Already exists 
+9841cc274ae3: Already exists 
+513e4ea81866: Already exists 
+741a0c892709: Already exists 
+b8de0db39c27: Already exists 
+13491ab36883: Already exists 
+e0b8f13d740b: Already exists 
+e70a3154ec3f: Already exists 
+0ba8cabe3cb5: Already exists 
+5f1b7262c6e6: Pull complete 
+5a6fd0d45865: Pull complete 
+Digest: sha256:bd66f37354061fae86a43f2686404d1f1eeec849050f6f8657ab3e2368b9aa99
+Status: Downloaded newer image for 192.168.2.78:5000/dev/ly-sm-bpm-expansion-ui:4.2
+[192.168.2.78:5000/dev/ly-sm-bpm-expansion-ui:4.2]拉取完成后的镜像ID: a7dbe9d8166b
+imageFormatName:192.168.2.78:5000/dev/ly-sm-bpm-expansion-ui:4.2:a7dbe9d8166b
+repository :ly-sm-bpm-expansion-ui:4.2:a7dbe9d8166b
+新镜像地址: 192.168.35.105:5000/lyzhxg/ly-sm-bpm-expansion-ui:20200330-145604
+The push refers to a repository [192.168.35.105:5000/lyzhxg/ly-sm-bpm-expansion-ui]
+95bb7c95408a: Layer already exists 
+8453f0eac2c0: Layer already exists 
+9d20f94a2ac9: Layer already exists 
+76d42c49a4b7: Layer already exists 
+1ee7f41e8f64: Layer already exists 
+2e91b69704ca: Layer already exists 
+98ee4140c3a9: Layer already exists 
+acd8813714a5: Layer already exists 
+34f92ee5b1dc: Layer already exists 
+9eeca9c73db1: Layer already exists 
+855fa15376da: Layer already exists 
+8e36976219db: Layer already exists 
+cf516324493c: Layer already exists 
+20200330-145604: digest: sha256:bd66f37354061fae86a43f2686404d1f1eeec849050f6f8657ab3e2368b9aa99 size: 3034
+</code></pre>
+
+<p>然后我们使用docker images查看刚刚推送过去的镜像：</p>
+
+<p><a href="https://img.it610.com/image/info8/75fc6bf379e742f3aff7b1171bb9e9ab.jpg"><img src="https://img.it610.com/image/info8/75fc6bf379e742f3aff7b1171bb9e9ab.jpg" alt="Docker批量拉取和推送的Linux
+Shell脚本_第1张图片" /></a></p>
+
+<p>可见，同时成功构建了两个镜像，实际项目中可以同时构建多个镜像，不需要构建的在images.txt中用#注释掉即可掉过本次构建，比起一个一个构建，显然方便不少。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

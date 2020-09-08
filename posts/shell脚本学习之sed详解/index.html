@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本学习之sed详解 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本学习之sed详解 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本学习之sed详解">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E5%AD%A6%E4%B9%A0%E4%B9%8Bsed%E8%AF%A6%E8%A7%A3/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本学习之sed详解</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>在编写shell脚本的过程中，我们经常需要使用sed流编辑器和awk对文本文件进行处理。</p>
+
+<h2 id="一-什么是sed">一、什么是sed？</h2>
+
+<p>sed
+是一种在线编辑器，它一次处理一行内容。sed是非交互式的编辑器。它不会修改文件，除非使用shell重定向来保存结果。默认情况下，所有的输出行都被打印到屏幕上。</p>
+
+<h2 id="二-sed的处理过程">二、sed的处理过程</h2>
+
+<p>sed编辑器逐行处理文件（或输入），并将结果发送到屏幕。具体过程如下：首先sed把当前正在处理的行保存在一个临时缓存区中（也称为模式空间），然后处理临时缓冲区中的行，完成后把该行发送到屏幕上。sed每处理完一行就将其从临时缓冲区删除，然后将下一行读入，进行处理和显示。处理完输入文件的最后一行后，sed便结束运行。</p>
+
+<p>前面说到sed不会修改文件，那么现在我们可以知道是为什么了？是因为sed把每一行都存在临时缓冲区中，对这个副本进行编辑，所以不会修改原文件。</p>
+
+<p>补充知识：</p>
+
+<p>在使用sed的过程中，我们经常会听到“定址”，那么什么是“定址”呢？</p>
+
+<p>定址用于决定对哪些行进行编辑。地址的形式可以是数字、正则表达式、或二者的结合。如果没有指定地址，sed将处理输入文件的所有行。</p>
+
+<p>1、地址是一个数字，则表示行号；是“$&ldquo;符号，则表示最后一行。</p>
+
+<p>例如：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -n &lsquo;3p&rsquo; datafile #只打印第三行</li>
+</ol>
+
+<p>2、只显示指定行范围的文件内容</p>
+
+<p>例如：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -n &lsquo;100,200p&rsquo; mysql_slow_query.log # 只查看文件的第100行到第200行</li>
+</ol>
+
+<p>3、地址是逗号分隔的，那么需要处理的地址是这两行之间的范围（包括这两行在内）。范围可以用数字、正则表达式、或二者的组合表示。</p>
+
+<p>例如：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &lsquo;2,5d&rsquo; datafile</li>
+<li>#删除第二到第五行</li>
+<li>4. sed &lsquo;/My/,/You/d&rsquo; datafile</li>
+<li>#删除包含&rdquo;My&rdquo;的行到包含&rdquo;You&rdquo;的行之间的行</li>
+<li>7. sed &lsquo;/My/,10d&rsquo; datafile</li>
+<li>#删除包含&rdquo;My&rdquo;的行到第十行的内容</li>
+</ol>
+
+<h2 id="三-sed命令和选项">三、sed命令和选项</h2>
+
+<p>sed命令告诉sed如何处理由地址指定的各输入行，如果没有指定地址则处理所有的输入行。</p>
+
+<p>1、sed命令</p>
+
+<p>命令</p>
+
+<p>|</p>
+
+<p>功能</p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>a</p>
+
+<p>|</p>
+
+<p>在当前行后添加一行或多行。多行时除最后一行外，每行末尾需用“\”续行</p>
+
+<p>c</p>
+
+<p>|</p>
+
+<p>用此符号后的新文本替换当前行中的文本。多行时除最后一行外，每行末尾需用&rdquo;\&ldquo;续行</p>
+
+<p>i</p>
+
+<p>|</p>
+
+<p>在当前行之前插入文本。多行时除最后一行外，每行末尾需用&rdquo;\&ldquo;续行</p>
+
+<p>d</p>
+
+<p>|</p>
+
+<p>删除行</p>
+
+<p>h</p>
+
+<p>|</p>
+
+<p>把模式空间里的内容复制到暂存缓冲区</p>
+
+<p>H</p>
+
+<p>|</p>
+
+<p>把模式空间里的内容追加到暂存缓冲区</p>
+
+<p>g</p>
+
+<p>|</p>
+
+<p>把暂存缓冲区里的内容复制到模式空间，覆盖原有的内容</p>
+
+<p>G</p>
+
+<p>|</p>
+
+<p>把暂存缓冲区的内容追加到模式空间里，追加在原有内容的后面</p>
+
+<p>l</p>
+
+<p>|</p>
+
+<p>列出非打印字符</p>
+
+<p>p</p>
+
+<p>|</p>
+
+<p>打印行</p>
+
+<p>n</p>
+
+<p>|</p>
+
+<p>读入下一输入行，并从下一条命令而不是第一条命令开始对其的处理</p>
+
+<p>q</p>
+
+<p>|</p>
+
+<p>结束或退出sed</p>
+
+<p>r</p>
+
+<p>|</p>
+
+<p>从文件中读取输入行</p>
+
+<p>!</p>
+
+<p>|</p>
+
+<p>对所选行以外的所有行应用命令</p>
+
+<p>s</p>
+
+<p>|</p>
+
+<p>用一个字符串替换另一个</p>
+
+<p>g</p>
+
+<p>|</p>
+
+<p>在行内进行全局替换</p>
+
+<p>w</p>
+
+<p>|</p>
+
+<p>将所选的行写入文件</p>
+
+<p>x</p>
+
+<p>|</p>
+
+<p>交换暂存缓冲区与模式空间的内容</p>
+
+<p>y</p>
+
+<p>|</p>
+
+<p>将字符替换为另一字符（不能对正则表达式使用y命令）</p>
+
+<p>2、sed选项</p>
+
+<p>选项</p>
+
+<p>|</p>
+
+<p>功能</p>
+
+<p>&mdash;|&mdash;</p>
+
+<p>-e</p>
+
+<p>|</p>
+
+<p>进行多项编辑，即对输入行应用多条sed命令时使用</p>
+
+<p>-n</p>
+
+<p>|</p>
+
+<p>取消默认的输出</p>
+
+<p>-f</p>
+
+<p>|</p>
+
+<p>指定sed脚本的文件名</p>
+
+<h2 id="四-正则表达式元字符">四、正则表达式元字符</h2>
+
+<p>与grep一样，sed也支持特殊元字符，来进行模式查找、替换。不同的是，sed使用的正则表达式是括在斜杠线&rdquo;/&ldquo;之间的模式。</p>
+
+<p>如果要把正则表达式分隔符&rdquo;/&ldquo;改为另一个字符，比如o，只要在这个字符前加一个反斜线，在字符后跟上正则表达式，再跟上这个字符即可。</p>
+
+<p>例如：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -n &lsquo;\o^Myop&rsquo; datafile
+
+<br /></li>
+</ol>
+
+<p>常用的正则表达式如下：</p>
+
+<p>元字符</p>
+
+<p>|</p>
+
+<p>功能</p>
+
+<p>|</p>
+
+<p>示例</p>
+
+<p>&mdash;|&mdash;|&mdash;</p>
+
+<p>^</p>
+
+<p>|</p>
+
+<p>行首定位符</p>
+
+<p>|</p>
+
+<p>/^my/ 匹配所有以my开头的行</p>
+
+<p>$</p>
+
+<p>|</p>
+
+<p>行尾定位符</p>
+
+<p>|</p>
+
+<p>/my$/ 匹配所有以my结尾的行</p>
+
+<p>.</p>
+
+<p>|</p>
+
+<p>匹配除换行符以外的单个字符</p>
+
+<p>|</p>
+
+<p>/m..y/ 匹配包含字母m，后跟两个任意字符，再跟字母y的行</p>
+
+<p>*</p>
+
+<p>|</p>
+
+<p>匹配零个或多个前导字符</p>
+
+<p>|</p>
+
+<p>/my*/ 匹配包含字母m,后跟零个或多个y字母的行</p>
+
+<p>[]</p>
+
+<p>|</p>
+
+<p>匹配指定字符组内的任一字符</p>
+
+<p>|</p>
+
+<p>/[Mm]y/ 匹配包含My或my的行</p>
+
+<p>[^]</p>
+
+<p>|</p>
+
+<p>匹配不在指定字符组内的任一字符</p>
+
+<p>|</p>
+
+<p>/[^Mm]y/ 匹配包含y，但y之前的那个字符不是M或m的行</p>
+
+<p>\(..\)</p>
+
+<p>|</p>
+
+<p>保存已匹配的字符</p>
+
+<p>|</p>
+
+<p>1,20s/\(you\)self/\1r/
+标记元字符之间的模式，并将其保存为标签1，之后可以使用\1来引用它。最多可以定义9个标签，从左边开始编号，最左边的是第一个。此例中，对第1到第20行进行处理，you被保存为标签1，如果发现youself，则替换为your。</p>
+
+<p>&amp;</p>
+
+<p>|</p>
+
+<p>保存查找串以便在替换串中引用</p>
+
+<p>|</p>
+
+<p>s/my/<strong>&amp;</strong>/ 符号&amp;代表查找串。my将被替换为<strong>my</strong></p>
+
+<p>&lt;</p>
+
+<p>|</p>
+
+<p>词首定位符</p>
+
+<p>|</p>
+
+<p>/\匹配包含以my开头的单词的行</p>
+
+<p>&gt;</p>
+
+<p>|</p>
+
+<p>词尾定位符</p>
+
+<p>|</p>
+
+<p>/my&gt;/ 匹配包含以my结尾的单词的行</p>
+
+<p>x\{m\}</p>
+
+<p>|</p>
+
+<p>连续m个x</p>
+
+<p>|</p>
+
+<p>/9\{5\}/匹配包含连续5个9的行</p>
+
+<p>x\{m,\}</p>
+
+<p>|</p>
+
+<p>至少m个x</p>
+
+<p>|</p>
+
+<p>/9\{5,\}/ 匹配包含至少连续5个9的行</p>
+
+<p>x\{m,n\}</p>
+
+<p>|</p>
+
+<p>至少m个，但不超过n个x</p>
+
+<p>|</p>
+
+<p>/9\{5,7\}/ 匹配包含连续5到7个9的行</p>
+
+<h2 id="五-sed的退出状态">五、sed的退出状态</h2>
+
+<p>sed不向grep一样，不管是否找到指定的模式，它的退出状态都是0。只有当命令存在语法错误时，sed的退出状态才不是0。</p>
+
+<h2 id="六-常用范例">六、常用范例</h2>
+
+<p>1、p命令</p>
+
+<p>命令p用于显示模式空间的内容。默认情况下，sed把输入行打印在屏幕上，选项-n用于取消默认的打印操作。当选项-n和命令p同时出现时,sed可打印选定的内容。</p>
+
+<p>例子：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>（1）sed &lsquo;/my/p&rsquo; datafile</li>
+<li>#默认情况下，sed把所有输入行都打印在标准输出上。如果某行匹配模式my，p命令将把该行另外打印一遍。</li>
+<li>4. （2）sed -n &lsquo;/my/p&rsquo; datafile</li>
+<li>#选项-n取消sed默认的打印，p命令把匹配模式my的行打印一遍。</li>
+</ol>
+
+<p>2、d命令</p>
+
+<p>命令d用于删除输入行。sed先将输入行从文件复制到模式空间里，然后对该行执行sed命令，最后将模式空间里的内容显示在屏幕上。如果发出的是命令d，当前模式空间里的输入行会被删除，不被显示。</p>
+
+<p>例子：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>（1）sed &lsquo;$d&rsquo; datafile</li>
+<li>#删除最后一行，其余的都被显示</li>
+<li>4. （2）sed &lsquo;/my/d&rsquo; datafile</li>
+<li>#删除包含my的行，其余的都被显示</li>
+</ol>
+
+<p>3、s命令</p>
+
+<p>例子：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>（1）sed &rsquo;s/^My/You/g&rsquo; datafile</li>
+<li>#命令末端的g表示在行内进行全局替换，也就是说如果某行出现多个My，所有的My都被替换为You。</li>
+<li>4. （2）sed -n &lsquo;1,20s/My$/You/gp&rsquo; datafile</li>
+<li>#取消默认输出，处理1到20行里匹配以My结尾的行，把行内所有的My替换为You，并打印到屏幕上。</li>
+<li>7. （3）sed &rsquo;s#My#Your#g&rsquo; datafile</li>
+<li>#紧跟在s命令后的字符就是查找串和替换串之间的分隔符。分隔符默认为正斜杠，但可以改变。无论什么字符（换行符、反斜线除外），只要紧跟s命令，就成了新的串分隔符。
+
+<br /></li>
+</ol>
+
+<p>4、e选项</p>
+
+<p>-e是编辑命令，用于sed执行多个编辑任务的情况下。在下一行开始编辑前，所有的编辑动作将应用到模式缓冲区中的行上。</p>
+
+<p>例子：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -e &lsquo;1,10d&rsquo; -e &rsquo;s/My/Your/g&rsquo; datafile</li>
+<li>#选项-e用于进行多重编辑。第一重编辑删除第1-3行。第二重编辑将出现的所有My替换为Your。因为是逐行进行这两项编辑（即这两个命令都在模式空间的当前行上执行），所以编辑命令的顺序会影响结果。</li>
+</ol>
+
+<p>5、r命令</p>
+
+<p>r命令是读命令。sed使用该命令将一个文本文件中的内容加到当前文件的特定位置上。</p>
+
+<p>例如：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &lsquo;/My/r introduce.txt&rsquo; datafile</li>
+<li>#如果在文件datafile的某一行匹配到模式My，就在该行后读入文件introduce.txt的内容。如果出现My的行不止一行，则在出现My的各行后都读入introduce.txt文件的内容。</li>
+</ol>
+
+<p>6、w命令</p>
+
+<p>例子：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -n &lsquo;/hrwang/w me.txt&rsquo; datafile</li>
+</ol>
+
+<p>7、a\ 命令</p>
+
+<p>a<br />
+命令是追加命令，追加将添加新文本到文件中当前行（即读入模式缓冲区中的行）的后面。所追加的文本行位于sed命令的下方另起一行。如果要追加的内容超过一行，则每一行都必须以反斜线结束，最后一行除外。最后一行将以引号和文件名结束。</p>
+
+<p>例子：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &lsquo;/^hrwang/a\</li>
+<li>&gt;hrwang and mjfan are husband\</li>
+<li>&gt;and wife&rsquo; datafile</li>
+<li>#如果在datafile文件中发现匹配以hrwang开头的行，则在该行下面追加hrwang and mjfan are husband and wife</li>
+</ol>
+
+<p>8、i\ 命令</p>
+
+<p>i\ 命令是在当前行的前面插入新的文本。</p>
+
+<p>9、c\ 命令</p>
+
+<p>sed使用该命令将已有文本修改成新的文本。</p>
+
+<p>10、n命令</p>
+
+<p>sed使用该命令获取输入文件的下一行，并将其读入到模式缓冲区中，任何sed命令都将应用到匹配行紧接着的下一行上。</p>
+
+<p>例如：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &lsquo;/hrwang/{n;s/My/Your/;}&rsquo; datafile</li>
+</ol>
+
+<p>注：如果需要使用多条命令，或者需要在某个地址范围内嵌套地址，就必须用花括号将命令括起来，每行只写一条命令，或这用分号分割同一行中的多条命令。</p>
+
+<p>11、y命令</p>
+
+<p>该命令与UNIX/Linux中的tr命令类似，字符按照一对一的方式从左到右进行转换。例如，y/abc/ABC/将把所有小写的a转换成A，小写的b转换成B，小写的c转换成C。</p>
+
+<p>例如：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &lsquo;1,20y/hrwang12/HRWANG^$/&rsquo; datafile</li>
+<li>#将1到20行内，所有的小写hrwang转换成大写，将1转换成^,将2转换成$。</li>
+<li>#正则表达式元字符对y命令不起作用。与s命令的分隔符一样，斜线可以被替换成其它的字符。</li>
+</ol>
+
+<p>12、q命令</p>
+
+<p>q命令将导致sed程序退出，不再进行其它的处理。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &lsquo;/hrwang/{s/hrwang/HRWANG/;q;}&rsquo; datafile</li>
+</ol>
+
+<p>13、h命令和g命令</p>
+
+<p>为了更好说明这两个命令，我们先创建如下的文本文件：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>#cat datafile</li>
+<li>My name is hrwang.</li>
+<li>Your name is mjfan.</li>
+<li>hrwang is mjfan&rsquo;s husband.</li>
+<li>mjfan is hrwang&rsquo;s wife.</li>
+</ol>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -e &lsquo;/hrwang/h&rsquo; -e &lsquo;$G&rsquo; datafile</li>
+<li>sed -e &lsquo;/hrwang/H&rsquo; -e &lsquo;$G&rsquo; datafile</li>
+<li>#通过上面两条命令，你会发现h会把原来暂存缓冲区的内容清除，只保存最近一次执行h时保存进去的模式空间的内容。而H命令则把每次匹配hrwnag的行都追加保存在暂存缓冲区。</li>
+<li>5. sed -e &lsquo;/hrwang/H&rsquo; -e &lsquo;$g&rsquo; datafile</li>
+<li>sed -e &lsquo;/hrwang/H&rsquo; -e &lsquo;$G&rsquo; datafile</li>
+<li>#通过上面两条命令，你会发现g把暂存缓冲区中的内容替换掉了模式空间中当前行的内容，此处即替换了最后一行。而G命令则把暂存缓冲区的内容追加到了模式空间的当前行后。此处即追加到了末尾。</li>
+</ol>
+
+<p>补充知识点：sed特殊用法</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -n &lsquo;/root/w a.txt&rsquo; #将匹配行输出到文件</li>
+<li>3. sed &lsquo;/root/r abc.txt&rsquo; /etc/passwd #把abc.txt的文件内容读入到root匹配行后</li>
+<li>5. sed -n &lsquo;/root/w a.txt&rsquo;</li>
+<li>7. sed -n &lsquo;/root/{=;p}&rsquo; /etc/passwd #打印行号和匹配root的行</li>
+<li>9. sed -n &lsquo;/root/{n;d}&rsquo; /etc/passwd #将匹配root行的下一行删除</li>
+<li>11. sed -n &lsquo;/root/{N;d}&rsquo; /etc/passwd #将匹配root行和下一行都删除</li>
+<li>13. sed &lsquo;22{h;d};23,33{H;d};44G&rsquo; pass</li>
+</ol>
+
+<h2 id="七-sed脚本编写方法">七、sed脚本编写方法</h2>
+
+<p>1、从文件读入命令</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -f sed.sh</li>
+</ol>
+
+<p>sed.sh文件内容：</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>s/root/yerik/p</li>
+<li>s/bash/csh/p</li>
+</ol>
+
+<p>2、直接运行脚本 ./sed.sh /etc/passwd</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>#!/bib/sed -f</li>
+<li>s/root/yerik/p</li>
+<li>s/bash/csh/p</li>
+</ol>
+
+<h2 id="八-小技巧">八、小技巧</h2>
+
+<p>1、用sed 输出自己的IP 地址</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>ifconfig eth0 |sed &lsquo;2p&rsquo; |sed &rsquo;s/^.<em>addr:/ /g&rsquo; |sed &rsquo;s/B.</em>$ / /g&rsquo;</li>
+</ol>
+
+<p>2、在sed的命令行中引用shell变量时要使用双引号，而不是通常所用的单引号。下面是一个根据name变量的内容来删除named.conf文件中zone段的脚本：</p>
+
+<p>name=&lsquo;zone\ &ldquo;localhost&rdquo;&rsquo;</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &ldquo;/$name/,/};/d&rdquo; named.conf</li>
+</ol>
+
+<p>3、保持和获取：h命令和G命令</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>$ sed -e &lsquo;/test/h&rsquo; -e &lsquo;$G example</li>
+</ol>
+
+<p>在sed处理文件的时候，每一行都被保存在一个叫模式空间的临时缓冲区中，除非行被删除或者输出被取消，否则所有被处理的行都将打印在屏幕上。接着模式空间被清空，并存入新的一行等待处理。在这个例子里，匹配test的行被找到后，将存入模式空间，h命令将其复制并存入一个称为保持缓存区的特殊缓冲区内。第二条语句的意思是，当到达最后一行后，G命令取出保持缓冲区的行，然后把它放回模式空间中，且追加到现在已经存在于模式空间中的行的末尾。在这个例子中就是追加到最后一行。简单来说，任何包含test的行都被复制并追加到该文件的末尾。</p>
+
+<p>4、保持和互换：h命令和x命令</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>$ sed -e &lsquo;/test/h&rsquo; -e &lsquo;/check/x&rsquo; example</li>
+</ol>
+
+<p>互换模式空间和保持缓冲区的内容。也就是把包含test与check的行互换。</p>
+
+<h2 id="九-练习">九、练习</h2>
+
+<p>1，删除文件每行的第一个字符。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -n &rsquo;s/^.//gp&rsquo; /etc/passwd</li>
+<li>sed -nr &rsquo;s/(.)(.*)/\2/p&rsquo; /etc/passwd</li>
+</ol>
+
+<p>2，删除文件每行的第二个字符。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/(.)(.)(.*)/\1\3/p&rsquo; /etc/passwd</li>
+</ol>
+
+<p>3，删除文件每行的最后一个字符。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/.$//p&rsquo; /etc/passwd</li>
+<li>sed -nr &rsquo;s/(.*)(.)/\1/p&rsquo; /etc/passwd</li>
+</ol>
+
+<p>4，删除文件每行的倒数第二个字符。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/(.*)(.)(.)/\1\3/p&rsquo; /etc/passwd</li>
+</ol>
+
+<p>5，删除文件每行的第二个单词。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/([^a-Z]<em>)([a-Z]+)([^a-Z]+)([a-Z]+)(.</em>)/\1\2\3\5/p&rsquo; /etc/passwd</li>
+</ol>
+
+<p>6，删除文件每行的倒数第二个单词。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/(.<em>)([^a-Z]+)([a-Z]+)([^a-Z]+)([a-Z]+)([^a-Z]</em>)/\1\2\4\5\6/p&rsquo; /etc/samba/smb.conf</li>
+</ol>
+
+<p>7，删除文件每行的最后一个单词。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/(.<em>)([^a-Z]+)([a-Z]+)([^a-Z]</em>)/\1\2\4/p&rsquo; /etc/samba/smb.conf</li>
+</ol>
+
+<p>8，交换每行的第一个字符和第二个字符。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/(.)(.)(.*)/\2\1\3/p&rsquo; /etc/passwd</li>
+</ol>
+
+<p>9，交换每行的第一个单词和第二个单词。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/([^a-Z]<em>)([a-Z]+)([^a-Z]+)([a-Z]+)(.</em>)/\1\4\3\2\5/p&rsquo; /etc/samba/smb.conf</li>
+</ol>
+
+<p>10，交换每行的第一个单词和最后一个单词。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/([^a-Z]<em>)([a-Z]+)([^a-Z]+)([a-Z]+)(.</em>)/\1\4\3\2\5/p&rsquo; /etc/passwd</li>
+</ol>
+
+<p>11，删除一个文件中所有的数字。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &rsquo;s/[0-9]*//g&rsquo; /etc/passwd</li>
+</ol>
+
+<p>12，删除每行开头的所有空格。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -n &rsquo;s/^\ *//p&rsquo; /etc/samba/smb.conf</li>
+<li>sed -nr &rsquo;s/( <em>)(.</em>)/\2/p&rsquo; testp</li>
+</ol>
+
+<p>13，用制表符替换文件中出现的所有空格。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -n &rsquo;s/\ /\t/gp&rsquo; pass</li>
+</ol>
+
+<p>14，把所有大写字母用括号（）括起来。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/([A-Z])/(&amp;)/gp&rsquo; testp</li>
+<li>sed -n &rsquo;s/[A-Z]/(&amp;)/gp&rsquo; testp</li>
+</ol>
+
+<p>15，打印每行3次。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &lsquo;p;p&rsquo; pass</li>
+</ol>
+
+<p>16，隔行删除。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -n &lsquo;1~2p&rsquo; pass</li>
+</ol>
+
+<p>17，把文件从第22行到第33行复制到第44行后面。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &lsquo;1,21h;22h;23,33H;44G&rsquo; pass</li>
+</ol>
+
+<p>18，把文件从第22行到第33行移动到第44行后面。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed &lsquo;22{h;d};23,33{H;d};44G&rsquo; pass</li>
+</ol>
+
+<p>19，只显示每行的第一个单词。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/([^a-Z]<em>)([a-Z]+)([^a-Z]+)(.</em>)/\2/p&rsquo; /etc/passwd</li>
+</ol>
+
+<p>20，打印每行的第一个单词和第三个单词。</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>sed -nr &rsquo;s/([^a-Z]<em>)([a-Z]+)([^a-Z]+)([a-Z]+)([^a-Z]+)([a-Z]+)(.</em>)/\2&ndash;\4/p&rsquo; /etc/passwd</li>
+</ol>
+
+<p>21，将格式为 mm/yy/dd 的日期格式换成 mm；yy；dd</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>date +%m/%Y/%d |sed -n &rsquo;s#/#;#gp&rsquo;</li>
+</ol>
+
+<p>22, 逆向输出</p>
+
+<p><strong>[plain]</strong> view plain copy</p>
+
+<ol>
+<li>cat a.txt</li>
+<li>ABC</li>
+<li>DEF</li>
+<li>XYZ</li>
+<li>输出样式变成</li>
+<li>XYZ</li>
+<li>DEF</li>
+<li>ABC<br /></li>
+</ol>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>02shell文本处理三剑客之sed | 开发者问答集锦</title>
+    <meta property="og:title" content="02shell文本处理三剑客之sed - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="02shell文本处理三剑客之sed">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/02shell%E6%96%87%E6%9C%AC%E5%A4%84%E7%90%86%E4%B8%89%E5%89%91%E5%AE%A2%E4%B9%8Bsed/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">02shell文本处理三剑客之sed</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>sed 是流编辑器，但是它不会修改源文件。</p>
+
+<p>sed (流文本编辑器)<br />
+用法：sed OPTIONS… [SCRIPT] [INPUTFILE…]<br />
+-r: 使用扩展的正则表达式;<br />
+-n, –quiet, –silent: 不输出模式空间的内容；<br />
+-i：直接编辑原文件；<br />
+-e: -e ” -e ” -e ”<br />
+‘CMD1;CMD2;CMD3’<br />
+-f /path/to/sed_script：从指定的文件读取处理脚本</p>
+
+<p><strong>1 模式空间是什么？</strong><br />
+模式空间其实就是内存中一个空间，归sed所有s。ed读取流文本文件的时候，每次读取一行，然后载入内存中，这个内存就成为模式空间。那么我们编辑的内容是属于模式空间中的内容，而不是源文件内容。</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '1,10d' /etc/fstab 
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]# cat /etc/fstab 
+
+#
+# /etc/fstab
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>sed ‘1,10d’ /etc/fstab
+这一句语句的执行逻辑是，sed把内容读到模式空间中，判断是不是1——10的内容，是的话执行删除命令d,所以删除了1——10行内容，11行以后的内容就显示出来了。<br />
+sed的工作流程可以总结为：<br />
+第一步：提取一行内容到模式空间<br />
+第二步：针对模式空间中的内容执行编辑命令。<br />
+第三步：将模式空间中的内容进行输出。<br />
+第四步：清空模式空间。</p>
+
+<p><strong>2 地址定界：</strong><br />
+#（行号）: 指定行<br />
+$: 最后一行<br />
+/regexp/：任何能够被regexp匹配到的行<br />
+\%regexp%: 任何能够被regexp匹配到的行；换用%为边界符号；<br />
+/regexp/I<br />
+\%regexp%I：匹配时忽略字符大小写；<br />
+addr1, addr2: 指定范围内的所有行：<br />
+1·,/regexp/<br />
+#（行号）,#（行号）<br />
+/regexp/,/regexp/<br />
+#(行号),+#<br />
+first~step：指定起始位置，以及步长 1~3</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '$d' /etc/fstab 
+
+#
+# /etc/fstab
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>以上功能是删除了最后一行。</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '/dev/d' /etc/fstab 
+
+#
+# /etc/fstab
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]# sed '\%/dev/mapper%d' /etc/fstab 
+
+#
+# /etc/fstab
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]# sed '1+2d' /etc/fstab 
+sed: -e expression #1, char 2: unknown command: `+'
+[root@hadoop1 shelltest]# sed '1,+2d' /etc/fstab 
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]# sed '1~2d' /etc/fstab 
+#
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+#
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+[root@hadoop1 shelltest]#
+
+
+基本正则表达式元字符：
+    字符：.  []  [^]
+    次数：*, \+, \?, \{i,j\}
+    分组：\(\)
+    锚定：^, $, \
+    或者：|
+    后向引用：\1, \2, ...
+
+编辑命令：
+    注意：命令之前可以使用!表示取反操作；
+
+    =: 显示行号
+        # sed -n '\%/dev/mapper%=' /etc/fstab
+
+    d: 删除匹配到的行；
+    p: 打印模式空间中的内容；
+        通常与-n选项一同使用；
+    a \text: append，
+        a \text1\ntext2\ntext3: 附加多行文本
+    i \text：insert, 
+        i \text1\ntext2: 插入多行文本
+    c \text: change，把匹配到的行替换为给定的文本
+    s///: 替换命令
+        g: 全局替换
+        i: 不区分大小写
+
+
+
+[root@hadoop1 shelltest]# sed -n '\%/dev/%=' /etc/fstab 
+6
+12
+13
+[root@hadoop1 shelltest]# sed -n '5,7p' /etc/fstab
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>追加：</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '1a \xielaoshi' /etc/fstab 
+
+xielaoshi
+#
+# /etc/fstab
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>还可以同时执行多条命令：</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '1d;2p;3=' /etc/fstab 
+#
+#
+3
+# /etc/fstab
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>替换：</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '3c \bbbb' /etc/fstab 
+
+#
+bbbb
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]#
+
+
+[root@hadoop1 shelltest]# sed 's/dev/xielaoshi/' /etc/fstab 
+
+#
+# /etc/fstab
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# Accessible filesystems, by reference, are maintained under '/xielaoshi/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /xielaoshi/shm                tmpfs   defaults        0 0
+xielaoshipts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]#
+</code></pre>
+
+<p>全局替换：</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed 's/dev/xielaoshi/g' /etc/fstab 
+
+#
+# /etc/fstab
+# Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+# Accessible filesystems, by reference, are maintained under '/xielaoshi/disk'
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /xielaoshi/shm                tmpfs   defaults        0 0
+xielaoshipts                  /xielaoshi/pts                xielaoshipts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]#
+</code></pre>
+
+<p><strong>3 练习</strong><br />
+练习1：删除/boot/grub/grub.conf文件中所以空白开头的行行首的空白；</p>
+
+<pre><code>[root@hadoop1 shelltest]# cat /boot/grub/grub.conf 
+# grub.conf generated by anaconda
+#
+# Note that you do not have to rerun grub after making changes to this file
+# NOTICE:  You have a /boot partition.  This means that
+#          all kernel and initrd paths are relative to /boot/, eg.
+#          root (hd0,0)
+#          kernel /vmlinuz-version ro root=/dev/sda2
+#          initrd /initrd-[generic-]version.img
+#boot=/dev/sda
+default=0
+timeout=5
+splashimage=(hd0,0)/grub/splash.xpm.gz
+hiddenmenu
+title CentOS (2.6.32-431.el6.x86_64)
+    root (hd0,0)
+    kernel /vmlinuz-2.6.32-431.el6.x86_64 ro root=UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 rd_NO_LUKS rd_NO_LVM LANG=en_US.UTF-8 rd_NO_MD SYSFONT=latarcyrheb-sun16 crashkernel=auto  KEYBOARDTYPE=pc KEYTABLE=us rd_NO_DM rhgb quiet
+    initrd /initramfs-2.6.32-431.el6.x86_64.img
+[root@hadoop1 shelltest]# sed 's/^[[:space:]]\+//g' /boot/grub/grub.conf
+# grub.conf generated by anaconda
+#
+# Note that you do not have to rerun grub after making changes to this file
+# NOTICE:  You have a /boot partition.  This means that
+#          all kernel and initrd paths are relative to /boot/, eg.
+#          root (hd0,0)
+#          kernel /vmlinuz-version ro root=/dev/sda2
+#          initrd /initrd-[generic-]version.img
+#boot=/dev/sda
+default=0
+timeout=5
+splashimage=(hd0,0)/grub/splash.xpm.gz
+hiddenmenu
+title CentOS (2.6.32-431.el6.x86_64)
+root (hd0,0)
+kernel /vmlinuz-2.6.32-431.el6.x86_64 ro root=UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 rd_NO_LUKS rd_NO_LVM LANG=en_US.UTF-8 rd_NO_MD SYSFONT=latarcyrheb-sun16 crashkernel=auto  KEYBOARDTYPE=pc KEYTABLE=us rd_NO_DM rhgb quiet
+initrd /initramfs-2.6.32-431.el6.x86_64.img
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>练习2：删除/etc/fstab文件中所有以#开头，后跟至少一个空白字符的行的行首的#和空白字符；</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed 's/^#[[:space:]]\+//g' /etc/fstab 
+
+#
+/etc/fstab
+Created by anaconda on Tue Jan 26 09:32:28 2016
+#
+Accessible filesystems, by reference, are maintained under '/dev/disk'
+See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info
+#
+UUID=b8a0a61e-c5e1-40e7-9a4f-e9a9096565a9 /                       ext4    defaults        1 1
+UUID=a4623924-f98a-47c9-a9e7-38c06e0fc7f6 /boot                   ext4    defaults        1 2
+UUID=04777095-5e99-46d5-87cf-1bc6665635ee swap                    swap    defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults        0 0
+devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>练习3：echo一个文件路径给sed命令，取出其基名；取出其目录名；</p>
+
+<pre><code>[root@hadoop1 shelltest]# echo &quot;/etc/sysconfig/&quot; | sed 's@[^/]\{1,\}/\?$@@g'
+/etc/
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>练习4：替换/etc/inittab文件“id:数字:initdefault:”一行中的那个数字为6；</p>
+
+<pre><code>[root@hadoop1 shelltest]# cat /etc/inittab 
+# inittab is only used by upstart for the default runlevel.
+#
+# ADDING OTHER CONFIGURATION HERE WILL HAVE NO EFFECT ON YOUR SYSTEM.
+#
+# System initialization is started by /etc/init/rcS.conf
+#
+# Individual runlevels are started by /etc/init/rc.conf
+#
+# Ctrl-Alt-Delete is handled by /etc/init/control-alt-delete.conf
+#
+# Terminal gettys are handled by /etc/init/tty.conf and /etc/init/serial.conf,
+# with configuration in /etc/sysconfig/init.
+#
+# For information on how to write upstart event handlers, or how
+# upstart works, see init(5), init(8), and initctl(8).
+#
+# Default runlevel. The runlevels used are:
+#   0 - halt (Do NOT set initdefault to this)
+#   1 - Single user mode
+#   2 - Multiuser, without NFS (The same as 3, if you do not have networking)
+#   3 - Full multiuser mode
+#   4 - unused
+#   5 - X11
+#   6 - reboot (Do NOT set initdefault to this)
+# 
+id:5:initdefault:
+[root@hadoop1 shelltest]# sed 's@id:[0-9]:initdefault:@id:6:initdefault@' /etc/inittab 
+# inittab is only used by upstart for the default runlevel.
+#
+# ADDING OTHER CONFIGURATION HERE WILL HAVE NO EFFECT ON YOUR SYSTEM.
+#
+# System initialization is started by /etc/init/rcS.conf
+#
+# Individual runlevels are started by /etc/init/rc.conf
+#
+# Ctrl-Alt-Delete is handled by /etc/init/control-alt-delete.conf
+#
+# Terminal gettys are handled by /etc/init/tty.conf and /etc/init/serial.conf,
+# with configuration in /etc/sysconfig/init.
+#
+# For information on how to write upstart event handlers, or how
+# upstart works, see init(5), init(8), and initctl(8).
+#
+# Default runlevel. The runlevels used are:
+#   0 - halt (Do NOT set initdefault to this)
+#   1 - Single user mode
+#   2 - Multiuser, without NFS (The same as 3, if you do not have networking)
+#   3 - Full multiuser mode
+#   4 - unused
+#   5 - X11
+#   6 - reboot (Do NOT set initdefault to this)
+# 
+id:6:initdefault
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p><strong>4 高级编辑命令：</strong><br />
+h: 用模式空间中的内容覆盖保持空间中的内容；<br />
+H：把模式空间中的内容追求至保持空间；<br />
+g: get, 从保持空间取回数据至模式空间，覆盖模式空间中原有的内容；<br />
+G：GET, 从保持空间取回数据至模式空间，追加于模式空间中现有的内容后面；<br />
+x: 把模式空间和保持空间中的内容进行交换；<br />
+n: 读取匹配到的行下一行至模式空间；<br />
+N: 追加读匹配到的行下一行至模式空间；<br />
+d: 删除模式空间中的内容；<br />
+D：删除多行模式空间中首行；<br />
+sed ‘1!G;h;$!d’ FILE</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '1!G;h;$!d' /etc/issue
+
+Kernel \r on an \m
+CentOS release 6.5 (Final)
+[root@hadoop1 shelltest]# cat /etc/issue
+CentOS release 6.5 (Final)
+Kernel \r on an \m
+
+[root@hadoop1 shelltest]# 
+
+
+    显示文件的偶数行：sed -n 'n;p' FILE;     sed -n '2~2p' FILE
+        1
+        2
+        3
+        4
+
+    显示文件的奇数行：sed -n 'p;n' FILE;     sed -n '1~2;p' FILE
+</code></pre>
+
+<p>练习：用sed将文件的奇数行与偶数行合并为一行，中间用“&amp;&amp;”隔开；</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '$!N;s@\n@\&amp;\&amp;@g' /etc/issue
+CentOS release 6.5 (Final)&amp;&amp;Kernel \r on an \m
+
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>5 课后练习：说明以下sed命令的意义：<br />
+(1) sed ‘ !N; !D’ /etc/issue</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '$!N;$!D' /etc/issue
+Kernel \r on an \m
+
+[root@hadoop1 shelltest]# cat /etc/issue
+CentOS release 6.5 (Final)
+Kernel \r on an \m
+
+[root@hadoop1 shelltest]#
+</code></pre>
+
+<p>(2) sed ‘$!d’ /etc/issue<br />
+删除非尾行。<br />
+(3) sed ‘G’ /etc/issue</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed 'G' /etc/issue
+CentOS release 6.5 (Final)
+
+Kernel \r on an \m
+
+
+
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>因为保持空间里面都是空的，所以追加到模式空间后面全是空行。<br />
+(4) sed ‘/^$/d;G’ /etc/issue</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed '/^$/d;G' /etc/issue
+CentOS release 6.5 (Final)
+
+Kernel \r on an \m
+
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>(5) sed ‘n;d’ /etc/issue</p>
+
+<pre><code>[root@hadoop1 shelltest]# sed 'n;d' /etc/issue
+CentOS release 6.5 (Final)
+
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p>(6) sed -n ‘1!G;h;$p’ /etc/issue</p>
+
+<pre><code>[root@hadoop1 shelltest]# cat /etc/issue
+CentOS release 6.5 (Final)
+Kernel \r on an \m
+
+[root@hadoop1 shelltest]# 
+</code></pre>
+
+<p><strong>6 参考资料</strong><br />
+模式空间和保持空间的理解：<br />
+什么是模式空间和保持空间</p>
+
+<p>O(∩∩)O嗯!O(∩∩)O嗯!O(∩_∩)O嗯!今天就写到这里，休息一下。如果你看到此文，想进一步学习或者和我沟通，加我微信公众号：名字：五十年后 。<br />
+<a href="https://img.it610.com/image/info8/95e778e865884197a62f90c85badc918.jpg"><img src="https://img.it610.com/image/info8/95e778e865884197a62f90c85badc918.jpg" alt="02-shell文本处理三剑客之sed_第1张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

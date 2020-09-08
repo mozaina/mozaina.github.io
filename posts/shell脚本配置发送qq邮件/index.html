@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本配置发送QQ邮件 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本配置发送QQ邮件 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本配置发送QQ邮件">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E9%85%8D%E7%BD%AE%E5%8F%91%E9%80%81qq%E9%82%AE%E4%BB%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本配置发送QQ邮件</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<pre><code>* 方法一
+  * 1进入QQ邮箱网页界面客服端
+  * 2用root用户，执行脚本
+* 方法二：
+</code></pre>
+
+<h2 id="方法一">方法一</h2>
+
+<h3 id="1进入qq邮箱网页界面客服端">1进入QQ邮箱网页界面客服端</h3>
+
+<p>①点击设置 ====》点击账户<br />
+<a href="https://img.it610.com/image/info8/133c4aaa48034656a25a10ad9ef2a375.jpg"><img src="https://img.it610.com/image/info8/133c4aaa48034656a25a10ad9ef2a375.jpg" alt="Shell
+脚本配置发送QQ邮件_第1张图片" /></a><br />
+② 开启SMTP服务 ====》生成授权码<br />
+<a href="https://img.it610.com/image/info8/a8d5b2210cd141f58a2ec5264caa04a6.jpg"><img src="https://img.it610.com/image/info8/a8d5b2210cd141f58a2ec5264caa04a6.jpg" alt="Shell
+脚本配置发送QQ邮件_第2张图片" /></a></p>
+
+<h3 id="2用root用户-执行脚本">2用root用户，执行脚本</h3>
+
+<pre><code>#!/bin/bash
+
+. /etc/init.d/functions
+
+if [ $# -ne 0 ];then
+    echo &quot;Usage: sh `basename $0`&quot;
+    exit 1
+fi
+
+frommail='1937859795@qq.com'
+smtp_host='smtp.qq.com'
+smtp_auth_user='1937859795@qq.com'
+smpt_auth_password='kgnydypviahxidda'
+certs_dir=/root/.certs
+mail_conf=/etc/mail.rc
+
+
+content=`cat $mail_conf |grep 'smtp-auth-user'`
+if [ &quot;x$content&quot; != &quot;x&quot;  ];then
+   action  &quot;'$mail_conf' 文件已经配置&quot; /bin/true
+   exit 1
+fi
+
+
+cat &gt;&gt; $mail_conf &lt;&lt;EOF 
+set from=$frommail
+set smtp=$smtp_host
+set smtp-auth-user=$smtp_auth_user
+set smtp-auth-password=$smpt_auth_password
+set smtp-auth=login
+set smtp-use-starttls
+set ssl-verify=ignore
+set nss-config-dir=$certs_dir
+EOF
+
+[ $? -eq 0  ] &amp;&amp; action &quot;配置$mail_conf文件&quot; /bin/true
+
+[ ! -d $certs_dir ] &amp;&amp; mkdir -p $certs_dir
+echo -n | openssl s_client -connect $smtp_host:465 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' &gt; $certs_dir/qq.crt
+certutil -A -n &quot;GeoTrust SSL CA&quot; -t &quot;C,,&quot; -d $certs_dir -i $certs_dir/qq.crt
+certutil -A -n &quot;GeoTrust Global CA&quot; -t &quot;C,,&quot; -d $certs_dir -i $certs_dir/qq.crt
+certutil -L -d $certs_dir
+
+[ $? -eq 0  ] &amp;&amp; action &quot;生成证书&quot; /bin/true
+</code></pre>
+
+<p>执行</p>
+
+<pre><code>[root@flink01 ~]# sh auto_mail_config.sh 
+配置/etc/mail.rc文件                                       [  OK  ]
+depth=2 C = US, O = DigiCert Inc, OU = www.digicert.com, CN = DigiCert Global Root CA
+verify return:1
+depth=1 C = US, O = DigiCert Inc, OU = www.digicert.com, CN = GeoTrust RSA CA 2018
+verify return:1
+depth=0 C = CN, ST = Guangdong, L = Shenzhen, O = Tencent Technology (Shenzhen) Company Limited, OU = R&amp;D, CN = pop.qq.com
+verify return:1
+DONE
+
+Certificate Nickname                                         Trust Attributes
+                                                             SSL,S/MIME,JAR/XPI
+
+GeoTrust SSL CA                                              C,,  
+生成证书                                                   [  OK  ]
+</code></pre>
+
+<p>发送邮件</p>
+
+<pre><code>[root@flink01 ~]# echo  hello kzw | mailx -v -s &quot; title&quot; 1937859795@qq.com
+</code></pre>
+
+<p>最后到邮箱查收，成功收到邮件！<br />
+<a href="https://img.it610.com/image/info8/b0607d13961241e0b17746293f9c1907.jpg"><img src="https://img.it610.com/image/info8/b0607d13961241e0b17746293f9c1907.jpg" alt="Shell
+脚本配置发送QQ邮件_第3张图片" /></a></p>
+
+<h2 id="方法二">方法二：</h2>
+
+<p>①与方法一中的第一步还是一样，必不可少，打开服务协议，生成验证码<br />
+②停止发邮件服务</p>
+
+<pre><code>[root@hadoop002 ~]service sendmail stop
+sendmail: unrecognized service
+[root@hadoop002 ~]chkconfig sendmail off
+</code></pre>
+
+<p>③开启postfix服务</p>
+
+<pre><code>[root@hadoop002  ~]# service postfix status
+master is stopped
+[root@hadoop002  ~]# service postfix start
+Starting postfix:                                          [  OK  ]
+[root@hadoop002  ~]#service postfix status
+Redirecting to /bin/systemctl status  postfix.service
+● postfix.service - Postfix Mail Transport Agent
+   Loaded: loaded (/usr/lib/systemd/system/postfix.service; enabled; vendor preset: disabled)
+   Active: active (running) since Fri 2019-08-23 15:42:20 CST; 47min ago
+  Process: 3102 ExecStart=/usr/sbin/postfix start (code=exited, status=0/SUCCESS)
+  Process: 3099 ExecStartPre=/usr/libexec/postfix/chroot-update (code=exited, status=0/SUCCESS)
+  Process: 3094 ExecStartPre=/usr/libexec/postfix/aliasesdb (code=exited, status=0/SUCCESS)
+ Main PID: 3174 (master)
+</code></pre>
+
+<p>④，修改 inet_interfaces(记得先关闭防火墙）<br />
+注意参数看仔细，是inet_interface <strong>s</strong> 而不是inet_interface</p>
+
+<pre><code>vi /etc/postfix/main.cf
+inet_interfaces = all
+inet_protocols = ipv4
+</code></pre>
+
+<p>⑤创建认证 （直接拷贝命令执行即可，这里顺便贴出执行成功的效果）</p>
+
+<pre><code>[root@hadoop002  ~]# mkdir -p /root/.certs/
+[root@hadoop002 .certs]# echo -n | openssl s_client -connect smtp.qq.com:465 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' &gt; ~/.certs/qq.crt
+depth=2 C = US, O = DigiCert Inc, OU = www.digicert.com, CN = DigiCert Global Root CA
+verify return:1
+depth=1 C = US, O = DigiCert Inc, OU = www.digicert.com, CN = GeoTrust RSA CA 2018
+verify return:1
+depth=0 C = CN, ST = Guangdong, L = Shenzhen, O = Tencent Technology (Shenzhen) Company Limited, OU = R&amp;D, CN = pop.qq.com
+verify return:1
+DONE
+[root@hadoop002 .certs]# ll
+total 64
+-rw------- 1 root root 65536 Aug 23 16:13 cert8.db
+-rw------- 1 root root 16384 Aug 23 16:13 key3.db
+-rw-r--r-- 1 root root  2529 Aug 23 16:14 qq.crt
+-rw------- 1 root root 16384 Aug 23 15:49 secmod.db
+[root@hadoop002 .certs]# certutil -A -n &quot;GeoTrust SSL CA&quot; -t &quot;C,,&quot; -d ~/.certs -i ~/.certs/qq.crt
+[root@hadoop002 .certs]# certutil -A -n &quot;GeoTrust Global CA&quot; -t &quot;C,,&quot; -d ~/.certs -i ~/.certs/qq.crt
+[root@hadoop002 .certs]# certutil -L -d ~/.certs
+
+Certificate Nickname                                         Trust Attributes
+                                                             SSL,S/MIME,JAR/XPI
+
+GeoTrust SSL CA                                              C,,  
+[root@hadoop002 .certs]# certutil -A -n &quot;GeoTrust SSL CA - G3&quot; -t &quot;Pu,Pu,Pu&quot; -d ./ -i qq.crt
+Notice: Trust flag u is set automatically if the private key is present.
+</code></pre>
+
+<p>⑥配置邮件发送读者，修改mail.rc参数，末尾直接添加<br />
+vi /etc/mail.rc</p>
+
+<pre><code>set from=1937859795@qq.com
+set smtp=smtp.qq.com
+set smtp-auth-user=1937859795
+#授权码（第一步生成的授权码）
+set smtp-auth-password=sokiolestmlzdddf
+set smtp-auth=login
+set smtp-use-starttls
+set ssl-verify=ignore
+set nss-config-dir=/root/.certs
+</code></pre>
+
+<p>⑦，发送一个测试邮件 (后面的邮箱可以填任意收件人邮箱）</p>
+
+<pre><code>echo hello email| mail -s &quot; title&quot; 1937859795@qq.com
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/937b2d757c454b4c9f8d1cc1bd8ba5a8.jpg"><img src="https://img.it610.com/image/info8/937b2d757c454b4c9f8d1cc1bd8ba5a8.jpg" alt="Shell
+脚本配置发送QQ邮件_第4张图片" /></a><br />
+发送有内容的邮件<br />
+cat filename| mail -s &ldquo; title&rdquo; 1937859795@qq.com</p>
+
+<p>⑧发送打附件的邮件</p>
+
+<pre><code>[root@hadoop002 .certs]#echo -e &quot;`date &quot;+%Y-%m-%d %H:%M:%S&quot;` : Please to check the fail sql attachement.&quot; |
+mailx \
+-r &quot;From: alertAdmin &lt;1937859795@qq.com&gt;&quot; \
+-a qq.crt \
+-s &quot;Critical:KSSH fail sql.&quot; 1937859795@qq.com
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/8266158d83b04e76bdf5ad7142de8c80.jpg"><img src="https://img.it610.com/image/info8/8266158d83b04e76bdf5ad7142de8c80.jpg" alt="Shell
+脚本配置发送QQ邮件_第5张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

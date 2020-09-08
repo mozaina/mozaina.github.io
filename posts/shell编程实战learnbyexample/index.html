@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell编程实战LearnByExample | 开发者问答集锦</title>
+    <meta property="og:title" content="shell编程实战LearnByExample - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell编程实战LearnByExample">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E7%BC%96%E7%A8%8B%E5%AE%9E%E6%88%98learnbyexample/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell编程实战LearnByExample</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h1 id="shell编程实战-learn-by-example">shell编程实战——Learn By Example</h1>
+
+<p>2010-11-16 星期二 清冷</p>
+
+<p>一直都是在命令行上使用shell命令，但是却没有写过shell脚本，今天刚好要将国际站的所有代码拉到本地grep看修改点。人肉肯定是不行的，分支实在太多了，写个shell脚本吧^_^</p>
+
+<p><strong>svncotrunk.sh</strong></p>
+
+<pre><code>#!/bin/bash
+
+### 从svn上将指定的SVN URL递归将所有应用的trunk(有时间改成支持pattern)分支co到本地目录 ###
+# 例如： svnco http://svn.alibaba-inc.com/repos/ali_intl/apps/intl-biz/escrow/ destdir（目标根目录，默认是当前目录）
+#
+#输入：svnurl
+#操作：将给定URL的所有应用拉到本地某个目录（默认是当前目录）
+#算法：
+# 如果svnurl包含trunk，则直接svn co svnurl substr(svnurl)/trunk
+# 否则如果svnurl包含branch/tags，则直接忽略（因为branch/tags分支太多了，需要额外信息明确要co的分支）
+# 否则，说明这是在上层目录中，对svnurl的每个子目录，递归做上面的操作(递归终止条件：svnurl含有branch/tags/trunk 或者 &gt; maxdepth=5)
+
+## Shell脚本中的函数必须先定义后调用，一般把函数定义都写在脚本的前面，把函数调用和其它命令写在脚本的最后
+## 参数：当一个函数被调用时，脚本程序的位置参数$*、$@、$#、$1, $2, ..等会被替换成函数的参数。这个跟shell的命令行参数是一样的处理方式。当函数执行完毕，这些参数会恢复它们先前的值。
+## 局部变量：可以使用local关键字在shell函数中声明局部变量，局部变量将局限在函数的作用范围内。
+## 返回值：如果在函数里没有使用return命令指定一个返回值，函数返回的就是执行的最后一条命令的退出码; 如果return后面跟一个数字则表示函数的Exit Status。shell的函数返回值只能是整数，作为函数的退出状态，and this exit status is assigned to the variable $?.
+
+## 检查给字符串是不是以某个子字符串结尾
+end_with()
+{
+    local src=$1
+    local pattern=$2
+
+    ret=`echo $src | grep $pattern$`
+
+    if [ -z &quot;$ret&quot; ] #not found
+    then
+        return 1
+    else
+        return 0
+    fi
+}
+
+## 检查给定字符串是不是包含指定子字符串
+# 这里用来判断是否包含/trunk/tags/branches
+contains()
+{
+    local src=$1
+        local pattern=$2
+
+    ret=`echo $src | grep $pattern`
+
+    if [ -z &quot;$ret&quot; ] #not found
+    then
+        return 1
+    else
+        return 0
+    fi
+}
+
+## 从svnurl中获取保存本地的目录名
+## 如：http://svn.alibaba-inc.com/repos/ali_intl/apps/intl-biz/escrow/trunk/ ==&gt; ali_intl/apps/intl-biz/escrow/
+##    http://svn.alibaba-inc.com/repos/ali_intl/apps/intl-biz/escrow/trade/trunk/biztrade/ ==&gt; ali_intl/apps/intl-biz/escrow/trade/biztrade/
+get_path_from_svnurl()
+{
+    local svnurl=$1
+    echo $svnurl | sed 's#http://svn.alibaba-inc.com/repos/##' | sed 's#trunk/##'
+}
+
+get_svncourl_from_svnurl()
+{
+    local svncourl=$1
+    svncourl=${svncourl%%trunk*} 
+    local TRUNK=&quot;trunk/&quot;
+    echo $svncourl$TRUNK
+}
+
+### 从svn上将指定的SVN URL递归将所有应用的trunk(有时间改成支持pattern)分支co到本地目录 ###
+# 例如： svnco http://svn.alibaba-inc.com/repos/ali_intl/apps/intl-biz/escrow/ destdir（目标根目录，默认是当前目录）
+function svncotrunk(){
+    #为了方便后面的判断和子svnurl拼接
+    if end_with $1 &quot;/&quot;; then
+        local svnurl=&quot;$1&quot;
+    else
+        local svnurl=&quot;$1/&quot;
+    fi
+
+    local depth=$2      
+
+    # 超过递归最大层次，退出   
+    if [ $depth -lt 0 ]; then
+        datetime=`date +&quot;%y-%m-%d %H:%M:%S&quot;`
+        echo &quot;$datetime ERROR: Recursive depth exceed $MAX_DEPTH for $svnurl&quot;
+        echo &quot;$datetime ERROR: Recursive depth exceed $MAX_DEPTH for $svnurl&quot; &gt;&gt; $SVN_CO_LOG
+        return 1
+    fi
+
+        # 注意Shell中的函数调用不写括号，否则会报错；参数之间是用空格隔开，而不是逗号
+    # Remember that the exit status of zero is a true condition in shell programming.
+    if contains $svnurl &quot;/archived/&quot;; then
+        echo &quot;Ignore archived url&quot;
+    elif contains $svnurl &quot;/trunk/&quot;; then
+            # 从svnurl中截取以trunk/结尾的那部分url 
+        local svncourl=`get_svncourl_from_svnurl $svnurl`
+        # 保存分支到一个统计文件
+        datetime=`date +&quot;%y-%m-%d %H:%M:%S&quot;`
+        echo &quot;$datetime==&gt;$svncourl&quot; &gt;&gt; $SVN_CO_LOG
+        local path=`get_path_from_svnurl $svncourl`
+        svn co $svncourl $path 
+    elif contains $svnurl &quot;/branches/&quot; || contains $svnurl &quot;/tags/&quot; || contains $svnurl &quot;/milestone/&quot;; then
+        echo &quot;This is a branch or tag or milestone, we don't deal with braches or tags or milestone right now!&quot;
+    else
+        subdirs=`svn ls $svnurl`
+        for subdir in $subdirs; do
+                subsvnurl=$svnurl$subdir
+        # Recursive
+            svncotrunk $subsvnurl `expr $depth - 1`  #注意减号两旁必须有空格，否则会被当作字符串拼接
+        done
+    fi
+}
+
+MAX_DEPTH=8
+
+# we have less than 1 argument. Print the help text:
+if [ $# -lt 1 ]; then
+cat&lt;&lt; HELP
+
+NAME
+    svncotrunk -- 从svn上将指定的SVN URL递归将所有子分支的trunk分支co到本地目录
+SYNOPSTS
+    svncotrunk svnurl [svnco.log path] [depth=8]
+DESCRIPTION
+    从svn上将指定的SVN URL递归将所有子分支的trunk分支co到本地目录, 将svn co分支保存在svnco.log文件中（如果没有指定文件，默认是当前目录下的svnco.log）
+
+例如： svncotrunk http://svn.alibaba-inc.com/repos/ali_intl/apps/intl-biz/escrow/ cohistory.log
+
+
+HELP
+   exit 0
+elif [ $# -eq 1 ]; then
+   SVN_CO_LOG=&quot;svnco.log&quot;
+   svncotrunk $1 MAX_DEPTH
+elif [ $# -eq 2 ]; then
+   SVN_CO_LOG=$2
+   svncotrunk $1 $MAX_DEPTH
+elif [ $# -ge 3 ]; then
+   MAX_DEPTH=$3
+   svncotrunk $1 $MAX_DEPTH
+fi
+</code></pre>
+
+<p>关于函数和返回值</p>
+
+<p>法一： 使用 return 这个命令，把函数中某个数值返回，其实是使用Exist Status作为返回值，使用$?接收返回值</p>
+
+<p>法二： 在函数中使用  echo 输出想要返回的结果，使用<code>function call</code>接收函数输出结果。</p>
+
+<p>Output can be in the form of <em>stdout</em> or a <em>return code</em> value or <em>both</em>.</p>
+
+<p>这两者往往是结合在一起的，如果你不想显示在stdout中显示函数的echo值，可以采用function &gt; /dev/null将函数的echo输出到黑洞中。</p>
+
+<p>参考资料：</p>
+
+<p>1. Shell 编程中的函数返回值
+<a href="http://hi.baidu.com/jidongxx/blog/item/03d06bf07e8049a2a50f5237.html">http://hi.baidu.com/jidongxx/blog/item/03d06bf07e8049a2a50f5237.html</a></p>
+
+<p>2. Functions <a href="http://www.injunea.demon.co.uk/pages/page212.htm">http://www.injunea.demon.co.uk/pages/page212.htm</a></p>
+
+<p>3. 13. Functions <a href="http://steve-parker.org/sh/functions.shtml">http://steve-parker.org/sh/functions.shtml</a></p>
+
+<p>4. Chapter 6. Exit and Exit Status <a href="http://www.faqs.org/docs/abs/HTML/exit-">http://www.faqs.org/docs/abs/HTML/exit-</a>
+status.html</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

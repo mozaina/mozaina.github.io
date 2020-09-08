@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell学习之四expect命令 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell学习之四expect命令 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell学习之四expect命令">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E5%AD%A6%E4%B9%A0%E4%B9%8B%E5%9B%9Bexpect%E5%91%BD%E4%BB%A4/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell学习之四expect命令</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>expect可以实现shell实现不了的用户交互的需求。expect可以将交互写在一个脚本上，完成很多自动化的动作，比如ssh、ftp登陆等，都是需要交互需求的。expect是需要安装的，直接yum
+-y install expect安装即可。</p>
+
+<p>expect的四个关键命令为：spawn、expect、send、set，其中spawn是调用要执行的命令，expect是等待命令提示信息的出现也即捕捉用户提示信息，send是发送需要交互的信息来替代手工的输入，set则是输入变量值。</p>
+
+<p><strong>一、expect关键语法</strong></p>
+
+<p>1、关键语法</p>
+
+<p>［#!/usr/bin/expect］
+这一行告诉操作系统脚本里的代码使用那一个shell来执行。这里的expect其实和linux下的bash、windows下的cmd是一类东西。
+注意：这一行需要在脚本的第一行。</p>
+
+<p>spawn 调用要执行的命令<br />
+expect
+只有spawn执行的命令的执行结果才被expect捕捉到，主要包括标准输入的提示信息、eof和timeout。等待命令提示信息的出现，也就是捕捉用户输入的提示：<br />
+send 发送需要交互的值，替代了用户手动输入内容<br />
+set 设置变量值<br />
+interact 执行完成后保持交互状态，把控制权交给控制台，这个时候就可以手工操作了。如果没有这一句登录完成后会退出，而不是留在远程终端上。<br />
+expect eof 这个一定要加，与spawn对应表示捕获终端输出信息终止，类似于if&hellip;.endif</p>
+
+<p>PS：expect脚本必须以interact或expect eof结束，执行自动化任务通常expect eof就够了。</p>
+
+<p>2、常见设置</p>
+
+<p>set timeout -1 设置expect永不超时</p>
+
+<p>set timeout 300 设置expect 300秒超时，如果超过300没有expect内容出现，则退出</p>
+
+<p>PS：为什么要设置超时时间，因为默认时间是10s，则在交互执行的过程中，很可能会断开，导致任务执行没完成就终止。我司的一个从远程ftp上同步文件的计划任务总是执行终止，后来设置了超时时间为-1就可以了。</p>
+
+<p><strong>二、expect的用法示例</strong></p>
+
+<p>1、一个简单的拉取文件的例子</p>
+
+<pre><code>#!/usr/bin/expect -f
+set passwd &quot;123456&quot;     ##这个是你设置的密码
+set timeout -1          ##设置超时时间
+spawn sftp -P 2022 Jmsftp@ftp.jms.com
+
+expect &quot;password:&quot;
+send &quot;$passwd\r&quot;
+expect &quot;sftp&gt;&quot;
+send &quot;get -r data/201711*\r&quot;
+expect &quot;sftp&gt;&quot;
+send &quot;exit\r&quot;
+interact
+</code></pre>
+
+<p>2、一个小例子，用于linux下账户的建立：</p>
+
+<pre><code>1 #!/usr/bin/expect
+  2
+  3 set passwd &quot;mypasswd&quot;    
+  4 set timeout 60           
+  5
+  6 if {$argc != 1} {
+  7     send &quot;usage ./account.sh \$newaccount\n&quot;
+  8     exit
+  9 }
+ 10
+ 11 set user [lindex $argv [expr $argc-1]]
+ 12
+ 13 spawn sudo useradd -s /bin/bash -g mygroup -m $user
+ 14
+ 15 expect {
+ 16     &quot;assword&quot; {
+ 17         send_user &quot;sudo now\n&quot;
+ 18         send &quot;$passwd\n&quot;
+ 19         exp_continue
+ 20     }
+ 21     eof
+ 22     {
+ 23         send_user &quot;eof\n&quot;
+ 24     }
+ 25 }
+ 26
+ 27 spawn sudo passwd $user
+ 28 expect {
+ 29     &quot;assword&quot; {
+ 30         send &quot;$passwd\n&quot;
+ 31         exp_continue
+ 32     }
+ 33     eof
+ 34     {
+ 35         send_user &quot;eof&quot;
+ 36     }
+ 37 }
+ 38
+ 39 spawn sudo smbpasswd -a $user
+ 40 expect {
+ 41     &quot;assword&quot; {
+ 42         send &quot;$passwd\n&quot;
+ 43         exp_continue
+ 44     }
+ 45     eof
+ 46     {
+ 47         send_user &quot;eof&quot;
+ 48     }
+ 49 }
+</code></pre>
+
+<p>以上脚本的注意点如下：<br />
+第3行： 对变量赋值的方法；<br />
+第4行： 默认情况下，timeout是10秒；<br />
+第6行： 参数的数目可以用$argc得到；<br />
+第11行：参数存在$argv当中，比如取第一个参数就是[lindex $argv 0]；并且如果需要计算的话必须用expr，如计算2-1，则必须用[expr
+2-1]；<br />
+第13行：用spawn来执行一条shell命令，shell命令根据具体情况可自行调整；有文章说sudo要加-S，经过实际测试，无需加-S亦可；<br />
+第15行：一般情况下，如果连续做两个expect，那么实际上是串行执行的，用例子中的结构则是并行执行的，主要是看匹配到了哪一个；在这个例子中，如果你写成串行的话，即<br />
+expect &ldquo;assword&rdquo;<br />
+send &ldquo;$passwd\n&rdquo;<br />
+expect eof<br />
+send_user &ldquo;eof&rdquo;<br />
+那么第一次将会正确运行，因为第一次sudo时需要密码；但是第二次运行时由于密码已经输过（默认情况下sudo密码再次输入时间为5分钟），则不会提示用户去输入，所以第一个expect将无法匹配到assword，而且必须注意的是如果是spawn命令出现交互式提问的但是expect匹配不上的话，那么程序会按照timeout的设置进行等待；可是如果spawn直接发出了eof也就是本例的情况，那么expect
+&ldquo;assword&rdquo;将不会等待，而直接去执行expect eof。<br />
+这时就会报expect: spawn id exp6 not
+open，因为没有spawn在执行，后面的expect脚本也将会因为这个原因而不再执行；所以对于类似sudo这种命令分支不定的情况，最好是使用并行的方式进行处理；<br />
+第17行：仅仅是一个用户提示而已，可以删除；<br />
+第18行：向spawn进程发送password；<br />
+第19行：使得spawn进程在匹配到一个后再去匹配接下来的交互提示；<br />
+第21行：eof是必须去匹配的，在spawn进程结束后会向expect发送eof；如果不去匹配，有时也能运行，比如sleep多少秒后再去spawn下一个命令，但是不要依赖这种行为，很有可能今天还可以，明天就不能用了；</p>
+
+<p>3、下面这个例子比较特殊，在整个过程中就不能expect eof了</p>
+
+<pre><code>1  #!/usr/bin/expect
+ 2   set mypassword=123456
+ 3  set timeout 30
+ 4  spawn ssh 10.192.224.224
+ 5  expect &quot;password:&quot;
+ 6  send &quot;mypassword\n&quot;
+ 7  expect &quot;*$&quot;
+ 8  send &quot;mkdir tmpdir\n&quot;
+ 9  expect &quot;*$&quot;
+</code></pre>
+
+<p>这个例子实际上是通过ssh去登录远程机器，并且在远程机器上创佳一个目录，我们看到在我们输入密码后并没有去expect
+eof，这是因为ssh这个spawn并没有结束，而且手动操作时ssh实际上也不会自己结束除非你exit；所以你只能expect
+bash的提示符，当然也可以是机器名等，这样才可以在远程创建一个目录。注意，请不要用spawn mkdir
+tmpdir，这样会使得上一个spawn即ssh结束，那么你的tmpdir将在本机建立。当然实际情况下可能会要你确认ssh
+key，可以通过并行的expect进行处理，不多赘述。</p>
+
+<p>PS:在shell脚本中插入expect命令，格式为如下</p>
+
+<pre><code>#!/bin/sh
+expect &lt;&quot;
+send &quot;mkdir xxxxx\r&quot;
+send &quot;exit\r&quot;
+expect eof
+!          ##结尾
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

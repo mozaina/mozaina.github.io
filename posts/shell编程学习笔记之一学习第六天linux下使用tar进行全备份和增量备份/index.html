@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell编程学习笔记之一学习第六天Linux下使用tar进行全备份和增量备份 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell编程学习笔记之一学习第六天Linux下使用tar进行全备份和增量备份 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell编程学习笔记之一学习第六天Linux下使用tar进行全备份和增量备份">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E7%BC%96%E7%A8%8B%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0%E4%B9%8B%E4%B8%80%E5%AD%A6%E4%B9%A0%E7%AC%AC%E5%85%AD%E5%A4%A9linux%E4%B8%8B%E4%BD%BF%E7%94%A8tar%E8%BF%9B%E8%A1%8C%E5%85%A8%E5%A4%87%E4%BB%BD%E5%92%8C%E5%A2%9E%E9%87%8F%E5%A4%87%E4%BB%BD/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell编程学习笔记之一学习第六天Linux下使用tar进行全备份和增量备份</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<h3 id="文章目录">文章目录</h3>
+
+<ul>
+<li>一、说明：
+
+<ul>
+<li>1、整理一些linux命令必须熟练掌握常的命令（复习+扩展学习Linux命令）</li>
+<li>2、Linux下vim/vi 编辑器 命令总结</li>
+<li>3、学习课件：</li>
+<li>4、之前的shell学习笔记：</li>
+</ul></li>
+<li>二、实战演练（全备份和增量备份）
+
+<ul>
+<li>1、全局备份：
+
+<ul>
+<li>第一步：生成一个测试文件</li>
+<li>第二步：tar备份压缩</li>
+<li>第三步：查看压缩包里面的内容：</li>
+<li>第四步：删除test1目录（模拟数据丢失）并恢复备份：</li>
+</ul></li>
+<li>2、增量备份（不是接着删除后恢复的步骤）：
+
+<ul>
+<li>第一步：新增文件+修改之前的文件，模拟正常工作情况下的数据情况：</li>
+<li>第二步：增量备份（数据不丢失情况下）：</li>
+</ul></li>
+<li>3、如果结果第一步删除然后恢复的操作：</li>
+<li>4、数据丢失的恢复：（接着第2增量备份）
+
+<ul>
+<li>数据恢复一定要按时间顺序从早到后进行恢复（具体指先恢复第一次的全部备份，然后增量备份从先到后加压恢复，因为后面的修改文件可以覆盖前面的修改文件）</li>
+</ul></li>
+<li>5、总结下我的理解全部备份和增量备份：
+
+<ul>
+<li>第一个难点：（根据指纹信息来进行增量备份还是全部备份）</li>
+<li>第二个难点：（文件丢失后，解压恢复后的文件，再次进行备份肯定是全局备份）</li>
+</ul></li>
+<li>6、每周日进行一个备份，每日进行一个全局备份
+
+<ul>
+<li>1、tar: Removing leading `/&rsquo; from member names错误问题：</li>
+<li>2、最终我修改可以的代码：</li>
+</ul></li>
+</ul></li>
+</ul>
+
+<h1 id="一-说明">一、说明：</h1>
+
+<p>打算从B站学习一下shell编程，从很多的课程视频中，挑选了一个：<br />
+B站视频地址：<br />
+打算开始学习着做着笔记：<br />
+这个需要一些Linux基础，还有vim的，如果不太熟练，可以看下我之前的整理的俩个博客：</p>
+
+<h2 id="1-整理一些linux命令必须熟练掌握常的命令-复习-扩展学习linux命令">1、整理一些linux命令必须熟练掌握常的命令（复习+扩展学习Linux命令）</h2>
+
+<p>整理一些linux命令必须熟练掌握常的命令（复习+扩展学习Linux命令）</p>
+
+<h2 id="2-linux下vim-vi-编辑器-命令总结">2、Linux下vim/vi 编辑器 命令总结</h2>
+
+<p>Linux下vim/vi 编辑器 命令总结</p>
+
+<h2 id="3-学习课件">3、学习课件：</h2>
+
+<p>这个地址我直接把B站中评论下方分享的弄出来了，如果失效，可以下方评论，我把我下载的分享给你。<br />
+下载地址</p>
+
+<h2 id="4-之前的shell学习笔记">4、之前的shell学习笔记：</h2>
+
+<p>shell编程学习笔记之–学习第一天<br />
+shell编程学习笔记之–学习第二天<br />
+shell编程学习笔记之–学习第三天<br />
+shell编程学习笔记之一–学习第四天<br />
+shell编程学习笔记之一–学习第五天</p>
+
+<h1 id="二-实战演练-全备份和增量备份">二、实战演练（全备份和增量备份）</h1>
+
+<p>这个地方我跟着视频看完了，但是有些地方没有懂，后来自己测试之后才懂，就是使用tar进行全备份和增量备份时候，-g后面跟的参数(可以理解备份文件的指纹信息)不一定放在tmp下，因为tmp和window的temp的目录差不多，就是临时文件，所以我猜想视频的讲解者也是习惯性的放在那个位置，注意后面跟的文件是这种：<br />
+第二行的一串数字是时间戳和一些其他的内容，应该用来对比的。而且后面跟的文件也可以随意命名，不过一个目录备份要命名一样，主要就是根据命名文件中的时间戳进行增量备份和全备份的。</p>
+
+<pre><code>GNU tar-1.26-2
+1574926024^@94209664^@0^@1574925940^@517187692^@64769^@2515024^@test1^@N1^@N2^@N3^@N4^@N5^@Ya^@Yb^@Yc^@Yd^@Ye^@^@^@
+~ 
+</code></pre>
+
+<h2 id="1-全局备份">1、全局备份：</h2>
+
+<h3 id="第一步-生成一个测试文件">第一步：生成一个测试文件</h3>
+
+<p>创建一个目录和一些文件：</p>
+
+<p>创建目录：</p>
+
+<pre><code>$mkdir test1
+</code></pre>
+
+<p>创建5个文件</p>
+
+<pre><code>$touch test1/{1,2,3,4,5}
+</code></pre>
+
+<p>查看创建的文件：</p>
+
+<pre><code>$ll test1/
+total 0
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 15:03 1
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 15:03 2
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 15:03 3
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 15:03 4
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 15:03 5
+</code></pre>
+
+<p>查看目前的文件：（可以看出目前只有一个test1目录）</p>
+
+<pre><code>$ls
+test1
+</code></pre>
+
+<h3 id="第二步-tar备份压缩">第二步：tar备份压缩</h3>
+
+<pre><code>$tar -g abcdefg -czvf backup_full.tar.gz test1/
+tar: test1: Directory is new
+test1/
+test1/1
+test1/2
+test1/3
+test1/4
+test1/5
+</code></pre>
+
+<p>这个时候当前目录生成了俩个文件：<br />
+一个是备份的压缩文件，一个就是我前面说的-g后面的参数文件，用来储存一个时间戳和其他信息的。</p>
+
+<pre><code>$ls
+abcdefg  backup_full.tar.gz  test1
+</code></pre>
+
+<h3 id="第三步-查看压缩包里面的内容">第三步：查看压缩包里面的内容：</h3>
+
+<pre><code>$tar ztf backup_full.tar.gz
+test1/
+test1/1
+test1/2
+test1/3
+test1/4
+test1/5
+</code></pre>
+
+<h3 id="第四步-删除test1目录-模拟数据丢失-并恢复备份">第四步：删除test1目录（模拟数据丢失）并恢复备份：</h3>
+
+<p>删除，查看：</p>
+
+<pre><code>$rm -rf test1
+$ls
+11backup.sh  abcdefg  backup_full.tar.gz
+</code></pre>
+
+<p>解压备份文件：</p>
+
+<pre><code>$tar -zxvf backup_full.tar.gz
+test1/
+test1/1
+test1/2
+test1/3
+test1/4
+test1/5
+</code></pre>
+
+<p>查看恢复文件：</p>
+
+<pre><code>$ls
+11backup.sh  abcdefg  backup_full.tar.gz  test1
+$ll test1/
+total 0
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 1
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 2
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 3
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 4
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 5
+</code></pre>
+
+<h2 id="2-增量备份-不是接着删除后恢复的步骤">2、增量备份（不是接着删除后恢复的步骤）：</h2>
+
+<p>这个就是在第一个基础上对新增加或者修改的文件进行增量备份（也可以理解为对修改的文件或者新增的文件单独备份），不是接着删除恢复的步骤。<br />
+记得增量备份的压缩包要和全局备份不能一样，后面的每个全局备份也不能一样。</p>
+
+<h3 id="第一步-新增文件-修改之前的文件-模拟正常工作情况下的数据情况">第一步：新增文件+修改之前的文件，模拟正常工作情况下的数据情况：</h3>
+
+<p>新增文件：</p>
+
+<pre><code>$touch test1/{a,b,c,d,e}
+</code></pre>
+
+<p>查看新增成功：</p>
+
+<pre><code>$ll test1/
+total 0
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 1
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 2
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 3
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 4
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:19 5
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:31 a
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:31 b
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:31 c
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:31 d
+-rw-r--r-- 1 wb-zjf497303 users 0 Nov 28 16:31 e
+</code></pre>
+
+<p>修改文件：</p>
+
+<pre><code>$echo zhaojiafu &gt; test1/1
+</code></pre>
+
+<p>查看已经修改成功：</p>
+
+<pre><code>$cat test1/1
+zhaojiafu
+</code></pre>
+
+<h3 id="第二步-增量备份-数据不丢失情况下">第二步：增量备份（数据不丢失情况下）：</h3>
+
+<p>这个有一点需要注意：（如果之前备份的删掉，然后进行重新解压出来的，再次进行备份，会当成全局备份，tar命令会认为没有之前备份，估计和备份目录的文件修改时间戳有关，这个只是我的猜想那个指纹快照和这个需要备份创建的所有目录和文件的最后修改时间有关，感兴趣的可以在多了解了解，如果有人知道增量备份原理，欢迎下方赐教哈）</p>
+
+<p>这个结果模拟数据不丢失情况下的增量备份。</p>
+
+<pre><code>$tar -g abcdefg -zcvf backup_add1.tar.gz test1/
+test1/
+test1/1
+test1/a
+test1/b
+test1/c
+test1/d
+test1/e
+</code></pre>
+
+<p>从结果来看，新增的备份中只有修改的1文件和新增的a-e几个文件，原来的文件没有再次备份，达到了增量备份的效果。</p>
+
+<h2 id="3-如果结果第一步删除然后恢复的操作">3、如果结果第一步删除然后恢复的操作：</h2>
+
+<p>如果结果第一步删除然后恢复的操作：会把所有文件再次备份（也就是全部备份，和第一个的全局备份没有什么区别，为什么会这样?我的猜想写道刚刚增量备份里面的第二步里面了，所有我后来又重新创建新的目录和文件，测试数据不丢失的情况下的增量备份。）</p>
+
+<h2 id="4-数据丢失的恢复-接着第2增量备份">4、数据丢失的恢复：（接着第2增量备份）</h2>
+
+<p>查看当前数据：</p>
+
+<pre><code>$ls
+abcdefg  backup_add1.tar.gz  backup_full.tar.gz  test1
+</code></pre>
+
+<p>删除test1目录，模拟数据丢失：</p>
+
+<pre><code>$rm -rf test1/
+$ls
+abcdefg  backup_add1.tar.gz  backup_full.tar.gz
+</code></pre>
+
+<p><strong>准备数据恢复：</strong></p>
+
+<h4 id="数据恢复一定要按时间顺序从早到后进行恢复-具体指先恢复第一次的全部备份-然后增量备份从先到后加压恢复-因为后面的修改文件可以覆盖前面的修改文件">数据恢复一定要按时间顺序从早到后进行恢复（具体指先恢复第一次的全部备份，然后增量备份从先到后加压恢复，因为后面的修改文件可以覆盖前面的修改文件）</h4>
+
+<p>比如我的解压恢复顺序：</p>
+
+<p>解压恢复最初的全部备份</p>
+
+<pre><code>$tar -zxvf backup_full.tar.gz
+test1/
+test1/1
+test1/2
+test1/3
+test1/4
+test1/5
+</code></pre>
+
+<p>解压后面更多的增量备份</p>
+
+<pre><code>$tar -zxvf backup_add1.tar.gz
+test1/
+test1/1
+test1/a
+test1/b
+test1/c
+test1/d
+test1/e
+</code></pre>
+
+<p>当然实际工作中，肯定是还有更多的<code>backup_add</code>压缩文件，需要更多的<code>tar -zxvf backup_add</code>解压恢复命令。</p>
+
+<p>到这里我也就理解了，为什么要用日期来进行增量备份的文件压缩名称了，这样更能方便根据顺序进行恢复，后续还需要每周或者每月的全局备份。</p>
+
+<h2 id="5-总结下我的理解全部备份和增量备份">5、总结下我的理解全部备份和增量备份：</h2>
+
+<h3 id="第一个难点-根据指纹信息来进行增量备份还是全部备份">第一个难点：（根据指纹信息来进行增量备份还是全部备份）</h3>
+
+<p>单个周期的全部备份和增量备份，需要的指纹快照，也就是我例子中的<code>-g</code>后面跟的<br />
+<code>abcdefg</code>文件，是否能够增量也是根据这个进行的。<br />
+比如：我把<code>abcdefg</code>删除进行测试我的猜想。</p>
+
+<p>先查看数据：</p>
+
+<pre><code>$ll
+total 16
+-rw-r--r-- 1 wb-zjf497303 users  111 Nov 28 16:58 abcdefg
+-rw-r--r-- 1 wb-zjf497303 users  280 Nov 28 16:58 backup_add1.tar.gz
+-rw-r--r-- 1 wb-zjf497303 users  231 Nov 28 16:54 backup_full.tar.gz
+drwxr-xr-x 2 wb-zjf497303 users 4096 Nov 28 16:55 test1
+
+
+
+$ll test1/
+total 4
+-rw-r--r-- 1 wb-zjf497303 users 10 Nov 28 16:55 1
+-rw-r--r-- 1 wb-zjf497303 users  0 Nov 28 16:54 2
+-rw-r--r-- 1 wb-zjf497303 users  0 Nov 28 16:54 3
+-rw-r--r-- 1 wb-zjf497303 users  0 Nov 28 16:54 4
+-rw-r--r-- 1 wb-zjf497303 users  0 Nov 28 16:54 5
+-rw-r--r-- 1 wb-zjf497303 users  0 Nov 28 16:55 a
+-rw-r--r-- 1 wb-zjf497303 users  0 Nov 28 16:55 b
+-rw-r--r-- 1 wb-zjf497303 users  0 Nov 28 16:55 c
+-rw-r--r-- 1 wb-zjf497303 users  0 Nov 28 16:55 d
+-rw-r--r-- 1 wb-zjf497303 users  0 Nov 28 16:55 e
+
+
+
+$rm -rf abcdefg
+
+
+
+$tar -g abcdefg -zcvf backup_full2.tar.gz test1/
+tar: test1: Directory is new
+test1/
+test1/1
+test1/2
+test1/3
+test1/4
+test1/5
+test1/a
+test1/b
+test1/c
+test1/d
+test1/e
+</code></pre>
+
+<p>可以看出，因为之前的<code>指纹</code>（应该其他称呼，我这里就称之为<code>指纹</code>）被删除，所以这里再次进行压缩备份，就是全局备份，而不是之前的增量备份。这也就是我刚开始看到课件和视频，俩个代码不是一样么？为什么后面的命令就是变成增量备份了呐？直到我的一点点的摸索，发现就是和这个<code>指纹</code>信息有关。</p>
+
+<h3 id="第二个难点-文件丢失后-解压恢复后的文件-再次进行备份肯定是全局备份">第二个难点：（文件丢失后，解压恢复后的文件，再次进行备份肯定是全局备份）</h3>
+
+<p>模仿文件丢失，进行删除test1目录时，虽然可以恢复文件都是和原来的一样，但是这时候指纹信息已经更改，所以再次按照增量备份命令，其实这时候已经变成全局备份了，（我的猜想是和每个文件和目录创建的时间还有关，因为恢复解压的文件可是和之前的文件创建时间戳肯定不一样，所以就认为指纹信息不符合所以进行的是全部备份。）</p>
+
+<h2 id="6-每周日进行一个备份-每日进行一个全局备份">6、每周日进行一个备份，每日进行一个全局备份</h2>
+
+<h3 id="1-tar-removing-leading-from-member-names错误问题">1、tar: Removing leading `/’ from member names错误问题：</h3>
+
+<p>跟着视频会改好代码之后会出现这个错误，然后需要修改参数，主要是tar主要使用相对路径，如果使用绝对路径，需要加个参数<code>P</code>，这个地方很重要。</p>
+
+<p>这个主要问题视频中没有讲解，最终我找到了解决方法：</p>
+
+<h3 id="2-最终我修改可以的代码">2、最终我修改可以的代码：</h3>
+
+<p>记得自己新建一个存放指纹的目录，然后修改。后续的备份也是这个目录，比如我的代码中的设置目录为：</p>
+
+<pre><code>TARGET_DIR=/home/temp/backup
+</code></pre>
+
+<p>sh文件代码：我把我看懂的都讲解放到代码中了，如果有问题欢迎沟通一起讨论哈。</p>
+
+<pre><code>#!/bin/bash
+#Automatic Backup Linux System Files
+#by Author zhaojiafu 2019-11-28
+#Define Variable
+
+
+#1、需要备份的目录
+SOURCE_DIR=(
+$*
+)
+#2、备份到目标地址
+TARGET_DIR=/home/temp/backup
+#3、年
+YEAR=`date +%Y`
+#4、月
+MONTH=`date +%m`
+#5、日
+DAY=`date +%d`
+#6、周几
+WEEK=`date +%u`
+#7、时分 字符串 用来创建备份名称
+A_NAME=`date +%H%M`
+FILES=system_backup.tgz
+CODE=$?
+
+#判断是否输入需要备份的目录地址参数
+if [ -z &quot;$*&quot; ];then
+        echo  -e &quot;\033[32mUsage:\nPlease  Enter Your Backup Files or Directories\n--------------------------------------------\n
+        \nUsage: { $0 /boot /etc}\033[0m&quot;
+        exit
+fi
+
+#判断是否含有备份 年/月/日的文件夹，没有会创建
+#Determine Whether the Target Directory Exists
+if [ ! -d $TARGET_DIR/$YEAR/$MONTH/$DAY ];then
+        mkdir -p $TARGET_DIR/$YEAR/$MONTH/$DAY
+        echo -e &quot;\033[32mThe $TARGET_DIR Created Successfully !\033[0m&quot;
+fi
+
+
+#全部备份（每周日）
+#EXEC Full_Backup Function Command
+Full_Backup(){
+        # 判断是否是周日，如果是周日，进行一个将之前的指纹信息删除，然后进入今天的目录下，创建新的全部备份
+        if [ &quot;$WEEK&quot; -eq &quot;7&quot; ];then
+                rm -rf $TARGET_DIR/snapshot
+                cd $TARGET_DIR/$YEAR/$MONTH/$DAY ;
+                tar -g $TARGET_DIR/snapshot -czvPf $FILES ${SOURCE_DIR[@]}
+                [ &quot;$CODE&quot; == &quot;0&quot; ]&amp;&amp;echo -e &quot;--------------------------------------------\n\033[32mThese Full_Backup System Files Backup Successfully !\033[0m&quot;
+
+        fi
+}
+
+
+#每天的增量备份
+#Perform incremental BACKUP Function Command
+Add_Backup(){
+        #判断是否是周日，如果不是周日就直接进入今天（系统tr日期的今天）的目录，进行一个增量备份（这个没有删除指纹操作）
+        echo $WEEK
+        if [ $WEEK -ne &quot;7&quot; ];then
+                cd $TARGET_DIR/$YEAR/$MONTH/$DAY
+                tar -g $TARGET_DIR/snapshot -czvPf  $A_NAME$FILES  ${SOURCE_DIR[@]}
+                [ &quot;$CODE&quot; == &quot;0&quot; ] &amp;&amp; echo -e &quot;-----------------------------------------\n\033[32mThese Add_Backup System Files $TARGET_DIR/$YEAR/$MONTH/$DAY/${YEAR}_$A_NAME$FILES Backup Successfully !\033[0m&quot;
+        fi
+}
+sleep 3
+Full_Backup;Add_Backup
+</code></pre>
+
+<p>最终运行来个简单示例：</p>
+
+<p><strong>比如第一次备份，全局备份</strong></p>
+
+<pre><code>$sh 11backup.sh /home/zjf/shell_study/day01/
+4
+tar: /home/zjf/shell_study/day01: Directory is new
+/home/zjf/shell_study/day01/
+/home/zjf/shell_study/day01/first_shell.sh
+/home/zjf/shell_study/day01/first_shell2.sh
+/home/zjf/shell_study/day01/if_is_dir.sh
+/home/zjf/shell_study/day01/if_text.sh
+/home/zjf/shell_study/day01/is_file.sh
+/home/zjf/shell_study/day01/score.sh
+/home/zjf/shell_study/day01/test.txt
+/home/zjf/shell_study/day01/var.sh
+/home/zjf/shell_study/day01/var2.sh
+-----------------------------------------
+These Add_Backup System Files /home/zjf/temp/backup/2019/11/28/2019_1853system_backup.tgz Backup Successfully !
+</code></pre>
+
+<p><strong>新增加入几个文件</strong></p>
+
+<pre><code>$touch ../day01/{1,2,3}
+</code></pre>
+
+<p><strong>再次备份效果</strong></p>
+
+<pre><code>$sh 11backup.sh /home/zjf/shell_study/day01/
+4
+/home/zjf/shell_study/day01/
+/home/zjf/shell_study/day01/1
+/home/zjf/shell_study/day01/2
+/home/zjf/shell_study/day01/3
+-----------------------------------------
+These Add_Backup System Files /home/zjf/temp/backup/2019/11/28/2019_1854system_backup.tgz Backup Successfully !
+</code></pre>
+
+<p>好了，完美结束，虽然今天就学习了这一个知识点，虽说学的不多，但是我觉得学会才是第一位，不聪明就多努力吧，加油！！！</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

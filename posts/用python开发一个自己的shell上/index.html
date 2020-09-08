@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>用python开发一个自己的shell上 | 开发者问答集锦</title>
+    <meta property="og:title" content="用python开发一个自己的shell上 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="用python开发一个自己的shell上">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%94%A8python%E5%BC%80%E5%8F%91%E4%B8%80%E4%B8%AA%E8%87%AA%E5%B7%B1%E7%9A%84shell%E4%B8%8A/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">用python开发一个自己的shell上</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>﻿﻿</p>
+
+<p>我很好奇 shell（比如 bash、cash等）内部的工作原理，所以我用 Python 实现了 <strong>yosh</strong> （Your Own
+Shell）来满足自己的好奇心。我在本文中阐释的概念同样适用于其他语言。</p>
+
+<p><strong>Step 0: 项目结构</strong></p>
+
+<p>在这个项目中，我使用了下面的结构：</p>
+
+<p>![]()![]()</p>
+
+<p>yosh_project 是项目根文件夹（你也可以用 yosh 来命名）。yosh 是包文件夹，<strong>init</strong>.py 会让包与文件夹同名（如果你不写
+python，可以忽略这点）。shell.py 是主要的 shell 文件。</p>
+
+<p>Step 1: Shell 循环启动 shell 时，它会立刻展示命令提示符并等待输入。在接收到命令并执行完毕（细节会在后面讲到）后，shell
+会再次回到等待循环，准备接收下一条命令</p>
+
+<p>。在 shell.py 中，我们通过主函数调用 shell_loop() 函数，来启动循环。代码如下：</p>
+
+<p>![]()</p>
+
+<p>然后在 <code>shell_loop()</code> 函数中，使用 <code>status</code> 标志来表示循环是否应该继续。在循环开始时，shell
+将立即显示命令提示符，并等待输入。</p>
+
+<p>![]()</p>
+
+<p>接下来，对输入的命令进行切分（tokenize），并执行（稍后会实现 <code>tokenize</code> 和 <code>execute</code> 函数）。</p>
+
+<p>现在，<code>shell_loop()</code> 函数应该如下：</p>
+
+<p>![]()</p>
+
+<p>上述就是整个的 shell 循环。如果通过 python shell.py 启动
+shell，会立即显示命令提示符。但是如果我们输入命令并回车，就会抛出错误，因为我们还没有定义 tokenize 函数。要退出 shell，可以使用
+ctrl-c，稍后我会介绍如何优雅地终止 shell。</p>
+
+<p>Step 2: 切分（Tokenization）</p>
+
+<p>用户在 shell 中键入命令并按下回车时，输入的命令是一条长长的字符串，其中包含了命令名以及参数。因此，我们必须将其切分（将字符串拆分成多个
+token）。</p>
+
+<p>字符串切分乍一看很简单。我们可能会使用 cmd.split() 根据空格来分割输入的命令。对于形如 ls -a my_folder 的命令是奏效的，因为
+cmd.split() 会将其拆分为一个列表 — [&lsquo;ls&rsquo;, &lsquo;-a&rsquo;, &lsquo;my_folder’]，这样我们使用起来就比较容易了。</p>
+
+<p>但是，某些情况下，某些参数会带有单引号或者双引号，比如 echo &ldquo;Hello World” 或者 echo &lsquo;Hello World’。如果我们使用
+cmd.split(), 将会得到一个包含三个 token 的列表 — [&lsquo;echo&rsquo;, &lsquo;&ldquo;Hello&rsquo;, &lsquo;World”’]，而不是包含两个 token
+的列表 — [&lsquo;echo&rsquo;, &lsquo;Hello World’]。</p>
+
+<p>幸运地是，Python 提供了一个叫做 shlex 的库，可以很好地帮助我们分词（注：我们也可以使用正则表达式，但这不是本文的重点）。</p>
+
+<p>![]()</p>
+
+<p>然后，我们将这些 token 传给执行进程。</p>
+
+<p>Step 3: 执行</p>
+
+<p>这是 shell 核心，而且也是有趣的部分。shell 执行 mkdir test_dir 时会发生什么呢？（注：mkdir 是一个程序，传递
+test_dir 参数执行后会创建名为 test_dir 的目录）。这一步中涉及的第一个函数是 execvp。在解释 execvp
+的功能之前，让我们先来实际使用一下。</p>
+
+<p>![]()</p>
+
+<p>尝试再次运行 shell 并输入命令 mkdir test_dir，然后回车。</p>
+
+<p>现在的问题是，我们敲击回车后，shell 并未等待下一条命令，而是终止了。但是目录成功被创建。</p>
+
+<p>所以，execvp 到底做了什么呢？</p>
+
+<p>execvp 是系统调用 exec 的一个变种。第一个参数是程序名。v 表示第二个参数是程序参数列表（可变的参数个数）。p 表示 PATH
+环境将用于搜索给定的程序名。在我们之前的尝试中，mkdir 程序就是基于 PATH 环境变量。（exec 还有其他变种，比如
+execv、execvpe、execl、execlp、execlpe等，你可以google一下获取更多信息。）exec
+会将当前调用进程的内存，替换为一个即将执行的进程。在我们的示例中，shell 进程的内存被 mkdir 程序替换。然后 mkdir 变为主进程，并创建
+test_dir 目录，最后进程终止。</p>
+
+<p>这里最主要的一点是，shell 进程已经被 mkdir 进程取代。这也是为什么 shell 会终止而不是等待下一条命令。所以，我们需要另外一个系统调用
+fork 来解决这个问题。</p>
+
+<p>fork 会分配新的内存，并将现有进程拷贝到新的进程，我们称这个新进程为子进程，调用进程为父进程。之后，执行过 exec
+的程序将会取代子进程。因此，作为父进程的 shell 就不用进行内存替换了。</p>
+
+<p>下面是修改后的代码：</p>
+
+<p>![]()</p>
+
+<p>当父进程调用 os.fork() 时，你可以认为所有的源码都被拷贝到子进程。这时父子进程的代码相同，而且并行执行。</p>
+
+<p>运行的代码若属于子进程，pid 为 0；若属于父进程，pid 为子进程的 id。</p>
+
+<p>如果 os.execvp 在子进程中被调用，子进程的所有源码将被调用程序的源码替换掉。但是，父进程的代码没有改变。父进程等待子进程终止后，会返回继续
+shell 循环的状态。</p>
+
+<p>运行：</p>
+
+<p>现在你可以尝试运行我们自己打造的 shell ，并键入 mkdir test_dir2。shell应该会正常运转，而且 shell
+进程会继续等待你输入下一条命令。尝试 ls 命令就会看到已创建的目录。但是，还是存在一些问题。</p>
+
+<p>第一点，输入 cd test_dir2 ，然后再输入 ls，应该会进入到 test_dir2这个空目录中，但是目录并没有切换到 test_dir2。</p>
+
+<p>第二点，我们仍不能优雅地退出 shell。</p>
+
+<p>上述问题将会在 Part2 中解决。</p>
+
+<p>shell.py代码如下</p>
+
+<p>import sys<br />
+import shlex<br />
+import os</p>
+
+<p>SHELL_STATUS_RUN=1</p>
+
+<p>SHELL_STATUS_STOP=0</p>
+
+<p>def tokenize(string):<br />
+return shlex.split(string)</p>
+
+<p>def execute(cmd_tokens):<br />
+pid=os.fork()<br />
+if pid==0:<br />
+os.execvp(cmd_tokens[0],cmd_tokens)<br />
+elif pid&gt;0:<br />
+while True:<br />
+wpid,status=os.waitpid(pid,0)<br />
+if os.WIFEXITED(status) or os.WISIGNALED(status):<br />
+break<br />
+return SHELL_STATUS_RUN</p>
+
+<p>def shell_loop():<br />
+status=SHELL_STATUS_RUN<br />
+while status==SHELL_STATUS_RUN:<br />
+sys.stdout.write(&lsquo;&gt; &lsquo;)<br />
+sys.stdout.flush()</p>
+
+<p>cmd=sys.stdin.readline()<br />
+cmd_tokens=tokenize(cmd)<br />
+status=execute(cmd_tokens)</p>
+
+<p>def main():<br />
+shell_loop()</p>
+
+<p>if <strong>name</strong>==&rdquo;<strong>main</strong>&ldquo;:<br />
+main()</p>
+
+<p>图片显示不了。如下是原网址：</p>
+
+<p><a href="http://toutiao.com/a6324809935478800641/?tt_from=mobile_qq&amp;utm_campaign=client_share&amp;app=news_article&amp;utm_source=mobile_qq&amp;iid=5329820054&amp;utm_medium=toutiao_android">http://toutiao.com/a6324809935478800641/?tt_from=mobile_qq&amp;utm_campaign=client_share&amp;app=news_article&amp;utm_source=mobile_qq&amp;iid=5329820054&amp;utm_medium=toutiao_android</a></p>
+
+<p><a href="http://toutiao.com/a6324856009526690049/?tt_from=mobile_qq&amp;utm_campaign=client_share&amp;app=news_article&amp;utm_source=mobile_qq&amp;iid=5329820054&amp;utm_medium=toutiao_android">http://toutiao.com/a6324856009526690049/?tt_from=mobile_qq&amp;utm_campaign=client_share&amp;app=news_article&amp;utm_source=mobile_qq&amp;iid=5329820054&amp;utm_medium=toutiao_android</a></p>
+
+<p>﻿﻿</p>
+
+<p>﻿﻿</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

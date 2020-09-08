@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Redis伪集群及哨兵集群配置教程和shell脚本编写 | 开发者问答集锦</title>
+    <meta property="og:title" content="Redis伪集群及哨兵集群配置教程和shell脚本编写 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Redis伪集群及哨兵集群配置教程和shell脚本编写">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/redis%E4%BC%AA%E9%9B%86%E7%BE%A4%E5%8F%8A%E5%93%A8%E5%85%B5%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AE%E6%95%99%E7%A8%8B%E5%92%8Cshell%E8%84%9A%E6%9C%AC%E7%BC%96%E5%86%99/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Redis伪集群及哨兵集群配置教程和shell脚本编写</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p><strong>下载redis，解压并安装：</strong></p>
+
+<blockquote>
+<h1 id="wget-http-download-redis-io-releases-redis-4-0-2-tar-gz">wget <a href="http://download.redis.io/releases/redis-4.0.2.tar.gz">http://download.redis.io/releases/redis-4.0.2.tar.gz</a></h1>
+
+<h1 id="tar-xzf-redis-4-0-2-tar-gz">tar xzf redis-4.0.2.tar.gz</h1>
+
+<h1 id="cd-redis-4-0-2">cd redis-4.0.2</h1>
+
+<h1 id="make">make</h1>
+
+<h1 id="mv-redis-4-0-2-usr-local-redis">mv redis-4.0.2 /usr/local/redis</h1>
+</blockquote>
+
+<p><strong>启动并测试：</strong></p>
+
+<blockquote>
+<h1 id="usr-local-redis-src-redis-server-启动6379端口的redis实例并执行下面的命令测试-另开窗口">/usr/local/redis/src/redis-server //启动6379端口的redis实例并执行下面的命令测试(另开窗口)</h1>
+
+<h1 id="usr-local-redis-src-redis-cli-p-6379">/usr/local/redis/src/redis-cli -p 6379</h1>
+
+<blockquote>
+<p>keys *</p>
+
+<p>set k1 v1</p>
+
+<p>keys *</p>
+
+<p>get k1</p>
+</blockquote>
+</blockquote>
+
+<p><strong>配置环境变量：</strong></p>
+
+<blockquote>
+<h1 id="echo-path-path-usr-local-redis-src-etc-profile">echo &lsquo;PATH=${PATH}:/usr/local/redis/src/&rsquo; &gt;&gt; /etc/profile</h1>
+
+<h1 id="source-etc-profile-重新加载配置文件">source /etc/profile #&lt;== 重新加载配置文件</h1>
+</blockquote>
+
+<p><strong>配置伪集群：</strong></p>
+
+<blockquote>
+<h1 id="mkdir-p-data-redis-6379-6380-conf-db-log">mkdir -p /data/redis/{6379,6380}/{conf,db,log}</h1>
+
+<h1 id="cp-usr-local-redis-redis-conf-data-redis-6379-conf">cp /usr/local/redis/redis.conf /data/redis/6379/conf/</h1>
+
+<h1 id="cp-usr-local-redis-redis-conf-data-redis-6380-conf">cp /usr/local/redis/redis.conf /data/redis/6380/conf/</h1>
+
+<h1 id="tree-查看项目树形结构">tree //查看项目树形结构</h1>
+</blockquote>
+
+<p><strong>将redis.conf修改为对应的实例参数：</strong></p>
+
+<blockquote>
+<h1 id="grep-6379-daemonize-6380-conf-redis-conf">grep &ldquo;6379|daemonize&rdquo; 6380/conf/redis.conf</h1>
+
+<h1 id="grep-6380-daemonize-6380-conf-redis-conf">grep &ldquo;6380|daemonize&rdquo; 6380/conf/redis.conf</h1>
+</blockquote>
+
+<p><strong>启动redis实例：</strong></p>
+
+<blockquote>
+<h1 id="redis-server-data-redis-6379-conf-redis-conf">redis-server /data/redis/6379/conf/redis.conf</h1>
+
+<h1 id="redis-server-data-redis-6380-conf-redis-conf">redis-server /data/redis/6380/conf/redis.conf</h1>
+</blockquote>
+
+<p>确认是否启动成功</p>
+
+<blockquote>
+<h1 id="netstat-ntlp-grep-e-6379-6380">netstat -ntlp | grep -E &ldquo;:6379|:6380&rdquo;</h1>
+</blockquote>
+
+<p><strong>配置主从同步：</strong></p>
+
+<p>6379为主库，6380为从库</p>
+
+<p>修改从库6380配置：</p>
+
+<blockquote>
+<h1 id="vim-data-redis-6380-conf-redis-conf">vim /data/redis/6380/conf/redis.conf</h1>
+
+<p>在里面添加一行：</p>
+
+<p>slaveof 127.0.0.1 6379</p>
+
+<p>验证是否添加成功：</p>
+
+<h1 id="redis-cli-p-6379-info">redis-cli -p 6379 &ldquo;info&rdquo;</h1>
+
+<p>role:master &lt;== 角色：master</p>
+
+<p>connected_slaves:2 &lt;== slave链接数 1</p>
+
+<p>slave0:ip=127.0.0.1,port=6380,state=online,offset=141,lag=1 &lt;== slave 的信息</p>
+
+<p>master_repl_offset:141</p>
+
+<p>repl_backlog_active:1</p>
+
+<p>repl_backlog_size:1048576</p>
+
+<p>repl_backlog_first_byte_offset:2</p>
+
+<p>repl_backlog_histlen:140</p>
+
+<h1 id="redis-cli-p-6380-info">redis-cli -p 6380 &ldquo;info&rdquo;</h1>
+
+<p>&hellip;.</p>
+
+<h1 id="replication">Replication</h1>
+
+<p>role:slave  &lt;==角色 slave</p>
+
+<p>master_host:127.0.0.1 &lt;==master主机</p>
+
+<p>master_port:6379 &lt;== master端口</p>
+
+<p>master_link_status:up &lt;== 链接状态 up</p>
+
+<p>master_last_io_seconds_ago:5</p>
+
+<p>master_sync_in_progress:0</p>
+
+<p>slave_repl_offset:673</p>
+
+<p>slave_priority:100</p>
+
+<p>slave_read_only:1</p>
+
+<p>connected_slaves:0</p>
+
+<p>master_repl_offset:0</p>
+
+<p>repl_backlog_active:0</p>
+
+<p>repl_backlog_size:1048576</p>
+
+<p>repl_backlog_first_byte_offset:0</p>
+
+<p>repl_backlog_histlen:0</p>
+</blockquote>
+
+<p><strong>搭建哨兵集群：</strong></p>
+
+<p>在对应的/data/redis/6379和/data/redis/6380分别创建sentinel.conf文件：</p>
+
+<blockquote>
+<h1 id="cd-data-redis-6379">cd /data/redis/6379</h1>
+
+<h1 id="vim-sentinel-26379-conf-内容如下">vim sentinel-26379.conf //内容如下：</h1>
+
+<p>#port</p>
+
+<p>port 26379</p>
+
+<p>#master2 configuration</p>
+
+<p>sentinel monitor mymaster 10.10.10.127 6379 1</p>
+
+<p>daemonize yes</p>
+
+<p>pidfile &ldquo;/data/redis/6379/sentinel-26379.pid&rdquo;</p>
+
+<p>logfile &ldquo;/data/redis/6379/sentinel-26379.log&rdquo;</p>
+
+<h1 id="generated-by-config-rewrite">Generated by CONFIG REWRITE</h1>
+
+<p>dir &ldquo;/data/redis/6379&rdquo;</p>
+
+<p>sentinel config-epoch mymaster 0</p>
+
+<p>sentinel leader-epoch mymaster 3432</p>
+
+<p>sentinel current-epoch 3432</p>
+
+<h1 id="cd-data-redis-6380">cd /data/redis/6380</h1>
+
+<h1 id="vim-sentinel-26380-conf-内容如下">vim sentinel-26380.conf //内容如下：</h1>
+
+<p>#port</p>
+
+<p>port 26380</p>
+
+<p>#master2 configuration</p>
+
+<p>sentinel monitor mymaster 10.10.10.127 6379 1</p>
+
+<p>sentinel down-after-milliseconds mymaster 5000</p>
+
+<p>sentinel failover-timeout mymaster 900000</p>
+
+<p>sentinel parallel-syncs mymaster 2</p>
+
+<p>daemonize yes</p>
+
+<p>pidfile &ldquo;/data/redis/6380/sentinel-26380.pid&rdquo;</p>
+
+<p>logfile &ldquo;/data/redis/6380/sentinel-26380.log&rdquo;</p>
+
+<h1 id="generated-by-config-rewrite-1">Generated by CONFIG REWRITE</h1>
+
+<p>dir &ldquo;/data/redis/6380&rdquo;</p>
+
+<p>sentinel config-epoch mymaster 0</p>
+
+<p>sentinel leader-epoch mymaster 688</p>
+
+<p>sentinel current-epoch 688</p>
+</blockquote>
+
+<p>然后分别启动两个哨兵：</p>
+
+<blockquote>
+<h1 id="redis-sentinel-data-redis-6379-sentinel-6379-conf-sentinel">redis-sentinel /data/redis/6379/sentinel-6379.conf &ndash;sentinel</h1>
+
+<h1 id="redis-sentinel-data-redis-6380-sentinel-6380-conf-sentinel">redis-sentinel /data/redis/6380/sentinel-6380.conf &ndash;sentinel</h1>
+</blockquote>
+
+<p>ps观察下进程如下：</p>
+
+<blockquote>
+<h1 id="ps-ef-grep-redis">ps -ef | grep redis</h1>
+</blockquote>
+
+<p><a href="https://img.it610.com/image/info8/9ec27ba6b35d4bdca0a35f1e3f46e90c.jpg"><img src="https://img.it610.com/image/info8/9ec27ba6b35d4bdca0a35f1e3f46e90c.jpg" alt="" /></a></p>
+
+<p><strong>shell重启关闭脚本编写(因为redis使用root起的，所以需要给777权限或用root执行该脚本)：</strong></p>
+
+<p>因为单机集群和哨兵重启有点麻烦，所有我写了两个脚本(第一个是重启脚本，第二个是关闭脚本)方便重启、关闭如下：</p>
+
+<blockquote>
+<p>echo &ldquo;重启开始&hellip;&hellip;&hellip;.&rdquo;</p>
+
+<p>echo &ldquo;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&rdquo;</p>
+
+<h1 id="redis主从部署目录">redis主从部署目录</h1>
+
+<p>redis_data_dir=/data/redis</p>
+
+<h1 id="遍历处理-先杀掉所有redis相关的进程">遍历处理,先杀掉所有redis相关的进程</h1>
+
+<p>for application_dir in <code>ls $redis_data_dir</code></p>
+
+<p>do</p>
+
+<h1 id="应用的进程id-包含sentinel-redis应用的pid">应用的进程ID 包含sentinel、redis应用的PID</h1>
+
+<p>redis_pid=<code>ps -ef | grep redis-server | grep ${application_dir} | grep -v
+grep | awk '{print $2}'</code></p>
+
+<p>sentinel_pid=<code>ps -ef | grep redis-sentinel | grep ${application_dir} | grep
+-v grep | awk '{print $2}'</code></p>
+
+<h1 id="判断进程是否存在-存在则杀掉">判断进程是否存在，存在则杀掉</h1>
+
+<p>if [ -n &ldquo;$redis_pid&rdquo; ]; then</p>
+
+<p>kill -9 $redis_pid</p>
+
+<p>fi</p>
+
+<p>if [ -n &ldquo;$sentinel_pid&rdquo; ]; then</p>
+
+<p>kill -9 $sentinel_pid</p>
+
+<p>fi</p>
+
+<p>done</p>
+
+<p>sleep 1</p>
+
+<h1 id="启动-遍历先启动redis实例-在启动sentinel哨兵">启动，遍历先启动redis实例，在启动sentinel哨兵</h1>
+
+<p>for application_dir in <code>ls $redis_data_dir</code></p>
+
+<p>do</p>
+
+<h1 id="启动redis实例">启动redis实例</h1>
+
+<p>redis-server /data/redis/${application_dir}/conf/redis.conf</p>
+
+<p>done</p>
+
+<p>sleep 2</p>
+
+<p>for application_dir in <code>ls $redis_data_dir</code></p>
+
+<p>do</p>
+
+<h1 id="启动sentinel">启动sentinel</h1>
+
+<p>redis-sentinel
+/data/redis/${application_dir}/sentinel-2${application_dir}.conf &ndash;sentinel</p>
+
+<p>done</p>
+
+<p>echo &ldquo;重启结束&hellip;&hellip;&hellip;.&rdquo;</p>
+
+<p>echo &ldquo;关闭开始&hellip;&hellip;&hellip;.&rdquo;</p>
+
+<p>echo &ldquo;&hellip;&hellip;&hellip;&hellip;&hellip;&hellip;&rdquo;</p>
+
+<h1 id="redis主从部署目录-1">redis主从部署目录</h1>
+
+<p>redis_data_dir=/data/redis</p>
+
+<h1 id="遍历处理-先杀掉所有redis相关的进程-1">遍历处理,先杀掉所有redis相关的进程</h1>
+
+<p>for application_dir in <code>ls $redis_data_dir</code></p>
+
+<p>do</p>
+
+<h1 id="应用的进程id-包含sentinel-redis应用的pid-1">应用的进程ID 包含sentinel、redis应用的PID</h1>
+
+<p>redis_pid=<code>ps -ef | grep redis-server | grep ${application_dir} | grep -v
+grep | awk '{print $2}'</code></p>
+
+<p>sentinel_pid=<code>ps -ef | grep redis-sentinel | grep ${application_dir} | grep
+-v grep | awk '{print $2}'</code></p>
+
+<h1 id="判断进程是否存在-存在则杀掉-1">判断进程是否存在，存在则杀掉</h1>
+
+<p>if [ -n &ldquo;$redis_pid&rdquo; ]; then</p>
+
+<p>kill -9 $redis_pid</p>
+
+<p>fi</p>
+
+<p>if [ -n &ldquo;$sentinel_pid&rdquo; ]; then</p>
+
+<p>kill -9 $sentinel_pid</p>
+
+<p>fi</p>
+
+<p>done</p>
+
+<p>echo &ldquo;关闭结束&hellip;&hellip;&hellip;.&rdquo;</p>
+</blockquote>
+
+<p>参考链接：</p>
+
+<p>redis单机伪集群主从实例搭建：<a href="https://www.cnblogs.com/lgeng/p/6623336.html">https://www.cnblogs.com/lgeng/p/6623336.html</a></p>
+
+<p>redis哨兵集权搭建：<a href="https://blog.csdn.net/qq_37853817/article/details/78961462">https://blog.csdn.net/qq_37853817/article/details/78961462</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

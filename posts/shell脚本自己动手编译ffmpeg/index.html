@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本自己动手编译FFmpeg | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本自己动手编译FFmpeg - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本自己动手编译FFmpeg">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E8%87%AA%E5%B7%B1%E5%8A%A8%E6%89%8B%E7%BC%96%E8%AF%91ffmpeg/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本自己动手编译FFmpeg</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>有了 Makefile、CMake 和 Shell 的基础后，我们就可以自己动手编译 FFmpeg
+了。当然网上能找到别人已经有编译好的库文件，我们之所以折腾这么一大圈，还是为了自己以后能去裁剪编译。之前在公司看老大一顿 shell
+命令操作，觉得非常的高大上，觉得自己很菜，觉得应该要很多年才能达到这程度吧。自己用心学了才知道，其实也就一周的时间完完全全足够了。</p>
+
+<p>我们先来做一些准备工作，准备一台 Linux 云主机或者一台 Mac 电脑，下载 ndk ，下载 FFmpeg</p>
+
+<pre><code>Linux 环境（Ubuntu 14.04 ，x86_64）
+NDK 版本（android-ndk-r16b）
+FFmpeg 版本(ffmpeg-3.3.9)
+复制代码
+</code></pre>
+
+<p>关于版本的选择问题，我在国内看了一圈，大家基本都是用的 2.x.x
+的版本。高版本与低版本相比，一般性能和各个方面都会有一些改进，那我们就用高版本？其实也不完全是这样，很多低版本的 api 会被废弃掉，比如视频解码方法
+avcodec_decode_video2 在 3.x.x 的版本后取而代之的是 avcodec_send_packet 和
+avcodec_receive_frame 。因此如果你想去查一下 3.x.x 版本的 api
+资料可能会发现比较少，或者开发过程中遇到某些问题也会比较棘手。因此建议大家学习时尽量使用较高的版本，开发时尽量使用大众的版本。</p>
+
+<p>下载完成后把下载好的 ndk 和 FFmpeg 用 xftp 推到 linux 云主机上。把 ndk 解压到 /lib/ndk 目录下，然后配置
+NDK_PATH 环境变量：</p>
+
+<pre><code># 配置NDK路径
+export NDK_PATH=/lib/ndk/android-ndk-r16b
+export PATH=$NDK_PATH:$PATH
+复制代码
+</code></pre>
+
+<p>FFmpeg 直接解压到工作目录下：</p>
+
+<pre><code>ubuntu@VM-0-9-ubuntu:~/ffmpeg-3.3.9$ ls
+arch.mak                CREDITS                ffserver.c         LICENSE.md
+Changelog               doc                    ffserver_config.c  MAINTAINERS
+cmdutils.c              ffmpeg.c               ffserver_config.h  Makefile
+cmdutils_common_opts.h  ffmpeg_cuvid.c         INSTALL.md         presets
+cmdutils.h              ffmpeg_dxva2.c         libavcodec         README.md
+cmdutils_opencl.c       ffmpeg_filter.c        libavdevice        RELEASE
+common.mak              ffmpeg.h               libavfilter        RELEASE_NOTES
+compat                  ffmpeg_opt.c           libavformat        tests
+configure               ffmpeg_qsv.c           libavresample      tools
+CONTRIBUTING.md         ffmpeg_vaapi.c         libavutil          VERSION
+COPYING.GPLv2           ffmpeg_vdpau.c         libpostproc        version.sh
+COPYING.GPLv3           ffmpeg_videotoolbox.c  library.mak
+COPYING.LGPLv2.1        ffplay.c               libswresample
+COPYING.LGPLv3          ffprobe.c              libswscale
+复制代码
+</code></pre>
+
+<p>我们发现目录下已经有写好的 Makefile 编译文件了，那是不是可以直接编译运行呢？使用 make 命令出现如下错误：</p>
+
+<pre><code>Makefile:2: config.mak: No such file or directory
+Makefile:67: /common.mak: No such file or directory
+Makefile:114: /libavutil/Makefile: No such file or directory
+Makefile:114: /library.mak: No such file or directory
+Makefile:116: /doc/Makefile: No such file or directory
+Makefile:206: /tests/Makefile: No such file or directory
+make: *** No rule to make target '/tests/Makefile'.  Stop.
+复制代码
+</code></pre>
+
+<p>这些文件怎么来？在 configure 脚本文件里面，当然刚开始大家基本看不懂，这也是为什么我们要先学学 shell 脚本基础的原因。我们只需要再写一个
+build.sh 脚本来执行 ./configure 脚本文件即可，至于需要传递哪些参数，怎么裁剪 so 动态库这里先不详细讲，大家可以用
+./configure &ndash;help 来查看，学到后面我们自然而然就该知道怎么裁剪了，刚开始就能很明白一般不太现实。当然我们也可以去 copy
+了别人写好的脚本文件，但有时脚本的一个空格不对，都有可能浪费我们一周的时间。因此我还是建议大家要能自己写，以后我们可能会遇到各式各样的第三方库，而编译
+FFmpeg 库文件是我所遇到的非常简单的一个。</p>
+
+<pre><code>#!/bin/bash
+. /etc/profile
+function build
+{
+    echo &quot;start build ffmpeg for $ARCH&quot;
+    ./configure --target-os=linux \
+    --prefix=$PREFIX --arch=$ARCH \
+    --disable-doc \
+    --enable-shared \
+    --disable-static \
+    --disable-yasm \
+    --disable-asm \
+    --disable-symver \
+    --enable-gpl \
+    --disable-ffmpeg \
+    --disable-ffplay \
+    --disable-ffprobe \
+    --disable-ffserver \
+    --cross-prefix=$CROSS_COMPILE \
+    --enable-cross-compile \
+    --sysroot=$SYSROOT \
+    --enable-small \
+    --extra-cflags=&quot;-Os -fpic $ADDI_CFLAGS&quot; \
+    --extra-ldflags=&quot;$ADDI_LDFLAGS&quot; \
+    $ADDITIONAL_CONFIGURE_FLAG
+    make clean
+    make
+    make install
+    echo &quot;build ffmpeg for $ARCH finished&quot;
+}
+
+ARCH=arm
+CPU=arm
+PREFIX=$(pwd)/android/$ARCH
+TOOLCHAIN=$NDK_PATH/android-toolchains/arm-19
+CROSS_COMPILE=$TOOLCHAIN/bin/arm-linux-androideabi-
+ADDI_CFLAGS=&quot;-marm&quot;
+SYSROOT=$TOOLCHAIN/sysroot
+build
+复制代码
+
+
+ubuntu@VM-0-9-ubuntu:~/ffmpeg-3.3.9/android/arm/lib$ ls
+libavcodec.so            libavformat.so            libswresample.so
+libavcodec.so.57         libavformat.so.57         libswresample.so.2
+libavcodec.so.57.89.100  libavformat.so.57.71.100  libswresample.so.2.7.100
+libavdevice.so           libavutil.so              libswscale.so
+libavdevice.so.57        libavutil.so.55           libswscale.so.4
+libavdevice.so.57.6.100  libavutil.so.55.58.100    libswscale.so.4.6.100
+libavfilter.so           libpostproc.so            pkgconfig
+libavfilter.so.6         libpostproc.so.54
+libavfilter.so.6.82.100  libpostproc.so.54.5.100
+复制代码
+</code></pre>
+
+<p>如果大家不出意外会得到以上文件，我们发现编译出来是 linux 的命名方式，因此我们需要在 configure 中改一下生成文件名的格式：</p>
+
+<pre><code># SLIBNAME_WITH_MAJOR='$(SLIBNAME).$(LIBMAJOR)'
+# LIB_INSTALL_EXTRA_CMD='$$(RANLIB) &quot;$(LIBDIR)/$(LIBNAME)&quot;'
+# SLIB_INSTALL_NAME='$(SLIBNAME_WITH_VERSION)'
+# SLIB_INSTALL_LINKS='$(SLIBNAME_WITH_MAJOR) $(SLIBNAME)'
+# 替换成如下
+SLIBNAME_WITH_MAJOR='$(SLIBPREF)$(FULLNAME)-$(LIBMAJOR)$(SLIBSUF)'
+LIB_INSTALL_EXTRA_CMD='$$(RANLIB)&quot;$(LIBDIR)/$(LIBNAME)&quot;'
+SLIB_INSTALL_NAME='$(SLIBNAME_WITH_MAJOR)'
+SLIB_INSTALL_LINKS='$(SLIBNAME)'
+复制代码
+</code></pre>
+
+<p>最后我们把生成好的 .so 和头文件 copy 整合到 Android 工程下，就可以开始做视频的开发了，至于怎么整合到 AS ，可以参考 《CMake
+语法 - 详解 CMakeLists.txt》 一文。关于视音频编解码，视音频同步播放，直播推拉流等等，会在接下来的文章中，给大家陆陆续续的介绍。
+视频链接：pan.baidu.com/s/17CiYcqTj… 视频密码：hq2d</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

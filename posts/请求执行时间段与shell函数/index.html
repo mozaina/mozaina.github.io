@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>请求执行时间段与Shell函数 | 开发者问答集锦</title>
+    <meta property="og:title" content="请求执行时间段与Shell函数 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="请求执行时间段与Shell函数">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E8%AF%B7%E6%B1%82%E6%89%A7%E8%A1%8C%E6%97%B6%E9%97%B4%E6%AE%B5%E4%B8%8Eshell%E5%87%BD%E6%95%B0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">请求执行时间段与Shell函数</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p><strong>请求执行时间段与Shell函数</strong></p>
+
+<hr />
+
+<p>下载例子程序</p>
+
+<p>理论:</p>
+
+<p>请求执行时间段通常被简称为&rdquo;appy
+time&rdquo;。是指当系统VM稳定到充许VxDs和ring-3级别的应用软件（特别是16-bit的应用软件）交互时的时间段。例如，在一个特定时间段，VxDs能加载并调用在16-bit
+Dlls中的函数。这个appy time在Windows 3.x中是无效的。在Windows3.x，一个VxD能包含在16-bit
+DLLs中的任意函数的地址，并模拟一个远调用到这个地址。然而，因为造成了VMM重入，这个操作将中断所有正在ring-3中执行的任务。所以能被VxDs能调用的APIs被要求是中断安全的，象PostMessage。在Windows
+95，一个VxD在appy time的帮助下能调用任意一个在16-bit DLLs中的函数。</p>
+
+<p>假如你的VxDs被通知正处在appy time，它就能加载16-bit DLLs并调用其中的函数。VxDs怎么知道appy
+time到来了呢？这就要使用Shell VxD请求一个appy time。当系统VM在稳定状态，Shell
+VxD将调用某VxD的一个回调函数，此函数是在VxD请求appy time时指定的。Shell VxD发生一次appy
+time事件仅仅调用一次你的回调函数。这就象找工作。你到职业介绍所，登记你的名字和电话号码。当你回到家，如有一个工作适合你，职业介绍所将电话通知你这个好消息。当你收到了这个消息，他们就不再通知你了。</p>
+
+<p>在一个appy time起作用前要花上一些时间进行相关处理。appy time事件以下环境中将不起作用：</p>
+
+<p>1、系统启动或关机时。<br />
+2、当系统VM在临界段或等待一个信号量时。</p>
+
+<p>管理一个appy time事件</p>
+
+<p>你可以通过调用_SHELL_CallAtAppyTime来注册一个appy time事件，它的定义如下：</p>
+
+<p>VxDCall _SHELL_CallAtAppyTime, &lt;, dwRefData, dwFlags, dwTimeout&gt;</p>
+
+<ul>
+<li>pfnCallBack &ndash; 当appy time事件发生时你要Shell VxD调用的回调函数的平板地址。这个函数接收两个参数，dwRefData和dwFlags，与你传送给_SHELL_CallAtAppyTime的两个一样。记住，Shell VxD采用C调用顺序调用你的回调函数。总而言之，你要象这样定义你的回调函数：<br />
+<br /></li>
+</ul>
+
+<p>BeginProc OnAppyTime, CCALL, PUBLIC<br />
+ArgVar dwRefData,DWORD ; declare argument name and type<br />
+ArgVar dwFlags, DWORD<br />
+EnterProc<br />
+你的代码&hellip;<br />
+LeaveProc<br />
+Return<br />
+EndProc OnAppyTime</p>
+
+<ul>
+<li>dwRefData &ndash; 你要Shell VxD传送给你的回调函数的参考数据。可以是你想要的任何东西。</li>
+<li>dwFlags &ndash; 事件标志。<br />
+<br /></li>
+</ul>
+
+<p>如下值之一：<br />
+CAAFL_RING0 ring-0事件<br />
+CAAFL_TIMEOUT 由dwTimeout指定的时间到期事件。</p>
+
+<p>假如你只想在一定的时间内等待appy time事件，使用CAAFL_TIMEOUT标志。如你想一直等待appy
+time事件，使用NULL。CAAFL_RING0作用不明。</p>
+
+<ul>
+<li>dwTimeout &ndash; 在appy time事件发生前，VxD能等待时间段长度。时间段的单位不明。</li>
+</ul>
+
+<p>这个服务是异步的，意味着你为appy time事件注册回调函数之后立即返回。</p>
+
+<p>如果这个服务调用是成功的，在eax中返回appy time事件句柄。假如调用失败，在eax返回0。</p>
+
+<p>你可以调用_SHELL_CancelAppyTimeEvent来撤消appy
+time事件注册，它仅有一个参数，就是由_SHELL_CallAtAppyTime返回的appy time事件句柄。</p>
+
+<p>你应当在appy time事件到来时检查系统。例如，当你在系统关闭时注册appy time会发生什么？你的VxD的回调函数将不会得到调用！当appy
+time事件到来时，你应当调用_SHELL_QueryAppyTimeAvailable来查询系统状态。这个服务没有参数。如果appy
+time无效，在eax中返回0，例如：当系统关闭时或消息服务程序产生一个一般保护性错误时。</p>
+
+<p>这个服务不会告诉你现在是不是appy time：它仅仅告诉你可能有一个appy
+time事件到来。简而言之，如果你想安全运行，首先调用_SHELL_QueryAppyTimeAvailable并检查eax中的值是否非零值，然后才可继续调用_SHELL_CallAtAppyTime。</p>
+
+<p>请求执行时间段Shell服务</p>
+
+<p>当appy time到达时，你可以使用几个Shell服务调用：</p>
+
+<ul>
+<li>_SHELL_CallDll</li>
+<li>_SHELL_FreeLibrary</li>
+<li>_SHELL_GetProcAddress</li>
+<li>_SHELL_LoadLibrary</li>
+<li>_SHELL_LocalAllocEx</li>
+<li>_SHELL_LocalFree</li>
+</ul>
+
+<p>使用提供的这6个服务，VxDs可以调用在16-bit
+DLLs/EXE中的16-bit函数，象WinHelp。然而，我们马上要进步到32-bit时代（未来是64-bit）
+，所以我不会仔细研究它们。如你对此感兴趣，你可以在Windows 95/98DDK文档中了解它们。</p>
+
+<p>另外一些只请求执行时间段服务我想更有用处：_SHELL_ShellExecute和
+_SHELL_BroadcastSystemMessage。使用_SHELL_BroadcastSystemMessage，你能在一次调用中发送消息到顶端的窗口和所有的VxDs。如果appy
+time有效，你可以发送消息到窗口和VxDs。如果appy time无效，你只能发送消息到VxDs。</p>
+
+<p>_SHELL_ShellExecute是在ring-3中的函数ShellExecute在ring-0中的对应函数。实际上，它调用ring-3中的ShellExecute完成这个工作。使用外壳服务，你可以运行/打开/打印任意文件。</p>
+
+<p>_SHELL_ShellExecute的定义如下所示：</p>
+
+<p>VxDCall _SHELL_ShellExecute,</p>
+
+<p>它仅有一个参数，SHEXPACKET结构的平板地址。它从ShellExecute函数中返回一个值到eax中。让我们研究一下SHEXPACKET结构：</p>
+
+<p>shex_dwTotalSize
+SHEXPACKET结构的字节数加上可选的参数rgchBaggage的大小，它直接跟随在这个结构之后。我等一下描述rgchBaggage。</p>
+
+<ul>
+<li>shex_dwTotalSize SHEXPACKET结构的字节数加上可选的参数rgchBaggage的大小，它直接跟随在这个结构之后。我等一下描述rgchBaggage。</li>
+<li>shex_dwSize SHEXPACKET结构的字节数，不包括rgchBaggage。结合上面的shex_dwTotalSize值，外壳VxD能计算任意长度的rgchBaggage的大小。</li>
+<li>shex_ibOp 你要完成的操作。假如你指定0，意味着你想要打开一个文件。如果是一个可执行文件，就运行它。如果你想要完成其他的操作，你必须在rgchBaggage中指定操作的名字，在这个域中，必须包括从这个SHEXPACKET结构开始到一个ASCII字符串的距离，此距离大小以字节计数，字符串指定你要完成的操作的名称。SHEXPACKET结构的大小是32字节。如果操作字符串紧跟在SHEXPACKET结构后，shex_ibOp中的值必须是32。要知道你可以完成的操作，请查看ShellExecute服务。有三个操作被定义，&rdquo;open&rdquo;、&rdquo;print&rdquo;和&rdquo;explore&rdquo;。</li>
+<li>shex_ibFile 从此结构开始到一个ASCII字符串的距离，这个字符串是你想要传递给ShellExecute的文件名，就象Shex_ibOp成员。</li>
+<li>shex_ibParams 你想传递到由shex_ibFile指定的文件的可选参数。假如此文件是一个文档文件，你不想传递任何参数给它，就用0。假如你想传递参数给那个文件，在把从此结构开始到此成员指定的字符串的距离放在这个成员中。简而言之，就象shex_ibOp和shex_ibFile成员。</li>
+<li>shex_ibDir 工作目录。假如你想使用Windows目录就指定0，否则指定其为在此结构后的首选目录名字符串，并把从此结构开始到目录名字符串的距离值放到这个成员中。</li>
+<li>shex_dwReserved 如其名字所指，它是保留的。不要理它。</li>
+<li>shex_nCmdShow 应用程序窗口怎样被显示。这是一个你正常传递给ShowWindow的值，比如，SW_XXXX值。可在windows.inc中查看这些值。</li>
+</ul>
+
+<p>所有成员的大小都是双字的。在这里我介绍刚才我承诺的rgchBaggage成员。仅有一点不同，因为其大小是可变的，所以它作为SHEXPACKET结构的一员却不能包括在此结构的定义中。查看shell.inc，你看到rgchBaggage并不在SHEXPACKET结构的定义中，尽管在Windows
+9x DDK文档中，声明其是SHEXPACKET结构的一员。</p>
+
+<p>rgchBaggage是什么？简单说来其是跟在SHEXPACKET结构后的一个字符串数组。在这个数组中，你可以把你要对文件完成的操作名称、文件的名字、你要传递给文件的参数和工作目录放在其中。首先得到从SHEXPACKET结构到这些字符串的第一个字符之间的距离（即此结构的一些成员值），再把这些值加上SHEXPACKET结构的平板编移量，Shell
+VxD就能得到这些字符串在rgchBaggage数组中的偏移量。例如，假如SHEXPACKET结构从60000h开始，字符串紧跟其后，结构与字符串之间的距离是结构本身的大小，32字节（20h）。所以Shell
+VxD知道字符串定位在60020h。</p>
+
+<p>例子</p>
+
+<p>这是一个显示如何注册一个appy
+time事件并且使用_SHELL_ShellExecute的例子。VxD是动态的，被一个简单的Win32应用程序使用。当一个用户按下&rdquo;run
+Calculator&rdquo;按纽，win32应用程序调用DeviceIoControl去要求VxD注册一个appy
+time事件并且运行在Windows目录中的calc.exe。</p>
+
+<p>讲解</p>
+
+<p>VxD等待一个DeviceIoControl消息：第1号服务。当它收到上述消息，它将注册一个appy time事件。</p>
+
+<p>VxDCall _SHELL_CallAtAppyTime,&lt;,0,0,0&gt;</p>
+
+<p>它将传送OnAppyTime函数的平板地址到_SHELL_CallAtAppyTime，这样，当appy time事件发生时，Shell
+VxD将调用它。因我们不需要使用任何参考数据并且不需要处理过期情况，所以紧跟OnAppyTime函数的三个参数都是0。</p>
+
+<p>当appy time事件发生时， Shell VxD调用OnAppyTime函数。</p>
+
+<p>BeginProc OnAppyTime, CCALL</p>
+
+<p>我们用BeginProc描述一个函数。因为Shell VxD用C调用顺序调用OnAppyTime，我们需要指定CCALL属性。</p>
+
+<p>ArgVar RefData,DWORD<br />
+ArgVar TheFlag,DWORD<br />
+EnterProc<br />
+&hellip;<br />
+LeaveProc<br />
+Return</p>
+
+<p>因为Shell VxD用两个参数调用OnAppyTime，我们必须设置堆栈结构。ArgVar宏用来调整每个要传递到函数的参数的堆栈结构。它的语法如下：</p>
+
+<p>ArgVar varname, size, used</p>
+
+<p>varname是参数的名字。你可以使用你喜欢的任意名字。size是参数的大小。你可以使用BYTE、WORD、DWORD或1,2,4。used通常被忽略。</p>
+
+<p>紧接着ArgVar宏，我们需要使用EnterProc和LeaveProc宏来标志在程序中存放变量和参数的结构的开始与结束，使其能被正确访问。使用Return宏返回到调用者。</p>
+
+<p>在这个程序中的指令是简单的：初始化SHEXPACKET结构并且调用_SHELL_ShellExecute服务。记住
+shex_dwTotalSize包含SHEXPACKET结构自身的和跟着它的字符串的组合大小。这是一个简单的事情。假如字符串不紧跟在此结构之后的，你必须计算从结构第一个字节到到字符串最后一个字节之间的距离。shex_ibFile包含此结构自身的大小，因为程序名紧跟在此结构之后。shex_ibDir是0，意味着把Windows目录作为工作目录。这并不意味着程序必须在Windows目录中。程序可以在Windows能找到的任意地方。</p>
+
+<p>shex_nCmdShow是1，即SW_SHOWNORMAL的值。</p>
+
+<p>File SHEXPACKET &lt;&gt;<br />
+EXEName db &ldquo;calc.exe&rdquo;,0</p>
+
+<p>我们定义一个SHEXPACKET结构，其后紧跟着想要运行的程序名。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

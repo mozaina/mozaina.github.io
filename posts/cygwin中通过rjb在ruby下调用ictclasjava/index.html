@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Cygwin中通过RJB在Ruby下调用ICTCLASJAVA | 开发者问答集锦</title>
+    <meta property="og:title" content="Cygwin中通过RJB在Ruby下调用ICTCLASJAVA - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Cygwin中通过RJB在Ruby下调用ICTCLASJAVA">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/cygwin%E4%B8%AD%E9%80%9A%E8%BF%87rjb%E5%9C%A8ruby%E4%B8%8B%E8%B0%83%E7%94%A8ictclasjava/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Cygwin中通过RJB在Ruby下调用ICTCLASJAVA</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>参考文章：</p>
+
+<ol>
+<li>ruby 下使用 ICTCLAS(JAVA)</li>
+<li>RJB 在windows下的一些安装事项</li>
+<li>ICTCLAS4J 的编译脚本</li>
+</ol>
+
+<p>参考文章1中，在windows中成功在Ruby中调用了ICTCLAS4J，当环境迁到Cygwin中时，出现了一些错误。本文中，将修正这些错误，在Cygwin中通过RJB在Ruby中调用ICTCLAS4J</p>
+
+<p>先说明几个问题：</p>
+
+<ol>
+<li>Cygwin中没有合适的JDK，调用的是windows中的JDK，所以本文中JVM的环境是windows环境（比如：JVM的路径格式都是windows样式的）</li>
+
+<li><p>JDK默认的安装路径是 C:\Program Files\JAVA\JDKxxx ，其中&rdquo;Program Files“中间的空格会给我们带来很大麻烦，比如</p>
+
+<pre><code>java -cp C:\Program Files\JAVA\JDKxxx\... 
+</code></pre></li>
+</ol>
+
+<p>就会出错，不得不使用</p>
+
+<pre><code>    java -cp &quot;C:\Program Files\JAVA\JDKxxx\...&quot; ...
+</code></pre>
+
+<p>为了方便，我们要避免那个空格，有两个办法</p>
+
+<pre><code>1. 重装JDK，安到C:\JAVA\JDKxxx，比较笨拙但方便的方法 
+2. 建立软链接，windows下建立软链接的工具是微软junction，将JDK目录映射到C:\JAVA\JDKxxx 
+</code></pre>
+
+<p>下面来逐步解决出现的问题：</p>
+
+<p>1. 将环境迁移到cygwin下</p>
+
+<p>安装好Ruby , RJB后 ， 运行</p>
+
+<pre><code>require 'rubygems' 
+require 'rjb' 
+Rjb::load 
+str = Rjb::import(&quot;java.lang.String&quot;)
+</code></pre>
+
+<p>得到错误</p>
+
+<pre><code>Error occurred during initialization of VM
+java/lang/NoClassDefFoundError: java/lang/Object
+</code></pre>
+
+<p>如果Google这个错误，可以知道是rt.jar没有载入进来，但是无论怎么设置Rjb::load 的 classpath 参数都是无效的，比如</p>
+
+<pre><code>require 'rubygems'
+require 'rjb'
+Rjb::load(classpath = &quot;.;c:\\Java\\jdk1.6.0_18\\jre\\lib\\rt.jar&quot;)
+str = Rjb::import(&quot;java.lang.String&quot;)
+</code></pre>
+
+<p>得到的是一样的错误，说明不是classpath的问题 <strong>问题分析：</strong> （如果只需要解决方案，可以跳过问题分析，因为这个问题分析只是臆测，并未得到证实）
+如果运行java –verbose，可以看到java载入类的顺序大致如下：</p>
+
+<pre><code>[Loaded java.lang.Object from shared objects file]
+[Loaded java.io.Serializable from shared objects file]
+[Loaded java.lang.Comparable from shared objects file]
+[Loaded java.lang.CharSequence from shared objects file]
+[Loaded java.lang.String from shared objects file]
+...
+[Opened C:\Java\jdk1.6.0_18\jre\lib\rt.jar]
+[Loaded java.nio.charset.Charset$3 from C:\Java\jdk1.6.0_18\jre\lib\rt.jar]
+</code></pre>
+
+<p>为了启动速度，JAVA 6开始将一些类预先载入，不再依赖于rt.jar，也就是classpath的读取在预载入之后，预载入中没有 rt.jar，就会出现错误<br />
+查找资料后，设置-Xbootclasspath也许会解决我们的问题，试验一下</p>
+
+<pre><code>java -Xbootclasspath:c:\\Java\\jdk1.6.0_18\\jre\\lib\\rt.jar -verbose
+</code></pre>
+
+<p>结果如下：</p>
+
+<pre><code>[Opened c:\Java\jdk1.6.0_18\jre\lib\rt.jar]
+[Loaded java.lang.Object from c:\Java\jdk1.6.0_18\jre\lib\rt.jar]
+[Loaded java.io.Serializable from c:\Java\jdk1.6.0_18\jre\lib\rt.jar]
+[Loaded java.lang.Comparable from c:\Java\jdk1.6.0_18\jre\lib\rt.jar]
+[Loaded java.lang.CharSequence from c:\Java\jdk1.6.0_18\jre\lib\rt.jar]
+[Loaded java.lang.String from c:\Java\jdk1.6.0_18\jre\lib\rt.jar]
+[Loaded java.lang.reflect.GenericDeclaration from c:\Java\jdk1.6.0_18\jre\lib\rt.jar]
+</code></pre>
+
+<p>That’s Great!</p>
+
+<p><strong>问题解决：</strong></p>
+
+<p>将测试代码改成</p>
+
+<pre><code>require 'rubygems'
+require 'rjb'
+Rjb::load(classpath = &quot;.&quot; , 
+[
+&quot;-Xbootclasspath:c:\\Java\\jdk1.6.0_18\\jre\\lib\\rt.jar&quot;
+])
+str = Rjb::import(&quot;java.lang.String&quot;)
+</code></pre>
+
+<p>前面的错误将解决，我们也将迎来新的错误：</p>
+
+<pre><code>Error occurred during initialization of VM
+java.lang.UnsatisfiedLinkError: no zip in java.library.path
+        at java.lang.ClassLoader.loadLibrary(ClassLoader.java:1734)
+        at java.lang.Runtime.loadLibrary0(Runtime.java:823)
+        at java.lang.System.loadLibrary(System.java:1028)
+        at java.lang.System.initializeSystemClass(System.java:1086)
+</code></pre>
+
+<p>2. no zip in java.library.path</p>
+
+<p>显然因为zip.dll没有包含在library路径中，很自然有下面的解决方案</p>
+
+<pre><code>require 'rubygems'
+require 'rjb'
+Rjb::load(classpath = &quot;.&quot; , 
+[
+&quot;-Xbootclasspath:c:\\Java\\jdk1.6.0_18\\jre\\lib\\rt.jar&quot; ,
+&quot;-Djava.library.path=c:\\Java\\jdk1.6.0_18\\jre\\bin&quot;
+])
+str = Rjb::import(&quot;java.lang.String&quot;)
+</code></pre>
+
+<p>不过运行后 no zip 依旧</p>
+
+<p><strong>问题分析：</strong></p>
+
+<p>zip.dll 是在 rt.jar的类要求链接的库，rt.jar都是预载入的，zip.dll当然也要预载入…</p>
+
+<p><strong>问题解决：</strong></p>
+
+<pre><code>require 'rubygems'
+require 'rjb'
+Rjb::load(classpath = &quot;.&quot; , 
+[
+&quot;-Xbootclasspath:c:\\Java\\jdk1.6.0_18\\jre\\lib\\rt.jar&quot; ,
+&quot;-Dsun.boot.library.path=c:\\Java\\jdk1.6.0_18\\jre\\bin&quot;
+])
+str = Rjb::import(&quot;java.lang.String&quot;)
+input = str.new(&quot;we got it&quot;)
+puts input.toString()
+</code></pre>
+
+<p>We got it</p>
+
+<p>3. 至此，RJB基本可以在cygwin下使用，但是当我们使用ICTCLAS的时候，还是出现了一些问题的</p>
+
+<p>先根据参考文章3，编译ICTCLAS4J，因为我们在之后要hack ICTCLAS4J</p>
+
+<p><strong>测试代码：</strong></p>
+
+<pre><code>require 'rubygems'
+require 'rjb'
+root_ICTCLAS = &quot;C:\\cygwin\\home\\Tachikoma\\workspace\\try\\ICTCLAS&quot;
+root_jdk = &quot;c:\\Java\\jdk1.6.0_18&quot;
+
+Rjb::load(classpath = &quot;.;#{root_ICTCLAS}\\bin;#{root_ICTCLAS}\\commons-lang-#2.5\\commons-lang-2.5.jar&quot; , 
+[
+&quot;-Xbootclasspath:#{root_jdk}\\jre\\lib\\rt.jar&quot; ,
+&quot;-Dsun.boot.library.path=#{root_jdk}\\jre\\bin&quot; ,
+&quot;-Duser.dir=#{root_ICTCLAS}&quot;
+])
+segtag_class = Rjb::import('org.ictclas4j.segment.SegTag')
+segtag = segtag_class.new_with_sig(&quot;I&quot;,1)
+seg_res = segtag.split(&quot;今天好累...&quot;)
+result = seg_res.getFinalResult()
+puts result
+</code></pre>
+
+<p>运行后出现错误：</p>
+
+<pre><code>test.rb:12:in `method_missing': unknown exception (NullPointerException)
+        from test.rb:12
+</code></pre>
+
+<p><strong>问题分析：</strong>
+猜测错误是没有用的，只能侵入ICTCLAS4J的代码，看个究竟。略去调试过程，得到的第一个问题是在org\ictclas4j\bean\Dictionary.java
+71行，file.canRead()返回false。解释一下：ICTCLAS4j/Data中的数据文件没有读取权限，所以返回了空指针，导致失败。这个问题涉及到Windows，Cygwin，Ruby，RJB，JAVA之间的权限联动问题，我也说不清楚，只提供解决方法。发现了file
+= new File(filename) ，当filename为绝对路径时，具有读权限，为相对路径是，没有读权限。<br />
+<strong>问题解决：</strong> 在org\ictclas4j\bean\Dictionary.java load函数和save函数中，关于file的初始化部分，修改成</p>
+
+<pre><code>file = new File(filename);
+filename = file.getAbsolutePath();
+file = new File(filename);
+</code></pre>
+
+<p>(就两个地方需要修改，就不重构提取函数了)</p>
+
+<p>运行代码，错误依旧？</p>
+
+<p>由于省去了调试过程，所以看不到出错地点，不过我确定文件权限的问题，已经就此解决</p>
+
+<p>那么剩下的错误是由什么引起的？</p>
+
+<p>4. GBK的错误</p>
+
+<p>我们在org\ictclas4j\bean\Dictionary.java 125行左右处理IOException的代码改成如下</p>
+
+<pre><code>} catch (IOException e) {
+    e.printStackTrace();
+    //logger.error(e);
+}
+</code></pre>
+
+<p>（关于ICTCLAS4源代码作者如此处理这个错误…发点牢骚，logger只让程序员看到，但是用户也应当看到一些错误信息）</p>
+
+<p>再运行测试代码，得到错误：</p>
+
+<pre><code>java.io.UnsupportedEncodingException: GBK
+        at java.lang.StringCoding.decode(StringCoding.java:170)
+        at java.lang.String.(String.java:443)
+        at java.lang.String.(String.java:515)
+        at org.ictclas4j.bean.Dictionary.load(Dictionary.java:102)
+        at org.ictclas4j.bean.Dictionary.load(Dictionary.java:52)
+        at org.ictclas4j.segment.PosTagger.(PosTagger.java:39)
+        at org.ictclas4j.segment.SegTag.(SegTag.java:33)
+</code></pre>
+
+<p>没有支持GBK的编码包，这个好办，加载C:\\Java\\jdk1.6.0_18\\jre\\lib\\charsets.jar就可以了</p>
+
+<p>测试代码修改如下</p>
+
+<pre><code>require 'rubygems'
+require 'rjb'
+root_ICTCLAS = &quot;C:\\cygwin\\home\\Tachikoma\\workspace\\try\\ICTCLAS&quot;
+root_jdk = &quot;c:\\Java\\jdk1.6.0_18&quot;
+
+Rjb::load(classpath = &quot;.;#{root_ICTCLAS}\\bin;#{root_ICTCLAS}\\commons-lang-#2.5\\commons-lang-2.5.jar;C:\\Java\\jdk1.6.0_18\\jre\\lib\\charsets.jar&quot; , 
+[
+&quot;-Xbootclasspath:#{root_jdk}\\jre\\lib\\rt.jar&quot; ,
+&quot;-Dsun.boot.library.path=#{root_jdk}\\jre\\bin&quot; ,
+&quot;-Duser.dir=#{root_ICTCLAS}&quot;
+])
+segtag_class = Rjb::import('org.ictclas4j.segment.SegTag')
+segtag = segtag_class.new_with_sig(&quot;I&quot;,1)
+seg_res = segtag.split(&quot;今天好累...&quot;)
+result = seg_res.getFinalResult()
+puts result
+</code></pre>
+
+<p>5. 终于，终于…</p>
+
+<pre><code>$ ruby test.rb 
+今/g 天/g 好/g 累/v ../m 
+</code></pre>
+
+<p>很好的结果</p>
+
+<p>P.S. 如果看到的是乱码，记得把ruby的源文件按照utf-8的编码存储</p>
+
+<p>6. 小感慨下</p>
+
+<p>写完了才发现：有用的部分只是我的调试过程中很小的部分，实际调试的过程中，侵入了RJB的代码，ICTCLAS4J的代码，不得不花时间建立些小工具方便调试。</p>
+
+<p>休息休息…</p>
+
+<p>7.不得不承认，再过了一天后，我们的程序出了问题</p>
+
+<p>问题大致是这样的：我们的程序只能对于&rdquo;今天好累&hellip;&ldquo;这样的短句分词，当涉及到&rdquo;他从马上摔下来了“这样的例子，依然会看到NullPointerException这样的错误。</p>
+
+<p>Hack进ICTCLAS的源程序，也没什么收获。只得对比Windows中调用ICTCLAS(通过segtag.bat脚本)和我们在Cygwin下调用ICTCLAS脚本的过程，在java选项中加入-
+verbose查看类载入过程(判断还是由于哪个类载入不正确或者Data文件夹下字典文件读取不正确造成的)，没有发现特别的区别，只是charsets.jar也被作为bootclass载入了，于是修改测试代码中Rjb的载入部分如下：</p>
+
+<pre><code>Rjb::load(classpath = &quot;.;#{root_ICTCLAS}\\bin;#{root_ICTCLAS}\\commons-lang-2.5\\commons-lang-2.5.jar&quot; , 
+[
+&quot;-Xbootclasspath:#{root_jdk}\\jre\\lib\\rt.jar;C:\\Java\\jdk1.6.0_18\\jre\\lib\\charsets.jar&quot; ,
+&quot;-Dsun.boot.library.path=#{root_jdk}\\jre\\bin&quot; ,
+&quot;-Duser.dir=#{root_ICTCLAS}&quot;
+])
+</code></pre>
+
+<p>将charsets.jar也调入bootclass中，运行结果成功</p>
+
+<p>这个错误的修正，也算是运气，实际并没有什么理论的依据，而且对于charsets.jar的载入顺序问题，整个机制并没有给出错误或警告</p>
+
+<p>转载于:<a href="https://www.cnblogs.com/Tachikoma/archive/2010/04/15/1712629.html">https://www.cnblogs.com/Tachikoma/archive/2010/04/15/1712629.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a></li>
+        
+        <li><a href="/posts/051rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%981hellorails/">051RubyonRails學習筆記1Hellorails</a></li>
+        
+        <li><a href="/posts/053rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%986%E9%87%8D%E6%A7%8B%E5%88%AA%E9%99%A4%E7%95%99%E8%A8%80%E5%AE%89%E5%85%A8/">053RubyonRails學習筆記6重構刪除留言安全</a></li>
+        
+        <li><a href="/posts/055rubyonrails%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%987carrierwaveimplementation/">055RubyonRails學習筆記7CarrierwaveImplementation</a></li>
+        
+        <li><a href="/posts/065rubyonrails%E7%AD%86%E8%A8%9810showtargetinfoongooglemaps/">065Rubyonrails筆記10showtargetinfoongooglemaps</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/ruby'>ruby</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

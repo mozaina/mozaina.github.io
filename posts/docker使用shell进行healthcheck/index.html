@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>docker使用shell进行healthcheck | 开发者问答集锦</title>
+    <meta property="og:title" content="docker使用shell进行healthcheck - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="docker使用shell进行healthcheck">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/docker%E4%BD%BF%E7%94%A8shell%E8%BF%9B%E8%A1%8Chealthcheck/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">docker使用shell进行healthcheck</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>起因是公司要逐渐把wmware上tomcat部署的服务 迁移到docker，再到k8s。</p>
+
+<p>现在由于资源紧张，docker服务器的内存不够，容器又不是以tomcat进程作为1号进程。原因是
+需要通过启动脚本传参数进去，对tomcat内存进行限制。最近经常出现容器内tomcat崩掉了，但是容器还是up，需要手动排查是哪个服务的tomcat挂掉了。</p>
+
+<p><a href="https://img.it610.com/image/info8/a1eefbbe77a14492a7d13468bf221e0f.jpg"><img src="https://img.it610.com/image/info8/a1eefbbe77a14492a7d13468bf221e0f.jpg" alt="" /></a></p>
+
+<h5 id="创建健康检查的脚本health-check-sh">创建健康检查的脚本health_check.sh</h5>
+
+<p>建议使用curl命令检查页面 因为很多容器里不带ss或者netstat命令 我这里没有统一健康检查页面就偷懒了 哈哈哈</p>
+
+<pre><code>#!/bin/bash
+# 检测tomcat端口 细心的小伙伴可以在awk把最后一个:后面的端口取出来 会更准确
+netstat -luntp |awk '{print $4}'  |grep 8080
+if [ $? == 0 ]
+then
+    echo $?
+    exit 0
+else
+    echo $?
+    exit 1
+fi
+</code></pre>
+
+<h5 id="创建dockerfile">创建Dockerfile</h5>
+
+<p>我这里因为启动比较慢 所以设置了容器启动60s之后开始检测</p>
+
+<pre><code>FROM registry.cn-shanghai.aliyuncs.com/yjk-datag/tomcat:v1
+MAINTAINER YJK Enterprise Container Images &lt;xujiamin@hz-health.cn&gt;
+ENV LANG C.UTF-8
+ENV PATH /usr/bin:$PATH
+RUN    mv /srv/tomcat/tomcat8/  /srv/tomcat/tomcat-haozhuo-video
+ADD ROOT.war  /srv/tomcat/tomcat-haozhuo-video/webapps/
+ADD health_check.sh  /opt/
+EXPOSE 8080 20920
+HEALTHCHECK --start-period=60s  --interval=60s --timeout=5s --retries=3 CMD /bin/bash /opt/health_check.sh
+</code></pre>
+
+<p><a href="https://img.it610.com/image/info8/550504c432714de6811e97cdb4902443.jpg"><img src="https://img.it610.com/image/info8/550504c432714de6811e97cdb4902443.jpg" alt="docker使用shell进行healthcheck_第1张图片" /></a></p>
+
+<h5 id="构建镜像">构建镜像</h5>
+
+<pre><code>docker build -t haozhuo-video:62 ./
+</code></pre>
+
+<h5 id="启动容器">启动容器</h5>
+
+<pre><code>docker run -d -it --privileged -p 8820:8080 -p 20920:20920     --cpus=1 -m 2048m -e DUBBO_PORT_TO_REGISTRY=20920 -e DUBBO_IP_TO_REGISTRY=192.168.1.108 -h haozhuo-video --name haozhuo-video -v /data/tomcat-haozhuo-video:/srv/tomcat/tomcat-haozhuo-video/yjklogs/ haozhuo-video:62
+</code></pre>
+
+<h5 id="查看容器状态-并-启动tomat-测试">查看容器状态 并 启动tomat 测试</h5>
+
+<p>tomcat 启动成功之后 容器status由starting变成healthy</p>
+
+<p><a href="https://img.it610.com/image/info8/06ab5daff9544c66a046dbca4a570bbc.jpg"><img src="https://img.it610.com/image/info8/06ab5daff9544c66a046dbca4a570bbc.jpg" alt="docker使用shell进行healthcheck_第2张图片" /></a></p>
+
+<p><code>HEALTHCHECK</code> 支持下列选项：</p>
+
+<ul>
+<li><code>--interval=</code>：两次健康检查的间隔，默认为 30 秒；</li>
+<li><code>--timeout=</code>：健康检查命令运行超时时间，如果超过这个时间，本次健康检查就被视为失败，默认 30 秒；</li>
+<li><code>--retries=</code>：当连续失败指定次数后，则将容器状态视为 <code>unhealthy</code>，默认 3 次。</li>
+<li><code>--start-period=</code>: 应用的启动的初始化时间，在启动过程中的健康检查失效不会计入，默认 0 秒； (从17.05)引入</li>
+</ul>
+
+<p>在 <code>HEALTHCHECK [选项] CMD</code> 后面的命令，格式和 <code>ENTRYPOINT</code> 一样，分为 <code>shell</code> 格式，和 <code>exec</code>
+格式。命令的返回值决定了该次健康检查的成功与否：</p>
+
+<ul>
+<li><code>0</code>：成功；</li>
+<li><code>1</code>：失败；</li>
+<li><code>2</code>：保留值，不要使用</li>
+</ul>
+
+<p>容器启动之后，初始状态会为 <code>starting</code> (启动中)。Docker Engine会等待 <code>interval</code>
+时间，开始执行健康检查命令，并周期性执行。如果单次检查返回值非0或者运行需要比指定 <code>timeout</code>
+时间还长，则本次检查被认为失败。如果健康检查连续失败超过了 <code>retries</code> 重试次数，状态就会变为 <code>unhealthy</code> (不健康)。</p>
+
+<p>注：</p>
+
+<ul>
+<li>一旦有一次健康检查成功，Docker会将容器置回 <code>healthy</code> (健康)状态</li>
+<li>当容器的健康状态发生变化时，Docker Engine会发出一个 <code>health_status</code> 事件。</li>
+</ul>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

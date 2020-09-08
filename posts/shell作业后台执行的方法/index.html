@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>shell作业后台执行的方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="shell作业后台执行的方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="shell作业后台执行的方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E4%BD%9C%E4%B8%9A%E5%90%8E%E5%8F%B0%E6%89%A7%E8%A1%8C%E7%9A%84%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">shell作业后台执行的方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>来思考几种场景：</p>
+
+<p>1、某个脚本需要执行时间比较长，无人值守，可能执行过程中因ssh会话超时而中断？</p>
+
+<p>2、某次测试一段代码，需要临时放入后台运行？</p>
+
+<p>3、放入后台运行的脚本，需要在一段时间后重新调到前台？</p>
+
+<p>4、已经调起作用后，忽然发现没有将作业放入后台执行，如何补救？</p>
+
+<p>5、需要在后台运行大量的脚本，如何管理？</p>
+
+<h1 id="一-问题分析与思路">一、问题分析与思路</h1>
+
+<p>当终端关闭或网络断开时，当前终端中运行的进程就会收到SIGHUP（终止信号），终端关闭，终端进程之下的所有子进程也会关闭。</p>
+
+<p>为此，我们可以考虑：</p>
+
+<p>（1）有没有方法让运行中的进程不再收到SIGHUP信号</p>
+
+<p>（2）有没有方法让运行中的进程独立存在，不属于当前终端的子进程</p>
+
+<h1 id="二-shell-命令-作业后台执行方法">二、shell/命令/作业后台执行方法</h1>
+
+<h2 id="1-nohup">1、nohup</h2>
+
+<p>nohup的用途就是让提交的命令忽略hangup信号。语法如下：</p>
+
+<pre><code># nohup --help
+用法：nohup 命令 [参数]...
+　或：nohup 选项
+忽略挂起信号运行指定的命令。
+</code></pre>
+
+<h3 id="1-使用">（1）使用</h3>
+
+<p>nohup的使用比较简单，只需在要处理的命令前加上 nohup 即可，标准输出和标准错误缺省会被重定向到nohup.out文件中。</p>
+
+<p>使用时，常见的有以下几种方式：<br />
+(1)一般我们可在结尾加上&rdquo;&amp;&ldquo;来将命令同时放入后台运行；<br />
+(2)&ldquo;&gt;filename 2&gt;&amp;1&rdquo;来更改缺省的重定向文件名；<br />
+(3)直接&rdquo;&gt;/dev/null 2&gt;&amp;1 &amp;&ldquo;重定向到/dev/null，不记录日志；</p>
+
+<p>注意：<br />
+(1)如果不将 nohup 命令的输出重定向，输出将附加到 <strong>当前目录</strong> 的 nohup.out 文件中。<br />
+(2)如果当前目录的 nohup.out 文件不可写，输出重定向到 <strong>$HOME</strong> /nohup.out 文件中。<br />
+(3)如果没有文件能创建或打开以用于追加，那么 COMMAND参数指定的命令不可调用。<br />
+(4)如果标准错误是一个终端，那么把指定的命令写给标准错误的所有输出作为标准输出重定向到相同的文件描述符。</p>
+
+<h3 id="2-示例">（2）示例</h3>
+
+<p>示例1：直接放入后台运行</p>
+
+<pre><code>[root@vnx ~]# cat a.sh 
+ping www.baidu.com
+[root@vnx ~]# nohup sh a.sh &amp;       ##直接放入后台运行
+[1] 31159                           ##进程号
+[root@vnx ~]# nohup: 忽略输入并把输出追加到&quot;nohup.out&quot;
+
+[root@vnx ~]# ps -ef | grep 31159
+root      31159  31051  0 22:49 pts/0    00:00:00 sh a.sh
+root      31160  31159  0 22:49 pts/0    00:00:00 ping www.baidu.com
+root      31280  31134  0 23:06 pts/1    00:00:00 grep 31159
+[root@vnx ~]# ps -ef | grep ping 
+root      31160  31159  0 22:49 pts/0    00:00:00 ping www.baidu.com
+root      31282  31134  0 23:06 pts/1    00:00:00 grep ping
+
+[root@vnx ~]# kill -9 31159
+[root@vnx ~]# ps aux | grep 31159
+root      31331  0.0  0.0 103256   848 pts/1    S+   23:11   0:00 grep 31159
+[root@vnx ~]# ps -ef | grep ping
+root      31160      1  0 22:49 pts/0    00:00:00 ping www.baidu.com
+root      31333  31134  0 23:11 pts/1    00:00:00 grep ping
+[root@vnx ~]# tail -f nohup.out 
+64 bytes from 61.135.169.121: icmp_seq=976 ttl=128 time=1.56 ms
+64 bytes from 61.135.169.121: icmp_seq=977 ttl=128 time=2.02 ms
+</code></pre>
+
+<p>示例2：重定向到文件</p>
+
+<pre><code>[root@vnx ~]# nohup sh a.sh &gt;tmp.log 2&gt;&amp;1 &amp; 
+[1] 31392
+[root@vnx ~]# ps -ef | grep 31392
+root      31392  31134  0 23:21 pts/1    00:00:00 sh a.sh
+root      31393  31392  0 23:21 pts/1    00:00:00 ping www.baidu.com
+root      31395  31134  0 23:21 pts/1    00:00:00 grep 31392
+[root@vnx ~]# **jobs            ##查看作业，jobs可以查看nohup提交到后台的作业**
+[1]+  Running                 nohup sh a.sh &gt; tmp.log 2&gt;&amp;1 &amp;
+[root@vnx ~]# **fg % 1** **#将jobs查到的作业调入前台**
+nohup sh a.sh &gt; tmp.log 2&gt;&amp;1
+</code></pre>
+
+<p>不记录日志方式与此类似，只是将/dev/null作为重定向的目标。</p>
+
+<p>说明：</p>
+
+<pre><code>(1)ctrl + z：可以将一个正在前台执行的命令放到后台，并且暂停
+(2)jobs：查看当前有多少在后台运行的命令
+    jobs 列出当前shell环境中已启动的任务状态，若未指定jobsid，则显示所有活动的任务状态信息；如果报告了一个任务的终止(即任务的状态被标记为Terminated)，shell 从当前的shell环境已知的列表中删除任务的进程标识
+(3)fg：将后台中的命令调至前台继续运行
+    如果后台中有多个命令，可以用 fg %jobnumber将选中的命令调出，%jobnumber是通过jobs命令查到的后台正在执行的命令的序号(不是pid)
+(4)bg：将一个在后台暂停的命令，变成继续执行
+    如果后台中有多个命令，可以用bg %jobnumber将选中的命令调出，%jobnumber是通过jobs命令查到的后台正在执行的命令的序号(不是pid)
+</code></pre>
+
+<h2 id="2-setid">2、setid</h2>
+
+<p>setsid能新建一个session，语法如下：</p>
+
+<pre><code>NAME
+    setsid - run a program in a new session
+SYNOPSIS
+    setsid program [arg...]
+</code></pre>
+
+<p>示例</p>
+
+<pre><code>[root@vnx ~]# setsid ping www.baidu.com 
+[root@vnx ~]# PING www.a.shifen.com (220.181.111.188) 56(84) bytes of data.
+64 bytes from 220.181.111.188: icmp_seq=1 ttl=128 time=3.63 ms
+64 bytes from 220.181.111.188: icmp_seq=2 ttl=128 time=4.12 ms
+64 bytes from 220.181.111.188: icmp_seq=3 ttl=128 time=4.18 ms
+
+[root@vnx ~]# ps -ef |grep ping
+root      31758      1  0 23:55 ?        00:00:00 ping www.baidu.com    ##注意与nohup的区分，这里的父进程号是1（init进程）
+root      31760  31727  0 23:55 pts/1    00:00:00 grep ping
+[root@vnx ~]# jobs   #这里使用jobs是无法查到相关的作业信息的
+</code></pre>
+
+<p>注意：setsid与nohup的区分，这里的进程 ID(PID)为31758，而它的父ID(PPID)为1(即为 init进程ID)并不是当前终端的进程ID</p>
+
+<p>说明：当新建一个session后，相当创建了init进程的一个子进程，与当前终端的session便不再关联，自然，关闭终端，也不会对其产生影响。</p>
+
+<p><a href="https://img.it610.com/image/info8/64172017713e4c819884fcd0e7e1a7cb.png"><img src="https://img.it610.com/image/info8/64172017713e4c819884fcd0e7e1a7cb.png" alt="shell作业后台执行的方法_第1张图片" /></a></p>
+
+<h2 id="3-和">3、()和&amp;</h2>
+
+<p>我们知道在Shell中有这样一个知识点：</p>
+
+<pre><code>(cmd1;cmd2;cmd3)
+</code></pre>
+
+<p>命令组：在括号中的命令列表，将会作为一个子shell来运行。</p>
+
+<p>（注：在括号中的变量，由于是在子shell中，所以对于脚本剩下的部分是不可用的。父进程，也就是脚本本身，将不能够读取在子进程中创建的变量，
+也就是在子shell中创建的变量。）</p>
+
+<p>示例：</p>
+
+<pre><code>[root@vnx ~]# (ping www.baidu.com )                                      ##会话1
+PING www.a.shifen.com (220.181.111.188) 56(84) bytes of data.
+64 bytes from 220.181.111.188: icmp_seq=1 ttl=128 time=5.11 ms
+64 bytes from 220.181.111.188: icmp_seq=2 ttl=128 time=3.94 ms
+^C
+--- www.a.shifen.com ping statistics ---
+19 packets transmitted, 19 received, 0% packet loss, time 18817ms
+rtt min/avg/max/mdev = 3.408/4.026/5.480/0.539 ms
+[root@vnx ~]# 　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　##直接用()包围命令，在会话退出后子命令也是会退出的
+
+[root@vnx ~]# ps -ef | grep www.baidu.com                               ##会话2
+root      54495  31051  0 14:38 pts/0    00:00:00 ping www.baidu.com    ##发现子命令的父命令进程是31051
+root      54497  31727  0 14:39 pts/1    00:00:00 grep www.baidu.com
+[root@vnx ~]# jobs　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　##jobs作业列表里面没有作业与之对应  
+[root@vnx ~]# 
+[root@vnx ~]# ps -ef | grep www.baidu.com                               ##会话1中终止后，会话2中就看不到相关子命令的进程了
+root      54514  31727  0 14:40 pts/1    00:00:00 grep www.baidu.com
+</code></pre>
+
+<p>上面我们知道，&amp;可以将命令放入后台执行，我们尝试将&amp;也放入括号里面：</p>
+
+<pre><code>[root@vnx ~]# (ping www.baidu.com &amp;)　　　　　　　　　　　　　　　　　　　　　　　　　##会话1
+[root@vnx ~]# PING www.a.shifen.com (61.135.169.125) 56(84) bytes of data.
+64 bytes from 61.135.169.125: icmp_seq=1 ttl=128 time=6.73 ms
+64 bytes from 61.135.169.125: icmp_seq=2 ttl=128 time=9.75 ms
+^C　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　 ##Ctrl + C不能终止子命令
+[root@vnx ~]# 64 bytes from 61.135.169.125: icmp_seq=3 ttl=128 time=3.17 ms
+64 bytes from 61.135.169.125: icmp_seq=4 ttl=128 time=3.44 ms
+64 bytes from 61.135.169.125: icmp_seq=5 ttl=128 time=1.88 ms
+
+[root@vnx ~]# ps -ef | grep www.baidu.com                      ##查看该命令的进程，发现其父进程是1，即init初始进程，故当前终端的hub信号是无法影响到它的
+root      54535      1  0 14:44 pts/0    00:00:00 ping www.baidu.com
+root      54537  31727  0 14:45 pts/1    00:00:00 grep www.baidu.com
+[root@vnx ~]# jobs　　　　　　　　　　　　　　　　　　　　　　　　　　##jobs作业列表里面是查询不到的  
+[root@vnx ~]#
+</code></pre>
+
+<p>从上面我们可以看到：(cmd1;cmd2;cmd3 &amp;)也可以将命令放入后台执行，效果与setsid类似。</p>
+
+<h2 id="4-disown">4、disown</h2>
+
+<p>若某次操作中，作业已经提交后发现没有放入后台执行，如何补救才能避免被hup信号影响呢？</p>
+
+<p>这种情况下，使用setsid、()+&amp;是为时已晚的，只能使用作业调度和disown来解决这个问题。disown命令的语法如下：</p>
+
+<pre><code>disown jobID
+disown jobID1 jobID2 ... jobIDN
+disown [options] jobID1 jobID2 ... jobIDN
+</code></pre>
+
+<p>disown的可选参数如下：</p>
+
+<pre><code>-a    Delete all jobs if jobID is not supplied.
+-h    Mark each jobID so that SIGHUP is not sent to the job if the shell receives a SIGHUP.(使某个作业忽略hup信号)
+-r    Delete only running jobs.
+</code></pre>
+
+<p>man手册说明如下：</p>
+
+<pre><code>disown [-ar] [-h] [jobspec ...]
+  Without  options, each jobspec is removed from the table of active jobs.  
+  If jobspec is not present, and neither -a nor -r is supplied, the shell’s notion of the current job is used.
+  If the -h option is given, each jobspec is not removed from the table, but is marked so that SIGHUP is not sent to the job  if  the  
+shell  receives  a  SIGHUP.  
+  If no jobspec is present, and neither the -a nor the -r option is supplied, the current job is used.  
+  If no jobspec is supplied,the -a option means to remove or mark all jobs;the -r option without a jobspec argument restricts operation to running jobs.  The return value is 0 unless a jobspec does not specify a valid job.
+</code></pre>
+
+<p>下面通过例子进行说明：</p>
+
+<p>（1）没有任何选项的情况下，移除不活动作业</p>
+
+<p><a href="https://img.it610.com/image/info8/dab23eb3bf4246a19cd2e499dc1d3869.png"><img src="https://img.it610.com/image/info8/dab23eb3bf4246a19cd2e499dc1d3869.png" alt="shell作业后台执行的方法_第2张图片" /></a></p>
+
+<p>（2）所有的作业都忽略hup信号</p>
+
+<pre><code>[root@vnx ~]# jobs -l
+[1]+ 73743 Running                 nohup ping www.baidu.com &amp;
+[root@vnx ~]# 
+[root@vnx ~]# disown -a
+[root@vnx ~]# jobs -l
+</code></pre>
+
+<p>（3）只有正在运行的作业忽略hup信号</p>
+
+<pre><code>[root@vnx ~]# jobs -l
+[1]- 83039 Running                 nohup ping www.baidu.com &amp;
+[2]+ 83187 停止                  ping www.baidu.com
+[root@vnx ~]# disown -r
+[root@vnx ~]# jobs -l
+[2]  83187 停止                  ping www.baidu.com
+</code></pre>
+
+<p>（4）当退出会话时，如何保持作业在后台继续运行</p>
+
+<p>方式一：指定作业ID</p>
+
+<pre><code># disown -h jobID
+# disown -h %n ##n为作业号，%%代表当前job
+</code></pre>
+
+<p>方式二：不指定作业ID</p>
+
+<pre><code>## Step 1: update system ##
+apt-get upgrade &amp;&gt; /root/system.update.log &amp;
+
+## Step 2: Mark apt-get so that SIGHUP is not sent when you exit and go for tea ##
+disown -h 
+
+## Step 3: exit from root shell ##
+exit
+</code></pre>
+
+<p>（5）组合使用方式</p>
+
+<pre><code>用disown -h jobspec来使某个作业忽略HUP信号
+用disown -ah 来使所有的作业都忽略HUP信号
+用disown -rh 来使正在运行的作业忽略HUP信号
+</code></pre>
+
+<p>注意：（1）当使用过 disown 之后，会将把目标作业从作业列表中移除，我们将不能再使用jobs来查看它，但是依然能够用ps -ef查找到它。</p>
+
+<p>（2）这种方法的操作对象是作业，如果我们在运行命令时在结尾加了&rdquo;&amp;&ldquo;来使它成为一个作业并在后台运行，那么就万事大吉了，我们可以通过jobs命令来得到所有作业的列表。但是如果并没有把当前命令作为作业来运行，如何才能得到它的作业号呢？答案就是用
+CTRL-z（按住Ctrl键的同时按住z键）了！<br />
+CTRL-z 的用途就是将当前进程挂起（Suspend），然后我们就可以用jobs命令来查询它的作业号，再用bg
+jobspec来将它放入后台并继续运行。需要注意的是，如果挂起会影响当前进程的运行结果，请慎用此方法。示例如下：</p>
+
+<p>（6）若提交命令时，已经使用&amp;建命令放入后台执行，则可直接使用disown：</p>
+
+<pre><code>[root@vnx ~]# cp -r /opt/hadoop-2.7.3 /root/ &amp;
+[1] 62042
+[root@vnx ~]# jobs 
+[1]+  Running                 cp -i -r /opt/hadoop-2.7.3 /root/ &amp;
+[root@vnx ~]# disown -h %1
+[root@vnx ~]# jobs 
+[1]+  Running                 cp -i -r /opt/hadoop-2.7.3 /root/ &amp;
+[root@vnx ~]# ps -ef | grep hadoop
+root      62042  46781 10 18:51 pts/0    00:00:01 cp -i -r /opt/hadoop-2.7.3 /root/
+root      62140  46781  0 18:51 pts/0    00:00:00 grep hadoop
+</code></pre>
+
+<p>（7）若提交命令时，未将命令放入后台执行，则先用ctrl + z和bg将命令放入后台执行，然后使用disown：</p>
+
+<pre><code>[root@vnx ~]# cp -r /opt/hadoop-2.7.3/ /root/
+^Z
+[1]+  Stopped                 cp -i -r /opt/hadoop-2.7.3/ /root/
+[root@vnx ~]# bg %1
+[1]+ cp -i -r /opt/hadoop-2.7.3/ /root/ &amp;
+[root@vnx ~]# jobs 
+[1]+  Running                 cp -i -r /opt/hadoop-2.7.3/ /root/ &amp;
+[root@vnx ~]# disown -h %1
+[root@vnx ~]# jobs 
+[1]+  Running                 cp -i -r /opt/hadoop-2.7.3/ /root/ &amp;
+[root@vnx ~]# ps -ef | grep hadoop
+root      63368  58621  6 18:55 pts/3    00:00:01 cp -i -r /opt/hadoop-2.7.3/ /root/
+root      63514  58621  0 18:55 pts/3    00:00:00 grep hadoop
+</code></pre>
+
+<h2 id="5-screen">5、screen</h2>
+
+<p>screen是建立一个新的全屏虚拟会话终端，这个会话只有在手动输入exit的时候才会退出，在这个会话里执行的命令不用担心HUP信号会对我们的进程造成影响，因此也不用给每个命令前都加上“nohup”或“setsid”了，非常适合我们有规划的执行大量的后台任务，可以非常方便的让我们对这些后台任务进行管理。</p>
+
+<p>使用方法：</p>
+
+<pre><code>screen                       ##立即创建并进入一个会话。
+screen -dmS {name}           ##建立一个处于挂起模式下的会话，并根据我们的需要指定其会话名称。
+screen -dmS {name} {script}  ##在建立会话时同时执行指定的命令或脚本
+screen -list                 ##列出所有会话。
+screen -r {name}             ##以独占方式进入指定会话。
+screen -x {name}             ##以并行方式进入指定会话。
+ctrl +ad                     ##输入快捷键ctrl +a和d，可暂时退出当前会话。
+exit                         ##进入指定会话后执行exit即可关闭该会话。
+</code></pre>
+
+<p>注：若有兴趣，可尝试用pstree命令查看一下使用screen过程中的进程树，这样会更容易理解！！！</p>
+
+<p>通过以上几种说明，可总结几种情况的使用情境：</p>
+
+<pre><code>nohup/setsid 适用于作业量比较少的情况下;
+()+&amp;　　　　  适用于测试或写脚本过程中，临时使用;
+disown 　　　 适用于事后补救当前已经在运行的作业和命令的情况;
+screen 　　　 最适合有大批量操作时的情况。
+</code></pre>
+
+<p>为方便理解，可阅读以下参考文档：</p>
+
+<p>Linux 技巧：让进程在后台可靠运行的几种方法（nohup等）
+<a href="http://blog.csdn.net/zstu_zlj/article/details/51783937">http://blog.csdn.net/zstu_zlj/article/details/51783937</a></p>
+
+<p>Linux学习：让进程在后台运行的几种方法</p>
+
+<p>fg bg ctrl + z jobs &amp; 等命令
+<a href="http://www.cnblogs.com/xlmeng1988/archive/2012/06/04/jobs.html">http://www.cnblogs.com/xlmeng1988/archive/2012/06/04/jobs.html</a></p>
+
+<p>linux中的(),(()),[],[[]],{}的作用
+<a href="http://blog.csdn.net/damotiansheng/article/details/44196769">http://blog.csdn.net/damotiansheng/article/details/44196769</a></p>
+
+<p>Linux / Unix: disown Command Examples – nixCraft
+<a href="https://www.cyberciti.biz/faq/unix-linux-disown-command-examples-usage-syntax/">https://www.cyberciti.biz/faq/unix-linux-disown-command-examples-usage-syntax/</a></p>
+
+<p>Linux运行与控制后台进程的方法：nohup, setsid, &amp;, disown, screen « Hey! Linux.
+<a href="http://www.heylinux.com/archives/1282.html">http://www.heylinux.com/archives/1282.html</a></p>
+
+<p>本文原始链接：<a href="http://www.cnblogs.com/chinas/p/7130378.html，转载请注明出处，谢谢！！！！">http://www.cnblogs.com/chinas/p/7130378.html，转载请注明出处，谢谢！！！！</a></p>
+
+<p>转载于:<a href="https://www.cnblogs.com/chinas/p/7130378.html">https://www.cnblogs.com/chinas/p/7130378.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

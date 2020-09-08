@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Shell脚本的应用 | 开发者问答集锦</title>
+    <meta property="og:title" content="Shell脚本的应用 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Shell脚本的应用">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/shell%E8%84%9A%E6%9C%AC%E7%9A%84%E5%BA%94%E7%94%A8/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Shell脚本的应用</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>工作中用到的脚本，用来实现WRF气象模式的预测。首先使用脚本下载天气数据。</p>
+
+<pre><code>#!/bin/bash
+# FTP_SERVER=192.168.10.241
+FILECONFIG=/home/NWP/RIXINWRF/source/file.down
+DOWNCONFIG=/home/NWP/RIXINWRF/download/download.config
+FTP_SERVER=`cat $DOWNCONFIG | grep '^server' | awk -F= '{print $2}'`
+FTP_USER=`cat $DOWNCONFIG | grep '^user' | awk -F= '{print $2}'`
+FTP_PASS=`cat $DOWNCONFIG | grep '^passwd' | awk -F= '{print $2}'`
+FTP_DIR=`cat $DOWNCONFIG | grep '^fdir' | awk -F= '{print $2}'`
+FTP_HOUR=`cat $DOWNCONFIG | grep '^hour' | awk -F= '{print $2}'`
+FTP_TIMES=`echo $FTP_HOUR | awk -F, '{print NF}'`
+
+while true
+do
+for y in `seq 1 $FTP_TIMES`
+do
+THISHOUR=`echo $FTP_HOUR | awk -F, -v fly=$y '{print $fly}'`
+#THISHOUR=12
+FTP_DDIR=gfs.`date -d '-1day' +%Y%m%d`$THISHOUR
+LOC_DIR=`cat $DOWNCONFIG | grep '^ldir' | awk -F= '{print $2}'`
+LOC_DDIR=`date -d '-1day' +%Y%m%d`$THISHOUR
+DOW_DAYS=`cat $DOWNCONFIG | grep '^days' | awk -F= '{print $2}'`
+
+#del tmp.sh
+rm -rf tmp.sh
+
+
+if [ ! -x &quot;$LOC_DIR/$LOC_DDIR&quot; ]; then
+    echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】新建目录$LOC_DIR/$LOC_DDIR&quot;
+    mkdir &quot;$LOC_DIR/$LOC_DDIR&quot;
+else
+    echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】目录已经存在，检查GFS文件是否已经下载&quot;
+    num=`ls $LOC_DIR/$LOC_DDIR -l | wc -l`
+    if [ $num -ge $(($DOW_DAYS*4)) ]; then
+        echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】目录$LOC_DIR/$LOC_DDIR下面的GFS文件已经下载，不需要再下载&quot;
+        continue
+    fi
+fi
+
+echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】下载GFS$FTP_DDIR文件开始......&quot;
+
+cat &gt;&gt; tmp.sh &lt;&amp;1
+open $FTP_SERVER
+user $FTP_USER $FTP_PASS
+cd ${FTP_DIR}${FTP_DDIR}
+lcd $LOC_DIR/$LOC_DDIR
+tick 1024
+prompt off
+HEAD
+
+for x in `seq 0 $(($DOW_DAYS*4))`;
+do
+#   echo &quot;开始下载第$x个文件&quot;
+    day=$(($x*6))
+    if [ $day -lt 10 ]
+    then
+        day=0$day
+    fi
+    #all_gfs[x]=gfs.t${FTP_HOUR}z.pgrbf${day}.grib2
+    #echo ${all_gfs[@]}
+    echo &quot;mget gfs.t${THISHOUR}z.pgrbf${day}.grib2&quot; &gt;&gt; tmp.sh
+#   echo &quot;第$x个文件下载完成&quot;
+done
+
+cat &gt;&gt; tmp.sh &lt;
+</code></pre>
+
+<p>这里面有两个重要的配置文件，是我为了用来配置下载时间和文件夹的，如下</p>
+
+<p>第一个是file.down</p>
+
+<pre><code>f_down      = 1
+f_start     = 2013-05-11 10:32:10
+f_end       = 2013-05-11 10:50:48
+f_file      = 2013051018
+f_fname     = 2013-05-10_18
+
+s_down      = 0
+s_start     = 20130505 18:00:00
+s_end       = 
+s_file      = 2013050518
+s_fname     = 2013-05-05_18
+</code></pre>
+
+<p>接着是down.config</p>
+
+<pre><code>days    =8
+hour    =12,18
+server  =ftpprd.ncep.noaa.gov
+#server =192.168.10.241
+user    =anonymous
+#user   =fly
+passwd  =fly@gmail.com
+#passwd =sprixin2012
+fdir    =pub/data/nccf/com/gfs/prod/
+#fdir   =FTP
+ldir    =/home/NWP/RIXINWRF/source
+</code></pre>
+
+<p>下载完成后，接着运行预测脚本nwp.sh</p>
+
+<pre><code>#!/bin/bash
+HOMEDIR=/home/NWP/RIXINWRF
+WRFDIR=${HOMEDIR}/WRF1
+#下载的配置文件
+SOURCE=${HOMEDIR}/source
+CONFIG=${SOURCE}/file.down
+#要计算的天数
+COMPUTEDAY=7
+DATEDIR=`date +%Y%m%d%H`
+YEAR=`date +%Y%m%d`
+HOUR=`date +%H`
+NAME=`date +%H-%m-%d_%H`
+DOWN=0
+E_NOTROOT=67
+
+#check download nwp file
+#检查气象数据文件是否在下载
+checkFile(){
+    echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】检查下载文件&quot;
+    s_down=`cat $CONFIG | grep &quot;s_down&quot; |awk -F'= ' '{print$2}'`
+    if [ $s_down -ne 0 ]
+    then
+        DATEDIR=`cat $CONFIG | grep &quot;s_file&quot; |awk -F'= ' '{print$2}'`
+        YEAR=`cat $CONFIG | grep &quot;s_file&quot; |awk -F'= ' '{print$2}' | sed 's/ //g' | cut -c1-8`
+        HOUR=`cat $CONFIG | grep &quot;s_file&quot; |awk -F'= ' '{print$2}' | sed 's/ //g' | cut -c9-10`
+        NAME=`cat $CONFIG | grep &quot;s_fname&quot; |awk -F'= ' '{print$2}' | sed 's/ //g'`
+        DOWN=2
+        echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】下载的文件目录为:$DATEDIR&quot;
+    else
+        f_down=`cat $CONFIG | grep &quot;f_down&quot; |awk -F'= ' '{print$2}'`
+        if [ $f_down -ne 0 ]
+        then
+            DATEDIR=`cat $CONFIG | grep &quot;f_file&quot; |awk -F'= ' '{print$2}'`
+            YEAR=`cat $CONFIG | grep &quot;f_file&quot; |awk -F'= ' '{print$2}' | sed 's/ //g' | cut -c1-8`
+            HOUR=`cat $CONFIG | grep &quot;f_file&quot; |awk -F'= ' '{print$2}' | sed 's/ //g' | cut -c9-10`
+            NAME=`cat $CONFIG | grep &quot;f_fname&quot; |awk -F'= ' '{print$2}' | sed 's/ //g'`
+            DOWN=1
+            echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】下载的文件目录为:$DATEDIR&quot;
+        else
+            echo '【`date +%Y-%m-%d_%H:%M:%S`】文件未下载成功！等待下载中...'
+            sleep 1m
+            checkFile
+        fi
+    fi
+}
+
+#config namelist.wps file
+#配置操作文件
+MAX_DOM=4
+#HOUR=00
+CONFIGFILE=${WRFDIR}/WPS/namelist.wps
+config(){
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】配置【namelist.wps】开始************************************\n&quot;
+    START=\'`date -d &quot;$YEAR&quot; +%F`_${HOUR}:00:00\'
+    END=\'`date -d &quot;$YEAR +${COMPUTEDAY}day&quot; +%F`_${HOUR}:00:00\'
+    #echo $START $END
+    sed -i &quot;/max_dom/ s/=.*,/= $MAX_DOM,/g&quot; $CONFIGFILE
+    sed -i &quot;/start_date/ s/=.*,/= $START, $START, $START, $START,/g&quot; $CONFIGFILE
+    sed -i &quot;/end_date/ s/=.*,/= $END, $END, $END, $END,/g&quot; $CONFIGFILE
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】配置【namelist.wps】完毕！**********************************\n&quot;
+}
+
+#update namelist.input
+INPUTFILE=${WRFDIR}/WRFV3/test/em_real/namelist.input
+#如果计算三天的话，运行时间设置为3*24小时
+#如需其他参数设置，在这个地方初始化，然后在下面用sed命令更新
+RUN_HOURS=$((${COMPUTEDAY}*24))
+updateInput(){
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】更新【namelist.input】开始************************************\n&quot;
+    START_YEAR=`date -d &quot;$YEAR&quot; +%Y`
+    START_MONTH=`date -d &quot;$YEAR&quot; +%m`
+    START_DAY=`date -d &quot;$YEAR&quot; +%d`
+    # START_MINUTE=`date +%M`
+    # START_HOUR=`date +%H`
+    # START_SECOND=`date +%S`
+    START_HOUR=$HOUR
+    START_MINUTE=00 
+    START_SECOND=00
+    END_YEAR=`date -d &quot;$YEAR +${RUN_HOURS}hour&quot; +%Y`
+    END_MONTH=`date -d &quot;$YEAR +${RUN_HOURS}hour&quot; +%m`
+    END_DAY=`date -d &quot;$YEAR +${RUN_HOURS}hour&quot; +%d`
+    # END_HOUR=`date -d &quot;+${RUN_HOURS}hour&quot; +%H`
+    # END_MINUTE=`date -d &quot;+${RUN_HOURS}hour&quot; +%M`
+    # END_SECOND=`date -d &quot;+${RUN_HOURS}hour&quot; +%S`
+    # END_HOUR=$HOUR
+    END_HOUR=$HOUR
+    END_MINUTE=00
+    END_SECOND=00
+    sed -i &quot;/run_hours/ s/=.*/= $RUN_HOURS,/g&quot; $INPUTFILE
+    sed -i &quot;/start_year/ s/=.*/= $START_YEAR,$START_YEAR,$START_YEAR,$START_YEAR,/g&quot; $INPUTFILE
+    sed -i &quot;/start_month/ s/=.*/= $START_MONTH,$START_MONTH,$START_MONTH,$START_MONTH,/g&quot; $INPUTFILE
+    sed -i &quot;/start_day/ s/=.*/= $START_DAY,$START_DAY,$START_DAY,$START_DAY,/g&quot; $INPUTFILE
+    sed -i &quot;/start_hour/ s/=.*/= $START_HOUR,$START_HOUR,$START_HOUR,$START_HOUR,/g&quot; $INPUTFILE
+    sed -i &quot;/start_minute/ s/=.*/= $START_MINUTE,$START_MINUTE,$START_MINUTE,$START_MINUTE,/g&quot; $INPUTFILE
+    sed -i &quot;/start_second/ s/=.*/= $START_SECOND,$START_SECOND,$START_SECOND,$START_SECOND,/g&quot; $INPUTFILE
+    sed -i &quot;/end_year/ s/=.*/= $END_YEAR,$END_YEAR,$END_YEAR,$END_YEAR,/g&quot; $INPUTFILE
+    sed -i &quot;/end_month/ s/=.*/= $END_MONTH,$END_MONTH,$END_MONTH,$END_MONTH,/g&quot; $INPUTFILE
+    sed -i &quot;/end_day/ s/=.*/= $END_DAY,$END_DAY,$END_DAY,$END_DAY,/g&quot; $INPUTFILE
+    sed -i &quot;/end_hour/ s/=.*/= $END_HOUR,$END_HOUR,$END_HOUR,$END_HOUR,/g&quot; $INPUTFILE
+    sed -i &quot;/end_minute/ s/=.*/= $END_MINUTE,$END_MINUTE,$END_MINUTE,$END_MINUTE,/g&quot; $INPUTFILE
+    sed -i &quot;/end_second/ s/=.*/= $END_SECOND,$END_SECOND,$END_SECOND,$END_SECOND,/g&quot; $INPUTFILE
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】更新【namelist.input】结束************************************\n&quot;
+}
+
+#Link Grib
+WPSDIR=${WRFDIR}/WPS
+#Grid
+grid(){
+    cd $WPSDIR || echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】目录错误，无法打开!&quot;
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】【GeoGrib.exe】开始************************************\n&quot;
+    cd $WPSDIR &amp;&amp; ./geogrid.exe
+    #Link 文件
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】【Link WPS】开始************************************\n&quot;
+    cd $WPSDIR || echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】目录$WPSDIR不存在,无法打开！&quot;
+    cd $WPSDIR &amp;&amp; ./link_grib.csh $SOURCE/$DATEDIR/gfs.t${HOUR}z.pgrbf* ./ &amp;&amp; echo &quot;Link_Grid GFS文件成功&quot;
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】【Link WPS】结束************************************\n&quot;
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】【UnGrib.exe】开始************************************\n&quot;
+    cd $WPSDIR &amp;&amp; ./ungrib.exe
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】【MetGrid.exe】开始************************************\n&quot;
+    cd $WPSDIR &amp;&amp; ./metgrid.exe
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】【Met WPS】结束************************************\n&quot;
+}
+
+#Real Data
+REALDIR=${WRFDIR}/WRFV3/test/em_real/
+realAndWrf(){
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】【Real WPS】开始,当前时间：`date +%Y-%m-%d_%H:%M:%S`************************************\n&quot;
+    cd $REALDIR &amp;&amp; ln -s $WPSDIR/met_em.d* ./
+    cd $REALDIR &amp;&amp; ./real.exe
+    mpiexec -n 6 ./wrf.exe
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】【Real WPS】结束,当前时间：`date +%Y-%m-%d_%H:%M:%S`************************************\n&quot;
+}
+
+#Analysis Data And BackUp解析数据
+WRFOUTDIR=${HOMEDIR}/wrfout
+MAPCONFIG=${WRFOUTDIR}/mapping.config
+ANACONFIG=${WRFOUTDIR}/analysis.config
+SIZE=`cat $MAPCONFIG | grep size | awk -F'= ' '{print $2}'`
+NCNAME=`cat $MAPCONFIG | grep ncname | awk -F'= ' '{print $2}'`
+TXTNAME=`cat $MAPCONFIG | grep txtname | awk -F'= ' '{print $2}'`
+analysisData(){
+    s=$(($SIZE+2))
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】NCL解析数据开始！************************************\n&quot;
+    for i in $(seq 3 $s)
+    do
+        #首先把数据移动到tmp临时目录，然后在backup目录下面备份
+        echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】${WRFDIR}/WRFV3/test/em_real/wrfout_d0${i}_${NAME}*&quot;
+        if [ -f ${WRFDIR}/WRFV3/test/em_real/wrfout_d0${i}_${NAME}* ]
+        then
+            echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】`cd ${WRFDIR}/WRFV3/test/em_real/ &amp;&amp; ls wrfout_d0${i}_${NAME}* -l`&quot;
+            mv ${WRFDIR}/WRFV3/test/em_real/wrfout_d0${i}_${NAME}* ${HOMEDIR}/tmp/ &amp;&amp; echo &quot;文件wrfout_do${i}_${NAME}*移动成功!&quot;
+        else
+            echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】文件wrfout_d0${i}_${NAME}*不存在，可能已经移动到tmp目录下面!&quot;
+        fi
+        #引入外部变量，获取电场简写名称
+        fname=`echo $TXTNAME | awk -F',' -v fly=$i '{print $fly}'`
+        #获取时间
+        echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】检查文件${HOMEDIR}/tmp/wrfout_d0${i}_${NAME}*是否已经存,不存在去bacukup目录下查找！&quot;
+        if [ -f ${HOMEDIR}/tmp/wrfout_d0${i}_${NAME}* ]
+        then
+            sname=`cd ${HOMEDIR}/tmp &amp;&amp; ls wrfout_d0${i}_${NAME}* | sed 's/-//g' | sed 's/ //g' | sed 's/://g' |sed 's/_//g' | cut -c10-19`
+            #文件备份与重命名
+            echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】复制${HOMEDIR}/tmp/wrfout_d0${i}_${NAME}*到${HOMEDIR}/backup/目录下&quot;
+            cp ${HOMEDIR}/tmp/wrfout_d0${i}_${NAME}* ${HOMEDIR}/backup/
+            echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】重命名${HOMEDIR}/tmp/wrfout_d0${i}_${NAME}*为${HOMEDIR}/tmp/${fname}${sname}.nc&quot;
+            mv ${HOMEDIR}/tmp/wrfout_d0${i}_${NAME}* ${HOMEDIR}/tmp/${fname}${sname}.nc
+        else
+            if [ -f ${HOMEDIR}/backup/wrfout_d0${i}_${NAME}* ]
+            then
+                echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】在bacukup中发现wrfout_d0${i}_${NAME}*，开始解析...&quot;
+                cp  ${HOMEDIR}/backup/wrfout_d0${i}_${NAME}* ${HOMEDIR}/tmp/
+                sname=`cd ${HOMEDIR}/tmp &amp;&amp; ls wrfout_d0${i}_${NAME}* | sed 's/-//g' | sed 's/ //g' | sed 's/://g' |sed 's/_//g' | cut -c10-19`
+                mv ${HOMEDIR}/tmp/wrfout_d0${i}_${NAME}* ${HOMEDIR}/tmp/${fname}${sname}.nc
+            else
+                echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】文件wrfout_d0${i}_${NAME}*不存在，可能没有解析完成，等待解析中...&quot;
+                sleep 2m
+                #重新开始解析
+                analysisData
+            fi
+        fi
+        sed -i &quot;/wrfoutname/ s/=.*/= ${fname}${sname}.nc/g&quot; $ANACONFIG
+        sed -i &quot;/txtpath/ s/=.*/= ${fname}${sname}.txt/g&quot; $ANACONFIG
+        sed -i &quot;/start/ s/=.*/= $sname/g&quot; $ANACONFIG
+        sed -i &quot;/tt/ s/=.*/= $[RUN_HOURS*4+1]/g&quot; $ANACONFIG
+        cd ${HOMEDIR}/wrfout &amp;&amp; ncl try.ncl
+        cd ${HOMEDIR}/tmp &amp;&amp; rm -rf *
+        catToWpd &amp;&amp; echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】生成WPD文件成功！************************************\n&quot;
+        if [ $DOWN -eq 2 ]
+        then
+            sed -i &quot;/s_down/ s/=.*/= 0/g&quot; $CONFIG &amp;&amp; echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】重置$CONFIG中文件下载属性s_down************************************\n&quot;
+        fi
+        if [ $DOWN -eq 1 ]
+        then
+            sed -i &quot;/f_down/ s/=.*/= 0/g&quot; $CONFIG &amp;&amp; echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】重置$CONFIG中文件下载属性f_down************************************\n&quot;
+        fi
+    done
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】NCL解析数据结束！************************************\n&quot;
+}
+
+#解析成wpd数据
+catToWpd(){
+    WPDDIR=${HOMEDIR}/wpd
+    LAT=`cat $MAPCONFIG | grep clat | awk -F'= ' '{print $2}'`
+    LON=`cat $MAPCONFIG | grep clon | awk -F'= ' '{print $2}'`
+    HIGH=`cat $MAPCONFIG | grep high | awk -F'= ' '{print $2}'`
+    TIME=`cat $CONFIG | grep &quot;f_file&quot; |awk -F'= ' '{print$2}' | sed 's/ //g'`
+    #TIME=2013050712
+    s=$(($SIZE+2))
+    for i in $(seq 3 $s)
+    do
+            fname=`echo $TXTNAME | awk -F',' -v fly=$i '{print $fly}'`
+            lat=`echo $LAT | awk -F',' -v fly=$i '{print $fly}'`
+            lon=`echo $LON | awk -F',' -v fly=$i '{print $fly}'`
+            high=`echo $HIGH | awk -F',' -v fly=$i '{print $fly}'`
+            cat $WRFOUTDIR/$fname$TIME.txt | grep &quot;$lat&quot; | grep &quot;$lon&quot; | grep &quot; $high &quot; &gt; $WPDDIR/$fname$TIME.WPD
+    done
+}
+
+#Delete Data
+deleteData(){
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】删除数据开始************************************\n&quot;
+    rm ${WPSDIR}/FILE:*
+    rm ${WPSDIR}/GRIBFILE.*
+    rm ${WPSDIR}/met_em.d*
+    rm ${WPSDIR}/*.nc
+    rm ${WRFDIR}/WRFV3/test/em_real/rsl.*
+    rm ${WRFDIR}/WRFV3/test/em_real/met_em.d*
+    rm ${WRFDIR}/WRFV3/test/em_real/wrfinput_d*
+    rm ${WRFDIR}/WRFV3/test/em_real/wrfrst_d0*
+    rm ${WRFDIR}/WRFV3/test/em_real/wrfout_d01*
+    rm ${WRFDIR}/WRFV3/test/em_real/wrfout_d02*
+    printf &quot;【`date +%Y-%m-%d_%H:%M:%S`】删除数据成功************************************\n&quot;
+}
+
+#主程序
+ROOT_UID=`cat /etc/passwd | grep '^NWP' | awk -F: '{print $3}'`
+MY_ID=`id -u`
+#ROOT_UID=0
+echo $MY_ID
+while true
+do
+    if [ $MY_ID -ne $ROOT_UID ]
+    then
+        echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】只有【NWP】用户才有操作权限!&quot;
+        exit E_NOTROOT
+    else
+        echo &quot;【`date +%Y-%m-%d_%H:%M:%S`】数据解析开始！&quot;
+    fi
+    #Delete 数据
+    deleteData
+    checkFile
+    #配置文件
+    config
+    #Grid文件
+    grid
+    #更新输入文件
+    updateInput
+    #Real文件
+    realAndWrf
+    #Analysis Data解析文件
+    analysisData 
+    sleep 12h
+done
+</code></pre>
+
+<p>这里面也会使用几个配置文件，第一个是上面使用的file.down，</p>
+
+<p>然后是mapping.config</p>
+
+<pre><code>size    = 2
+ncname  = _,_,WRF,WRF
+txtname = _,_,DJH,HF
+rlon    = _,_,114.3863,117.7453
+rlat    = _,_,41.1766,42.5437
+clon    = _,_,114.3952,117.7477
+clat    = _,_,41.1770,42.5304
+high    = _,_,50,70
+</code></pre>
+
+<p>以及analysis.config</p>
+
+<pre><code>wrfoutname  = HF2013051012.nc
+gx      = 8
+gy      = 8
+sx      = 1
+sy      = 1
+tt      = 673
+th      = 4
+tn      = 15
+start       = 2013051012
+txtpath     = HF2013051012.txt
+</code></pre>
+
+<p>最后就是我们的ncl解析脚本了，如下</p>
+
+<pre><code>load &quot;$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl&quot;
+load &quot;$NCARG_ROOT/lib/ncarg/nclscripts/wrf/WRFUserARW.ncl&quot;
+;载入ncl库
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+begin
+    APATH = systemfunc(&quot;cat analysis.config | grep 'wrfoutname'|awk -F'=' '{print $2}'|sed 's/ //g'&quot;)
+    print(&quot;../tmp/&quot; + APATH)
+    a = addfile(&quot;../tmp/&quot; + APATH,&quot;r&quot;)
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;读入wrfout.nc文件
+;1、当wrf计算完成后，生成的wrfout文件需要cp到存档文件夹以及供ncl解析气象要素的临时文件夹两个地方
+;2、cp到ncl解析气象要素的临时文件夹后，相应所需要的wrfout文件需要改名为wrfout_d0*.nc
+;3、建议将addfile(&quot;./wrfout.nc&quot;,&quot;r&quot;)中的./wrfout.nc作为变量，每次需要的时候到控制文件中读取，相应的语法为APATH =systemfunc(&quot;echo $WRF_temp_PATH&quot;)
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    T = (wrf_user_getvar(a,&quot;T2&quot;,-1) - 273.15) 
+    u10 = wrf_user_getvar(a,&quot;U10&quot;,-1) 
+    v10 = wrf_user_getvar(a,&quot;V10&quot;,-1)
+    sw = wrf_user_getvar(a,&quot;SWDOWN&quot;,-1) 
+    sh = wrf_user_getvar(a,&quot;QVAPOR&quot;,-1) 
+    pr = (wrf_user_getvar(a,&quot;P&quot;,-1)+ wrf_user_getvar(a,&quot;PB&quot;,-1) )*0.01
+    uw = wrf_user_getvar(a,&quot;U&quot;,-1) 
+    vw = wrf_user_getvar(a,&quot;V&quot;,-1)
+    st = (wrf_user_getvar(a,&quot;TSK&quot;,-1) - 273.15)
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;uw及vw为u及v方向上的风速
+;T2为2米高温度
+;u10及v10为10米高度上uv方向的风速
+;sh为水汽混合比
+;pr为大气压
+;st为地表温度
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    gx = stringtointeger(systemfunc(&quot;cat analysis.config | grep 'gx'|awk -F'=' '{print $2}'|sed 's/ //g'&quot;))
+    gy = stringtointeger(systemfunc(&quot;cat analysis.config | grep 'gy'|awk -F'=' '{print $2}'|sed 's/ //g'&quot;))
+    sx = stringtointeger(systemfunc(&quot;cat analysis.config | grep 'sx'|awk -F'=' '{print $2}'|sed 's/ //g'&quot;))
+    sy = stringtointeger(systemfunc(&quot;cat analysis.config | grep 'sy'|awk -F'=' '{print $2}'|sed 's/ //g'&quot;))
+    tt = stringtointeger(systemfunc(&quot;cat analysis.config | grep 'tt'|awk -F'=' '{print $2}'|sed 's/ //g'&quot;))
+    th = 4
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;gx是wrf的网格格点中我们需要的x方向上的个数，gy我们需要的y方向上的个数
+;sx是wrf计算结果中对应我们需要的位置在domain中的x方向起始点所在位置，sy为y方向起始点所在位置
+;tt是时间序列上要素的总数量，tt的计算方法为：如果计算时长为72小时，每隔15分钟取一次风速，tt=72*4+1
+;th高度序列的总个数
+;建议将这些参数做成变量存在控制文件，当每次开始计算之前到控制文件中取出相应的参数，gx = stringtoitteger(systemfunc(&quot;echo $gard_number_in_x&quot;))
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    lons = new((/gx/),float)
+    do n = sx,gx+sx-1
+        lons(n-sx) = n
+    end do
+    lats = new((/gy/),float)
+    do m = sy,gy+sy-1
+        lats(m-sy) = m
+    end do
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+    res = 0
+    loc = wrf_user_ij_to_ll(a,lons,lats,res)
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;将wrf的gard格点转换为经纬度
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    shn = new((/tt,th,gy,gx/),float)
+    prn = new((/tt,th,gy,gx/),float)
+    un = new((/tt,th,gy,gx/),float)
+    vn = new((/tt,th,gy,gx/),float)
+    swn = new((/tt,th,gy,gx/),float)
+    stn = new((/tt,th,gy,gx/),float)
+    Tn = new((/tt,th,gy,gx/),float)
+    hn = new((/th/),integer)
+    ;tn = new((/tt/),integer)
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;定义sh\u\v\st\高度\时间\pr\T的四维数组
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    do k = 0,tt-1
+        do j = sy,sy+gy-1
+            do i = sx,sx+gx-1
+                un(k,0:0,j-sy,i-sx) = (/u10(k,j,i)/)
+                vn(k,0:0,j-sy,i-sx) = (/v10(k,j,i)/)
+                Tn(k,0:0,j-sy,i-sx) = (/T(k,j,i)/)
+                shn(k,0:0,j-sy,i-sx)= (/sh(k,1:1,j,i)/)
+                prn(k,0:0,j-sy,i-sx)= (/pr(k,1:1,j,i)/)
+                stn(k,0:0,j-sy,i-sx)= (/st(k,j,i)/)
+                swn(k,0:0,j-sy,i-sx)= (/sw(k,j,i)/)
+
+                un(k,1:3:1,j-sy,i-sx) = (/uw(k,3:5:1,j,i)/)
+                vn(k,1:3:1,j-sy,i-sx) = (/vw(k,3:5:1,j,i)/)
+                Tn(k,1:3:1,j-sy,i-sx) = (/T(k,j,i)/)
+                shn(k,1:3:1,j-sy,i-sx)= (/sh(k,3:5:1,j,i)/)
+                prn(k,1:3:1,j-sy,i-sx)= (/pr(k,3:5:1,j,i)/)
+                stn(k,1:3:1,j-sy,i-sx)= (/st(k,j,i)/)
+            end do
+        end do
+        ;tn(k)=((floattointeger(k/4))%24)*100+(k%4)*15
+    end do
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;将所需高度的要素赋予相应的数组
+;设定时间间隔tn(k)=((floattointeger(k/4))%24)*100+(k%4)*15需要做以下处理：tn(k)=((stringtointeger(systemfunc(&quot;echo $WRF_start_HOUR&quot;))+floattointeger(k/4))%24)*100+(k%4)*15，建议将$WRF_start_HOUR（wrf开始计算的时间）做成变量每次从控制文件中读取。
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    hgt = (/10,30,50,70/)
+    ;hgt = (/10,20,50,65/) 
+    ;mydate = stringtointeger(systemfunc(&quot;date -d '20160416'+'%Y%m%d %h%M%s'&quot;))
+    startdate = systemfunc(&quot;cat analysis.config | grep 'start'|awk -F'=' '{print $2}'|sed 's/ //g' | cut -c1-8&quot;)
+    starthour = systemfunc(&quot;cat analysis.config | grep 'start'|awk -F'=' '{print $2}'|sed 's/ //g' | cut -c9-10&quot;)
+    ;print(startdate)
+    ;print(starthour)
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;设定高度和日期，stringtointeger(20130416)建议做成变量从控制文件中读取，例如stringtointeger(systemfunc(&quot;echo $WRF_start_DATE&quot;))
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+txtpath = systemfunc(&quot;cat analysis.config | grep 'txtpath'|awk -F'=' '{print $2}'|sed 's/ //g'&quot;)
+mns= gx*gy*th*tt
+pms= new(mns,&quot;string&quot;)
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;建议将&quot;1.txt&quot; 做成变量从控制文件中读取
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    mn = 0
+    flag = 0
+    do t=0,tt-1
+        ;if(t%96.eq.0)
+            ;mydate = stringtointeger(systemfunc(&quot;date -d '&quot; + flag + &quot; day' +'%Y%m%d'&quot;))
+            _mm = (t+(stringtointeger(starthour)+8)*4)*15
+            ;print(_mm)
+            mydate = systemfunc(&quot;date -d '&quot; + startdate +&quot; &quot; + _mm + &quot;minute' +'%Y-%m-%d %H:%M:%S'&quot;)
+            ;flag = flag + 1
+        ;end if
+        do k=0,th-1
+            do j=0,gy-1
+                do i=0,gx-1
+                    pms(mn) = sprintf(&quot;%10.4f&quot;, loc(0,i))
+                    pms(mn) = pms(mn) + sprintf(&quot;%10.4f&quot;, loc(1,j))
+                    pms(mn) = pms(mn) + sprinti(&quot;%5i&quot;, hgt(k))
+                    pms(mn) = pms(mn) + &quot;     &quot; + mydate
+                    ;pms(mn) = pms(mn) + sprinti(&quot;%5.4i&quot;, tn(t))
+                    xu = un(t,k,j,i)
+                    yu = vn(t,k,j,i)
+                    pms(mn) = pms(mn) + sprintf(&quot;%10.2f &quot;,xu) 
+                    pms(mn) = pms(mn) + sprintf(&quot;%10.2f &quot;,yu)
+                    pms(mn) = pms(mn) + sprintf(&quot;%10.2f &quot;,(xu*xu + yu*yu)^0.5)
+                    pms(mn) = pms(mn) + sprintf(&quot;%10.2f &quot;,Tn(t,k,j,i))
+                    pms(mn) = pms(mn) + sprintf(&quot;%10.2f &quot;,shn(t,k,j,i))
+                    ;pms(mn) = pms(mn) + sprintf(&quot;%10.2f &quot;,swn(t,k,j,i))
+                    pms(mn) = pms(mn) + sprintf(&quot;%10.2f &quot;,prn(t,k,j,i))
+                    pms(mn) = pms(mn) + sprintf(&quot;%10.2f &quot;,stn(t,k,j,i))
+                    mn = mn + 1
+                end do
+            end do
+        end do
+    end do
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+asciiwrite (txtpath , pms)
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+end
+</code></pre>
+
+<p>ncl的代码是朋友教我做的，非常感谢他。</p>
+
+<p>除了这些之外，我们还需要一个上传脚本，也就是当文件解析好了，需要上传到服务器catwpd.sh</p>
+
+<pre><code>#!/bin/bash
+MAPCONFIG=/home/NWP/RIXINWRF/wrfout/mapping.config
+CONFIG=/home/NWP/RIXINWRF/source/file.down
+SIZE=`cat $MAPCONFIG | grep size | awk -F'= ' '{print $2}'`
+TXTNAME=`cat $MAPCONFIG | grep txtname | awk -F'= ' '{print $2}'`
+LAT=`cat $MAPCONFIG | grep clat | awk -F'= ' '{print $2}'`
+LON=`cat $MAPCONFIG | grep clon | awk -F'= ' '{print $2}'`
+HIGH=`cat $MAPCONFIG | grep high | awk -F'= ' '{print $2}'`
+TIME=`cat $CONFIG | grep &quot;f_file&quot; |awk -F'= ' '{print$2}' | sed 's/ //g'`
+#TIME=2013050712
+s=$(($SIZE+2))
+for i in $(seq 3 $s)
+do
+    fname=`echo $TXTNAME | awk -F',' -v fly=$i '{print $fly}'`
+    lat=`echo $LAT | awk -F',' -v fly=$i '{print $fly}'`
+    lon=`echo $LON | awk -F',' -v fly=$i '{print $fly}'`
+    high=`echo $HIGH | awk -F',' -v fly=$i '{print $fly}'`
+    cat $fname$TIME.txt | grep &quot;$lat&quot; | grep &quot;$lon&quot; | grep &quot; $high &quot; &gt; $fname$TIME.WPD
+done
+</code></pre>
+
+<p>这是所有的代码，以后有时间讲解脚本的含义。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

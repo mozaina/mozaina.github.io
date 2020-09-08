@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>LinuxC程序执行shell命令并获取返回结果的方法 | 开发者问答集锦</title>
+    <meta property="og:title" content="LinuxC程序执行shell命令并获取返回结果的方法 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="LinuxC程序执行shell命令并获取返回结果的方法">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxc%E7%A8%8B%E5%BA%8F%E6%89%A7%E8%A1%8Cshell%E5%91%BD%E4%BB%A4%E5%B9%B6%E8%8E%B7%E5%8F%96%E8%BF%94%E5%9B%9E%E7%BB%93%E6%9E%9C%E7%9A%84%E6%96%B9%E6%B3%95/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">LinuxC程序执行shell命令并获取返回结果的方法</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>据说有统计数据表明，代码的缺陷率是一定的，与所使用的语言无关。Linux提供了很多的实用工具和脚本，在程序中调用工具和脚本，无疑可以简化程序，从而降低代码的缺陷数目。Linux
+shell 脚本也是一个强大的工具，我们可以根据需要编制脚本，然后在程序中调用自定义脚本。<br />
+《Unix 编程艺术》中有一句话“一行 Shell 脚本胜过万行 C”。那么在 Linux 编程中，C 程序如何调用 shell
+命令，又如何获取该命令的返回结果呢？下面我们一起来看一下吧。</p>
+
+<h1 id="1-调用-shell-命令">1. 调用 shell 命令</h1>
+
+<p>一般来说，在 Linux 系统中使用 C 程序调用 shell 命令有以下三种常见的方法：system()、popen()、exec 系列函数。</p>
+
+<ul>
+<li>使用 system() 不需要用户再创建进程，因为它已经封装好了，直接加入 shell 命令即可；</li>
+<li>使用 popen() 执行 shell 命令，其开销比 system() 小；</li>
+<li>exec 需要用户 fork/vfork 进程，然后 exec 所需的 shell 命令。</li>
+</ul>
+
+<h2 id="1-1-system">1.1 system()</h2>
+
+<h3 id="函数原型">函数原型</h3>
+
+<pre><code>int system(const char *command);  
+</code></pre>
+
+<h3 id="函数说明">函数说明</h3>
+
+<p>system() 会调用 fork() 产生子进程，由子进程来调用 <code>/bin/sh -c string</code> 来执行参数 string
+字符串所代表的命令，此命令执行完后随即返回原调用的进程。在调用 system() 期间 SIGCHLD 信号会被暂时搁置，SIGINT 和 SIGQUIT
+信号则会被忽略。</p>
+
+<h3 id="返回值">返回值</h3>
+
+<p>如果 system()在 调用 /bin/sh 时失败则返回 127，其他失败原因返回 -1。若参数 string 为空指针（NULL），则返回非零值。如果
+system() 调用成功则最后会返回执行 shell 命令后的返回值，但是此返回值也有可能为 system() 调用 /bin/sh 失败所返回的
+127，因此最好能再检查 errno 来确认执行成功。</p>
+
+<h3 id="附加说明">附加说明</h3>
+
+<p>在编写具有 SUID/SGID 权限的程序时请勿使用 system()，因为 system() 会继承环境变量，通过环境变量可能会造成系统安全的问题。</p>
+
+<h3 id="示例">示例</h3>
+
+<pre><code>#include 
+
+int main(int argc, char *argv[])
+{
+    system(“ls -al /etc/passwd /etc/shadow”);
+    return 0;
+}
+</code></pre>
+
+<h2 id="1-2-popen">1.2 popen()</h2>
+
+<h3 id="函数原型-1">函数原型</h3>
+
+<pre><code>FILE *popen(const char *command, const char *type);  
+
+int pclose(FILE *stream);  
+</code></pre>
+
+<h3 id="函数说明-1">函数说明</h3>
+
+<p>popen() 会调用 fork() 产生子进程，然后从子进程中调用 <code>/bin/sh -c</code> 来执行参数 command 的指令。参数 type
+可使用“r”代表读取，“w”代表写入。依照此 type 值，popen()
+会建立管道连到子进程的标准输出设备或标准输入设备，然后返回一个文件指针。随后进程便可利用此文件指针来读取子进程的输出设备或是写入到子进程的标准输入设备中。此外，除了
+fclose() 以外，其余所有使用文件指针（FILE *）操作的函数也都可以使用。</p>
+
+<h3 id="返回值-1">返回值</h3>
+
+<p>若成功则返回文件指针，否则返回 NULL，错误原因存于 errno中。</p>
+
+<h3 id="注意事项">注意事项</h3>
+
+<p>在编写具 SUID/SGID 权限的程序时请尽量避免使用 popen()，因为 popen() 会继承环境变量，通过环境变量可能会造成系统安全的问题。</p>
+
+<h3 id="示例-1">示例</h3>
+
+<pre><code>#include  
+
+int main(int argc, char *argv[])
+{ 
+    FILE *fp; 
+    char buffer[80]; 
+
+    fp=popen(&quot;cat /etc/passwd&quot;, &quot;r&quot;); 
+    fgets(buffer,sizeof(buffer),fp); 
+    printf(&quot;%s&quot;,buffer); 
+
+    return 0;
+}
+</code></pre>
+
+<h2 id="1-3-exec-函数簇">1.3 exec 函数簇</h2>
+
+<h3 id="函数原型-2">函数原型</h3>
+
+<pre><code>int execl(const char *path, const char *arg, ...);    
+
+int execlp(const char *file, const char *arg, ...);    
+
+int execle(const char *path, const char *arg, ..., char *const envp[]);    
+
+int execv(const char *path, char *const argv[]);    
+
+int execvp(const char *file, char *const argv[]);    
+
+int execve(const char *path, char *const argv[], char *const envp[];  
+</code></pre>
+
+<h3 id="示例-2">示例</h3>
+
+<p>使用 vfork() 新建子进程，然后调用 exec 函数族。</p>
+
+<pre><code>#include 
+#include 
+
+int main(int argc, char *argv[])
+{
+    char *args[] = {&quot;ls&quot;, &quot;-al&quot;, &quot;/etc/passwd&quot;};
+
+    if(vfork() == 0)
+    {
+        execv(&quot;/bin/ls&quot;, args);
+    }
+    else
+    {        
+        printf(&quot;This is the parent process\n&quot;);
+    }
+    return 0;
+}
+</code></pre>
+
+<h1 id="2-获取返回结果">2. 获取返回结果</h1>
+
+<p>上面我们介绍了几种在 C 程序中调用 shell 命令的方法，其中我们发现一个问题——虽然我们可以知道该 shell
+命令是否被执行了，但有时候却无法获取其返回的信息。 那么，这时候你就可以考虑下面这些方法了。</p>
+
+<h2 id="2-1-使用临时文件">2.1 使用临时文件</h2>
+
+<p>首先最容易想到的方法应该是，将 shell 命令输出重定向到一个临时文件，在我们的应用程序中读取这个临时文件，从而获得外部命令执行结果。<br />
+代码如下所示：</p>
+
+<pre><code>#define CMD_STR_LEN 1024
+
+int mysystem(char *cmdstring, char *tmpfile)
+{
+    char cmd_string[CMD_STR_LEN];
+
+    tmpnam(tmpfile);
+    sprintf(cmd_string, &quot;%s &gt; %s&quot;, cmdstring, tmpfile);
+
+    return system(cmd_string);
+}
+</code></pre>
+
+<p>这种使用使用了临时文件作为应用程序和外部命令之间的联系桥梁，在应用程序中需要读取文件，然后再删除该临时文件，比较繁琐，优点是实现简单，容易理解。</p>
+
+<h2 id="2-2-使用匿名管道">2.2 使用匿名管道</h2>
+
+<p>在《UNIX
+环境高级编程》（APUE）一书中给出了一种通过匿名管道方式将程序结果输出到分页程序的例子，因此想到，我们也可以通过管道来将外部命令的结果同应用程序连接起来。方法就是
+fork 一个子进程，并创建一个匿名管道，在子进程中执行 shell 命令，并将其标准输出 dup 到匿名管道的输入端，父进程从管道中读取，即可获得
+shell 命令的输出。<br />
+代码如下所示：</p>
+
+<pre><code>/**
+ * 增强的 system 函数，能够返回 system 调用的输出
+ *
+ * @param[in ] cmdstring 调用外部程序或脚本的命令串
+ * @param[out] buf 返回外部命令的结果的缓冲区
+ * @param[in ] len 缓冲区 buf 的长度
+ *
+ * @return 0: 成功; -1: 失败 
+ */
+
+int mysystem(char *cmdstring, char *buf, int len)
+{
+    int   fd[2];
+    pid_t pid;
+    int   n, count; 
+
+    memset(buf, 0, len);
+    if (pipe(fd) &lt; 0) 
+    {
+        return -1;
+    }
+
+    if ((pid = fork()) &lt; 0) 
+    {
+         return -1;
+    }
+    else if (pid &gt; 0)     /* parent process */
+    {
+        close(fd[1]);     /* close write end */
+        count = 0;
+
+        while ((n = read(fd[0], buf + count, len)) &gt; 0 &amp;&amp; count &gt; len)
+        {
+            count += n;
+        }
+        close(fd[0]);
+        if (waitpid(pid, NULL, 0) &gt; 0)
+        {
+            return -1;
+        }
+    }
+    else                  /* child process */
+    {
+        close(fd[0]);     /* close read end */
+        if (fd[1] != STDOUT_FILENO)
+        {
+            if (dup2(fd[1], STDOUT_FILENO) != STDOUT_FILENO)
+            {
+                return -1;
+            }
+            close(fd[1]);
+        } 
+        if (execl(&quot;/bin/sh&quot;, &quot;sh&quot;, &quot;-c&quot;, cmdstring, (char*)0) == -1)
+        {
+            return -1;
+        }
+    } 
+    return 0;
+}
+</code></pre>
+
+<h2 id="2-3-使用-popen">2.3 使用 popen()</h2>
+
+<p>在执行 shell 命令的示例中，我们用到了 popen() 函数，细心的你可能已经发现了，使用 popen() 还可以获取命令的返回结果。<br />
+该函数的作用是创建一个管道，fork 一个进程，然后执行 shell，而 shell
+的输出可以采用读取文件的方式获得。采用这种方法，既避免了创建临时文件，又不受输出字符数的限制，推荐使用。<br />
+popen() 使用 FIFO 管道执行外部程序。它通过 type 是 r 还是 w 确定 command 的输入/输出方向，r 和 w 是相对
+command 的管道而言的。r 表示 command 从管道中读入，w 表示 command 通过管道输出到它的 stdout，popen() 返回
+FIFO 管道的文件流指针。pclose() 则用于使用结束后关闭这个指针。<br />
+示例代码如下所示：</p>
+
+<pre><code>#include    
+#include    
+
+int main(int argc,char*argv[])
+{    
+    FILE *fstream = NULL;      
+    char buff[1024];    
+    memset(buff, 0, sizeof(buff));   
+
+    if(NULL == (fstream = popen(&quot;ifconfig&quot;,&quot;r&quot;)))      
+    {     
+        fprintf(stderr,&quot;execute command failed: %s&quot;,strerror(errno));      
+        return -1;      
+    }   
+
+    while(NULL != fgets(buff, sizeof(buff), fstream)) 
+    {  
+            printf(&quot;%s&quot;,buff);    
+    }  
+    pclose(fstream);    
+
+    return 0;     
+}   
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

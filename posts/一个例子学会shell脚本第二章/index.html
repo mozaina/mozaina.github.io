@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>一个例子学会shell脚本第二章 | 开发者问答集锦</title>
+    <meta property="og:title" content="一个例子学会shell脚本第二章 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="一个例子学会shell脚本第二章">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%B8%80%E4%B8%AA%E4%BE%8B%E5%AD%90%E5%AD%A6%E4%BC%9Ashell%E8%84%9A%E6%9C%AC%E7%AC%AC%E4%BA%8C%E7%AB%A0/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">一个例子学会shell脚本第二章</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>案例一：简易脚本安装jdk （暂时不是很完善）</p>
+
+<pre><code>#!/bin/bash
+
+
+# 1.remove openjdk if exists.
+
+for i in $(rpm -qa | grep jdk | grep -v grep)
+do
+ echo &quot;deleteing rmp -&gt;&quot;$i
+ sudo rpm -e $i  --nodeps
+done
+
+# 2.解压移动到具体的文件夹
+
+java_dir=/usr/java99 #解压后复制到该目录下
+java_tar=jdk-8u11-linux-x64.tar.gz #jdk默认放在cd目录下
+java_name=jdk1.8.0_11 #解压后的文件名
+
+rm -rf $java_dir/$java_name
+
+mkdir -p $java_dir
+
+echo &quot;进入到默认目录：root用户是root&quot;
+cd 
+
+tar -zxvf $java_tar
+
+mv ./$java_name $java_dir/$java_name
+
+rm -rf ./$java_name
+
+# 3.处理环境变量
+
+echo &quot;export JAVA_HOME=${java_dir}/${java_name}&quot;&gt;&gt;/etc/profile
+echo 'export PATH=$PATH:$JAVA_HOME/bin'&gt;&gt;/etc/profile #注意我这里没有用&quot;
+
+source /etc/profile
+</code></pre>
+
+<p>案例二、备份mysql数据</p>
+
+<pre><code>username=用户名
+password=密码
+
+database1=库1名称
+database2=库2名称
+
+datetime=$(date +%Y%m%d_%H%M) #日期格式 20190405_1212
+basedir=$(cd &quot;$(dirname &quot;$0&quot;)&quot;; pwd)  #获取当前目录
+
+echo 当前路径$basedir
+echo 当前时间戳$datetime
+
+basedir=$basedir/$(date +&quot;%Y&quot;)/$datetime
+
+mkdir -p $basedir 
+
+echo 基础路径$basedir
+
+back1=$database1-$datetime.sql #文件名称=库名称+时间.sql
+back2=$database2-$datetime.sql
+
+mysqldump -u$username -p$password $database1 &gt; $basedir/$back1
+mysqldump -u$username -p$password $database2 &gt; $basedir/$back2
+
+cd $basedir
+cd ..
+
+# 跳转到基础路径的上一层，进行压缩操作
+
+zip -r ${datetime}.zip ${datetime}
+
+if [ -e &quot;${datetime}&quot; ]
+then
+ rm -rf ${datetime}
+fi;
+</code></pre>
+
+<p>案例三、 rpm 安装mysql5.7</p>
+
+<pre><code>arr=$(rpm -qa | grep mysql)
+
+if [ -n &quot;$arr&quot; ] 
+then 
+  echo &quot;存在原安装:是否删除(y/n)&quot;
+  if [ &quot;$(read name)&quot; == &quot;y&quot; ] 
+  then 
+     for v in $arr
+     do 
+     yum -y remove $v
+     done 
+  fi
+else 
+  echo &quot;不存在原安装&quot;
+fi
+
+
+echo &quot;开始删除老版本的文件  (/etc/my.cnf , var/lib/mysql 不删除)&quot;
+
+rm -rf /usr/lib/mysql
+rm -rf /usr/include/mysql
+
+echo  开始安装依赖
+yum -y install make gcc-c++ cmake bison-devel ncurses-devel libaio libaio-devel
+
+echo 下载软件
+
+#指定mysql的版本
+
+version=&quot;5.7.13-1.el6.x86_64&quot;
+
+url=&quot;http://dev.mysql.com/get/Downloads/MySQL-5.7/mysql-${version}.rpm-bundle.tar&quot;
+
+wget ${url}
+
+#删除指定rpm版本，比如mariadb
+
+removeRpm () {
+ local list=$(rpm -qa|grep &quot;$1&quot;)
+ if [ -n $list ]
+ then
+   for i in $list
+   do
+     rmp -e $i   
+   done
+ fi
+}
+
+removeRpm mariadb
+
+
+echo.跳转到当前文件的目录
+
+cds=$(cd &quot;$(dirname &quot;$0&quot;)&quot;;pwd )
+
+cd $cds
+
+if [ -e &quot;temp&quot; ]
+then
+ rm -rf &quot;temp&quot;
+fi
+
+mkdir temp
+
+cd temp
+
+tar -xvf ../mysql-${version}.rpm-bundle.tar
+
+rpm -ivh mysql-community-common-${version}.rpm
+rpm -ivh mysql-community-libs-${version}.rpm
+rpm -ivh mysql-community-client-${version}.rpm
+rpm -ivh mysql-community-server-${version}.rpm
+
+cd ..
+rm -rf temp
+rm -rf mysql-${version}.rpm-bundle.tar
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

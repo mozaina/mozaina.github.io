@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>UNIX管道应用及Shell实现一主体框架 | 开发者问答集锦</title>
+    <meta property="og:title" content="UNIX管道应用及Shell实现一主体框架 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="UNIX管道应用及Shell实现一主体框架">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/unix%E7%AE%A1%E9%81%93%E5%BA%94%E7%94%A8%E5%8F%8Ashell%E5%AE%9E%E7%8E%B0%E4%B8%80%E4%B8%BB%E4%BD%93%E6%A1%86%E6%9E%B6/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">UNIX管道应用及Shell实现一主体框架</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            
+
+<p>操作系统的第一个大作业是做一个简单的Shell，实现重定向、管道等功能。奋战了好几天终于基本搞定了= =</p>
+
+<h1 id="基本要求">基本要求</h1>
+
+<p><strong>Shell能够解析的命令行法如下：</strong></p>
+
+<ol>
+<li>带参数的程序运行功能。</li>
+</ol>
+
+<blockquote>
+<p>program arg1 arg2 … argN</p>
+</blockquote>
+
+<ol>
+<li>重定向功能，将文件作为程序的输入/输出。<br />
+a)“&gt;”表示覆盖写</li>
+</ol>
+
+<blockquote>
+<p>program arg1 arg2 … argN &gt; output-file</p>
+</blockquote>
+
+<p>b)“&gt;&gt;”表示追加写</p>
+
+<blockquote>
+<p>program arg1 arg2 … argN &gt;&gt; output-file</p>
+</blockquote>
+
+<p>c)“</p>
+
+<blockquote>
+<p>program arg1 arg2 … argN &lt; input-file</p>
+</blockquote>
+
+<ol>
+<li>管道符号“|”，在程序间传递数据(最后也可用重定向符号)</li>
+</ol>
+
+<blockquote>
+<p>programA arg1 … argN | programB arg1 … argN | programC …</p>
+</blockquote>
+
+<ol>
+<li>后台符号&amp; ,表示此命令将以后台运行的方式执行</li>
+</ol>
+
+<blockquote>
+<p>program arg1 arg2 … argN &amp;</p>
+</blockquote>
+
+<ol>
+<li><p>工作路径移动命令cd</p></li>
+
+<li><p>Shell退出命令exit</p></li>
+
+<li><p>history显示开始任务后执行的命令；history n显示最近执行的n条指令</p></li>
+</ol>
+
+<h1 id="基本思路">基本思路</h1>
+
+<p>很明显本次实验主要是以考察Shell基本功能以及管道的实现为主。之前已经详细讲解了管道的实现，可以参考这篇文章。</p>
+
+<h2 id="熟悉命令">熟悉命令</h2>
+
+<p>首先我们先在UNIX自带的Shell下实现重定向和管道功能，示例命令可以参考如下：</p>
+
+<blockquote>
+<h1 id="ps">ps &amp;</h1>
+
+<p># cat numbers.txt | sort &gt; temp.txt<br />
+ # sort &lt; numbers.txt | grep 1 &gt; a.txt<br />
+ # ps -ef | grep -sh<br />
+ # cd ..</p>
+</blockquote>
+
+<p>我们不难发现：<br />
+1. “&gt;”，“&gt;&gt;”重定向命令只能在命令中 <strong>出现一次</strong> ，一旦出现后，之后还有什么命令也是无效的。<br />
+2. “ 2. “|”管道命令可以出现多次，且管道之后还可以使用重定向符号。<br />
+3. 实际上所有命令进入程序之后都是一串字符串，因此对字符串的解析是最重要的。<br />
+4. 对于 <strong>ps</strong> ， <strong>ls</strong> ， <strong>cd</strong> 等命令，可以使用 <strong>exceve</strong> 命令进行操作，并不需要我们自己实现。<br />
+5. 如果注意，可以发现系统Shell在实现后台进程时，可能会出现如下情况：</p>
+
+<p>我们让 <strong>ls</strong> 的结果在后台运行，但为什么会在结果前多一个“#”呢？<br />
+原因是因为后台运行的子进程和前台运行的父进程同时进行，谁先谁后不能确定，图中就是父进程先运行，打印了“#”，子进程再打印 <strong>ls</strong>
+的结果，因此出现了这种情况。</p>
+
+<h2 id="难点">难点</h2>
+
+<ol>
+<li>管道的实现以及 <strong>fork()</strong> 的使用。</li>
+<li>子父进程进行信号交互，以及回收僵尸进程。</li>
+<li>多文件的协调和编译。</li>
+</ol>
+
+<h1 id="大体框架">大体框架</h1>
+
+<h2 id="主函数入口">主函数入口</h2>
+
+<p>由于我们在Windows下写这个Shell无法编译，每次必须在UNIX下编译，因此必须在写之前就想好模块布局，不然很难debug和进行单元测试。<br />
+一个Shell其实就是一个 <strong>while(1)</strong> 的死循环，每次输出提示符到屏幕，然后执行输入的字符串命令。因此不难写出大体框架：</p>
+
+<pre><code>    int main() {
+    /*Command line*/
+    while (1) {
+
+        printf(&quot;cmd &gt;&quot;);
+        /*set buf to empty*/
+        memset(buf, 0, sizeof(buf));
+        /*Read from keyboard*/
+        fgets(buf, MAXLINE, stdin);
+
+        /*The function feof() tests the end-of-file indicator
+        for the stream pointed to by stream,
+        returning non-zero if it is set. */
+        if (feof(stdin))
+            exit(0);
+        /*update the command history*/
+        UpdateHistory();
+        /*command exceve*/
+        command();
+    }
+    return 0;
+}
+</code></pre>
+
+<p>主程序的确很简单，就是每次用 <strong>buf</strong> 读取输入的字符串，然后更新输入列表（为了 <strong>history</strong> 功能的实现），然后再解析命令（
+<strong>command</strong> ）即可。</p>
+
+<h2 id="字符串命令存储方式">字符串命令存储方式</h2>
+
+<p>Shell主要就是对得到的命令进行操作，因此命令如何存储是至关重要的。最简单的想法就是用一个 <strong>char*[]</strong>
+字符串数组存储，但是我们后面对命令解析需要 <strong>命令的下标</strong> 等其他信息，因此这里选择用 <strong>struct</strong> 进行存储更为方便。<br />
+定义结构体如下：</p>
+
+<pre><code>struct CommandInfomation {
+    char* argv[512]; /*store the command after Parsing*/
+    int argc;        /*the number of argv,split with space*/
+    int index;       /*store the index of special character*/
+    int background;  /*whether it is a background command*/
+    enum specify type[50];
+    int override; /* in case after &lt; command has muti pipes */
+    char* file;
+};
+</code></pre>
+
+<p>初始化函数为：</p>
+
+<pre><code>void initStruct(struct CommandInfomation* a) {
+    a-&gt;argc = 0;
+    a-&gt;index = 0;
+    a-&gt;background = 0;
+    a-&gt;override = 0;
+    a-&gt;file = NULL;
+    memset(a-&gt;type, 0, sizeof(a-&gt;type));
+}
+</code></pre>
+
+<h2 id="特殊字符命令">特殊字符命令</h2>
+
+<p>对于重定向”&gt;”，管道”|”等特殊命令，我们需要使用额外的标识来注明，方便后面的操作。这里使用 <strong>eunm</strong> 实现。</p>
+
+<pre><code>/*the enum stand for different command*/
+enum specify {NORMAL, OUT_REDIRECT, IN_REDIRECT, OUT_ADD, PIPE};
+</code></pre>
+
+<h2 id="主要函数详解">主要函数详解</h2>
+
+<h3 id="pipe-fd2">pipe(fd2)</h3>
+
+<p>此函数用于实现无名管道，将fd2数组中的两个文件描述符分别标记为管道读（fd[0]）和管道写（fd[1]）。</p>
+
+<h3 id="dup-fd">dup(fd)</h3>
+
+<p>为复制文件操作符的系统函数，可以定向目前未被使用的最小文件操作符到fd所指的文件。相类似的函数还有 <strong>dup2[fd1,fd2]</strong> ,意思是
+<strong>未被使用</strong> 的文件描述符 <strong>fd2</strong><br />
+作为 <strong>fd1</strong> 的副本，进过此函数后， <strong>fd1</strong> 和 <strong>fd2</strong> 都可访问同一个文件。</p>
+
+<h3 id="execlp-const-char-file-const-char-arg">execlp(const char *file, const char *arg, …)</h3>
+
+<p>属于exec()函数族，会从PATH环境变量所指的目录中查找符合参数file的文件名，找到后便执行该文件，然后将第二个以后的参数当做该文件的argv[0]、argv1……，最后一个参数必须用空指针(NULL)作结束。<br />
+命令中的 <strong>ls</strong> ， <strong>ps</strong> 等内置系统命令都可以由此函数进行解析。要注意，此函数一经调用就不会再返回。</p>
+
+<h3 id="chdir-const-char-path">chdir(const char * path)</h3>
+
+<p>改变当前的工作路径以参数path所指的目录，使用比较简单，支持常用的改变路径的方式，例如退回上一级： <strong>cd ..</strong> ，也支持绝对路径。</p>
+
+<h1 id="执行命令">执行命令</h1>
+
+<p>由主函数可知，我们得到了命令需要进行解析，由于我们知道 <strong>exceve</strong> 函数一旦调用就不会返回，因此要使用 <strong>fork()</strong>
+函数对其子进程进行处理。<br />
+这里需要注意的是，由于子进程一定要比父进程先结束，因此我们需要将执行的命令放到 <strong>子进程中</strong>
+，父进程进行等待或者执行后面的命令，否则会出现父进程结束子进程还在运行的错误。</p>
+
+<h2 id="父子进程进行通讯">父子进程进行通讯</h2>
+
+<p>需要注意的是，Shell支持 <strong>后台程序运行</strong>
+，因此，父进程不一定要等待子进程运行结束才做后面的事情，但这就涉及到子进程结束后，父进程需要回收僵尸进程。那么，如何做到这一点呢？</p>
+
+<h3 id="linux上进行信号屏蔽">Linux上进行信号屏蔽</h3>
+
+<p>在Linux系统上，我们可以使用 <strong>signal(int signum, sighandler_t handler)</strong>
+函数来设置某一类的信号处理或者屏蔽。我们知道，子进程要 <strong>exit()</strong> 之前，会发送 <strong>SIGCHLD</strong>
+信号给父进程，提醒父进程来回收子进程的退出状态和其他信息。<br />
+在这里，我们可以使用一个特殊的技巧：</p>
+
+<blockquote>
+<p>signal(SIGCHLD, SIG_IGN)</p>
+</blockquote>
+
+<p>这里是让父进程屏蔽子进程的信号，为什么这样就可以做到回收僵尸进程的作用呢？原来是因为在Linux中，
+<strong>当我们忽略SIGCHLD信号时，内核将把僵尸进程交由init进程去处理，能够省去大量僵尸进程占用系统资源</strong>
+。因此，屏蔽了子信号后，子程序在要结束时发送信号没人应答，内核就会认为这是一个孤儿进程，因此被init进程去回收，可以很好的解决我们面临的问题。</p>
+
+<h3 id="bsd系统上的信号处理">BSD系统上的信号处理</h3>
+
+<p>而笔者使用的是Minix3.3的系统，经过实测，内核并不会在父进程屏蔽信号后主动回收孤儿进程，因此不能使用这种方法。<br />
+那怎么办呢？因此只能自己写一个handler，规定父进程在收到子进程结束的信号后再wait，这样也可以实现此功能。但缺点就是 <strong>wait</strong>
+函数需要阻塞父进程直到子进程结束为止，对于并发要求较高的并发服务器，可能就不是很适用。<br />
+我们使用这种方法完成后台程序的运行：</p>
+
+<pre><code>    void SIG_IGN_handler(int sig)
+    {
+        waitpid(-1, NULL, 0);
+        return;
+    }
+</code></pre>
+
+<p>在主程序中install这个handler：</p>
+
+<blockquote>
+<p>signal(SIGCHLD, SIG_IGN_handler);</p>
+</blockquote>
+
+<p>这样就完成了后台进程的功能。</p>
+
+<h2 id="history功能实现">history功能实现</h2>
+
+<p>查找前n个命令是比较简单的功能，我们可以使用队列进行实现，在这里笔者就稍微偷懒一点，直接使用定长的字符串数组进行。</p>
+
+<pre><code>/*update command history*/
+void UpdateHistory()
+{
+    char *temp;
+    if (strcmp(buf, &quot;\n&quot;) == 0)
+        return;
+    if (HistoryIndex &gt; MAXLINE)
+        HistoryIndex = 0;
+    temp = (char *)malloc(sizeof(buf));
+    strcpy(temp, buf);
+    CommandHistory[HistoryIndex++] = temp;
+    return;
+}
+
+
+/*print the command with n lines*/
+void PrintCommand(int n)
+{
+    int i,j=0;
+    if (n == -1) {
+        for (i = 0 ; i &lt; HistoryIndex; i++)
+            printf(&quot;the %d command: %s\n&quot;, i, CommandHistory[i]);
+    }
+    else {
+        if (n &gt; HistoryIndex) {
+            printf(&quot;Warning: the argument is too large.\n&quot;);
+            return;
+        }
+        for (i = HistoryIndex - n; i &lt; HistoryIndex; i++)
+            printf(&quot;the %d command: %s\n&quot;, ++j, CommandHistory[i]);
+    }
+}
+</code></pre>
+
+<h1 id="参考资料">参考资料</h1>
+
+<ol>
+<li>linux信号函数signal</li>
+<li>Operating System:Design and Implementation,Third Edition</li>
+<li>Computer Systems: A Programmer’s Perspective, 3/E</li>
+</ol>
+
+<p>欢迎关注我的个人博客。</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>使用Jsch执行Shell脚本 | 开发者问答集锦</title>
+    <meta property="og:title" content="使用Jsch执行Shell脚本 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="使用Jsch执行Shell脚本">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E4%BD%BF%E7%94%A8jsch%E6%89%A7%E8%A1%8Cshell%E8%84%9A%E6%9C%AC/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">使用Jsch执行Shell脚本</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>首发CSDN <a href="http://blog.csdn.net/basecn/archive/2010/12/16/6080741.aspx">http://blog.csdn.net/basecn/archive/2010/12/16/6080741.aspx</a></p>
+
+<p>作者：BaseCN Email:basecn@163.com</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<p>Jsch是JAVA的SSH客户端，使用的目的是执行远程服务器上的命令。</p>
+
+<p>关于Session的使用，创建连接后这个session是一直可用的，所以不需要关闭。由Session中open的Channel在使用后应该关闭。</p>
+
+<p>测试了exec的方式，具体参考jsch自带example中的Exec.java。</p>
+
+<p>有两个问题：</p>
+
+<p>1、无法执行多条命令，每次ChannelExec在connect前要先setCommand，最后一次的设置生效。</p>
+
+<p>2、由于第一个原因的限制，如果执行的命令需要环境变量（如JAVA_HOME），就没有办法了。这种方式执行基本的ls,ps之类的命令没有问题，需要复杂的环境变量时有点力不从心。</p>
+
+<p>要是哪位知道exec如何解决上面现两个问题，请分享一下！</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<p>虽然exec可以得到命令的执行结果，但无法满足应用，无奈之下放弃exec转而使用ChannelShell。</p>
+
+<p>在使用ChannelShell的时候需要特别关注jsch的输入和输出流的设置。</p>
+
+<p><strong>输出</strong></p>
+
+<p>为了得到脚本的运行结果，设置jsch的outputStream为FileOutputStream，把shell的输出结果保存到本地文件。虽然最简单的方式是设置System.out为jsch的OutputStream，在控制台看到结果，只是无法保存下来。</p>
+
+<p>FileOutputStream fileOut = new FileOutputStream( outputFileName );
+channelShell.setOutputStream( fileOut );</p>
+
+<p><strong>输入</strong></p>
+
+<p>短时间运行的程序，输入可以直接设置为System.in，而长期运行的程序不能使用人工方式输入，必须由程序自动生成命令来执行。所以使用PipeStream来实现字符串输入命令：</p>
+
+<p>PipedInputStream pipeIn = new PipedInputStream(); PipedOutputStream pipeOut =
+new PipedOutputStream( pipeIn ); channelShell.setInputStream( pipeIn );</p>
+
+<p>调用pipeOut.write( cmd.getBytes() );把生成的命令输出给ssh。</p>
+
+<p><strong>运行</strong></p>
+
+<p>jsch是以多线程方式运行的，所以代码在connect后如果不disconnect
+Channel和Session，以及相关的Stream，程序会一直等待，直到关闭，目前还没有找到判断关闭或主动关闭的方法，相信应该有这方面的机制。</p>
+
+<p>要注意一个问题，相关的Stream和Channel是一定要关闭的，那么应该在什么时候来关。执行connect后，jsch接收客户端结果需要一定的时间(以秒计)，如果马上关闭session就会发现什么都没接收到或内容不全。</p>
+
+<p>可以采取两个办法来解决这个问题，一个开源一个节流</p>
+
+<p>1、在connect增加一个等待延迟，等待1~2秒，这个是开源；</p>
+
+<p>2、减小server端脚本的执行时间，这个是节流。给命令加上&rdquo;nohup XXXX &gt; output
+&amp;&ldquo;，以后台方式运行，并把运行结果输出到服务器端的本地目录下。这样脚本的执行时间可以是最小。</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<p>最后还有一点注意，使用shell时，看到有的朋友说执行后没有结果。解决的办法是在命令后加上&rdquo;/n&rdquo;字符，server端就认为是一条完整命令了。很奇怪的特性！</p>
+
+<p>-&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-</p>
+
+<p>附上类代码</p>
+
+<p>package jsch; import static java.lang.String.format; import java.io.Closeable;
+import java.io.FileOutputStream; import java.io.IOException; import
+java.io.InputStream; import java.io.PipedInputStream; import
+java.io.PipedOutputStream; import com.jcraft.jsch.ChannelExec; import
+com.jcraft.jsch.ChannelShell; import com.jcraft.jsch.JSch; import
+com.jcraft.jsch.Session; import com.jcraft.jsch.UserInfo; import
+com.nsm.hermes.wand.Wand; public class SshExecuter implements Closeable{
+static long interval = 1000L; static int timeout = 3000; private SshInfo
+sshInfo = null; private JSch jsch = null; private Session session = null;
+private SshExecuter( SshInfo info ) throws Exception{ sshInfo = info; jsch =
+new JSch(); jsch.addIdentity( sshInfo.getKey() ); session = jsch.getSession(
+sshInfo.getUser(), sshInfo.getHost(), sshInfo.getPort() ); UserInfo ui = new
+SshUserInfo( sshInfo.getPassPhrase() ); session.setUserInfo( ui );
+session.connect(); } public long shell( String cmd, String outputFileName )
+throws Exception{ long start = System.currentTimeMillis(); ChannelShell
+channelShell = (ChannelShell)session.openChannel( &ldquo;shell&rdquo; ); PipedInputStream
+pipeIn = new PipedInputStream(); PipedOutputStream pipeOut = new
+PipedOutputStream( pipeIn ); FileOutputStream fileOut = new FileOutputStream(
+outputFileName ); channelShell.setInputStream( pipeIn );
+channelShell.setOutputStream( fileOut ); channelShell.connect( timeout );
+pipeOut.write( cmd.getBytes() ); Thread.sleep( interval ); pipeOut.close();
+pipeIn.close(); fileOut.close(); channelShell.disconnect(); return
+System.currentTimeMillis() - start; } public int exec( String cmd ) throws
+Exception{ ChannelExec channelExec = (ChannelExec)session.openChannel( &ldquo;exec&rdquo;
+); channelExec.setCommand( cmd ); channelExec.setInputStream( null );
+channelExec.setErrStream( System.err ); InputStream in =
+channelExec.getInputStream(); channelExec.connect(); int res = -1;
+StringBuffer buf = new StringBuffer( 1024 ); byte[] tmp = new byte[ 1024 ];
+while ( true ) { while ( in.available() &gt; 0 ) { int i = in.read( tmp, 0, 1024
+); if ( i &lt; 0 ) break; buf.append( new String( tmp, 0, i ) ); } if (
+channelExec.isClosed() ) { res = channelExec.getExitStatus();
+System.out.println( format( &ldquo;Exit-status: %d&rdquo;, res ) ); break; } Wand.waitA(
+100 ); } System.out.println( buf.toString() ); channelExec.disconnect();
+return res; } public static SshExecuter newInstance() throws Exception{ String
+host = &ldquo;localhost&rdquo;; Integer port = 22; String user = &ldquo;hadoop&rdquo;; String key =
+&ldquo;./id_dsa&rdquo;; String passPhrase = &ldquo;&rdquo;; SshInfo i = new SshInfo( host, port, user,
+key, passPhrase ); return new SshExecuter( i ); } public Session getSession(){
+return session; } public void close() throws IOException{
+getSession().disconnect(); } } class SshInfo{ String host = null; Integer port
+= 22; String user = null; String key = null; String passPhrase = null; public
+SshInfo( String host, Integer port, String user, String key, String passPhrase
+){ super(); this.host = host; this.port = port; this.user = user; this.key =
+key; this.passPhrase = passPhrase; } public String getHost(){ return host; }
+public Integer getPort(){ return port; } public String getUser(){ return user;
+} public String getKey(){ return key; } public String getPassPhrase(){ return
+passPhrase; } } class SshUserInfo implements UserInfo{ private String
+passphrase = null; public SshUserInfo( String passphrase ){ super();
+this.passphrase = passphrase; } public String getPassphrase(){ return
+passphrase; } public String getPassword(){ return null; } public boolean
+promptPassphrase( String pass ){ return true; } public boolean promptPassword(
+String pass ){ return true; } public boolean promptYesNo( String arg0 ){
+return true; } public void showMessage( String m ){ System.out.println( m ); }
+}</p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

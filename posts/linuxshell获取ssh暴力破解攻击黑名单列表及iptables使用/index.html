@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>Linuxshell获取SSH暴力破解攻击黑名单列表及iptables使用 | 开发者问答集锦</title>
+    <meta property="og:title" content="Linuxshell获取SSH暴力破解攻击黑名单列表及iptables使用 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="Linuxshell获取SSH暴力破解攻击黑名单列表及iptables使用">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/linuxshell%E8%8E%B7%E5%8F%96ssh%E6%9A%B4%E5%8A%9B%E7%A0%B4%E8%A7%A3%E6%94%BB%E5%87%BB%E9%BB%91%E5%90%8D%E5%8D%95%E5%88%97%E8%A1%A8%E5%8F%8Aiptables%E4%BD%BF%E7%94%A8/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">Linuxshell获取SSH暴力破解攻击黑名单列表及iptables使用</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>SSH是Secure
+shell的简称，是一种可以用来加密连接的服务器的标准协议，使用SSH远程管理服务器，可以有效的防止信息泄露，目前几乎所有的UNIX服务器都会支持该协议。</p>
+
+<p>虽然SSH属于加密连接，但是如果攻击者使用暴力破解的方式破解远程密码，服务器中的数据依然有被盗取的危险，特别是在使用弱密码的情况下更是如此。暴力破解是攻击者使用密码字典中的密码逐一枚举，分别尝试每个密码是否可以登录服务器，如果字典中的密码足够多，并且不限制时间，理论上一定是可以破解成功的。</p>
+
+<p>作为管理员，我们需要识别这些攻击并能够拦截。Centos系统中有一个独立的登录日志文件/var/log/sercure，该文件中记录了系统的登录日志。</p>
+
+<p><strong>使用SSH远程登录服务器密码</strong></p>
+
+<p>如果使用SSH远程登录服务器密码，日志文件中会包含如下的记录信息,。</p>
+
+<blockquote>
+<p>Failed password for minger from 192.168.43.229 port 1234 ssh2</p>
+</blockquote>
+
+<p>远程连接使用的账户名称的minger，但是连接时密码错误。</p>
+
+<p><strong>使用SSH远程登录服务器时账户名错误</strong></p>
+
+<p>如果使用SSH远程登录服务器时账户错误，日志文件就会包含如下记录信息。</p>
+
+<blockquote>
+<p>Invalid usre test from 192.168.43.229 port 1234</p>
+</blockquote>
+
+<p>远程连接时使用的是无效的账户名称test，一台IP为 192.168.43.229 的主机使用1234端口连接本机的SSH（22）端口</p>
+
+<p><strong>SSH远程登录服务器成功</strong></p>
+
+<p>如果使用SSH远程登录服务器时成功，日志文件就会包含如下的记录信息。</p>
+
+<blockquote>
+<p>Accepted password for minger from 192.168.43.229 port 2082 ssh2</p>
+</blockquote>
+
+<p>有一台192.168.43.229的主机使用2082端口连接本机的SSH端口，登录账户名称minger，密码校验成功。</p>
+
+<p><strong>编写脚本过滤异常登录信息</strong></p>
+
+<p>了解了这些日志内容后，就可以编写脚本过滤异常登录的信息，并提取远程IP地址，然后将提取的IP地址写入黑名单，禁止该IP地址再次攻击服务器。编写脚本时我们可以创建3个函数，分别判断最近1分钟、5分钟、15分钟的日志内容，查看是否能异常记录，如果相同的异常记录超过3
+次，则提取产生该异常的IP地址并将其写入黑名单，最终可以根据黑名单文件编写防火墙策略，禁止该IP的再次攻击。像银行的密码系统一样，如果我们输入错误密码大于N次之后，当天账户会被锁定，但是第二天又可以继续测试密码。针对远程登录也是同样的道理，针对失败次数大于等于3次的IP地址，我们可以只需要禁用该IP特定的时间，比如20分钟，这样我们就需要再编写一个函数，用来清理黑名单中的时间大于20分钟的地址。</p>
+
+<pre><code>#!/bin/bash
+#功能描述(Description):分析系统登陆日志,过滤异常IP地址,并通过防火墙禁用该IP.
+
+#强制退出时关闭所有后台进程.
+trap 'kill $one_pid; kill $five_pid; kill $fifteen_pid; exit' EXIT INT
+
+#日志文件路径.
+LOGFILE=/var/log/secure
+BLOCKFILE=/tmp/blockip.txt
+
+one_minute(){
+    while :
+    do
+        #获取计算机当前时间,以及1分钟前的时间,时间格式:
+        #%b(月份简写,Jan)  %e(日期,1) %T(时间 18:00:00)
+        #LANG=C的作用是否防止输出中文.
+        #使用local定义局部变量的好处是多个函数使用相同的变量名也不会冲突.
+        local curtime_month=$(LANG=C date  +&quot;%b&quot;)
+        local curtime_day=$(LANG=C date  +&quot;%e&quot;)
+        local curtime_time=$(LANG=C date  +&quot;%T&quot;)
+        local one_minus_ago=$(LANG=C date -d &quot;1 minutes ago&quot; +&quot;%T&quot;)
+        #将当前时间转换为距离1970-01-01 00:00:00的秒数,方便后期计算.
+        local curtime_seconds=$(LANG=C date +&quot;%s&quot;)
+        #分析1分钟内所有的日志,如果密码失败则过滤倒数第4列的IP地址.
+        #通过管道对过滤的IP进行计数统计,提取密码失败次数大于等于3次的IP地址.
+        #awk调用外部Shell的变量时,双引号在外面表示字符串(&quot;''&quot;),单引号在外边表示数字('&quot;&quot;').
+        pass_fail_ip=$(awk '
+                       $1==&quot;'$curtime_month'&quot; &amp;&amp;   \
+                       $2=='&quot;$curtime_day&quot;'   &amp;&amp;   \
+                       $3&gt;=&quot;'$one_minus_ago'&quot; &amp;&amp;   \
+                       $3&lt;=&quot;'$curtime_time'&quot;       \
+                       { if($6==&quot;Failed&quot; &amp;&amp; $9!=&quot;invalid&quot;) {print $(NF-3)}}' $LOGFILE | \
+                       awk '{IP[$1]++} END{ for(i in IP){ if(IP[i]&gt;=3) {print i} } }')
+        #将密码失败次数大于3次的IP写入黑名单文件,
+        #每次写入前都需要判断黑名单中是否已经存在该IP.
+        #写入黑名单时附加时间标记,实现仅将IP放入黑名单特定的时间,
+        #如:密码失败3次后,禁止该IP在20分钟内再次访问服务器.
+        for i in $pass_fail_ip
+        do
+           if ! grep -q &quot;$i&quot; $BLOCKFILE ;then
+               echo &quot;$curtime_seconds $i&quot; &gt;&gt; $BLOCKFILE
+           fi
+        done
+        #提取无效账户登陆服务器3次的IP地址,并将其加入黑名单.
+        user_invalid_ip=$(awk '
+                       $1==&quot;'$curtime_month'&quot; &amp;&amp;   \
+                       $2=='&quot;$curtime_day&quot;'   &amp;&amp;   \
+                       $3&gt;=&quot;'$one_minus_ago'&quot; &amp;&amp;   \
+                       $3&lt;=&quot;'$curtime_time'&quot;       \
+                       { if($6==&quot;Invalid&quot;) {print $(NF-2)}}' $LOGFILE | \
+                       awk '{IP[$1]++} END{ for(i in IP){ if(IP[i]&gt;=3) {print i} } }')
+        for j in $user_invalid_ip
+        do
+           if ! grep -q &quot;$j&quot; $BLOCKFILE ;then
+               echo &quot;$curtime_seconds $j&quot; &gt;&gt; $BLOCKFILE
+           fi
+        done
+        sleep 60
+    done
+}
+
+five_minutes(){
+    while :
+    do
+        #获取计算机当前时间,以及5分钟前的时间,时间格式:
+        #%b(月份简写,Jan)  %e(日期,1) %T(时间 18:00:00)
+        #使用local定义局部变量的好处是多个函数使用相同的变量名也不会冲突.
+        local curtime_month=$(LANG=C date  +&quot;%b&quot;)
+        local curtime_day=$(LANG=C date  +&quot;%e&quot;)
+        local curtime_time=$(LANG=C date  +&quot;%T&quot;)
+        local one_minus_ago=$(LANG=C date -d &quot;5 minutes ago&quot; +&quot;%T&quot;)
+        #将当前时间转换为距离1970-01-01 00:00:00的秒数,方便后期计算.
+        local curtime_seconds=$(LANG=C date +&quot;%s&quot;)
+        #分析5分钟内所有的日志,提取3次密码错误的IP地址并加入黑名单.
+        pass_fail_ip=$(awk '
+                       $1==&quot;'$curtime_month'&quot; &amp;&amp;   \
+                       $2=='&quot;$curtime_day&quot;'   &amp;&amp;   \
+                       $3&gt;=&quot;'$one_minus_ago'&quot; &amp;&amp;   \
+                       $3&lt;=&quot;'$curtime_time'&quot;       \
+                       { if($6==&quot;Failed&quot; &amp;&amp; $9!=&quot;invalid&quot;) {print $(NF-3)}}' $LOGFILE | \
+                       awk '{IP[$1]++} END{ for(i in IP){ if(IP[i]&gt;=3) {print i} } }')
+        for i in $pass_fail_ip
+        do
+           if ! grep -q &quot;$i&quot; $BLOCKFILE ;then
+               echo &quot;$curtime_seconds $i&quot; &gt;&gt; $BLOCKFILE
+           fi
+        done
+        #提取错误用户名登陆服务器3次的IP地址,并将其加入黑名单.
+        user_invalid_ip=$(awk '
+                       $1==&quot;'$curtime_month'&quot; &amp;&amp;   \
+                       $2=='&quot;$curtime_day&quot;'   &amp;&amp;   \
+                       $3&gt;=&quot;'$one_minus_ago'&quot; &amp;&amp;   \
+                       $3&lt;=&quot;'$curtime_time'&quot;       \
+                       { if($6==&quot;Invalid&quot;) {print $(NF-2)}}' $LOGFILE | \
+                       awk '{IP[$1]++} END{ for(i in IP){ if(IP[i]&gt;=3) {print i} } }')
+        for j in $user_invalid_ip
+        do
+           if ! grep -q &quot;$j&quot; $BLOCKFILE ;then
+               echo &quot;$curtime_seconds $j&quot; &gt;&gt; $BLOCKFILE
+           fi
+        done
+        sleep 300
+    done
+}
+
+fifteen_minutes(){
+    while :
+    do
+        #获取计算机当前时间,以及15分钟前的时间,时间格式:
+        #%b(月份简写,Jan)  %e(日期,1) %T(时间 18:00:00)
+        #使用local定义局部变量的好处是多个函数使用相同的变量名也不会冲突.
+        local curtime_month=$(LANG=C date  +&quot;%b&quot;)
+        local curtime_day=$(LANG=C date  +&quot;%e&quot;)
+        local curtime_time=$(LANG=C date  +&quot;%T&quot;)
+        local one_minus_ago=$(LANG=C date -d &quot;15 minutes ago&quot; +&quot;%T&quot;)
+        #将当前时间转换为距离1970-01-01 00:00:00的秒数,方便后期计算.
+        local curtime_seconds=$(LANG=C date +&quot;%s&quot;)
+        #分析15分钟内所有的日志,提取3次密码错误的IP地址并加入黑名单.
+        pass_fail_ip=$(awk '
+                       $1==&quot;'$curtime_month'&quot; &amp;&amp;   \
+                       $2=='&quot;$curtime_day&quot;'   &amp;&amp;   \
+                       $3&gt;=&quot;'$one_minus_ago'&quot; &amp;&amp;   \
+                       $3&lt;=&quot;'$curtime_time'&quot;       \
+                       { if($6==&quot;Failed&quot; &amp;&amp; $9!=&quot;invalid&quot;) {print $(NF-3)}}' $LOGFILE | \
+                       awk '{IP[$1]++} END{ for(i in IP){ if(IP[i]&gt;=3) {print i} } }')
+        for i in $pass_fail_ip
+        do
+           if ! grep -q &quot;$i&quot; $BLOCKFILE ;then
+               echo &quot;$curtime_seconds $i&quot; &gt;&gt; $BLOCKFILE
+           fi
+        done
+        #提取错误用户名登陆服务器3次的IP地址,并将其加入黑名单.
+        user_invalid_ip=$(awk '
+                       $1==&quot;'$curtime_month'&quot; &amp;&amp;   \
+                       $2=='&quot;$curtime_day&quot;'   &amp;&amp;   \
+                       $3&gt;=&quot;'$one_minus_ago'&quot; &amp;&amp;   \
+                       $3&lt;=&quot;'$curtime_time'&quot;       \
+                       { if($6==&quot;Invalid&quot;) {print $(NF-2)}}' $LOGFILE | \
+                       awk '{IP[$1]++} END{ for(i in IP){ if(IP[i]&gt;=3) {print i} } }')
+        for j in $user_invalid_ip
+        do
+           if ! grep -q &quot;$j&quot; $BLOCKFILE ;then
+               echo &quot;$curtime_seconds $j&quot; &gt;&gt; $BLOCKFILE
+           fi
+        done
+        sleep 1200
+    done
+}
+
+#每隔20分钟检查一次黑名单,清理大于20分钟的黑名单IP.
+clear_blockip(){
+    while :
+    do
+        sleep 1200
+        #将当前时间转换为距离1970-01-01 00:00:00的秒数,方便后期计算.
+        local curtime_seconds=$(LANG=C date +&quot;%s&quot;)
+        #awk调用外部shell变量的另一种方式是使用-v选项.
+        #当前时间减去黑名单中的时间标记,大于等于1200秒(20分钟)则将其从黑名单中删除.
+        tmp=$(awk -v now=$curtime_seconds '(now-$1)&gt;=1200 {print $2}' $BLOCKFILE)
+        for i in $tmp
+        do
+            sed -i &quot;/$i/d&quot; $BLOCKFILE
+        done
+    done
+}
+
+&gt; $BLOCKFILE
+one_minute  &amp;
+one_pid=&quot;$!&quot;
+five_minutes &amp;
+five_pid=&quot;$!&quot;
+fifteen_minutes &amp;
+fifteen_pid=&quot;$!&quot;
+clear_blockip 
+</code></pre>
+
+<p>该脚本最终仅生成黑名单文件，如果需要拒绝黑名单ip地址的访问，还可以编写脚本读取黑名单名单文件并结合iptable防火墙规则，即可实现拒绝特定的IP访问本机。</p>
+
+<p><strong>iptables防火墙配置详解</strong></p>
+
+<p>Linux具有许多内置的能力，使开发人员可以根据自己的需要定制其工具、行为和外观,而无需昂贵的第三方工具。</p>
+
+<p>如果Linux系统连接到因特网或LAN、服务器或连接LAN和因特网的代理服务器,所要用到的一种内置能力就是针对网络上Linux系统的防火墙配置。可以在netfiter/iptablesP信息包过滤系统的帮助下运用这种能力。对于Linux系统管理员、网络管理员以及家庭用户，他们想要根据自己特定的需求来配置防火墙、在防火墙解决方案上节省费用和对IP信息包过滤具有完全控制权来说,
+netilter/iptables系统十分理想。</p>
+
+<p>netfilter/iptables（简称为iptables）组成Linux平台下的包过滤防火墙，与大多数的Linux软件一样，这个包过滤防火墙是免费的，它可以代替昂贵的商业防火墙解决方案，完成封包过滤、封包重定向和网络地址转换（NAT）等功能。</p>
+
+<p>如果您的发行版本没有安装iptables ，可以使用命令进行安装：</p>
+
+<pre><code>yum install iptables
+</code></pre>
+
+<p><em>语法</em></p>
+
+<pre><code>iptables(选项)(参数)
+</code></pre>
+
+<p><em>常用选项：</em></p>
+
+<pre><code>-t&lt;表&gt;：指定要操纵的表；
+-A：向规则链中添加条目；
+-D：从规则链中删除条目；
+-i：向规则链中插入条目；
+-R：替换规则链中的条目；
+-L：显示规则链中已有的条目；
+-F：清楚规则链中已有的条目；
+-Z：清空规则链中的数据包计算器和字节计数器；
+-N：创建新的用户自定义规则链；
+-P：定义规则链中的默认目标；
+-h：显示帮助信息；
+-p：指定要匹配的数据包协议类型；
+-s：指定要匹配的数据包源ip地址；
+-j&lt;目标&gt;：指定要跳转的目标；
+-i&lt;网络接口&gt;：指定数据包进入本机的网络接口；
+-o&lt;网络接口&gt;：指定数据包要离开本机所使用的网络接口。
+</code></pre>
+
+<p><strong>iptables常用命令</strong></p>
+
+<p><strong>开放指定的端口</strong></p>
+
+<p>允许本地回环接口(即运行本机访问本机)：</p>
+
+<pre><code>#INPUT——进来的数据包应用此规则链中的策略
+iptables -A INPUT -s 127.0.0.1 -d 127.0.0.1 -j ACCEPT       
+</code></pre>
+
+<p>允许已建立的或相关连的通行：</p>
+
+<pre><code>#ACCEPT 允许数据包通过
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+</code></pre>
+
+<p>允许所有本机向外的访问：</p>
+
+<pre><code>#OUTPUT——外出的数据包应用此规则链中的策略
+iptables -A OUTPUT -j ACCEPT 
+</code></pre>
+
+<p>允许访问22端口：</p>
+
+<pre><code>iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+</code></pre>
+
+<p>允许访问80端口</p>
+
+<pre><code>iptables -A INPUT -p tcp --dport 80 -j ACCEPT 
+</code></pre>
+
+<p>允许ftp服务的21端口：</p>
+
+<pre><code>iptables -A INPUT -p tcp --dport 21 -j ACCEPT
+</code></pre>
+
+<p>允许FTP服务的20端口：</p>
+
+<pre><code>iptables -A INPUT -p tcp --dport 20 -j ACCEPT
+</code></pre>
+
+<p>禁止其他未允许的规则访问：</p>
+
+<pre><code>iptables -A INPUT -j reject 
+</code></pre>
+
+<p>禁止其他未允许的规则访问：</p>
+
+<pre><code>iptables -A FORWARD -j REJECT     
+</code></pre>
+
+<p>拒绝访问防火墙的新数据包，但允许响应连接或与已有连接相关的数据包：</p>
+
+<pre><code>iptables -A INPUT -p tcp -m state --state NEW -j DROP
+iptables -A INPUT -p tcp -m state --state ESTABLISHED,RELATED -j ACCEPT
+</code></pre>
+
+<p>“ESTABLISHED”表示已经响应请求或者已经建立连接的数据包，“RELATED”表示与已建立的连接有相关性的，比如FTP数据连接等。</p>
+
+<p><strong>屏蔽IP</strong></p>
+
+<p>拒绝进入防火墙的所有ICMP协议数据包：</p>
+
+<pre><code>iptables -I INPUT -p icmp -j REJECT
+</code></pre>
+
+<p>允许防火墙转发除ICMP协议以外的所有数据包：</p>
+
+<pre><code>iptables -A FORWARD -p ! icmp -j ACCEPT
+</code></pre>
+
+<p>注意：使用“！”可以将条件取反。</p>
+
+<p>屏蔽单个IP的命令：</p>
+
+<pre><code>#DROP 直接丢弃数据包，不给任何回应信息
+iptables -I INPUT -s 192.45.6.7 -j DROP  
+</code></pre>
+
+<p>封整个段即从192.0.0.1到192.255.255.254的命令：</p>
+
+<pre><code>iptables -I INPUT -s 192.0.0.0/8 -j DROP
+</code></pre>
+
+<p>封IP段即从192.45.0.1到192.168.255.254的命令：</p>
+
+<pre><code>iptables -I INPUT -s 192.168.0.0/16 -j DROP
+</code></pre>
+
+<p>封IP段即从192.168.6.1到192.168.6.254的命令是：</p>
+
+<pre><code>iptables -I INPUT -s 192.168.6.0/24 -j DROP
+</code></pre>
+
+<p>禁止其他主机ping防火墙主机，但是允许从防火墙上ping其他主机：</p>
+
+<pre><code>iptables -I INPUT -p icmp --icmp-type Echo-Request -j DROP
+iptables -I INPUT -p icmp --icmp-type Echo-Reply -j ACCEPT
+iptables -I INPUT -p icmp --icmp-type destination-Unreachable -j ACCEPT
+</code></pre>
+
+<p><strong>查看已添加的iptables规则</strong></p>
+
+<p>iptables -L -n -v<br />
+<a href="https://img.it610.com/image/info8/c893aec2d3a24b6197ec7b5e8fdafaf9.jpg"><img src="https://img.it610.com/image/info8/c893aec2d3a24b6197ec7b5e8fdafaf9.jpg" alt="Linux shell
+获取SSH暴力破解攻击黑名单列表及iptables使用_第1张图片" /></a></p>
+
+<p><strong>常用的 Linux iptables 规则</strong></p>
+
+<p>删除所有现有规则：</p>
+
+<pre><code>iptables -F
+</code></pre>
+
+<p>防止 DoS 攻击：</p>
+
+<pre><code>iptables -A INPUT -p tcp --dport 80 -m limit --limit 25/minute --limit-burst 100 -j ACCEPT
+</code></pre>
+
+<p>阻止某个特定的 IP 地址：</p>
+
+<pre><code>BLOCK_THIS_IP=&quot;x.x.x.x&quot;
+iptables -A INPUT -s &quot;$BLOCK_THIS_IP&quot; -j DROP
+</code></pre>
+
+<p>仅允许来自某个特定网络的 MySQL 的链接：</p>
+
+<pre><code>iptables -A INPUT -i eth0 -p tcp -s 192.168.200.0/24 --dport 3306 -m state --state NEW,ESTABLISHED -j ACCEPT
+</code></pre>
+
+<p>允许全部进来的SSH：</p>
+
+<pre><code>iptables -A INPUT -i eth0 -p tcp --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o eth0 -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+</code></pre>
+
+<p>只允许某个特定网络进来的 SSH：</p>
+
+<pre><code>iptables -A INPUT -i eth0 -p tcp -s 192.168.3.0/24 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -o eth0 -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+</code></pre>
+
+<p>允许出去的SSH：</p>
+
+<pre><code>iptables -A OUTPUT -o eth0 -p tcp --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A INPUT -i eth0 -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+</code></pre>
+
+<p>允许外出的SSH，但仅访问某个特定的网络：</p>
+
+<pre><code>iptables -A OUTPUT -o eth0 -p tcp -d 192.168.101.0/24 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A INPUT -i eth0 -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+</code></pre>
+
+<p>多端口（允许进来的 SSH、HTTP 和 HTTPS）：</p>
+
+<pre><code>iptables -A INPUT -i eth0 -p tcp -m multiport --dports 22,80,443 -m state --state NEW,ESTABLISHED -j ACCEPT
+
+iptables -A OUTPUT -o eth0 -p tcp -m multiport --sports 22,80,443 -m state --state ESTABLISHED -j ACCEPT
+</code></pre>
+
+<p><strong>总结</strong></p>
+
+<p>对于连接到网络上的Linux系统来说，防火墙是必不可少的防御机制，它只允许合法的网络流量进出系统，而禁止其它任何网络流量。为了确定网络流量是否合法，防火墙依靠它所包含的由网络或系统管理员预定义的一组规则。</p>
+
+<p>出于各种因素和原因，需要根据特定需求来配置防火墙。或许,最重要的原因是安全性。</p>
+
+<p>参考：<a href="http://netfilter.org/">http://netfilter.org/</a> iptables官方网站<br />
+<a href="http://www.linux.gov.cn/netweb/iptables.htm">http://www.linux.gov.cn/netweb/iptables.htm</a> iptables配置手册</p>
+
+<p><a href="https://img.it610.com/image/info8/5fcf34dc56f14d95a97da4a9ca60a91f.jpg"><img src="https://img.it610.com/image/info8/5fcf34dc56f14d95a97da4a9ca60a91f.jpg" alt="Linux shell
+获取SSH暴力破解攻击黑名单列表及iptables使用_第2张图片" /></a><br />
+欢迎关注微信公众号【 <strong>程序猿编码</strong> 】，添加本人微信号( <strong>17865354792</strong> )，回复： <strong>领取学习资料</strong> 。或者回复：
+<strong>进入技术交流群</strong> 。网盘资料有如下：</p>
+
+<p><a href="https://img.it610.com/image/info8/abef384385314dac932455a1684884a7.jpg"><img src="https://img.it610.com/image/info8/abef384385314dac932455a1684884a7.jpg" alt="Linux shell
+获取SSH暴力破解攻击黑名单列表及iptables使用_第3张图片" /></a></p>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

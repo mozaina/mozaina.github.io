@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+    <title>用shell脚本配合awk文本处理工具进行文件处理 | 开发者问答集锦</title>
+    <meta property="og:title" content="用shell脚本配合awk文本处理工具进行文件处理 - 开发者问答集锦">
+    <meta property="og:type" content="article">
+        
+    <meta property="article:published_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+        
+    <meta property="article:modified_time" content='2020-09-02T00:00:00&#43;08:00'>
+        
+    <meta name="Keywords" content="">
+    <meta name="description" content="用shell脚本配合awk文本处理工具进行文件处理">
+        
+    <meta name="author" content="">
+    <meta property="og:url" content="https://zaina.newban.cn/posts/%E7%94%A8shell%E8%84%9A%E6%9C%AC%E9%85%8D%E5%90%88awk%E6%96%87%E6%9C%AC%E5%A4%84%E7%90%86%E5%B7%A5%E5%85%B7%E8%BF%9B%E8%A1%8C%E6%96%87%E4%BB%B6%E5%A4%84%E7%90%86/">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+
+    <link rel="stylesheet" href='/css/normalize.css'>
+    <link rel="stylesheet" href='/css/style.css'>
+    <script type="text/javascript" src="//cdn.bootcdn.net/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    
+    
+    
+    
+    
+    
+</head>
+
+
+<body>
+    <header id="header" class="clearfix">
+    <div class="container">
+        <div class="col-group">
+            <div class="site-name ">
+                
+                    <a id="logo" href="https://zaina.newban.cn">
+                        开发者问答集锦
+                    </a>
+                
+                
+            </div>
+            <div>
+                <nav id="nav-menu" class="clearfix">
+                    <a class="" href="https://zaina.newban.cn">首页</a>
+                    
+                </nav>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <div id="body">
+        <div class="container">
+            <div class="col-group">
+
+                <div class="col-8" id="main">
+                    
+<div class="res-cons">
+    
+    <article class="post">
+        <header>
+            <h1 class="post-title">用shell脚本配合awk文本处理工具进行文件处理</h1>
+        </header>
+        <date class="post-meta meta-date">
+            2020年9月2日
+        </date>
+        
+        
+        <div class="post-meta">
+            <span id="busuanzi_container_page_pv">|<span id="busuanzi_value_page_pv"></span><span>
+                    阅读</span></span>
+        </div>
+        
+        
+        <div class="post-content">
+            <p>由于项目是运行在linux环境下。需要统计文件中的记录金额总和等功能，于是提供了shell脚本处理文件的工具类</p>
+
+<pre><code>package com.lancy.common.util;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+public class ShellUtil {
+    private static Logger   logger  = LogManager.getLogger(ShellUtil.class);
+
+    /**
+     * 获取文件内某一列的总数,并且是以tab为分隔符
+     * 
+     * @param file
+     *            文件路径
+     * @param colNum
+     *            列号 由1开始
+     * @return 总和
+     */
+    public static double sumColumn(String file, int colNum) {
+        String cmds = &quot;awk -F '\t' '{a=a+$&quot; + colNum + &quot;}END{printf(\&quot;%.3f\\n\&quot;, a)}' &quot; + file;
+        String result = execWithChannel(cmds);
+        return result == null || &quot;&quot;.equals(result) ? 0 : Double.parseDouble(result);
+    }
+
+    /**
+     * 获取文件总行数 效率相对与直接调用java方法慢，不建议使用
+     * 
+     * @param file
+     *            文件路径
+     * @return 总行数
+     */
+    @Deprecated
+    public static int countLines(String file) {
+        String cmd = &quot;awk 'END{print NR}' &quot; + file;
+        String result = execWithChannel(cmd);
+        return result == null || &quot;&quot;.equals(result) ? 0 : Integer.parseInt(result);
+    }
+
+    /**
+     * 执行MongoDB数据导入脚本
+     * 
+     * @param filePath
+     *            文件路径
+     * @return
+     */
+    public static String execMongoImportScript(String filePath, String collection, String field) {
+        String cmds = &quot;source /etc/profile &amp;&amp; sh ${PROG_ROOT}/shell/script/mongo_data_import.sh &quot; + filePath + &quot; &quot;
+                + collection + &quot; &quot; + field;
+        return execWithChannel(cmds);
+    }
+
+    /**
+     * 执行MongoDB数据导入脚本
+     * 
+     * @param filePath
+     *            文件路径
+     * @return
+     */
+    public static String execMongoImportScript(String filePath, String collection, String field, String cardType) {
+        if (cardType == null || cardType.length() &lt;= 0) {
+            return execMongoImportScript(filePath, collection, field);
+        }
+        String cmds = &quot;source /etc/profile &amp;&amp; sh ${PROG_ROOT}/shell/script/mongo_data_import.sh &quot; + filePath + &quot; &quot;
+                + collection + &quot; &quot; + field + &quot; &quot; + cardType;
+        return execWithChannel(cmds);
+    }
+
+    /**
+     * 执行MongoDB票卡导出-去重-导入脚本
+     * 
+     * @param fileDir
+     *            票卡数据输出临时目录
+     * @return
+     */
+    public static String execMongoCardScript(String fileDir, String host, String db) {
+        String cmds = &quot;sh /home/lnt/shell/script/mongo_card_import.sh &quot; + fileDir + &quot; &quot; + host + &quot; &quot; + db;
+        return execWithChannel(cmds);
+    }
+
+    /**
+     * 执行shell命令
+     * 
+     * @param cmds
+     *            shell命令
+     * @return
+     */
+    public static String execute(String cmds) {
+        return execWithChannel(cmds);
+    }
+
+    /**
+     * 文件数据重复性检查
+     * 
+     * @param filePath
+     *            原始文件路径，字符串形式
+     * @param fields
+     *            查重字段，参数样式： new String[]{&quot;1&quot;,&quot;2&quot;}
+     * @return 结果文件，在原始文件每行记录前面添加一个标识，0表示未重复，1表示重复，原始记录与标识以&amp;分隔
+     */
+    public static File repetitionCheck(String filePath, String[] fields) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i &lt; fields.length; i++) {
+            sb.append(&quot;$&quot;).append(fields[i]);
+        }
+        File srcFile = new File(filePath);
+        File tmpFile = new File(filePath + &quot;.TMP&quot;);
+        StringBuilder cmds = new StringBuilder();
+        cmds.append(&quot;awk '{if(record[&quot;).append(sb.toString()).append(&quot;]==0){record[&quot;).append(sb.toString())
+                .append(&quot;]++;flag=0;}else{flag=1;}print flag\&quot;&amp;\&quot;$0}' &quot;).append(srcFile).append(&quot; &gt; &quot;).append(tmpFile);
+
+        String result = execWithChannel(cmds.toString());
+        System.out.println(result);
+        return tmpFile;
+    }
+
+    /**
+     * 文件内排序
+     * 
+     * @param file
+     *            文件路径
+     * @param dist
+     *            保存到的文件路径，可为源文件
+     * @param column
+     *            排序的列
+     */
+    public static void sort(String file, String dist, int column) {
+        sort(file, dist, new int[] { column }, false);
+    }
+
+    /**
+     * 文件内排序
+     * 
+     * @param file
+     *            文件路径
+     * @param dist
+     *            保存到的文件路径，可为源文件
+     * @param column
+     *            排序的列
+     * @param desc
+     *            是否倒序
+     */
+    public static void sort(String file, String dist, int column, boolean desc) {
+        sort(file, dist, new int[] { column }, desc);
+    }
+
+    /**
+     * 文件内排序
+     * 
+     * @param file
+     *            文件路径
+     * @param dist
+     *            保存到的文件路径，可为源文件
+     * @param columns
+     *            排序的多列
+     * @param desc
+     *            是否倒序
+     */
+    public static void sort(String file, String dist, int[] columns, boolean desc) {
+        StringBuilder cmds = new StringBuilder(&quot;sort&quot;);
+        for (int column : columns) {
+            cmds.append(&quot; -k&quot;).append(column);
+            if (desc) {
+                cmds.append(&quot;r&quot;);
+            }
+            cmds.append(&quot;,&quot;).append(column);
+        }
+        cmds.append(&quot; &quot;).append(file);
+        if (dist != null &amp;&amp; dist.length() &gt; 0) {
+            if (dist.equals(file)) {
+                cmds.append(&quot; -o &quot;);
+            } else {
+                cmds.append(&quot; &gt; &quot;);
+            }
+            cmds.append(dist);
+        }
+        System.out.println(cmds.toString());
+        String result = execWithChannel(cmds.toString());
+        System.out.println(result);
+    }
+
+    /**
+     * 文件内排序，支持不同列可具有不同的排序方式（正序或倒序）
+     * 
+     * @param file
+     *            文件路径
+     * @param dist
+     *            保存到的文件路径，可为源文件
+     * @param columns
+     *            排序的多列
+     */
+    public static void sort(String file, String dist, Map columns) {
+        StringBuilder cmds = new StringBuilder(&quot;sort&quot;);
+        for (Map.Entry entry : columns.entrySet()) {
+            cmds.append(&quot; -k&quot;).append(entry.getKey());
+            if (entry.getValue()) {
+                cmds.append(&quot;r&quot;);
+            }
+            cmds.append(&quot;,&quot;).append(entry.getKey());
+        }
+        cmds.append(&quot; &quot;).append(file);
+        if (dist != null &amp;&amp; dist.length() &gt; 0) {
+            if (dist.equals(file)) {
+                cmds.append(&quot; -o &quot;);
+            } else {
+                cmds.append(&quot; &gt; &quot;);
+            }
+            cmds.append(dist);
+        }
+        System.out.println(cmds.toString());
+        String result = execWithChannel(cmds.toString());
+        System.out.println(result);
+    }
+
+    /**
+     * 带管道符命令执行方法
+     * 
+     * @param cmds
+     * @return
+     */
+    private static String execWithChannel(String cmds) {
+        Process process = null;
+        BufferedInputStream in = null;
+        BufferedReader reader = null;
+        StringBuilder result = new StringBuilder();
+        try {
+            process = Runtime.getRuntime().exec(new String[] { &quot;/bin/sh&quot;, &quot;-c&quot;, cmds });
+            in = new BufferedInputStream(process.getInputStream());
+            reader = new BufferedReader(new InputStreamReader(in));
+            String lineStr = null;
+            while ((lineStr = reader.readLine()) != null) {
+                result.append(lineStr.trim()).append(&quot;\n&quot;);
+            }
+            int exitValue = process.waitFor();
+            logger.info(&quot;&gt;&gt;&gt;shell执行命令返回结果:exitValue = &quot; + exitValue);
+        } catch (IOException | InterruptedException e) {
+            logger.error(&quot;&gt;&gt;&gt;shell执行命令异常&gt;&gt;&gt;&quot; + e.getMessage());
+            result.append(&quot;999999999999&quot;);
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    logger.error(&quot;&gt;&gt;&gt;shell执行命令异常&gt;&gt;&gt;&quot; + e.getMessage());
+                }
+            }
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        logger.info(&quot;&gt;&gt;&gt;shell执行命令返回结果&gt;&gt;&gt;&quot; + result.toString());
+        return result.toString();
+    }
+
+    /**
+     * 执行命令
+     * 
+     * @param cmds
+     * @return
+     */
+    private static String exec(String[] cmds) {
+        Process process = null;
+        BufferedInputStream in = null;
+        BufferedReader reader = null;
+        StringBuilder result = new StringBuilder();
+        try {
+            process = Runtime.getRuntime().exec(cmds);
+            in = new BufferedInputStream(process.getInputStream());
+            reader = new BufferedReader(new InputStreamReader(in));
+            String lineStr = null;
+            while ((lineStr = reader.readLine()) != null) {
+                result.append(lineStr.trim()).append(&quot;\n&quot;);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return result.toString();
+    }
+
+}
+</code></pre>
+
+        </div>
+
+        
+
+
+        
+
+<div class="post-archive">
+    <h2>See Also</h2>
+    <ul class="listing">
+        
+        <li><a href="/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a></li>
+        
+        <li><a href="/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/">009Shell脚本下条件测试eqne</a></li>
+        
+        <li><a href="/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/">00Pythonmanagepyshell和Python的分析</a></li>
+        
+        <li><a href="/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a></li>
+        
+        <li><a href="/posts/018dockerfileshell/">018DockerfileSHELL</a></li>
+        
+    </ul>
+</div>
+
+
+        <div class="post-meta meta-tags">
+            
+            <ul class="clearfix">
+                
+                <li><a href='https://zaina.newban.cn/tags/shell'>shell</a></li>
+                
+            </ul>
+            
+        </div>
+    </article>
+    
+    
+
+    
+    
+</div>
+
+                    <footer id="footer">
+    <div>
+        &copy; 2020 <a href="https://zaina.newban.cn">开发者问答集锦 By </a>
+        
+    </div>
+    <br />
+    <div>
+        <div class="github-badge">
+            <a href="https://gohugo.io/" target="_black" rel="nofollow"><span class="badge-subject">Powered by</span><span class="badge-value bg-blue">Hugo</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://www.flysnow.org/" target="_black"><span class="badge-subject">Design by</span><span class="badge-value bg-brightgreen">飞雪无情</span></a>
+        </div>
+        <div class="github-badge">
+            <a href="https://github.com/flysnow-org/maupassant-hugo" target="_black"><span class="badge-subject">Theme</span><span class="badge-value bg-yellowgreen">Maupassant</span></a>
+        </div>
+    </div>
+</footer>
+
+
+    
+    <script type="text/javascript">
+        window.MathJax = {
+            tex2jax: {
+                inlineMath: [['$', '$']],
+                processEscapes: true
+                }
+            };
+    </script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+
+<a id="rocket" href="#top"></a>
+<script type="text/javascript" src='/js/totop.js?v=0.0.0' async=""></script>
+
+
+
+    <script type="text/javascript" src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+
+
+
+
+                </div>
+
+                <div id="secondary">
+    <section class="widget">
+        <form id="search" action='https://zaina.newban.cn/search/' method="get" accept-charset="utf-8" target="_blank" _lpchecked="1">
+      
+      <input type="text" name="q" maxlength="20" placeholder="Search">
+      <input type="hidden" name="sitesearch" value="https://zaina.newban.cn">
+      <button type="submit" class="submit icon-search"></button>
+</form>
+    </section>
+    
+    <section class="widget">
+        <h3 class="widget-title">最近文章</h3>
+<ul class="widget-list">
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/001rubyruby%E4%B8%AD%E5%85%A8%E5%B1%80%E5%8F%98%E9%87%8F%E5%AE%9E%E4%BE%8B%E5%8F%98%E9%87%8F%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E7%B1%BB%E5%8F%98%E9%87%8Fsymbol%E5%AF%B9%E6%AF%94/" title="001rubyRuby中全局变量实例变量局部变量类变量Symbol对比">001rubyRuby中全局变量实例变量局部变量类变量Symbol对比</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/007hadoop%E9%9B%86%E7%BE%A4%E9%85%8D%E7%BD%AEhadoop%E9%9B%86%E7%BE%A4%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%B5%8B%E8%AF%95ssh%E5%85%8D%E7%99%BB%E9%99%86%E9%85%8D%E7%BD%AEstartallshhdfs%E5%B8%B8%E7%94%A8%E7%9A%84shell/" title="007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell">007Hadoop集群配置Hadoop集群的启动和测试SSH免登陆配置startallshhdfs常用的shell</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/009shell%E8%84%9A%E6%9C%AC%E4%B8%8B%E6%9D%A1%E4%BB%B6%E6%B5%8B%E8%AF%95eqne/" title="009Shell脚本下条件测试eqne">009Shell脚本下条件测试eqne</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/00pythonmanagepyshell%E5%92%8Cpython%E7%9A%84%E5%88%86%E6%9E%90/" title="00Pythonmanagepyshell和Python的分析">00Pythonmanagepyshell和Python的分析</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/010zookeeper%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5zookeeper%E7%9A%84%E9%9B%86%E7%BE%A4%E6%90%AD%E5%BB%BAzookeeper%E7%9A%84shell%E5%91%BD%E4%BB%A4/" title="010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令">010Zookeeper的基本概念Zookeeper的集群搭建Zookeeper的shell命令</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/018dockerfileshell/" title="018DockerfileSHELL">018DockerfileSHELL</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%85%A5%E9%97%A801bashshell%E7%89%B9%E6%80%A7/" title="01Shell入门01bashShell特性">01Shell入门01bashShell特性</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%8F%98%E9%87%8F/" title="01Shell变量">01Shell变量</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E5%9F%BA%E7%A1%80%E6%A6%82%E8%BF%B0%E8%84%9A%E6%9C%AC%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8Fbash%E5%9F%BA%E6%9C%AC%E5%8A%9F%E8%83%BD/" title="01Shell基础概述脚本执行方式Bash基本功能">01Shell基础概述脚本执行方式Bash基本功能</a>
+    </li>
+    
+    <li>
+        <a href="https://zaina.newban.cn/posts/01shell%E7%BC%96%E7%A8%8Bhelloworld/" title="01shell编程helloworld">01shell编程helloworld</a>
+    </li>
+    
+</ul>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/categories">分类</a></h3>
+<ul class="widget-list">
+    
+</ul>
+    </section>
+
+    <section class="widget">
+        <h3 class="widget-title"><a href="/tags">标签</a></h3>
+<div class="tagcloud">
+    
+    <a href="https://zaina.newban.cn/tags/ruby/">ruby</a>
+    
+    <a href="https://zaina.newban.cn/tags/shell/">shell</a>
+    
+</div>
+    </section>
+
+    
+
+    <section class="widget">
+        <h3 class="widget-title">其它</h3>
+        <ul class="widget-list">
+            <li><a href="https://zaina.newban.cn/index.xml">文章 RSS</a></li>
+        </ul>
+    </section>
+</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
